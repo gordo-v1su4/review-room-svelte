@@ -12,6 +12,10 @@ Read in order:
 2. [`init-docs/01-PRD.md`](init-docs/01-PRD.md) — product scope, data model, build order
 3. [`init-docs/02-Design-Spec.md`](init-docs/02-Design-Spec.md) — screens, components, visual system
 
+## For agents
+
+See [`AGENTS.md`](AGENTS.md) for reading order, working assumptions, and placeholders for future build conventions.
+
 ## Status
 
 Pre-build — documentation handoff only. Application code has not started yet.
