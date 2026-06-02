@@ -37,7 +37,7 @@ type UserRole = "admin" | "client";
 
 ## 3. Stack
 
-Next.js (App Router) · React · TypeScript · Tailwind · shadcn/ui · TanStack Query if needed for client orchestration · **Convex** for all metadata/state/reactivity · S3-compatible storage (local **RustFS** now, abstracted for later swap). TanStack Table only inside the deferred List view, never as the primary UI. Deploy: Vercel + prod Convex (`*.convex.cloud`); any background image/ffmpeg work runs as a separate always-on worker, not on Vercel.
+Next.js (App Router) · React · TypeScript · Tailwind · shadcn/ui · TanStack Query if needed for client orchestration · **Convex** for all metadata/state/reactivity · S3-compatible storage (**RustFS** on homelab, abstracted for later swap). TanStack Table only inside the deferred List view, never as the primary UI. **Default infra:** self-hosted Convex + homelab RustFS (see [docs/adr/001-infrastructure.md](../docs/adr/001-infrastructure.md); [pindeck](https://github.com/gordo-v1su4/pindeck) is the reference wiring). Deploy: Vercel frontend pointing at homelab backends; any background image/ffmpeg work runs as a separate always-on worker, not on Vercel. Do not use `*.convex.cloud` or throwaway S3 buckets unless explicitly opted in.
 
 ## 4. Organizing model — metadata-driven, drag optional
 

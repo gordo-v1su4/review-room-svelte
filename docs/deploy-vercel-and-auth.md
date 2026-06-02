@@ -1,0 +1,130 @@
+# Deploy — Vercel + homelab Convex + RustFS
+
+Review Room uses **Next.js** (not Vite). Pindeck uses Vite; the env names differ but the URLs are the same.
+
+## VITE_* vs NEXT_PUBLIC_*
+
+| Pindeck (Vite) | Review Room (Next.js) | Used by |
+|----------------|----------------------|---------|
+| `VITE_CONVEX_URL` | `NEXT_PUBLIC_CONVEX_URL` | Browser Convex client |
+| `VITE_CONVEX_SITE_URL` | `NEXT_PUBLIC_CONVEX_SITE_URL` | Docs / optional client |
+| — | (server only) | Next API routes |
+
+**You only need one pair.** If your `.env.local` has `VITE_*` from pindeck, `next.config.ts` mirrors them to `NEXT_PUBLIC_*` at build time. Keeping both with the same values is fine.
+
+**Do not** expect `VITE_*` alone to work in the browser on Next without that mirror — Next does not expose `VITE_` prefixes unless configured.
+
+### Homelab vs local Convex
+
+For **self-hosted production** (pindeck pattern, Review Room deployment):
+
+- Set `NEXT_PUBLIC_CONVEX_URL=https://unfold.serving.cloud` (or `VITE_CONVEX_URL`)
+- Set `NEXT_PUBLIC_CONVEX_SITE_URL=https://unfold-site.serving.cloud` (or `VITE_CONVEX_SITE_URL`)
+- Set `CONVEX_SELF_HOSTED_URL` + `CONVEX_SELF_HOSTED_ADMIN_KEY` for `bun run deploy:convex`
+- **Remove** `CONVEX_DEPLOYMENT` if it points at anonymous local `127.0.0.1:3210` — that overrides homelab deploy
+
+---
+
+## Vercel environment variables
+
+In the Vercel project → Settings → Environment Variables, set:
+
+### Browser (Production + Preview)
+
+| Variable | Example |
+|----------|---------|
+| `NEXT_PUBLIC_CONVEX_URL` | `https://unfold.serving.cloud` |
+| `NEXT_PUBLIC_CONVEX_SITE_URL` | `https://unfold-site.serving.cloud` |
+| `SITE_URL` | `https://your-app.vercel.app` (your Vercel URL after first deploy) |
+
+You can use `VITE_*` instead if you mirror in `next.config.ts` (already done) — Vercel still needs at least one pair present at build time.
+
+### Server-only (never `NEXT_PUBLIC_`)
+
+| Variable | Purpose |
+|----------|---------|
+| `S3_ENDPOINT` | RustFS S3 API |
+| `S3_PUBLIC_BASE_URL` | Public object base |
+| `S3_BUCKET` | e.g. `unfold-review-room` (your bucket) |
+| `S3_ACCESS_KEY_ID` | RustFS key |
+| `S3_SECRET_ACCESS_KEY` | RustFS secret |
+| `S3_FORCE_PATH_STYLE` | `true` |
+| `MEDIA_WORKER_SECRET` | Shared secret for worker + `/api/media/enqueue` |
+| `MEDIA_WORKER_URL` | Homelab worker URL if not localhost |
+
+Or, if using the media gateway instead of direct S3 presign: `MEDIA_GATEWAY_*` and `USE_MEDIA_GATEWAY=1`.
+
+**RustFS / S3 vars are not in Convex** — they stay on Vercel (Next presign routes) or your worker host.
+
+---
+
+## JWT_PRIVATE_KEY (Convex Auth)
+
+Password sign-in is handled by **Convex Auth on the Convex backend**, not Next.js.
+
+`JWT_PRIVATE_KEY` in your local `.env.local` is **not** read by Convex functions. It must live on the **Convex deployment** (homelab dashboard or CLI).
+
+### Generate keys (once per deployment)
+
+From the project root:
+
+```bash
+bunx @convex-dev/auth
+```
+
+Follow prompts, or generate manually per [Convex Auth manual setup](https://labs.convex.dev/auth/setup/manual):
+
+```bash
+bunx jose-cli  # or use the generateKeys.mjs script from the docs
+```
+
+You need **two** variables on the Convex deployment:
+
+| Convex env var | Description |
+|----------------|-------------|
+| `JWT_PRIVATE_KEY` | PKCS#8 private key (`-----BEGIN PRIVATE KEY-----`) |
+| `JWKS` | JSON Web Key Set (matching public key) |
+
+### Set on self-hosted Convex
+
+With homelab admin key (same as pindeck deploy):
+
+```bash
+# CONVEX_SELF_HOSTED_URL and CONVEX_SELF_HOSTED_ADMIN_KEY in .env.local
+bunx convex env set JWT_PRIVATE_KEY -- "<paste PKCS8 key>"
+bunx convex env set JWKS '<paste jwks json>'
+bunx convex env set SITE_URL "https://your-app.vercel.app"
+```
+
+Also ensure `CONVEX_SITE_URL` on the backend matches your HTTP actions host (`https://unfold-site.serving.cloud`).
+
+### Google / GitHub (same as pindeck)
+
+On the **Convex deployment** env (not Vercel):
+
+| Variable | Purpose |
+|----------|---------|
+| `AUTH_GOOGLE_ID` | Google OAuth client ID |
+| `AUTH_GOOGLE_SECRET` | Google OAuth secret |
+| `AUTH_GITHUB_ID` | GitHub OAuth app ID |
+| `AUTH_GITHUB_SECRET` | GitHub OAuth secret |
+
+Review Room uses a separate homelab Convex deployment from pindeck. Reuse the same provider setup pattern, but set these on the Review Room deployment.
+
+OAuth redirect URIs in Google/GitHub consoles must include Convex Auth callback URLs on your **Convex site** host (see [Convex Auth docs](https://labs.convex.dev/auth)). `SITE_URL` should be your Review Room origin (`http://localhost:3000` locally, Vercel URL in prod).
+
+### After Vercel deploy
+
+1. Deploy to Vercel → note the production URL.
+2. Set `SITE_URL` on **Convex** to that URL (auth redirects).
+3. Set `SITE_URL` on **Vercel** to the same value (optional, for any server-side links).
+
+---
+
+## Quick checklist
+
+1. `.env.local`: homelab Convex URLs + RustFS `S3_*` or `MEDIA_GATEWAY_*`
+2. `bun run deploy:convex` → functions on homelab
+3. Convex deployment env: `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`
+4. Vercel env: `NEXT_PUBLIC_CONVEX_URL`, `S3_*`, `SITE_URL`
+5. `bun run worker:media` on homelab (or set `MEDIA_WORKER_URL` on Vercel)

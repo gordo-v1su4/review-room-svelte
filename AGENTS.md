@@ -27,22 +27,33 @@ Do not duplicate facts across docs; update the doc that owns the topic.
 - **Roles** — admin/creator vs client/reviewer (see PRD §1).
 - **MVP focus** — upload, review playback, ratings, shortlist, comments, smart views, share links.
 
-## When code lands
-
-Fill in these sections as the stack and layout are chosen:
-
-```markdown
 ## Commands
-<!-- e.g. bun dev, bun test -->
 
-## Architecture
-<!-- app layout, key folders -->
-
-## Conventions
-<!-- naming, state, API patterns -->
+```bash
+bun install
+bun dev                    # Next.js (port 3000)
+bunx convex dev            # local Convex OR homelab via .env.local
+bun run deploy:convex      # self-hosted: CONVEX_SELF_HOSTED_* set
+bun run worker:media       # ffmpeg thumbnail/sprite worker
 ```
 
-Until then, do not invent stack choices beyond what the PRD implies.
+Homelab env: copy from pindeck with `scripts/use-homelab-env.ps1`, then add `S3_*` from `.env.example`.
+
+## Architecture
+
+- `src/app/` — Next.js App Router (`/dashboard`, `/review/[token]`, storage API routes)
+- `convex/` — schema, auth, CRUD, public review mutations, HTTP worker callback
+- `src/components/` — UI by domain (`video/`, `project/`, `comments/`, `upload/`)
+- `src/lib/storage/` — S3 presign (RustFS path-style)
+- `services/media-worker/` — homelab ffmpeg jobs
+- `docs/adr/` — infrastructure decisions
+
+## Conventions
+
+- Metadata in Convex only; blobs in RustFS (keys on `videos`)
+- Smart views = queries over `status` + facets (see PRD §4–5)
+- Brand color on banner/CTA only; status pills use semantic tokens
+- Self-hosted Convex/RustFS per `docs/adr/001-infrastructure.md` (pindeck reference)
 
 ## Git
 

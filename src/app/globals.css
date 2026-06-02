@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-danger: var(--danger);
+  --color-selected: var(--selected);
+  --color-approved: var(--approved);
+  --font-sans: var(--font-geist-sans);
+}
+
+:root {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --surface: #18181b;
+  --surface-elevated: #27272a;
+  --border: #27272a;
+  --border-subtle: rgb(39 39 42 / 0.6);
+  --muted: #a1a1aa;
+  --muted-foreground: #a1a1aa;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --info: #38bdf8;
+  --danger: #ef4444;
+  --selected: #38bdf8;
+  --approved: #22c55e;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  min-height: 100dvh;
+}
+
+* {
+  border-color: var(--border);
+}
+
+@media (max-width: 1024px) {
+  .review-panel-drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .review-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
