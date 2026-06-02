@@ -1,32 +1,41 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { toast } from "sonner";
+import {
+  Clock,
+  Link2,
+  Upload,
+  User,
+} from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { AdminGate } from "@/components/auth/AdminGate";
-import { UploadDropzone } from "@/components/upload/UploadDropzone";
 import { VideoGrid } from "@/components/video/VideoGrid";
+import { VideoListView } from "@/components/video/VideoListView";
+import { VideoReviewMode } from "@/components/video/VideoReviewMode";
 import { VideoDetailsPanel } from "@/components/video/VideoDetailsPanel";
 import { ProjectViewSwitcher } from "./ProjectViewSwitcher";
 import { ProjectFilters } from "./ProjectFilters";
 import { VideoGroupedView } from "./VideoGroupedView";
 import { matchesSmartView } from "@/lib/smartViews";
 import { applyFilters, sortVideos, type FilterState } from "@/lib/filters";
-import type { GridSize, SmartViewId, SortKey } from "@/lib/types";
+import type { GridSize, SmartViewId, SortKey, WorkspaceLayout } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
-  const project = useQuery(api.projects.getById, { projectId });
-  const queriedVideos = useQuery(api.videos.listByProject, { projectId });
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const projectQueryArgs = isAuthenticated ? { projectId } : "skip";
+  const project = useQuery(api.projects.getById, projectQueryArgs);
+  const queriedVideos = useQuery(api.videos.listByProject, projectQueryArgs);
   const videos = useMemo(() => queriedVideos ?? [], [queriedVideos]);
   const createLink = useMutation(api.reviewLinks.create);
 
   const [view, setView] = useState<SmartViewId>("all");
-  const [layout, setLayout] = useState<"grid" | "grouped">("grid");
+  const [layout, setLayout] = useState<WorkspaceLayout>("grid");
   const [gridSize, setGridSize] = useState<GridSize>("md");
   const [selectedId, setSelectedId] = useState<Id<"videos"> | null>(null);
   const [panelExpanded, setPanelExpanded] = useState(false);
@@ -47,107 +56,78 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   }, [videos, view, filters, sort]);
 
   const selected = videos.find((v) => v._id === selectedId) ?? null;
+  const counts = {
+    awaiting: videos.filter((v) => v.status === "awaiting_review" && !v.viewed).length,
+    feedback: videos.filter((v) => v.commentCount > 0).length,
+    selected: videos.filter((v) => v.isSelect).length,
+    approved: videos.filter((v) => v.status === "approved").length,
+  };
+
+  if (isLoading || !isAuthenticated) {
+    return (
+      <AdminGate>
+        <div className="text-zinc-500">Loading project...</div>
+      </AdminGate>
+    );
+  }
 
   if (!project) {
-    return <div className="text-zinc-500">Loading project…</div>;
+    return (
+      <AdminGate>
+        <div className="text-zinc-500">Loading project...</div>
+      </AdminGate>
+    );
   }
 
   return (
     <AdminGate>
-      <div className="space-y-6">
-        <div
-          className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900"
-          style={
-            project.brandColor
-              ? { borderColor: `${project.brandColor}33` }
-              : undefined
+      <div className="min-h-dvh bg-zinc-950">
+        <ProjectHero
+          title={project.title}
+          clientName={project.clientName}
+          description={project.description}
+          counts={counts}
+          onShare={() =>
+            void createLink({
+              projectId,
+              canDownload: project.downloadEnabledByDefault,
+            }).then((res) => {
+              const url =
+                typeof window !== "undefined"
+                  ? `${window.location.origin}${res.url}`
+                  : res.url;
+              void navigator.clipboard?.writeText(url);
+              toast.success("Review link copied to clipboard");
+            })
           }
-        >
-          <div className="h-32 bg-gradient-to-br from-zinc-800 to-zinc-950" />
-          <div className="flex flex-wrap items-end justify-between gap-4 p-6">
-            <div>
-              <h1 className="text-2xl font-semibold">{project.title}</h1>
-              {project.clientName && (
-                <p className="text-sm text-zinc-400">{project.clientName}</p>
-              )}
-              {project.description && (
-                <p className="mt-2 max-w-2xl text-sm text-zinc-500">
-                  {project.description}
-                </p>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  void createLink({
-                    projectId,
-                    canDownload: project.downloadEnabledByDefault,
-                  }).then((res) => {
-                    const url =
-                      typeof window !== "undefined"
-                        ? `${window.location.origin}${res.url}`
-                        : res.url;
-                    void navigator.clipboard?.writeText(url);
-                    toast.success("Review link copied to clipboard");
-                  })
-                }
-              >
-                Share review link
-              </Button>
-              <Link href={`/dashboard/projects/${projectId}/upload`}>
-                <Button>Upload</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
+          uploadHref={`/dashboard/projects/${projectId}/upload`}
+        />
 
         <ProjectViewSwitcher videos={videos} active={view} onChange={setView} />
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <ProjectFilters
-            filters={filters}
-            sort={sort}
-            onFilters={setFilters}
-            onSort={setSort}
-            onClear={() =>
-              setFilters({
-                statuses: [],
-                tags: [],
-                minRating: 0,
-                selectedOnly: false,
-                hasComments: false,
-                search: "",
-              })
-            }
-          />
-          <div className="flex gap-2">
-            {(["sm", "md", "lg"] as GridSize[]).map((s) => (
-              <Button
-                key={s}
-                size="sm"
-                variant={gridSize === s ? "default" : "ghost"}
-                onClick={() => setGridSize(s)}
-              >
-                {s}
-              </Button>
-            ))}
-            <Button
-              size="sm"
-              variant={layout === "grouped" ? "default" : "ghost"}
-              onClick={() => setLayout(layout === "grid" ? "grouped" : "grid")}
-            >
-              {layout === "grid" ? "Grouped" : "Grid"}
-            </Button>
-          </div>
-        </div>
+        <ProjectFilters
+          layout={layout}
+          gridSize={gridSize}
+          resultCount={filtered.length}
+          filters={filters}
+          sort={sort}
+          onLayout={setLayout}
+          onGridSize={setGridSize}
+          onFilters={setFilters}
+          onSort={setSort}
+          onClear={() =>
+            setFilters({
+              statuses: [],
+              tags: [],
+              minRating: 0,
+              selectedOnly: false,
+              hasComments: false,
+              search: "",
+            })
+          }
+        />
 
-        <div
-          className={cn(
-            "flex gap-0",
-            selected && !panelExpanded && "lg:flex-row",
-          )}
-        >
+        <div className={cn("flex gap-0", selected && !panelExpanded && "lg:flex-row")}>
           <div className={cn("min-w-0 flex-1", selected && "lg:pr-0")}>
             {layout === "grid" ? (
               <VideoGrid
@@ -167,16 +147,34 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                   </div>
                 }
               />
-            ) : (
+            ) : layout === "grouped" ? (
               <VideoGroupedView
                 videos={filtered}
                 size={gridSize}
                 selectedId={selectedId ?? undefined}
                 onSelect={setSelectedId}
               />
+            ) : layout === "list" ? (
+              <VideoListView
+                videos={filtered}
+                selectedId={selectedId ?? undefined}
+                onSelect={(id) => {
+                  setSelectedId(id);
+                  setPanelExpanded(false);
+                }}
+              />
+            ) : (
+              <VideoReviewMode
+                videos={filtered}
+                activeId={selectedId ?? undefined}
+                onSelect={(id) => {
+                  setSelectedId(id);
+                  setPanelExpanded(false);
+                }}
+              />
             )}
           </div>
-          {selected && (
+          {selected && layout !== "review" && (
             <VideoDetailsPanel
               video={selected}
               mode="admin"
@@ -190,4 +188,118 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
       </div>
     </AdminGate>
   );
+}
+
+function ProjectHero({
+  title,
+  clientName,
+  description,
+  counts,
+  onShare,
+  uploadHref,
+}: {
+  title: string;
+  clientName?: string;
+  description?: string;
+  counts: {
+    awaiting: number;
+    feedback: number;
+    selected: number;
+    approved: number;
+  };
+  onShare: () => void;
+  uploadHref: string;
+}) {
+  return (
+    <div className="relative border-b border-zinc-800/60">
+      <div className="h-40 bg-[radial-gradient(circle_at_20%_0%,rgba(124,58,237,0.22),transparent_32%),linear-gradient(135deg,#18181b,#09090b_70%)]" />
+      <div className="relative -mt-16 px-6 pb-5 sm:px-8">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
+          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-violet-600 text-lg font-semibold text-white ring-4 ring-zinc-950 sm:h-20 sm:w-20">
+            {initials(title)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex items-center gap-2 text-[11px] text-zinc-500">
+              <span>Projects</span>
+              <span className="text-zinc-700">/</span>
+              <span className="truncate text-zinc-400">{clientName ?? "Client"}</span>
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">
+              {title}
+            </h1>
+            {description && (
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-zinc-500">
+                {description}
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-zinc-600">
+              <span className="inline-flex items-center gap-1.5">
+                <User className="h-3 w-3" />
+                {clientName ?? "No client"}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="h-3 w-3" />
+                Live workspace
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-emerald-400/80">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Review link ready
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" className="gap-2" onClick={onShare}>
+              <Link2 className="h-4 w-4" />
+              Share review link
+            </Button>
+            <Link href={uploadHref}>
+              <Button className="gap-2">
+                <Upload className="h-4 w-4" />
+                Upload
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <Stat label="Awaiting" value={counts.awaiting} accent="bg-zinc-400" />
+          <Stat label="Feedback" value={counts.feedback} accent="bg-sky-400" />
+          <Stat label="Selected" value={counts.selected} accent="bg-sky-400" />
+          <Stat label="Approved" value={counts.approved} accent="bg-emerald-400" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent: string;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border border-zinc-800/50 bg-zinc-900/30 px-3.5 py-2.5">
+      <span className={cn("h-6 w-0.5 rounded-full", accent)} />
+      <div>
+        <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+          {label}
+        </p>
+        <p className="text-lg font-semibold leading-tight tabular-nums text-zinc-200">
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function initials(value: string) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }

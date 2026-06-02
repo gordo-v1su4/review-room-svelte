@@ -114,7 +114,7 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
         <ul className="space-y-1 text-xs text-zinc-500">
           {files.map((f) => (
             <li key={f.file.name + f.file.size}>
-              {f.file.name} — {f.status} {f.progress > 0 && `${f.progress}%`}
+              {f.file.name} - {f.status} {f.progress > 0 && `${f.progress}%`}
             </li>
           ))}
         </ul>

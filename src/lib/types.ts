@@ -27,3 +27,5 @@ export type SortKey =
   | "most_comments";
 
 export type GridSize = "sm" | "md" | "lg";
+
+export type WorkspaceLayout = "grid" | "grouped" | "list" | "review";

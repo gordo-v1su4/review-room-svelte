@@ -8,12 +8,13 @@ export async function POST(request: Request) {
       storageKey: string;
     };
     const workerUrl = process.env.MEDIA_WORKER_URL ?? "http://127.0.0.1:8787";
+    const workerSecret = process.env.MEDIA_WORKER_SECRET || "dev";
     const sourceUrl = await createPresignedDownloadUrl(body.storageKey);
     const res = await fetch(`${workerUrl}/process`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.MEDIA_WORKER_SECRET ?? "dev"}`,
+        Authorization: `Bearer ${workerSecret}`,
       },
       body: JSON.stringify({
         videoId: body.videoId,

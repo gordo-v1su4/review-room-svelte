@@ -20,7 +20,7 @@ export function VideoGrid({
 }) {
   if (!videos.length) {
     return (
-      <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-zinc-800 text-sm text-zinc-500">
+      <div className="mx-6 flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-zinc-800 text-sm text-zinc-500 sm:mx-8">
         {empty ?? "No videos"}
       </div>
     );
@@ -34,7 +34,7 @@ export function VideoGrid({
         : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
 
   return (
-    <div className={cn("grid gap-4", gridClass)}>
+    <div className={cn("grid gap-3 p-6 sm:p-8", gridClass)}>
       {videos.map((video) => (
         <VideoCard
           key={video._id}

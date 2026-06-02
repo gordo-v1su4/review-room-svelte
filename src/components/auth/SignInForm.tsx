@@ -10,6 +10,19 @@ import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+function authErrorMessage(err: unknown, flow: "signIn" | "signUp") {
+  const message = err instanceof Error ? err.message : "";
+  if (
+    message.includes("InvalidAccountId") ||
+    message.includes("Invalid credentials")
+  ) {
+    return flow === "signIn"
+      ? "No account found for that email yet. Create an account first."
+      : "Could not create that account. Try a different email or password.";
+  }
+  return message || (flow === "signIn" ? "Sign in failed" : "Create account failed");
+}
+
 export function SignInForm() {
   const { signIn } = useAuthActions();
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -17,15 +30,16 @@ export function SignInForm() {
   const router = useRouter();
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [loading, setLoading] = useState(false);
+  const [pendingName, setPendingName] = useState<string | undefined>();
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
-    void ensureAdmin({})
+    void ensureAdmin({ name: pendingName })
       .then(() => router.replace("/dashboard"))
       .catch((err) => {
         toast.error(err instanceof Error ? err.message : "Could not finish sign-in");
       });
-  }, [isAuthenticated, isLoading, ensureAdmin, router]);
+  }, [isAuthenticated, isLoading, ensureAdmin, pendingName, router]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -34,13 +48,12 @@ export function SignInForm() {
     formData.set("flow", flow);
     setLoading(true);
     try {
-      await signIn("password", formData);
       const name = (formData.get("name") as string) || undefined;
-      await ensureAdmin({ name });
-      router.replace("/dashboard");
+      setPendingName(name);
+      await signIn("password", formData);
+      setLoading(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Sign in failed");
-    } finally {
+      toast.error(authErrorMessage(err, flow));
       setLoading(false);
     }
   }

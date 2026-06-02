@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "deploy:convex": "convex deploy",
-    "worker:media": "bun run services/media-worker/index.ts"
+    "worker:media": "bun --env-file=.env.local run services/media-worker/index.ts"
   },
   "dependencies": {
     "@auth/core": "^0.37.4",

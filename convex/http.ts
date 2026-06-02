@@ -1,16 +1,20 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { auth } from "./auth";
 
 const http = httpRouter();
+
+auth.addHttpRoutes(http);
 
 http.route({
   path: "/media/process-complete",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const secret = process.env.MEDIA_WORKER_SECRET;
+    const secret = process.env.MEDIA_WORKER_SECRET?.trim();
     const auth = request.headers.get("authorization");
-    if (!secret || auth !== `Bearer ${secret}`) {
+    const token = auth?.replace(/^Bearer\s+/i, "").trim();
+    if (!secret || token !== secret) {
       return new Response("Unauthorized", { status: 401 });
     }
     const body = (await request.json()) as {
