@@ -16,6 +16,7 @@ $map = @{
 $lines = Get-Content $pindeck
 $out = @(
   "# Generated from pindeck homelab — $(Get-Date -Format o)",
+  "# Pindeck VITE_* variables are converted to Review Room NEXT_PUBLIC_* names.",
   ""
 )
 
@@ -24,7 +25,6 @@ foreach ($line in $lines) {
   foreach ($key in $map.Keys) {
     if ($line -match "^${key}=(.+)$") {
       $out += "$($map[$key])=$($matches[1])"
-      $out += "$key=$($matches[1])"
     }
   }
   if ($line -match '^CONVEX_SELF_HOSTED_URL=(.+)$') { $out += $line }

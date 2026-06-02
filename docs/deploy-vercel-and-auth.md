@@ -1,8 +1,8 @@
 # Deploy — Vercel + homelab Convex + RustFS
 
-Review Room uses **Next.js** (not Vite). Pindeck uses Vite; the env names differ but the URLs are the same.
+Review Room uses **Next.js** (not Vite). Pindeck uses Vite; the URLs are the same, but the browser env names are different.
 
-## VITE_* vs NEXT_PUBLIC_*
+## NEXT_PUBLIC_* for Review Room
 
 | Pindeck (Vite) | Review Room (Next.js) | Used by |
 |----------------|----------------------|---------|
@@ -10,16 +10,14 @@ Review Room uses **Next.js** (not Vite). Pindeck uses Vite; the env names differ
 | `VITE_CONVEX_SITE_URL` | `NEXT_PUBLIC_CONVEX_SITE_URL` | Docs / optional client |
 | — | (server only) | Next API routes |
 
-**You only need one pair.** If your `.env.local` has `VITE_*` from pindeck, `next.config.ts` mirrors them to `NEXT_PUBLIC_*` at build time. Keeping both with the same values is fine.
-
-**Do not** expect `VITE_*` alone to work in the browser on Next without that mirror — Next does not expose `VITE_` prefixes unless configured.
+Use `NEXT_PUBLIC_*` in Review Room. If copying Pindeck env locally, run `scripts/use-homelab-env.ps1`; it reads Pindeck `VITE_*` values and writes Review Room `NEXT_PUBLIC_*` values. Do not keep duplicate `VITE_*` aliases in this repo.
 
 ### Homelab vs local Convex
 
 For **self-hosted production** (pindeck pattern, Review Room deployment):
 
-- Set `NEXT_PUBLIC_CONVEX_URL=https://unfold.serving.cloud` (or `VITE_CONVEX_URL`)
-- Set `NEXT_PUBLIC_CONVEX_SITE_URL=https://unfold-site.serving.cloud` (or `VITE_CONVEX_SITE_URL`)
+- Set `NEXT_PUBLIC_CONVEX_URL=https://unfold.serving.cloud`
+- Set `NEXT_PUBLIC_CONVEX_SITE_URL=https://unfold-site.serving.cloud`
 - Set `CONVEX_SELF_HOSTED_URL` + `CONVEX_SELF_HOSTED_ADMIN_KEY` for `bun run deploy:convex`
 - **Remove** `CONVEX_DEPLOYMENT` if it points at anonymous local `127.0.0.1:3210` — that overrides homelab deploy
 
@@ -37,7 +35,7 @@ In the Vercel project → Settings → Environment Variables, set:
 | `NEXT_PUBLIC_CONVEX_SITE_URL` | `https://unfold-site.serving.cloud` |
 | `SITE_URL` | `https://your-app.vercel.app` (your Vercel URL after first deploy) |
 
-You can use `VITE_*` instead if you mirror in `next.config.ts` (already done) — Vercel still needs at least one pair present at build time.
+Vercel must use `NEXT_PUBLIC_*` for browser-exposed Convex URLs.
 
 ### Server-only (never `NEXT_PUBLIC_`)
 
