@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type CSSProperties, useMemo, useRef, useState } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,7 +8,9 @@ import { toast } from "sonner";
 import {
   Archive,
   Clock,
+  ImagePlus,
   Link2,
+  Palette,
   RefreshCw,
   Trash2,
   Upload,
@@ -28,7 +30,15 @@ import { matchesSmartView } from "@/lib/smartViews";
 import { applyFilters, sortVideos, type FilterState } from "@/lib/filters";
 import type { GridSize, SmartViewId, SortKey, WorkspaceLayout } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useStorageUrl } from "@/hooks/useStorageUrl";
+
+type ProjectIdentityPatch = {
+  title?: string;
+  brandColor?: string;
+  bannerKey?: string;
+};
 
 export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const router = useRouter();
@@ -40,6 +50,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const createLink = useMutation(api.reviewLinks.create);
   const archiveVideos = useMutation(api.videos.archiveByProject);
   const archiveProject = useMutation(api.projects.archive);
+  const updateProject = useMutation(api.projects.update);
 
   const [view, setView] = useState<SmartViewId>("all");
   const [layout, setLayout] = useState<WorkspaceLayout>("grid");
@@ -135,7 +146,12 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           title={project.title}
           clientName={project.clientName}
           description={project.description}
+          brandColor={project.brandColor}
+          bannerKey={project.bannerKey}
+          updatedAt={project.updatedAt}
+          projectId={projectId}
           counts={counts}
+          onUpdate={(patch) => updateProject({ projectId, ...patch })}
           onShare={() =>
             void createLink({
               projectId,
@@ -248,7 +264,12 @@ function ProjectHero({
   title,
   clientName,
   description,
+  brandColor,
+  bannerKey,
+  updatedAt,
+  projectId,
   counts,
+  onUpdate,
   onShare,
   onReprocess,
   reprocessing,
@@ -260,12 +281,17 @@ function ProjectHero({
   title: string;
   clientName?: string;
   description?: string;
+  brandColor?: string;
+  bannerKey?: string;
+  updatedAt: number;
+  projectId: Id<"projects">;
   counts: {
     awaiting: number;
     feedback: number;
     selected: number;
     approved: number;
   };
+  onUpdate: (patch: ProjectIdentityPatch) => Promise<unknown>;
   onShare: () => void;
   onReprocess: () => void;
   reprocessing: boolean;
@@ -274,13 +300,153 @@ function ProjectHero({
   onArchiveProject: () => void;
   uploadHref: string;
 }) {
+  const bannerUrl = useStorageUrl(bannerKey, updatedAt);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  const [identityOpen, setIdentityOpen] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(title);
+  const [draftColor, setDraftColor] = useState(brandColor ?? "#14b8a6");
+  const [savingIdentity, setSavingIdentity] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+
+  const accent = brandColor ?? "#14b8a6";
+  const heroStyle = {
+    "--project-accent": accent,
+    backgroundImage: bannerUrl
+      ? `linear-gradient(90deg, rgba(9,9,11,0.68), rgba(9,9,11,0.22)), url("${bannerUrl}")`
+      : `radial-gradient(circle at 20% 0%, ${hexToRgba(accent, 0.2)}, transparent 32%), linear-gradient(135deg, #18181b, #09090b 70%)`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+  } as CSSProperties;
+
+  function openIdentityEditor() {
+    setDraftTitle(title);
+    setDraftColor(brandColor ?? "#14b8a6");
+    setIdentityOpen((open) => !open);
+  }
+
+  async function saveIdentity() {
+    const nextTitle = draftTitle.trim();
+    if (!nextTitle) return;
+    setSavingIdentity(true);
+    try {
+      await onUpdate({ title: nextTitle, brandColor: draftColor });
+      toast.success("Project identity updated");
+      setIdentityOpen(false);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not update project",
+      );
+    } finally {
+      setSavingIdentity(false);
+    }
+  }
+
+  async function uploadBanner(file?: File) {
+    if (!file) return;
+    setUploadingBanner(true);
+    try {
+      const formData = new FormData();
+      formData.append("projectId", projectId);
+      formData.append("file", file);
+      const response = await fetch("/api/storage/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = (await response.json()) as {
+        storageKey?: string;
+        error?: string;
+      };
+      if (!response.ok || !data.storageKey) {
+        throw new Error(data.error ?? "Banner upload failed");
+      }
+      await onUpdate({ bannerKey: data.storageKey });
+      toast.success("Project banner updated");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not upload banner",
+      );
+    } finally {
+      setUploadingBanner(false);
+      if (bannerInputRef.current) bannerInputRef.current.value = "";
+    }
+  }
+
   return (
     <div className="relative border-b border-zinc-800/60">
-      <div className="h-40 bg-[radial-gradient(circle_at_20%_0%,rgba(124,58,237,0.22),transparent_32%),linear-gradient(135deg,#18181b,#09090b_70%)]" />
+      <div className="h-40" style={heroStyle} />
       <div className="relative -mt-16 px-6 pb-5 sm:px-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
-          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-violet-600 text-lg font-semibold text-white ring-4 ring-zinc-950 sm:h-20 sm:w-20">
-            {initials(title)}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              className="group grid h-16 w-16 place-items-center rounded-xl text-lg font-semibold text-zinc-950 ring-4 ring-zinc-950 transition hover:brightness-110 sm:h-20 sm:w-20"
+              style={{ backgroundColor: accent }}
+              onClick={openIdentityEditor}
+              title="Edit project identity"
+            >
+              {initials(title)}
+              <span className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full border border-zinc-700 bg-zinc-900 text-zinc-300 opacity-0 shadow-sm transition group-hover:opacity-100">
+                <Palette className="h-3.5 w-3.5" />
+              </span>
+            </button>
+            {identityOpen && (
+              <div className="absolute left-0 top-full z-50 mt-3 w-80 rounded-lg border border-zinc-800 bg-zinc-950 p-3 shadow-2xl shadow-black/40">
+                <div className="space-y-3">
+                  <Input
+                    value={draftTitle}
+                    onChange={(event) => setDraftTitle(event.target.value)}
+                    aria-label="Project title"
+                  />
+                  <div className="flex items-center gap-3">
+                    <label className="flex h-9 flex-1 items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-3 text-xs text-zinc-400">
+                      <input
+                        type="color"
+                        value={draftColor}
+                        onChange={(event) => setDraftColor(event.target.value)}
+                        className="h-5 w-5 cursor-pointer rounded border-0 bg-transparent p-0"
+                      />
+                      Custom color
+                    </label>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="gap-2"
+                      disabled={uploadingBanner}
+                      onClick={() => bannerInputRef.current?.click()}
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                      Image
+                    </Button>
+                    <input
+                      ref={bannerInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => void uploadBanner(event.target.files?.[0])}
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIdentityOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={savingIdentity || !draftTitle.trim()}
+                      onClick={() => void saveIdentity()}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex items-center gap-2 text-[11px] text-zinc-500">
@@ -392,4 +558,16 @@ function initials(value: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+}
+
+function hexToRgba(hex: string, alpha: number) {
+  const normalized = hex.replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    return `rgba(20,184,166,${alpha})`;
+  }
+  const value = Number.parseInt(normalized, 16);
+  const red = (value >> 16) & 255;
+  const green = (value >> 8) & 255;
+  const blue = value & 255;
+  return `rgba(${red},${green},${blue},${alpha})`;
 }

@@ -41,7 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href="/dashboard"
             className="flex h-14 items-center gap-2.5 border-b border-zinc-800/70 px-4"
           >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-violet-600 text-white">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal-500 text-zinc-950">
               <Sparkles className="h-4 w-4" />
             </span>
             <span className="leading-tight">
@@ -93,7 +93,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300",
                   )}
                 >
-                  <span className="h-4 w-4 shrink-0 rounded bg-violet-500/80" />
+                  <span
+                    className={cn(
+                      "h-4 w-4 shrink-0 rounded",
+                      projectAccentClass(project.title),
+                    )}
+                  />
                   <span className="truncate">{project.title}</span>
                 </Link>
               ))}
@@ -124,7 +129,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur lg:hidden">
           <div className="flex h-14 items-center justify-between px-4">
             <Link href="/dashboard" className="flex items-center gap-2 text-sm font-semibold">
-              <Clapperboard className="h-4 w-4 text-violet-400" />
+              <Clapperboard className="h-4 w-4 text-teal-400" />
               Review Room
             </Link>
             {isAuthenticated && (
@@ -145,6 +150,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
     </div>
   );
+}
+
+const projectAccentClasses = [
+  "bg-cyan-400/85",
+  "bg-teal-400/85",
+  "bg-sky-400/85",
+  "bg-emerald-400/85",
+  "bg-blue-400/85",
+  "bg-zinc-400/85",
+];
+
+function projectAccentClass(title: string) {
+  const hash = title.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return projectAccentClasses[hash % projectAccentClasses.length] ?? "bg-teal-400/85";
 }
 
 function SideLink({

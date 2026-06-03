@@ -33,19 +33,21 @@ export default function NewProjectPage() {
 
   return (
     <AdminGate>
-      <h1 className="text-2xl font-semibold">New project</h1>
-      <form onSubmit={onSubmit} className="mt-8 max-w-lg space-y-4">
-        <Input name="title" placeholder="Project title" required />
-        <Input name="clientName" placeholder="Client name" />
-        <Textarea name="description" placeholder="Instructions for reviewers" />
-        <label className="flex items-center gap-2 text-sm text-zinc-400">
-          <input type="checkbox" name="download" />
-          Allow downloads by default
-        </label>
-        <Button type="submit" disabled={loading}>
-          Create project
-        </Button>
-      </form>
+      <div className="pl-3 sm:pl-6 lg:pl-8">
+        <h1 className="text-2xl font-semibold">New project</h1>
+        <form onSubmit={onSubmit} className="mt-8 max-w-lg space-y-4">
+          <Input name="title" placeholder="Project title" required />
+          <Input name="clientName" placeholder="Client name" />
+          <Textarea name="description" placeholder="Instructions for reviewers" />
+          <label className="flex items-center gap-2 text-sm text-zinc-400">
+            <input type="checkbox" name="download" className="accent-teal-400" />
+            Allow downloads by default
+          </label>
+          <Button type="submit" disabled={loading}>
+            Create project
+          </Button>
+        </form>
+      </div>
     </AdminGate>
   );
 }
