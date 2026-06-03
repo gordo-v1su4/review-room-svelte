@@ -185,6 +185,7 @@ export const setProcessingComplete = mutation({
     durationSec: v.optional(v.number()),
     width: v.optional(v.number()),
     height: v.optional(v.number()),
+    fps: v.optional(v.number()),
     error: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -194,6 +195,7 @@ export const setProcessingComplete = mutation({
       durationSec: args.durationSec,
       width: args.width,
       height: args.height,
+      fps: args.fps,
       processingStatus: args.error ? "error" : "ready",
       updatedAt: Date.now(),
     });
@@ -210,5 +212,26 @@ export const remove = mutation({
       status: "archived",
       updatedAt: Date.now(),
     });
+  },
+});
+
+export const archiveByProject = mutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await getProjectForAdmin(ctx, args.projectId);
+    const now = Date.now();
+    const videos = await ctx.db
+      .query("videos")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    const active = videos.filter((video) => video.status !== "archived");
+    for (const video of active) {
+      await ctx.db.patch(video._id, {
+        status: "archived",
+        updatedAt: now,
+      });
+    }
+    await ctx.db.patch(args.projectId, { updatedAt: now });
+    return { archived: active.length };
   },
 });

@@ -42,7 +42,7 @@ A spreadsheet · a rigid drag-everything Kanban board · a task manager · a hea
 
 Inspect for patterns and conventions — do not copy wholesale.
 
-- **`gordo-v1su4/freecut`** — the playback/scrub engine to emulate: frame-accurate playback, fast scrub overlays, decoder prewarming, adaptive preview quality via WebCodecs / WebGPU / Web Workers / OPFS, FFmpeg only where a format needs it. Lift the *preview module*, not the editor.
+- **`gordo-v1su4/freecut`** — the playback/scrub and media-analysis feel to emulate: batch import that becomes browsable quickly, hover scrub over every clip, frame-accurate preview behavior, decoder prewarming, adaptive preview quality via native video / WebCodecs / WebGPU / Web Workers / OPFS, and browser-local scene captions. Lift the *review media module*, not the editor, timeline, compositing, export, or project-authoring machinery.
 - **`gordo-v1su4/pindeck`** — clean, dense-but-simple layout direction; also the deploy pattern (Vercel frontend + prod Convex, separate always-on worker for any background processing).
 - **`gordo-v1su4/project-stack-structure`** — preferred folder structure, naming, and stack conventions. Align to this.
 

@@ -1,6 +1,6 @@
 ---
 name: Review Room MVP Plan
-overview: A staged delivery plan for Review Room (unfolding-review) derived from the three init-docs, using self-hosted Convex and homelab RustFS (pindeck as reference), with Fibonacci story points, dependencies, acceptance mapping, and parallel agent tracks.
+overview: A staged delivery plan for Review Room (review-room) derived from the three init-docs, using self-hosted Convex and homelab RustFS (pindeck as reference), with Fibonacci story points, dependencies, acceptance mapping, and parallel agent tracks.
 todos:
   - id: stage-0-discovery
     content: "Stage 0 (10 SP): Parallel inspect project-stack-structure, pindeck (self-hosted Convex + RustFS env), freecut; write ADR (auth, worker, homelab endpoints)"

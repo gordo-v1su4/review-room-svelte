@@ -1,6 +1,15 @@
 "use client";
 
-import { Bookmark, Check, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useState } from "react";
+import {
+  Bookmark,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ListVideo,
+  Repeat2,
+  X,
+} from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
@@ -9,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { VideoPlayer } from "./VideoPlayer";
 import { VideoRatingControl } from "./VideoRatingControl";
 import { VideoStatusPill } from "./VideoStatusPill";
+import { useStorageUrl } from "@/hooks/useStorageUrl";
 
 export function VideoReviewMode({
   videos,
@@ -19,6 +29,8 @@ export function VideoReviewMode({
   activeId?: string;
   onSelect: (id: VideoDoc["_id"]) => void;
 }) {
+  const [playbackMode, setPlaybackMode] = useState<"order" | "loop">("loop");
+  const [continuePlayback, setContinuePlayback] = useState(false);
   const toggleSelect = useMutation(api.videos.toggleSelect);
   const approve = useMutation(api.videos.approve);
   const requestChanges = useMutation(api.videos.requestChanges);
@@ -37,14 +49,84 @@ export function VideoReviewMode({
 
   function navigate(delta: number) {
     const next = videos[(activeIndex + delta + videos.length) % videos.length];
+    setContinuePlayback(false);
+    onSelect(next._id);
+  }
+
+  function selectVideo(id: VideoDoc["_id"]) {
+    setContinuePlayback(false);
+    onSelect(id);
+  }
+
+  function playNextInOrder() {
+    if (playbackMode !== "order" || videos.length < 2) return;
+    const next = videos[(activeIndex + 1) % videos.length];
+    setContinuePlayback(true);
     onSelect(next._id);
   }
 
   return (
     <div className="space-y-5 p-6 sm:p-8">
       <div className="overflow-hidden rounded-lg border border-zinc-800/60 bg-zinc-900/30">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/60 px-4 py-3">
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+              Playback
+            </p>
+            <p className="text-xs text-zinc-500">
+              {playbackMode === "loop"
+                ? "Looping the selected clip"
+                : "Advancing through the strip below"}
+            </p>
+          </div>
+          <div className="flex rounded-lg border border-zinc-800 bg-zinc-950/70 p-1">
+            <button
+              type="button"
+              aria-pressed={playbackMode === "order"}
+              onClick={() => {
+                setPlaybackMode("order");
+                setContinuePlayback(false);
+              }}
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-zinc-500 transition",
+                playbackMode === "order"
+                  ? "bg-zinc-800 text-zinc-100"
+                  : "hover:bg-zinc-900 hover:text-zinc-300",
+              )}
+            >
+              <ListVideo className="h-3.5 w-3.5" />
+              Play order
+            </button>
+            <button
+              type="button"
+              aria-pressed={playbackMode === "loop"}
+              onClick={() => {
+                setPlaybackMode("loop");
+                setContinuePlayback(false);
+              }}
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-zinc-500 transition",
+                playbackMode === "loop"
+                  ? "bg-zinc-800 text-zinc-100"
+                  : "hover:bg-zinc-900 hover:text-zinc-300",
+              )}
+            >
+              <Repeat2 className="h-3.5 w-3.5" />
+              Loop clip
+            </button>
+          </div>
+        </div>
         <div className="relative bg-black">
-          <VideoPlayer storageKey={active.storageKey} spriteKey={active.spriteKey} />
+          <VideoPlayer
+            key={active._id}
+            storageKey={active.storageKey}
+            spriteKey={active.spriteKey}
+            version={active.updatedAt}
+            fps={active.fps}
+            loop={playbackMode === "loop"}
+            autoPlay={continuePlayback}
+            onEnded={playNextInOrder}
+          />
           {videos.length > 1 && (
             <>
               <button
@@ -64,7 +146,7 @@ export function VideoReviewMode({
             </>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-3 border-t border-zinc-800/60 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-4 border-t border-zinc-800/60 px-6 py-4">
           <VideoStatusPill status={active.status} />
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-lg font-medium text-zinc-100">
@@ -115,25 +197,23 @@ export function VideoReviewMode({
       </div>
 
       <div>
-        <div className="mb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+        <div className="mb-3 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
           In this project
         </div>
-        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2">
+        <div className="no-scrollbar flex gap-3 overflow-x-auto pb-2">
           {videos.map((video) => (
             <button
               key={video._id}
               type="button"
-              onClick={() => onSelect(video._id)}
+              onClick={() => selectVideo(video._id)}
               className={cn(
                 "relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg border bg-zinc-950 text-left transition",
                 video._id === active._id
-                  ? "border-violet-300 ring-1 ring-violet-300/40"
+                  ? "border-teal-300/80"
                   : "border-zinc-800/60 opacity-65 hover:opacity-100",
               )}
             >
-              <div className="grid h-full place-items-center text-xs text-zinc-700">
-                {video.processingStatus === "processing" ? "Processing..." : "Preview"}
-              </div>
+              <ReviewStripThumbnail video={video} />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
                 <p className="truncate text-[11px] font-medium text-zinc-100">
                   {video.title}
@@ -146,6 +226,23 @@ export function VideoReviewMode({
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ReviewStripThumbnail({ video }: { video: VideoDoc }) {
+  const thumbUrl = useStorageUrl(video.thumbnailKey, video.updatedAt);
+
+  if (thumbUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
+    );
+  }
+
+  return (
+    <div className="grid h-full place-items-center text-xs text-zinc-700">
+      {video.processingStatus === "processing" ? "Processing..." : "No thumbnail"}
     </div>
   );
 }

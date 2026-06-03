@@ -1,20 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { Archive, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import { AdminGate } from "@/components/auth/AdminGate";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
-  const projects = useQuery(api.projects.listForAdmin);
+  const { isAuthenticated } = useConvexAuth();
+  const archiveProject = useMutation(api.projects.archive);
+  const projects = useQuery(
+    api.projects.listForAdmin,
+    isAuthenticated ? {} : "skip",
+  );
 
   return (
     <AdminGate>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
         <Link href="/dashboard/projects/new">
-          <Button>New project</Button>
+          <Button className="gap-2">
+            <Plus className="h-4 w-4" />
+            New project
+          </Button>
         </Link>
       </div>
       {!projects ? (
@@ -29,14 +39,33 @@ export default function DashboardPage() {
       ) : (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => (
-            <Link
+            <article
               key={p._id}
-              href={`/dashboard/projects/${p._id}`}
               className="group rounded-xl border border-zinc-800 bg-zinc-900 p-5 transition-colors hover:border-zinc-600"
             >
-              <h2 className="font-medium text-zinc-100 group-hover:text-white">
-                {p.title}
-              </h2>
+              <div className="flex items-start justify-between gap-3">
+                <Link
+                  href={`/dashboard/projects/${p._id}`}
+                  className="min-w-0 flex-1"
+                >
+                  <h2 className="truncate font-medium text-zinc-100 group-hover:text-white">
+                    {p.title}
+                  </h2>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Archive project"
+                  onClick={() => {
+                    if (!window.confirm(`Archive "${p.title}"?`)) return;
+                    void archiveProject({ projectId: p._id }).then(() => {
+                      toast.success("Project archived");
+                    });
+                  }}
+                >
+                  <Archive className="h-4 w-4 text-zinc-500" />
+                </Button>
+              </div>
               {p.clientName && (
                 <p className="mt-1 text-sm text-zinc-500">{p.clientName}</p>
               )}
@@ -54,7 +83,7 @@ export default function DashboardPage() {
                   <dd className="text-zinc-300">{p.feedbackCount}</dd>
                 </div>
               </dl>
-            </Link>
+            </article>
           ))}
         </div>
       )}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { X, Bookmark } from "lucide-react";
+import { X, Bookmark, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { VideoDoc } from "@/lib/smartViews";
@@ -51,6 +51,7 @@ export function VideoDetailsPanel({
   const addCommentAdmin = useMutation(api.comments.add);
   const addCommentClient = useMutation(api.reviewPublic.clientAddComment);
   const updateMeta = useMutation(api.videos.updateMetadata);
+  const removeVideo = useMutation(api.videos.remove);
 
   const handleFirstPlay = () => {
     if (!video.viewed) {
@@ -87,6 +88,8 @@ export function VideoDetailsPanel({
           <VideoPlayer
             storageKey={video.storageKey}
             spriteKey={video.spriteKey}
+            version={video.updatedAt}
+            fps={video.fps}
             onTimeUpdate={setPlayhead}
             seekTo={seekTo}
           />
@@ -164,6 +167,22 @@ export function VideoDetailsPanel({
             Request changes
           </Button>
         </div>
+
+        {mode === "admin" && (
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-300"
+            onClick={() => {
+              if (!window.confirm(`Discard "${video.title}" from this review?`)) return;
+              void removeVideo({ videoId: video._id }).then(() => {
+                onClose();
+              });
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+            Discard video
+          </Button>
+        )}
 
         <CommentComposer
           currentTime={playhead}

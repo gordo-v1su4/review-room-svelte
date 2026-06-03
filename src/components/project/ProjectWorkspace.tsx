@@ -3,10 +3,14 @@
 import { useMemo, useState } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  Archive,
   Clock,
   Link2,
+  RefreshCw,
+  Trash2,
   Upload,
   User,
 } from "lucide-react";
@@ -27,18 +31,22 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
+  const router = useRouter();
   const { isAuthenticated, isLoading } = useConvexAuth();
   const projectQueryArgs = isAuthenticated ? { projectId } : "skip";
   const project = useQuery(api.projects.getById, projectQueryArgs);
   const queriedVideos = useQuery(api.videos.listByProject, projectQueryArgs);
   const videos = useMemo(() => queriedVideos ?? [], [queriedVideos]);
   const createLink = useMutation(api.reviewLinks.create);
+  const archiveVideos = useMutation(api.videos.archiveByProject);
+  const archiveProject = useMutation(api.projects.archive);
 
   const [view, setView] = useState<SmartViewId>("all");
   const [layout, setLayout] = useState<WorkspaceLayout>("grid");
   const [gridSize, setGridSize] = useState<GridSize>("md");
   const [selectedId, setSelectedId] = useState<Id<"videos"> | null>(null);
   const [panelExpanded, setPanelExpanded] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
   const [filters, setFilters] = useState<FilterState>({
     statuses: [],
@@ -62,6 +70,47 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     selected: videos.filter((v) => v.isSelect).length,
     approved: videos.filter((v) => v.status === "approved").length,
   };
+
+  async function reprocessPreviews() {
+    setReprocessing(true);
+    try {
+      let ok = 0;
+      for (const video of videos) {
+        const res = await fetch("/api/media/enqueue", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            videoId: video._id,
+            storageKey: video.storageKey,
+          }),
+        });
+        if (res.ok) ok++;
+      }
+      toast.success(`Refreshing previews for ${ok} videos`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not refresh previews",
+      );
+    } finally {
+      setReprocessing(false);
+    }
+  }
+
+  async function clearVideos() {
+    if (!videos.length) return;
+    if (!window.confirm(`Archive ${videos.length} videos from this project?`)) return;
+    const result = await archiveVideos({ projectId });
+    setSelectedId(null);
+    toast.success(`Archived ${result.archived} videos`);
+  }
+
+  async function archiveCurrentProject() {
+    if (!project) return;
+    if (!window.confirm(`Archive project "${project.title}"?`)) return;
+    await archiveProject({ projectId });
+    toast.success("Project archived");
+    router.push("/dashboard");
+  }
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -100,6 +149,11 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
               toast.success("Review link copied to clipboard");
             })
           }
+          onReprocess={() => void reprocessPreviews()}
+          reprocessing={reprocessing}
+          onClearVideos={() => void clearVideos()}
+          canClearVideos={videos.length > 0}
+          onArchiveProject={() => void archiveCurrentProject()}
           uploadHref={`/dashboard/projects/${projectId}/upload`}
         />
 
@@ -196,6 +250,11 @@ function ProjectHero({
   description,
   counts,
   onShare,
+  onReprocess,
+  reprocessing,
+  onClearVideos,
+  canClearVideos,
+  onArchiveProject,
   uploadHref,
 }: {
   title: string;
@@ -208,6 +267,11 @@ function ProjectHero({
     approved: number;
   };
   onShare: () => void;
+  onReprocess: () => void;
+  reprocessing: boolean;
+  onClearVideos: () => void;
+  canClearVideos: boolean;
+  onArchiveProject: () => void;
   uploadHref: string;
 }) {
   return (
@@ -251,6 +315,32 @@ function ProjectHero({
             <Button variant="secondary" className="gap-2" onClick={onShare}>
               <Link2 className="h-4 w-4" />
               Share review link
+            </Button>
+            <Button
+              variant="secondary"
+              className="gap-2"
+              disabled={reprocessing}
+              onClick={onReprocess}
+            >
+              <RefreshCw className={cn("h-4 w-4", reprocessing && "animate-spin")} />
+              Refresh previews
+            </Button>
+            <Button
+              variant="secondary"
+              className="gap-2 text-zinc-300"
+              disabled={!canClearVideos}
+              onClick={onClearVideos}
+            >
+              <Trash2 className="h-4 w-4" />
+              Clear videos
+            </Button>
+            <Button
+              variant="ghost"
+              className="gap-2 text-zinc-500"
+              onClick={onArchiveProject}
+            >
+              <Archive className="h-4 w-4" />
+              Archive project
             </Button>
             <Link href={uploadHref}>
               <Button className="gap-2">

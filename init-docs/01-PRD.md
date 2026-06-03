@@ -18,8 +18,8 @@ type UserRole = "admin" | "client";
 
 **MVP**
 - Project create / list / workspace.
-- Direct-to-storage upload (presigned), batch + per-file progress, auto thumbnail.
-- Video grid with the card system; right-side viewer/details panel.
+- Direct-to-storage upload (presigned), drag/drop batch import, bounded parallel uploads, per-file progress, auto thumbnail + scrub sprite.
+- Video grid with the card system; hover scrub on every ready card; right-side viewer/details panel.
 - Status + tags + 0–5 rating + shortlist (select) + comments (with optional timecode).
 - Metadata-driven smart views (§4) exposed as tabs.
 - Client review page via share link (+ optional passcode).
@@ -30,10 +30,11 @@ type UserRole = "admin" | "client";
 - Threaded comments, drawing annotations, frame-accurate comment sync.
 - Transcoding, proxy generation, batch download.
 - Teams/orgs, enterprise permissions, email notifications.
-- The full freecut WebCodecs engine (see §8, Phase B).
+- The full freecut editor/timeline/export surface.
+- Browser-local AI scene captions/search unless explicitly pulled forward from §8 Phase C.
 
 **Phase 2**
-- Port the freecut scrub engine · in-browser contact sheets · saved custom views · version stacks / comparison · approval history · feedback export (CSV/JSON/PDF) · expiring links · per-project branding themes · activity log.
+- Port the freecut scrub engine · browser-local scene captions/search · in-browser contact sheets · saved custom views · version stacks / comparison · approval history · feedback export (CSV/JSON/PDF) · expiring links · per-project branding themes · activity log.
 
 ## 3. Stack
 
@@ -109,6 +110,10 @@ export default defineSchema({
     storageKey: v.string(),                    // object key only — no blobs in Convex
     thumbnailKey: v.optional(v.string()),
     spriteKey: v.optional(v.string()),         // scrub sprite sheet (Phase A)
+    analysisStatus: v.optional(v.union(        // Phase C
+      v.literal("none"), v.literal("queued"),
+      v.literal("processing"), v.literal("ready"), v.literal("error"),
+    )),
     mimeType: v.string(),
     sizeBytes: v.optional(v.number()),
     durationSec: v.optional(v.number()),
@@ -139,6 +144,17 @@ export default defineSchema({
     authorRole: v.union(v.literal("admin"), v.literal("client")),
     body: v.string(),
     timecodeSec: v.optional(v.number()),       // optional pinned playhead
+    createdAt: v.number(),
+  }).index("by_video", ["videoId"]).index("by_project", ["projectId"]),
+
+  videoScenes: defineTable({                   // Phase C: browser-local Analyze output
+    videoId: v.id("videos"),
+    projectId: v.id("projects"),
+    startSec: v.number(),
+    endSec: v.optional(v.number()),
+    caption: v.string(),
+    thumbnailKey: v.optional(v.string()),
+    embeddingKey: v.optional(v.string()),      // optional sidecar if stored outside Convex
     createdAt: v.number(),
   }).index("by_video", ["videoId"]).index("by_project", ["projectId"]),
 
@@ -184,10 +200,33 @@ S3_FORCE_PATH_STYLE=true
 ```
 Helpers: `createPresignedUploadUrl`, `createPresignedDownloadUrl`, `getSignedUrl`, `deleteObject`.
 
-## 8. Playback — two phases
+## 8. Media ingest, playback, and analysis
 
-- **Phase A (MVP):** HTML5 `<video>` streamed from a signed URL for full playback, plus an ffmpeg-generated **sprite sheet** for instant scrub-on-hover and scrubber previews — no decode cost at scrub time. Fast enough to feel good.
-- **Phase B:** port the freecut WebCodecs scrub engine (decoder prewarming, adaptive preview quality, frame-accurate seek, OPFS cache) behind the same player component interface so it's an isolated swap. Do not vendor the whole editor.
+This is the strongest FreeCut influence, but only the parts that serve review. The review app needs instant browsing, hover scrub, and responsive playback; it does **not** need a timeline, compositing surface, edit tools, or export pipeline.
+
+### Phase A — MVP review media path
+- Upload supports drag/drop and file picker, accepts many videos at once, and runs bounded parallel uploads so a 20–30 clip batch starts populating quickly.
+- Create Convex metadata as soon as upload completes; set `processingStatus = processing`; the grid should show useful progress/processing states instead of waiting for all media work.
+- Full playback uses native HTML5 `<video>` from a signed URL.
+- Hover scrub uses the ffmpeg-generated `spriteKey` sheet from `services/media-worker`, both on cards and the player scrubber. This is the default low-risk path because it has no decode cost at hover time.
+- If local object URLs are available during the upload session, use them for immediate admin-side preview while the RustFS upload/worker finishes. Persist only object keys and metadata.
+
+### Phase B — FreeCut-style review preview engine
+Port the FreeCut preview stack behind `VideoPlayer` / `VideoCard` interfaces:
+- pooled native `<video>` elements by source URL (`VideoSourcePool`) for fast reuse;
+- `requestVideoFrameCallback` where available for playback/drift correction;
+- Mediabunny / WebCodecs workers for decoder prewarm, filmstrip/contact-sheet extraction, and frame extraction;
+- OPFS/browser cache for generated previews and analysis sidecars;
+- WebGPU upload/render path where it helps (`copyExternalImageToTexture` style), with graceful fallback to native video/canvas.
+
+Keep this as a review-media module. Do not vendor the whole FreeCut editor.
+
+### Phase C — Browser-local Analyze / scene captions
+Optional but highly desirable: adapt FreeCut's Analyze flow for review search and smart browsing.
+- Sample frames every few seconds, run a local VLM in a worker, and create `videoScenes` with time ranges, captions, and optional thumbnails.
+- Keep Analyze separate from preview rendering: frame capture can use video seek + `OffscreenCanvas` + image blob → model worker; preview rendering can stay sprite/native/WebGPU.
+- Prefer public model assets and local browser compute so reviewers/admins do not need a Hugging Face API key.
+- UI output: a Scenes tab/list with caption rows, thumbnails, timecodes, search, and click-to-seek. It supports review, not editing.
 
 ## 9. Access & sharing
 
@@ -211,12 +250,13 @@ Admin auth for the dashboard; clients reach a project through `reviewLinks.token
 2. **Scaffold** — Next.js + TS + Tailwind + shadcn + Convex; app shell; env loading.
 3. **Convex data model** (§5) + CRUD + the transitions in §6.
 4. **Storage** — abstraction + presign routes; test against local RustFS.
-5. **Admin workspace** — project header/banner, upload dropzone, video grid + card, filters, right-side panel shell.
-6. **Player + details panel** — playback, status/tags/rating/select controls, download.
+5. **Admin workspace** — project header/banner, drag/drop upload dropzone, video grid + hover-scrub card, filters, right-side panel shell.
+6. **Player + details panel** — playback, scrub previews, status/tags/rating/select controls, download.
 7. **Comments** — composer + list + optional timecode capture.
 8. **Client review page** — `/review/[token]`, simplified panel, Approve / Request Changes.
 9. **Smart views** — tab bar with counts (§5 table); optional grouped (stacked) display reusing the card; optional drag-to-set on droppable sections.
 10. **Polish** — responsive, loading/empty/error states, upload progress, panel transitions.
+11. **Phase B/C ports when ready** — FreeCut preview engine first, then browser-local Analyze scenes/search.
 
 Build A→B per phase; each step should run before the next.
 
@@ -224,10 +264,11 @@ Build A→B per phase; each step should run before the next.
 
 MVP is done when:
 1. Admin creates a project and uploads videos to RustFS via presigned URLs; metadata lands in Convex.
-2. Uploaded videos appear as polished cards in a grid; thumbnail + scrub preview work.
-3. Selecting a card opens the right-side viewer; playback and scrubbing feel instant (Phase A).
-4. Client (link only, no account) can rate, shortlist, comment (with optional timecode), and Approve / Request Changes.
-5. `status` and facets update per §6; smart-view tabs reflect the changes live across sessions.
-6. Filtering/sorting over status, facets, tags, and dates works and matches the grid.
-7. Download works when enabled (signed URL).
-8. The interface reads as a presentable client portal — not a spreadsheet or a drag-required Kanban board.
+2. Admin can drag/drop a batch of videos; each file shows progress and appears in the workspace as soon as its metadata is ready.
+3. Uploaded videos appear as polished cards in a grid; thumbnail + hover scrub preview work.
+4. Selecting a card opens the right-side viewer; playback and scrubbing feel instant (Phase A).
+5. Client (link only, no account) can rate, shortlist, comment (with optional timecode), and Approve / Request Changes.
+6. `status` and facets update per §6; smart-view tabs reflect the changes live across sessions.
+7. Filtering/sorting over status, facets, tags, and dates works and matches the grid.
+8. Download works when enabled (signed URL).
+9. The interface reads as a presentable client portal — not a spreadsheet or a drag-required Kanban board.

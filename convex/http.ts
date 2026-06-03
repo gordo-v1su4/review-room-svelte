@@ -24,6 +24,7 @@ http.route({
       durationSec?: number;
       width?: number;
       height?: number;
+      fps?: number;
       error?: boolean;
     };
     await ctx.runMutation(internal.videosInternal.setProcessingCompleteInternal, {
@@ -33,6 +34,7 @@ http.route({
       durationSec: body.durationSec,
       width: body.width,
       height: body.height,
+      fps: body.fps,
       error: body.error,
     });
     return new Response(JSON.stringify({ ok: true }), {

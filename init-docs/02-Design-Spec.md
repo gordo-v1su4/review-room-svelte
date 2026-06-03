@@ -28,7 +28,7 @@ Same components, different surface. **Admin** adds: upload, edit status/tags/tit
 
 Don't design four heavyweight layouts. The card and the right-side panel carry the product; views are arrangements of the same cards.
 
-- **Grid (default, MVP)** — responsive cards, small/medium/large sizing, hover play affordance, clear selected state, good empty/loading states. Most-used view.
+- **Grid (default, MVP)** — responsive cards, small/medium/large sizing, hover scrub affordance, clear selected state, good empty/loading states. Most-used view.
 - **Review / focus (MVP)** — large player with prev/next, metadata, comments, actions; implemented as the *expanded state of the right-side panel*, not a separate screen. Optional filmstrip of nearby videos.
 - **Grouped (optional, low cost)** — the smart views rendered as stacked sections (each a wrapping row of the *same* cards). Communicates "generated from metadata," not a board. Avoid column-and-drag as the primary metaphor; drag is the optional override from PRD §4.
 - **List (Phase 2)** — compact production view; may use TanStack Table internally but must read as a media list (thumbnail, tasteful spacing, pills, row hover), never a raw spreadsheet. Deferred.
@@ -53,7 +53,9 @@ The second-most-important component after the card. Collapsible, integrated into
 
 **Priority hierarchy:** thumbnail → title → status/review state → rating/select/approved → tags/comments → secondary metadata. Small cards show less; large cards show more. Never overcrowd.
 
-**Shows:** thumbnail; hover play; optional duration; title; small status pill; tags; rating; comment count; selected/approved/needs-changes indicator; optional download icon.
+**Shows:** thumbnail or scrub frame; optional duration; title; small status pill; tags; rating; comment count; selected/approved/needs-changes indicator; optional download icon.
+
+**Hover scrub:** when a scrub sprite or preview cache exists, horizontal pointer movement over the thumbnail should seek the visible frame immediately. It should feel like FreeCut's media grid: no popover, no heavy player chrome, just quick visual inspection. If the preview is still processing, keep the thumbnail/processing state stable.
 
 **States to design:** default · hover · selected · viewed · commented · approved · needs-changes · uploading · processing-thumbnail · error/missing.
 
@@ -74,13 +76,17 @@ Simple and fast: a box, an "Add comment" button, and an optional "use current ti
 
 ## 9. Upload
 
-Sleek, no per-video form. Drag-drop area, multi-file, per-file progress; states for success / failed / processing-thumbnail / ready. Assets appear in the grid quickly after upload.
+Sleek, no per-video form. Drag-drop area, multi-file, bounded parallel uploads, per-file progress; states for success / failed / processing-thumbnail / ready. Assets appear in the grid quickly after upload, and admin-side local previews may appear before remote derivatives finish when the browser still has the dropped files.
 
-## 10. Filtering & sorting
+## 10. Scenes / Analyze (Phase 2)
+
+A FreeCut-inspired Scenes view can sit beside Media when Phase C lands. It is a review/search surface: caption rows with small thumbnails, source filename, timecode, search, and click-to-seek. It should resemble the attached FreeCut references in spirit — dense, useful, calm — but remove editor controls, track controls, and timeline authority. Captions are aids for finding moments, not decisions.
+
+## 11. Filtering & sorting
 
 Available but visually light — a filter popover, active-filter chips, and "clear all," plus the smart-view tabs as the fast path. **Filters:** status, review state/facets, tags, rating, selected, has-comments, uploaded/updated date. **Sorts:** newest, oldest, rating high→low, title, recently reviewed, most comments.
 
-## 11. Visual direction & token system
+## 12. Visual direction & token system
 
 **Dark mode first; make it excellent.** Light mode is optional and deferred; if built later it stays neutral white/gray, never bright SaaS.
 
@@ -111,25 +117,25 @@ The videos/thumbnails provide essentially all the saturated color on screen; chr
 ### Card / grid style
 Dark cards on dark canvas, soft borders, subtle hover, thumbnail-first, minimal metadata, small status pills, off-white type, muted gray secondary. Polished media tiles, not database rows.
 
-## 12. Component inventory (align names with dev)
+## 13. Component inventory (align names with dev)
 
-`ProjectHeader` · `ProjectBanner` · `ProjectViewSwitcher` (smart-view tabs) · `ProjectFilters` · `VideoGrid` · `VideoCard` · `VideoGroupedView` · `VideoDetailsPanel` · `VideoPlayer` · `VideoRatingControl` · `VideoStatusPill` · `VideoTagList` · `VideoActionsMenu` · `UploadDropzone` · `CommentList` · `CommentComposer` · `TimecodeCommentButton` · `AppShell`. (`VideoList` deferred with the List view.)
+`ProjectHeader` · `ProjectBanner` · `ProjectViewSwitcher` (smart-view tabs) · `ProjectFilters` · `VideoGrid` · `VideoCard` · `VideoHoverScrubPreview` · `VideoGroupedView` · `VideoDetailsPanel` · `VideoPlayer` · `ReviewMediaEngine` (Phase B adapter) · `SceneAnalysisPanel` (Phase C) · `VideoRatingControl` · `VideoStatusPill` · `VideoTagList` · `VideoActionsMenu` · `UploadDropzone` · `MediaIngestQueue` · `CommentList` · `CommentComposer` · `TimecodeCommentButton` · `AppShell`. (`VideoList` deferred with the List view.)
 
-## 13. Interaction states & motion
+## 14. Interaction states & motion
 
 States to specify across components: hover · selected · focus · disabled · uploading · error · reviewed · approved. Motion is smooth and quiet — panel open/close, card hover, tab switches. Optimistic UI where safe. Skeleton thumbnails on load. Persistent playback controls. Minimal blocking modals.
 
-## 14. Responsive intent
+## 15. Responsive intent
 
 Desktop-first, degrade gracefully — don't make mobile impossible. **Tablet:** fewer grid columns; panel becomes an overlay drawer. **Mobile:** cards stack, viewer goes fullscreen, filters collapse to a menu, comments sit below the video.
 
 > Measurements (card widths, panel width, paddings, header height, grid density) are the designer's to set — pick what serves the density and calm the brief calls for. No fixed pixel values are prescribed here.
 
-## 15. Empty / loading / error states
+## 16. Empty / loading / error states
 
 Design these as first-class, not afterthoughts. *No videos:* "Upload your first videos to start a review." → Upload. *No filter results:* "No videos match these filters." → Clear filters. *No comments (admin):* "No feedback yet." *(client):* "Leave a note when you're ready." *Uploading:* "Uploading 3 videos…" with progress.
 
-## 16. Design priorities (if time is short)
+## 17. Design priorities (if time is short)
 
 1. Admin workspace → 2. Client review page → 3. Video card system → 4. Right-side viewer panel → 5. Rating/comment/approval interactions → 6. Filters + smart-view tabs → 7. Upload states → 8. Grouped (stacked) view → 9. List view (Phase 2) → 10. Mobile refinements.
 

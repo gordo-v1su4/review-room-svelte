@@ -16,6 +16,7 @@ const CONVEX_SITE =
   process.env.CONVEX_SITE_URL ??
   "https://unfold-site.serving.cloud";
 const FFMPEG = process.env.FFMPEG_PATH ?? "ffmpeg";
+const FFPROBE = process.env.FFPROBE_PATH ?? "ffprobe";
 const S3_BUCKET = process.env.S3_BUCKET;
 
 let s3: S3Client | null = null;
@@ -49,6 +50,107 @@ async function runFfmpeg(args: string[]) {
       code === 0 ? resolve() : reject(new Error(`ffmpeg exit ${code}`)),
     );
   });
+}
+
+async function runProcess(command: string, args: string[]) {
+  return new Promise<string>((resolve, reject) => {
+    const proc = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+    proc.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    proc.on("error", reject);
+    proc.on("close", (code) =>
+      code === 0 ? resolve(stdout) : reject(new Error(`${command} exit ${code}: ${stderr}`)),
+    );
+  });
+}
+
+async function probeVideo(input: string) {
+  const raw = await runProcess(FFPROBE, [
+    "-v",
+    "error",
+    "-select_streams",
+    "v:0",
+    "-show_entries",
+    "stream=width,height,avg_frame_rate,r_frame_rate:format=duration",
+    "-of",
+    "json",
+    input,
+  ]);
+  const parsed = JSON.parse(raw) as {
+    streams?: {
+      width?: number;
+      height?: number;
+      avg_frame_rate?: string;
+      r_frame_rate?: string;
+    }[];
+    format?: { duration?: string };
+  };
+  const durationSec = Number(parsed.format?.duration);
+  const frameRate =
+    parseFrameRate(parsed.streams?.[0]?.avg_frame_rate) ??
+    parseFrameRate(parsed.streams?.[0]?.r_frame_rate);
+  return {
+    durationSec: Number.isFinite(durationSec) && durationSec > 0 ? durationSec : undefined,
+    width: parsed.streams?.[0]?.width,
+    height: parsed.streams?.[0]?.height,
+    fps: frameRate,
+  };
+}
+
+function parseFrameRate(value?: string) {
+  if (!value) return undefined;
+  const [numRaw, denRaw] = value.split("/");
+  const num = Number(numRaw);
+  const den = Number(denRaw ?? 1);
+  if (!Number.isFinite(num) || !Number.isFinite(den) || den <= 0) return undefined;
+  const fps = num / den;
+  return Number.isFinite(fps) && fps > 0 ? fps : undefined;
+}
+
+async function generateSprite(input: string, workDir: string, durationSec?: number) {
+  const frameCount = 10;
+  const safeDuration = durationSec && durationSec > 0 ? durationSec : 1;
+
+  for (let index = 0; index < frameCount; index++) {
+    const midpoint = (safeDuration * (index + 0.5)) / frameCount;
+    const seekSec = Math.max(0, Math.min(safeDuration - 0.05, midpoint));
+    await runFfmpeg([
+      "-y",
+      "-ss",
+      seekSec.toFixed(3),
+      "-i",
+      input,
+      "-vframes",
+      "1",
+      "-vf",
+      "scale=320:-1",
+      "-q:v",
+      "3",
+      join(workDir, `sprite-frame-${String(index).padStart(2, "0")}.jpg`),
+    ]);
+  }
+
+  const spritePath = join(workDir, "sprite.jpg");
+  await runFfmpeg([
+    "-y",
+    "-framerate",
+    "1",
+    "-i",
+    join(workDir, "sprite-frame-%02d.jpg"),
+    "-vf",
+    "tile=10x1",
+    "-frames:v",
+    "1",
+    spritePath,
+  ]);
+
+  return spritePath;
 }
 
 async function notifyConvex(payload: Record<string, unknown>) {
@@ -90,13 +192,14 @@ async function processJob(body: {
     if (!src.ok) throw new Error("Failed to download source");
     await writeFile(input, Buffer.from(await src.arrayBuffer()));
 
+    const probe = await probeVideo(input);
     const thumbPath = join(workDir, "thumb.jpg");
     await runFfmpeg([
       "-y",
+      "-ss",
+      String(Math.min(1, Math.max(0, (probe.durationSec ?? 2) / 2))),
       "-i",
       input,
-      "-ss",
-      "00:00:01",
       "-vframes",
       "1",
       "-q:v",
@@ -104,17 +207,7 @@ async function processJob(body: {
       thumbPath,
     ]);
 
-    const spritePath = join(workDir, "sprite.jpg");
-    await runFfmpeg([
-      "-y",
-      "-i",
-      input,
-      "-vf",
-      "fps=1/2,scale=160:-1,tile=10x1",
-      "-frames:v",
-      "1",
-      spritePath,
-    ]);
+    const spritePath = await generateSprite(input, workDir, probe.durationSec);
 
     await uploadDerivative(thumbKey, await Bun.file(thumbPath).bytes());
     await uploadDerivative(spriteKey, await Bun.file(spritePath).bytes());
@@ -123,9 +216,14 @@ async function processJob(body: {
       videoId: body.videoId,
       thumbnailKey: thumbKey,
       spriteKey: spriteKey,
+      durationSec: probe.durationSec,
+      width: probe.width,
+      height: probe.height,
+      fps: probe.fps,
       error: false,
     });
-  } catch {
+  } catch (error) {
+    console.error(error);
     await notifyConvex({
       videoId: body.videoId,
       error: true,

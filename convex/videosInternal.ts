@@ -9,6 +9,7 @@ export const setProcessingCompleteInternal = internalMutation({
     durationSec: v.optional(v.number()),
     width: v.optional(v.number()),
     height: v.optional(v.number()),
+    fps: v.optional(v.number()),
     error: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -18,6 +19,7 @@ export const setProcessingCompleteInternal = internalMutation({
       durationSec: args.durationSec,
       width: args.width,
       height: args.height,
+      fps: args.fps,
       processingStatus: args.error ? "error" : "ready",
       updatedAt: Date.now(),
     });

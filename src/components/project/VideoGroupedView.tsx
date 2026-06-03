@@ -17,6 +17,8 @@ export function VideoGroupedView({
   onSelect: (id: VideoDoc["_id"]) => void;
 }) {
   const sections = SMART_VIEWS.filter((v) => v.id !== "all");
+  const cardWidth =
+    size === "sm" ? "w-[180px]" : size === "lg" ? "w-[320px]" : "w-[240px]";
 
   return (
     <div className="space-y-10">
@@ -28,13 +30,14 @@ export function VideoGroupedView({
             <h3 className="mb-3 text-sm font-medium text-zinc-400">{section.label}</h3>
             <div className="flex flex-wrap gap-4">
               {items.map((video) => (
-                <VideoCard
-                  key={video._id}
-                  video={video}
-                  size={size}
-                  selected={selectedId === video._id}
-                  onSelect={() => onSelect(video._id)}
-                />
+                <div key={video._id} className={cardWidth}>
+                  <VideoCard
+                    video={video}
+                    size={size}
+                    selected={selectedId === video._id}
+                    onSelect={() => onSelect(video._id)}
+                  />
+                </div>
               ))}
             </div>
           </section>

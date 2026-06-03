@@ -1,4 +1,4 @@
-# unfolding-review — Agent Guide
+# review-room — Agent Guide
 
 Planning repo for a client-facing video review portal (working title: **Review Room**). Application code has not started yet; treat the docs below as the current source of truth.
 
