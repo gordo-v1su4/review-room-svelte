@@ -18,10 +18,10 @@ export default function DashboardPage() {
 
   return (
     <AdminGate>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
         <Link href="/dashboard/projects/new">
-          <Button className="gap-2">
+          <Button className="w-full gap-2 sm:w-auto">
             <Plus className="h-4 w-4" />
             New project
           </Button>
@@ -37,7 +37,7 @@ export default function DashboardPage() {
           </Link>
         </div>
       ) : (
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {projects.map((p) => (
             <article
               key={p._id}

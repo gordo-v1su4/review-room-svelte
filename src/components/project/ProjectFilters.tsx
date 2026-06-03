@@ -54,8 +54,8 @@ export function ProjectFilters({
     filters.minRating > 0;
 
   return (
-    <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-zinc-800/60 bg-zinc-950/85 px-6 py-3 backdrop-blur sm:px-8">
-      <div className="flex items-center gap-0.5 rounded-md border border-zinc-800/60 bg-zinc-900/60 p-0.5">
+    <div className="sticky top-14 z-20 flex flex-wrap items-center gap-2 border-b border-zinc-800/60 bg-zinc-950/90 px-4 py-3 backdrop-blur sm:px-6 lg:top-0 lg:px-8">
+      <div className="no-scrollbar flex max-w-full items-center gap-0.5 overflow-x-auto rounded-md border border-zinc-800/60 bg-zinc-900/60 p-0.5">
         {[
           { id: "grid", label: "Grid", icon: Grid3X3 },
           { id: "grouped", label: "Grouped", icon: Columns3 },
@@ -70,7 +70,7 @@ export function ProjectFilters({
               title={item.label}
               onClick={() => onLayout(item.id as WorkspaceLayout)}
               className={cn(
-                "inline-flex h-7 items-center gap-1.5 rounded px-2 text-[11px] font-medium transition",
+                "inline-flex h-8 shrink-0 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium transition",
                 layout === item.id
                   ? "bg-zinc-800 text-zinc-100"
                   : "text-zinc-500 hover:text-zinc-200",
@@ -83,7 +83,7 @@ export function ProjectFilters({
         })}
       </div>
 
-      <div className="relative min-w-[170px] flex-1 sm:max-w-sm">
+      <div className="relative order-3 min-w-full flex-1 sm:order-none sm:min-w-[220px] sm:max-w-sm">
         <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
         <Input
           placeholder="Search…"
@@ -105,7 +105,7 @@ export function ProjectFilters({
       <select
         value={sort}
         onChange={(e) => onSort(e.target.value as SortKey)}
-        className="h-8 rounded-md border border-zinc-800/60 bg-zinc-900/60 px-2 text-xs text-zinc-300"
+        className="h-8 min-w-0 rounded-md border border-zinc-800/60 bg-zinc-900/60 px-2 text-xs text-zinc-300"
       >
         {SORTS.map((s) => (
           <option key={s.id} value={s.id}>
@@ -119,7 +119,7 @@ export function ProjectFilters({
           onFilters({ ...filters, selectedOnly: !filters.selectedOnly })
         }
         className={cn(
-          "inline-flex h-8 items-center gap-1.5 rounded-md border px-2 text-[11px] font-medium transition",
+          "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[11px] font-medium transition",
           filters.selectedOnly
             ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
             : "border-zinc-800/60 bg-zinc-900/60 text-zinc-500 hover:text-zinc-200",

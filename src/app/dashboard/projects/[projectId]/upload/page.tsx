@@ -15,10 +15,12 @@ export default function UploadPage({
   const { projectId } = use(params);
   return (
     <AdminGate>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold">Upload videos</h1>
         <Link href={`/dashboard/projects/${projectId}`}>
-          <Button variant="secondary">Back to workspace</Button>
+          <Button variant="secondary" className="w-full sm:w-auto">
+            Back to workspace
+          </Button>
         </Link>
       </div>
       <UploadDropzone projectId={projectId as Id<"projects">} />

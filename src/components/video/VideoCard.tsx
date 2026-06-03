@@ -94,8 +94,8 @@ export function VideoCard({
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
         <div
           className={cn(
-            "absolute right-2 top-2 flex items-center rounded-full border border-white/10 bg-black/55 p-0.5 opacity-0 shadow-sm backdrop-blur transition-opacity",
-            "group-hover:opacity-100 group-focus-within:opacity-100",
+            "absolute right-2 top-2 flex items-center rounded-full border border-white/10 bg-black/55 p-0.5 opacity-100 shadow-sm backdrop-blur transition-opacity sm:opacity-0",
+            "sm:group-hover:opacity-100 sm:group-focus-within:opacity-100",
             video.isSelect && "opacity-100",
           )}
           onClick={(event) => event.stopPropagation()}

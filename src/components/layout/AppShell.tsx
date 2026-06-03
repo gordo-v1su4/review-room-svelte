@@ -127,22 +127,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur lg:hidden">
-          <div className="flex h-14 items-center justify-between px-4">
+          <div className="flex min-h-14 items-center justify-between gap-3 px-3 py-2 sm:px-4">
             <Link href="/dashboard" className="flex items-center gap-2 text-sm font-semibold">
               <Clapperboard className="h-4 w-4 text-teal-400" />
               Review Room
             </Link>
             {isAuthenticated && (
-              <Button variant="ghost" size="sm" onClick={() => void signOut()}>
-                Sign out
-              </Button>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <Link href="/dashboard/projects/new">
+                  <Button size="sm" className="h-8 gap-1.5 px-2.5">
+                    <Plus className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">New</span>
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2.5 text-zinc-500"
+                  onClick={() => void signOut()}
+                >
+                  Sign out
+                </Button>
+              </div>
             )}
           </div>
         </header>
         <main
           className={cn(
             "min-w-0 flex-1 overflow-y-auto",
-            isWorkspace ? "" : "mx-auto w-full max-w-[1600px] px-6 py-8",
+            isWorkspace ? "" : "mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8",
           )}
         >
           {children}

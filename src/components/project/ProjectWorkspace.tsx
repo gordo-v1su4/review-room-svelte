@@ -245,14 +245,22 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
             )}
           </div>
           {selected && layout !== "review" && (
-            <VideoDetailsPanel
-              video={selected}
-              mode="admin"
-              expanded={panelExpanded}
-              onClose={() => setSelectedId(null)}
-              onToggleExpand={() => setPanelExpanded((e) => !e)}
-              reviewerName="Admin"
-            />
+            <>
+              <button
+                type="button"
+                aria-label="Close video details"
+                className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm lg:hidden"
+                onClick={() => setSelectedId(null)}
+              />
+              <VideoDetailsPanel
+                video={selected}
+                mode="admin"
+                expanded={panelExpanded}
+                onClose={() => setSelectedId(null)}
+                onToggleExpand={() => setPanelExpanded((e) => !e)}
+                reviewerName="Admin"
+              />
+            </>
           )}
         </div>
       </div>
@@ -373,9 +381,9 @@ function ProjectHero({
 
   return (
     <div className="relative border-b border-zinc-800/60">
-      <div className="h-40" style={heroStyle} />
-      <div className="relative -mt-16 px-6 pb-5 sm:px-8">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
+      <div className="h-32 sm:h-40" style={heroStyle} />
+      <div className="relative -mt-14 px-4 pb-5 sm:-mt-16 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-5">
           <div className="relative shrink-0">
             <button
               type="button"
@@ -390,7 +398,7 @@ function ProjectHero({
               </span>
             </button>
             {identityOpen && (
-              <div className="absolute left-0 top-full z-50 mt-3 w-80 rounded-lg border border-zinc-800 bg-zinc-950 p-3 shadow-2xl shadow-black/40">
+              <div className="absolute left-0 top-full z-50 mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-zinc-800 bg-zinc-950 p-3 shadow-2xl shadow-black/40">
                 <div className="space-y-3">
                   <Input
                     value={draftTitle}
@@ -454,7 +462,7 @@ function ProjectHero({
               <span className="text-zinc-700">/</span>
               <span className="truncate text-zinc-400">{clientName ?? "Client"}</span>
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">
+            <h1 className="text-xl font-semibold tracking-tight text-zinc-100 sm:text-2xl">
               {title}
             </h1>
             {description && (
@@ -477,39 +485,43 @@ function ProjectHero({
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" className="gap-2" onClick={onShare}>
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
+            <Button variant="secondary" className="w-full gap-2 sm:w-auto" onClick={onShare}>
               <Link2 className="h-4 w-4" />
-              Share review link
+              <span className="hidden sm:inline">Share review link</span>
+              <span className="sm:hidden">Share</span>
             </Button>
             <Button
               variant="secondary"
-              className="gap-2"
+              className="w-full gap-2 sm:w-auto"
               disabled={reprocessing}
               onClick={onReprocess}
             >
               <RefreshCw className={cn("h-4 w-4", reprocessing && "animate-spin")} />
-              Refresh previews
+              <span className="hidden sm:inline">Refresh previews</span>
+              <span className="sm:hidden">Refresh</span>
             </Button>
             <Button
               variant="secondary"
-              className="gap-2 text-zinc-300"
+              className="w-full gap-2 text-zinc-300 sm:w-auto"
               disabled={!canClearVideos}
               onClick={onClearVideos}
             >
               <Trash2 className="h-4 w-4" />
-              Clear videos
+              <span className="hidden sm:inline">Clear videos</span>
+              <span className="sm:hidden">Clear</span>
             </Button>
             <Button
               variant="ghost"
-              className="gap-2 text-zinc-500"
+              className="w-full gap-2 text-zinc-500 sm:w-auto"
               onClick={onArchiveProject}
             >
               <Archive className="h-4 w-4" />
-              Archive project
+              <span className="hidden sm:inline">Archive project</span>
+              <span className="sm:hidden">Archive</span>
             </Button>
             <Link href={uploadHref}>
-              <Button className="gap-2">
+              <Button className="w-full gap-2 sm:w-auto">
                 <Upload className="h-4 w-4" />
                 Upload
               </Button>

@@ -66,9 +66,9 @@ export function VideoReviewMode({
   }
 
   return (
-    <div className="space-y-5 p-6 sm:p-8">
+    <div className="space-y-5 p-4 sm:p-6 lg:p-8">
       <div className="overflow-hidden rounded-lg border border-zinc-800/60 bg-zinc-900/30">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/60 px-4 py-3">
+        <div className="flex flex-col gap-3 border-b border-zinc-800/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">
               Playback
@@ -79,7 +79,7 @@ export function VideoReviewMode({
                 : "Advancing through the strip below"}
             </p>
           </div>
-          <div className="flex rounded-lg border border-zinc-800 bg-zinc-950/70 p-1">
+          <div className="grid grid-cols-2 rounded-lg border border-zinc-800 bg-zinc-950/70 p-1 sm:flex">
             <button
               type="button"
               aria-pressed={playbackMode === "order"}
@@ -88,7 +88,7 @@ export function VideoReviewMode({
                 setContinuePlayback(false);
               }}
               className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-zinc-500 transition",
+                "inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium text-zinc-500 transition",
                 playbackMode === "order"
                   ? "bg-zinc-800 text-zinc-100"
                   : "hover:bg-zinc-900 hover:text-zinc-300",
@@ -105,7 +105,7 @@ export function VideoReviewMode({
                 setContinuePlayback(false);
               }}
               className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-zinc-500 transition",
+                "inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium text-zinc-500 transition",
                 playbackMode === "loop"
                   ? "bg-zinc-800 text-zinc-100"
                   : "hover:bg-zinc-900 hover:text-zinc-300",
@@ -146,10 +146,10 @@ export function VideoReviewMode({
             </>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-4 border-t border-zinc-800/60 px-6 py-4">
+        <div className="grid gap-3 border-t border-zinc-800/60 px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:gap-4 sm:px-6">
           <VideoStatusPill status={active.status} />
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-lg font-medium text-zinc-100">
+            <h2 className="line-clamp-2 text-base font-medium text-zinc-100 sm:truncate sm:text-lg">
               {active.title}
             </h2>
             <p className="text-[11px] text-zinc-600">
@@ -157,47 +157,49 @@ export function VideoReviewMode({
               {formatDuration(active.durationSec)} / {active.originalFilename}
             </p>
           </div>
-          <VideoRatingControl
-            value={active.rating}
-            onChange={(rating) => void setRating({ videoId: active._id, rating })}
-          />
-          <Button
-            variant={active.isSelect ? "secondary" : "ghost"}
-            size="sm"
-            className={cn(
-              "gap-1.5",
-              active.isSelect && "border-sky-500/25 bg-sky-500/10 text-sky-200",
-            )}
-            onClick={() => void toggleSelect({ videoId: active._id })}
-          >
-            <Bookmark
-              className={cn("h-4 w-4", active.isSelect && "fill-sky-400 text-sky-400")}
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <VideoRatingControl
+              value={active.rating}
+              onChange={(rating) => void setRating({ videoId: active._id, rating })}
             />
-            {active.isSelect ? "Selected" : "Select"}
-          </Button>
-          <Button
-            variant="success"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => void approve({ videoId: active._id })}
-          >
-            <Check className="h-4 w-4" />
-            Approve
-          </Button>
-          <Button
-            variant="warning"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => void requestChanges({ videoId: active._id })}
-          >
-            <X className="h-4 w-4" />
-            Changes
-          </Button>
+            <Button
+              variant={active.isSelect ? "secondary" : "ghost"}
+              size="sm"
+              className={cn(
+                "gap-1.5",
+                active.isSelect && "border-sky-500/25 bg-sky-500/10 text-sky-200",
+              )}
+              onClick={() => void toggleSelect({ videoId: active._id })}
+            >
+              <Bookmark
+                className={cn("h-4 w-4", active.isSelect && "fill-sky-400 text-sky-400")}
+              />
+              {active.isSelect ? "Selected" : "Select"}
+            </Button>
+            <Button
+              variant="success"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => void approve({ videoId: active._id })}
+            >
+              <Check className="h-4 w-4" />
+              Approve
+            </Button>
+            <Button
+              variant="warning"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => void requestChanges({ videoId: active._id })}
+            >
+              <X className="h-4 w-4" />
+              Changes
+            </Button>
+          </div>
         </div>
       </div>
 
       <div>
-        <div className="mb-3 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+          <div className="mb-3 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
           In this project
         </div>
         <div className="no-scrollbar flex gap-3 overflow-x-auto pb-2">
@@ -207,7 +209,7 @@ export function VideoReviewMode({
               type="button"
               onClick={() => selectVideo(video._id)}
               className={cn(
-                "relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg border bg-zinc-950 text-left transition",
+                "relative aspect-video w-36 shrink-0 overflow-hidden rounded-lg border bg-zinc-950 text-left transition sm:w-40",
                 video._id === active._id
                   ? "border-teal-300/80"
                   : "border-zinc-800/60 opacity-65 hover:opacity-100",

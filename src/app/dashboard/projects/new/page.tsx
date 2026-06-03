@@ -33,7 +33,7 @@ export default function NewProjectPage() {
 
   return (
     <AdminGate>
-      <div className="pl-3 sm:pl-6 lg:pl-8">
+      <div className="pl-0 sm:pl-6 lg:pl-8">
         <h1 className="text-2xl font-semibold">New project</h1>
         <form onSubmit={onSubmit} className="mt-8 max-w-lg space-y-4">
           <Input name="title" placeholder="Project title" required />

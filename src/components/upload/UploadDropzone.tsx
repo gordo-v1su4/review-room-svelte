@@ -205,7 +205,7 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
     <div className="space-y-3">
       <label
         className={cn(
-          "flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed bg-zinc-900/40 px-6 py-10 transition-colors hover:border-zinc-500",
+          "flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed bg-zinc-900/40 px-4 py-9 text-center transition-colors hover:border-zinc-500 sm:px-6 sm:py-10",
           isDragging ? "border-zinc-300 bg-zinc-800/60" : "border-zinc-700",
         )}
         onDragEnter={(e) => {
@@ -253,7 +253,7 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
                 <div
                   className={cn(
                     "h-full rounded-full transition-all",
-                    f.status === "error" ? "bg-red-500" : "bg-zinc-300",
+                    f.status === "error" ? "bg-red-500" : "bg-teal-400",
                   )}
                   style={{ width: `${f.progress}%` }}
                 />
