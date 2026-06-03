@@ -20,7 +20,7 @@ export function VideoGrid({
 }) {
   if (!videos.length) {
     return (
-      <div className="mx-6 flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-zinc-800 text-sm text-zinc-500 sm:mx-8">
+      <div className="mx-4 flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-zinc-800 px-4 text-center text-sm text-zinc-500 sm:mx-6 lg:mx-8">
         {empty ?? "No videos"}
       </div>
     );
@@ -28,13 +28,13 @@ export function VideoGrid({
 
   const gridClass =
     size === "sm"
-      ? "grid-cols-2 md:grid-cols-4 lg:grid-cols-6"
+      ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
       : size === "lg"
-        ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-        : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
+        ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+        : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
 
   return (
-    <div className={cn("grid gap-3 p-6 sm:p-8", gridClass)}>
+    <div className={cn("grid gap-3 p-4 sm:p-6 lg:p-8", gridClass)}>
       {videos.map((video) => (
         <VideoCard
           key={video._id}

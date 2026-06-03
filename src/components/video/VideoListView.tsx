@@ -25,7 +25,7 @@ export function VideoListView({
   }
 
   return (
-    <div className="p-6 sm:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="overflow-hidden rounded-lg border border-zinc-800/60 bg-zinc-950">
         <div className="hidden grid-cols-[116px_minmax(0,2fr)_132px_minmax(0,1fr)_110px_72px_78px_40px] gap-3 border-b border-zinc-800/60 bg-zinc-900/40 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-zinc-600 md:grid">
           <div />
@@ -44,7 +44,7 @@ export function VideoListView({
               type="button"
               onClick={() => onSelect(video._id)}
               className={cn(
-                "grid w-full gap-3 px-3 py-2.5 text-left transition md:grid-cols-[116px_minmax(0,2fr)_132px_minmax(0,1fr)_110px_72px_78px_40px] md:items-center",
+                "grid w-full grid-cols-[112px_minmax(0,1fr)] gap-3 px-3 py-3 text-left transition md:grid-cols-[116px_minmax(0,2fr)_132px_minmax(0,1fr)_110px_72px_78px_40px] md:items-center md:py-2.5",
                 selectedId === video._id
                   ? "bg-zinc-800/45"
                   : "hover:bg-zinc-900/60",
@@ -67,10 +67,10 @@ export function VideoListView({
                   {video.originalFilename}
                 </div>
               </div>
-              <div>
+              <div className="col-start-2 md:col-start-auto">
                 <VideoStatusPill status={video.status} />
               </div>
-              <div className="flex min-w-0 flex-wrap gap-1">
+              <div className="col-span-2 flex min-w-0 flex-wrap gap-1 md:col-span-1">
                 {video.tags.slice(0, 3).map((tag) => (
                   <span
                     key={tag}
@@ -93,7 +93,7 @@ export function VideoListView({
                   />
                 ))}
               </div>
-              <div className="text-right text-[11px] tabular-nums">
+              <div className="text-left text-[11px] tabular-nums md:text-right">
                 {video.commentCount > 0 ? (
                   <span className="inline-flex items-center gap-1 text-sky-300">
                     <MessageSquare className="h-3 w-3" />

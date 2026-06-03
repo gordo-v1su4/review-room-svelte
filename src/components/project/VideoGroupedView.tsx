@@ -18,17 +18,21 @@ export function VideoGroupedView({
 }) {
   const sections = SMART_VIEWS.filter((v) => v.id !== "all");
   const cardWidth =
-    size === "sm" ? "w-[180px]" : size === "lg" ? "w-[320px]" : "w-[240px]";
+    size === "sm"
+      ? "w-[calc(50%_-_0.375rem)] min-w-[150px] sm:w-[180px]"
+      : size === "lg"
+        ? "w-full sm:w-[320px]"
+        : "w-full sm:w-[240px]";
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8 p-4 sm:p-6 lg:p-8">
       {sections.map((section) => {
         const items = videos.filter((v) => matchesSmartView(v, section.id));
         if (!items.length) return null;
         return (
           <section key={section.id}>
             <h3 className="mb-3 text-sm font-medium text-zinc-400">{section.label}</h3>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-3 sm:gap-4">
               {items.map((video) => (
                 <div key={video._id} className={cardWidth}>
                   <VideoCard

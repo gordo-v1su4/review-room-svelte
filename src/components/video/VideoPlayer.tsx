@@ -268,7 +268,7 @@ export function VideoPlayer({
             style={{ left: `${(currentTime / (duration || 1)) * 100}%` }}
           />
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500">
+        <div className="grid grid-cols-[auto_auto] items-center gap-3 text-xs text-zinc-500 sm:flex sm:flex-wrap sm:gap-4">
           <button
             type="button"
             onClick={togglePlayback}
@@ -281,7 +281,7 @@ export function VideoPlayer({
             )}
             {isPlaying ? "Pause" : "Play"}
           </button>
-          <p className="w-[27ch] font-mono text-[12px] tabular-nums text-zinc-400">
+          <p className="order-3 col-span-2 w-full font-mono text-[12px] tabular-nums text-zinc-400 sm:order-none sm:w-[27ch]">
             {displayMode === "timecode"
               ? `${formatEditorialTimecode(currentTime, frameRate)} / ${formatEditorialTimecode(duration, frameRate)}`
               : `${currentFrame.toLocaleString()} / ${totalFrames.toLocaleString()} fr`}

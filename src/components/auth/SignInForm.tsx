@@ -5,7 +5,7 @@ import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Github, Globe } from "lucide-react";
+import { Github } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,7 +69,7 @@ export function SignInForm() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-sm space-y-6">
+    <div className="mx-auto w-full max-w-md space-y-6">
       <div className="flex gap-2 rounded-lg bg-zinc-900 p-1">
         {(["signIn", "signUp"] as const).map((id) => (
           <button
@@ -109,21 +109,23 @@ export function SignInForm() {
         <Button
           type="button"
           variant="secondary"
-          className="w-full"
+          className="w-full justify-center"
           disabled={loading || isLoading}
           onClick={() => handleOAuth("github", "GitHub")}
         >
-          <Github className="mr-2 h-4 w-4" />
+          <Github className="h-4 w-4" />
           GitHub
         </Button>
         <Button
           type="button"
           variant="secondary"
-          className="w-full"
+          className="w-full justify-center"
           disabled={loading || isLoading}
           onClick={() => handleOAuth("google", "Google")}
         >
-          <Globe className="mr-2 h-4 w-4" />
+          <span className="grid h-4 w-4 place-items-center text-sm font-semibold leading-none text-zinc-50">
+            G
+          </span>
           Google
         </Button>
       </div>

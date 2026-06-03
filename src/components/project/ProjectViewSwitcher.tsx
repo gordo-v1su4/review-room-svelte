@@ -15,12 +15,12 @@ export function ProjectViewSwitcher({
 }) {
   return (
     <Tabs value={active} onValueChange={(v) => onChange(v as SmartViewId)}>
-      <TabsList className="no-scrollbar flex h-auto justify-start gap-0.5 overflow-x-auto border-b border-zinc-800/60 bg-transparent px-6 py-0 sm:px-8">
+      <TabsList className="no-scrollbar flex h-auto justify-start gap-0.5 overflow-x-auto border-b border-zinc-800/60 bg-transparent px-4 py-0 sm:px-6 lg:px-8">
         {SMART_VIEWS.map((view) => (
           <TabsTrigger
             key={view.id}
             value={view.id}
-            className="relative shrink-0 rounded-none border-0 bg-transparent px-3 py-3 text-xs text-zinc-600 shadow-none data-[state=active]:bg-transparent data-[state=active]:text-zinc-100 data-[state=active]:shadow-none"
+            className="relative shrink-0 rounded-none border-0 bg-transparent px-2.5 py-3 text-[11px] text-zinc-600 shadow-none data-[state=active]:bg-transparent data-[state=active]:text-zinc-100 data-[state=active]:shadow-none sm:px-3 sm:text-xs"
           >
             {view.label}
             <span className="rounded bg-zinc-800/70 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">

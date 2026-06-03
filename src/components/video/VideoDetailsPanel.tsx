@@ -66,15 +66,20 @@ export function VideoDetailsPanel({
   return (
     <aside
       className={cn(
-        "review-panel-drawer flex h-full flex-col border-l border-zinc-800 bg-zinc-950",
-        expanded ? "w-full max-w-none" : "w-full max-w-md lg:w-[420px]",
+        "review-panel-drawer fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] flex-col rounded-t-xl border-t border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/60 lg:static lg:z-auto lg:h-full lg:max-h-none lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none",
+        expanded ? "w-full max-w-none" : "w-full lg:max-w-md lg:w-[420px]",
       )}
     >
       <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <h2 className="truncate text-sm font-medium">{video.title}</h2>
         <div className="flex gap-1">
           {onToggleExpand && (
-            <Button variant="ghost" size="sm" onClick={onToggleExpand}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden lg:inline-flex"
+              onClick={onToggleExpand}
+            >
               {expanded ? "Collapse" : "Expand"}
             </Button>
           )}
@@ -83,7 +88,7 @@ export function VideoDetailsPanel({
           </Button>
         </div>
       </div>
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
         <div onMouseEnter={handleFirstPlay}>
           <VideoPlayer
             storageKey={video.storageKey}
@@ -110,7 +115,7 @@ export function VideoDetailsPanel({
           </div>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <VideoRatingControl
             value={video.rating}
             onChange={(rating) => {
@@ -139,7 +144,7 @@ export function VideoDetailsPanel({
           </Button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button
             className="flex-1"
             variant="success"
