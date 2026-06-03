@@ -134,12 +134,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
             {isAuthenticated && (
               <div className="flex min-w-0 items-center gap-1.5">
-                <Link href="/dashboard/projects/new">
-                  <Button size="sm" className="h-8 gap-1.5 px-2.5">
+                <Button size="sm" className="h-8 gap-1.5 px-2.5" asChild>
+                  <Link href="/dashboard/projects/new">
                     <Plus className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">New</span>
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"

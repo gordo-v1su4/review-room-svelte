@@ -17,11 +17,11 @@ export default function UploadPage({
     <AdminGate>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold">Upload videos</h1>
-        <Link href={`/dashboard/projects/${projectId}`}>
-          <Button variant="secondary" className="w-full sm:w-auto">
+        <Button variant="secondary" className="w-full sm:w-auto" asChild>
+          <Link href={`/dashboard/projects/${projectId}`}>
             Back to workspace
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
       <UploadDropzone projectId={projectId as Id<"projects">} />
     </AdminGate>

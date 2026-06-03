@@ -398,20 +398,21 @@ function ProjectHero({
               </span>
             </button>
             {identityOpen && (
-              <div className="absolute left-0 top-full z-50 mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-zinc-800 bg-zinc-950 p-3 shadow-2xl shadow-black/40">
-                <div className="space-y-3">
+              <div className="absolute left-0 top-full z-50 mt-3 w-[min(15.5rem,calc(100vw-2rem))] rounded-lg border border-zinc-700/60 bg-zinc-950/35 p-2.5 shadow-2xl shadow-black/30 ring-1 ring-white/5 backdrop-blur-xl">
+                <div className="space-y-2">
                   <Input
                     value={draftTitle}
                     onChange={(event) => setDraftTitle(event.target.value)}
                     aria-label="Project title"
+                    className="h-8 border-zinc-700/60 bg-zinc-950/35 px-2.5 text-xs backdrop-blur-md"
                   />
-                  <div className="flex items-center gap-3">
-                    <label className="flex h-9 flex-1 items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-3 text-xs text-zinc-400">
+                  <div className="flex items-center gap-2">
+                    <label className="flex h-8 flex-1 items-center gap-2 rounded-md border border-zinc-700/60 bg-zinc-950/35 px-2 text-[11px] text-zinc-300 backdrop-blur-md">
                       <input
                         type="color"
                         value={draftColor}
                         onChange={(event) => setDraftColor(event.target.value)}
-                        className="h-5 w-5 cursor-pointer rounded border-0 bg-transparent p-0"
+                        className="h-4 w-4 cursor-pointer rounded border-0 bg-transparent p-0"
                       />
                       Custom color
                     </label>
@@ -419,11 +420,11 @@ function ProjectHero({
                       type="button"
                       variant="secondary"
                       size="sm"
-                      className="gap-2"
+                      className="h-8 gap-1.5 px-2.5 text-xs"
                       disabled={uploadingBanner}
                       onClick={() => bannerInputRef.current?.click()}
                     >
-                      <ImagePlus className="h-4 w-4" />
+                      <ImagePlus className="h-3.5 w-3.5" />
                       Image
                     </Button>
                     <input
@@ -434,11 +435,12 @@ function ProjectHero({
                       onChange={(event) => void uploadBanner(event.target.files?.[0])}
                     />
                   </div>
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-2 pt-0.5">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
+                      className="h-8 px-2.5 text-xs"
                       onClick={() => setIdentityOpen(false)}
                     >
                       Cancel
@@ -446,6 +448,7 @@ function ProjectHero({
                     <Button
                       type="button"
                       size="sm"
+                      className="h-8 px-3 text-xs"
                       disabled={savingIdentity || !draftTitle.trim()}
                       onClick={() => void saveIdentity()}
                     >

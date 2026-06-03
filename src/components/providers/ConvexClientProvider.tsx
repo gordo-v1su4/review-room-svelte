@@ -5,12 +5,29 @@ import { ConvexReactClient } from "convex/react";
 import { ReactNode } from "react";
 import { isSelfHostedConvexUrl, publicEnv } from "@/lib/env/public";
 
-const url = publicEnv("CONVEX_URL");
-const convex = new ConvexReactClient(url, {
-  skipConvexDeploymentUrlCheck:
-    isSelfHostedConvexUrl(url) || url.includes("unfold.serving.cloud"),
-});
+const url = publicEnv("CONVEX_URL", { required: false });
+const convex = url
+  ? new ConvexReactClient(url, {
+      skipConvexDeploymentUrlCheck:
+        isSelfHostedConvexUrl(url) || url.includes("unfold.serving.cloud"),
+    })
+  : null;
 
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
+  if (!convex) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-zinc-950 px-4 text-zinc-100">
+        <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 text-center shadow-2xl shadow-black/30">
+          <p className="text-sm font-medium text-zinc-300">Review Room</p>
+          <h1 className="mt-3 text-xl font-semibold">Missing Convex URL</h1>
+          <p className="mt-2 text-sm leading-6 text-zinc-500">
+            Set <span className="font-mono text-zinc-300">NEXT_PUBLIC_CONVEX_URL</span>{" "}
+            for this deployment, then rebuild.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return <ConvexAuthProvider client={convex}>{children}</ConvexAuthProvider>;
 }
