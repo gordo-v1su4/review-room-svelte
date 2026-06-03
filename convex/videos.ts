@@ -189,6 +189,9 @@ export const setProcessingComplete = mutation({
     error: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const video = await ctx.db.get(args.videoId);
+    if (!video) throw new Error("Video not found");
+    await getProjectForAdmin(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       thumbnailKey: args.thumbnailKey,
       spriteKey: args.spriteKey,
@@ -197,6 +200,19 @@ export const setProcessingComplete = mutation({
       height: args.height,
       fps: args.fps,
       processingStatus: args.error ? "error" : "ready",
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const markProcessingFailed = mutation({
+  args: { videoId: v.id("videos") },
+  handler: async (ctx, args) => {
+    const video = await ctx.db.get(args.videoId);
+    if (!video) return;
+    await getProjectForAdmin(ctx, video.projectId);
+    await ctx.db.patch(args.videoId, {
+      processingStatus: "error",
       updatedAt: Date.now(),
     });
   },

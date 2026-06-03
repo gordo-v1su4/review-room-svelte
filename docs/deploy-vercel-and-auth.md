@@ -48,7 +48,7 @@ Vercel must use `NEXT_PUBLIC_*` for browser-exposed Convex URLs.
 | `S3_SECRET_ACCESS_KEY` | RustFS secret |
 | `S3_FORCE_PATH_STYLE` | `true` |
 | `MEDIA_WORKER_SECRET` | Shared secret for worker + `/api/media/enqueue` |
-| `MEDIA_WORKER_URL` | Homelab worker URL if not localhost |
+| `MEDIA_WORKER_URL` | Homelab worker URL if not localhost; required for Vercel Production and Preview uploads to generate thumbnails/scrub sprites |
 
 Or, if using the media gateway instead of direct S3 presign: `MEDIA_GATEWAY_*` and `USE_MEDIA_GATEWAY=1`.
 

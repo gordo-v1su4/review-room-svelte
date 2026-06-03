@@ -86,6 +86,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     setReprocessing(true);
     try {
       let ok = 0;
+      let failed = 0;
       for (const video of videos) {
         const res = await fetch("/api/media/enqueue", {
           method: "POST",
@@ -95,9 +96,17 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
             storageKey: video.storageKey,
           }),
         });
-        if (res.ok) ok++;
+        if (res.ok) {
+          ok++;
+        } else {
+          failed++;
+        }
       }
-      toast.success(`Refreshing previews for ${ok} videos`);
+      if (failed) {
+        toast.error(`Queued ${ok} previews; ${failed} failed to start`);
+      } else {
+        toast.success(`Refreshing previews for ${ok} videos`);
+      }
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not refresh previews",
