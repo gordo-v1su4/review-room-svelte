@@ -15,8 +15,151 @@ type FileState = {
   status: "pending" | "uploading" | "done" | "error";
 };
 
+type ClientPreviewResult = {
+  thumbnail: File;
+  sprite: File;
+  durationSec?: number;
+  width?: number;
+  height?: number;
+};
+
 function makeUploadId(file: File) {
   return `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`;
+}
+
+function waitForEvent(target: EventTarget, eventName: string, timeoutMs = 10000) {
+  return new Promise<void>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error(`Timed out waiting for ${eventName}`));
+    }, timeoutMs);
+    const onEvent = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("Video preview decode failed"));
+    };
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      target.removeEventListener(eventName, onEvent);
+      target.removeEventListener("error", onError);
+    };
+    target.addEventListener(eventName, onEvent, { once: true });
+    target.addEventListener("error", onError, { once: true });
+  });
+}
+
+async function seekVideo(video: HTMLVideoElement, time: number) {
+  if (Math.abs(video.currentTime - time) < 0.02) return;
+  const seeked = waitForEvent(video, "seeked");
+  video.currentTime = time;
+  await seeked;
+}
+
+function drawVideoCover(
+  ctx: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  width: number,
+  height: number,
+  dx = 0,
+) {
+  const sourceWidth = video.videoWidth || width;
+  const sourceHeight = video.videoHeight || height;
+  const sourceRatio = sourceWidth / sourceHeight;
+  const targetRatio = width / height;
+  let sx = 0;
+  let sy = 0;
+  let sw = sourceWidth;
+  let sh = sourceHeight;
+
+  if (sourceRatio > targetRatio) {
+    sw = sourceHeight * targetRatio;
+    sx = (sourceWidth - sw) / 2;
+  } else {
+    sh = sourceWidth / targetRatio;
+    sy = (sourceHeight - sh) / 2;
+  }
+
+  ctx.drawImage(video, sx, sy, sw, sh, dx, 0, width, height);
+}
+
+function canvasToJpegFile(
+  canvas: HTMLCanvasElement,
+  filename: string,
+  quality = 0.82,
+) {
+  return new Promise<File>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Could not encode preview image"));
+          return;
+        }
+        resolve(new File([blob], filename, { type: "image/jpeg" }));
+      },
+      "image/jpeg",
+      quality,
+    );
+  });
+}
+
+async function generateClientPreviews(file: File): Promise<ClientPreviewResult> {
+  const objectUrl = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.muted = true;
+  video.preload = "metadata";
+  video.playsInline = true;
+  video.src = objectUrl;
+
+  try {
+    await waitForEvent(video, "loadedmetadata");
+    const durationSec =
+      Number.isFinite(video.duration) && video.duration > 0
+        ? video.duration
+        : undefined;
+    const width = video.videoWidth || undefined;
+    const height = video.videoHeight || undefined;
+
+    const thumbCanvas = document.createElement("canvas");
+    thumbCanvas.width = 640;
+    thumbCanvas.height = 360;
+    const thumbCtx = thumbCanvas.getContext("2d");
+    if (!thumbCtx) throw new Error("Could not create thumbnail canvas");
+
+    await seekVideo(video, Math.min(1, Math.max(0, (durationSec ?? 2) / 2)));
+    drawVideoCover(thumbCtx, video, thumbCanvas.width, thumbCanvas.height);
+
+    const frameCount = 10;
+    const frameWidth = 320;
+    const frameHeight = 180;
+    const spriteCanvas = document.createElement("canvas");
+    spriteCanvas.width = frameWidth * frameCount;
+    spriteCanvas.height = frameHeight;
+    const spriteCtx = spriteCanvas.getContext("2d");
+    if (!spriteCtx) throw new Error("Could not create sprite canvas");
+
+    const safeDuration = durationSec && durationSec > 0 ? durationSec : 1;
+    for (let index = 0; index < frameCount; index++) {
+      const midpoint = (safeDuration * (index + 0.5)) / frameCount;
+      const seekSec = Math.max(0, Math.min(safeDuration - 0.05, midpoint));
+      await seekVideo(video, seekSec);
+      drawVideoCover(spriteCtx, video, frameWidth, frameHeight, index * frameWidth);
+    }
+
+    const baseName = file.name.replace(/\.[^.]+$/, "");
+    const [thumbnail, sprite] = await Promise.all([
+      canvasToJpegFile(thumbCanvas, `${baseName}-thumb.jpg`, 0.86),
+      canvasToJpegFile(spriteCanvas, `${baseName}-sprite.jpg`, 0.8),
+    ]);
+
+    return { thumbnail, sprite, durationSec, width, height };
+  } finally {
+    video.removeAttribute("src");
+    video.load();
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 function uploadToPresignedUrl({
@@ -91,6 +234,8 @@ function uploadViaServer({
 
 export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
   const createVideo = useMutation(api.videos.createFromUpload);
+  const markPreviewReady = useMutation(api.videos.setProcessingComplete);
+  const markProcessingFailed = useMutation(api.videos.markProcessingFailed);
   const [files, setFiles] = useState<FileState[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -166,11 +311,48 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
             sizeBytes: item.file.size,
           });
 
-          void fetch("/api/media/enqueue", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ videoId, storageKey: uploadedStorageKey }),
-          });
+          try {
+            const preview = await generateClientPreviews(item.file);
+            setFiles((prev) =>
+              prev.map((f) => (f.id === item.id ? { ...f, progress: 97 } : f)),
+            );
+            const [thumbnailUpload, spriteUpload] = await Promise.all([
+              uploadViaServer({
+                file: preview.thumbnail,
+                projectId,
+                onProgress: () => {},
+              }),
+              uploadViaServer({
+                file: preview.sprite,
+                projectId,
+                onProgress: () => {},
+              }),
+            ]);
+            await markPreviewReady({
+              videoId,
+              thumbnailKey: thumbnailUpload.storageKey,
+              spriteKey: spriteUpload.storageKey,
+              durationSec: preview.durationSec,
+              width: preview.width,
+              height: preview.height,
+            });
+          } catch {
+            const enqueue = await fetch("/api/media/enqueue", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ videoId, storageKey: uploadedStorageKey }),
+            });
+            if (!enqueue.ok) {
+              const payload = (await enqueue.json().catch(() => ({}))) as {
+                error?: string;
+              };
+              await markProcessingFailed({ videoId });
+              throw new Error(
+                payload.error ??
+                  "Upload saved, but preview processing could not start.",
+              );
+            }
+          }
 
           setFiles((prev) =>
             prev.map((f) =>
@@ -198,7 +380,7 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
         }),
       );
     },
-    [createVideo, projectId],
+    [createVideo, markPreviewReady, markProcessingFailed, projectId],
   );
 
   return (
