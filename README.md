@@ -1,24 +1,21 @@
+![Review Room interface](docs/assets/review-room-preview.webp)
+
 # Review Room
 
-Client-facing video review portal. Planning docs in `init-docs/`; application in `src/` + `convex/`.
+Client-facing video review workspace for uploading, scrubbing, shortlisting, commenting on, and approving clips.
 
-## Quick start
+## Quick Start
 
-1. `bun install`
-2. Copy `.env.example` → `.env.local` (or run `scripts/use-homelab-env.ps1` from pindeck homelab vars)
-3. `bunx convex dev` in one terminal, `bun dev` in another
-4. Open `/sign-in`, create admin account, create a project
+```bash
+bun install
+bun dev
+bun run worker:media
+```
 
-For production homelab: set `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, `CONVEX_SELF_HOSTED_*`, and `S3_*` — see [docs/adr/001-infrastructure.md](docs/adr/001-infrastructure.md) and [docs/deploy-vercel-and-auth.md](docs/deploy-vercel-and-auth.md).
+Copy `.env.example` to `.env.local` before running locally. Convex, RustFS/S3, and deployment notes live in [`docs/`](docs/).
 
-**Next.js vs Vite:** This app is Next.js (PRD), so browser env must use `NEXT_PUBLIC_*`. If copying env from Pindeck, run `scripts/use-homelab-env.ps1` to convert Pindeck’s `VITE_*` names.
+## Project Docs
 
-## Docs
-
-1. [`init-docs/00-Creative-Brief.md`](init-docs/00-Creative-Brief.md)
-2. [`init-docs/01-PRD.md`](init-docs/01-PRD.md)
-3. [`init-docs/02-Design-Spec.md`](init-docs/02-Design-Spec.md)
-
-## For agents
-
-See [`AGENTS.md`](AGENTS.md).
+- [`init-docs/00-Creative-Brief.md`](init-docs/00-Creative-Brief.md)
+- [`init-docs/01-PRD.md`](init-docs/01-PRD.md)
+- [`init-docs/02-Design-Spec.md`](init-docs/02-Design-Spec.md)
