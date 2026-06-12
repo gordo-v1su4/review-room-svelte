@@ -165,36 +165,6 @@ async function generateClientPreviews(file: File): Promise<ClientPreviewResult> 
   }
 }
 
-function uploadToPresignedUrl({
-  file,
-  uploadUrl,
-  onProgress,
-}: {
-  file: File;
-  uploadUrl: string;
-  onProgress: (progress: number) => void;
-}) {
-  return new Promise<void>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", uploadUrl);
-    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-    xhr.upload.onprogress = (event) => {
-      if (!event.lengthComputable) return;
-      onProgress(Math.max(10, Math.round((event.loaded / event.total) * 90)));
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress(95);
-        resolve();
-      } else {
-        reject(new Error(`Upload failed with HTTP ${xhr.status}`));
-      }
-    };
-    xhr.onerror = () => reject(new Error("Upload failed"));
-    xhr.send(file);
-  });
-}
-
 function uploadViaServer({
   file,
   projectId,
@@ -265,45 +235,16 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
               f.id === item.id ? { ...f, status: "uploading", progress: 10 } : f,
             ),
           );
-          const presign = await fetch("/api/storage/presign-upload", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              projectId,
-              filename: item.file.name,
-              contentType: item.file.type || "application/octet-stream",
-            }),
+          const upload = await uploadViaServer({
+            file: item.file,
+            projectId,
+            onProgress: (progress) => {
+              setFiles((prev) =>
+                prev.map((f) => (f.id === item.id ? { ...f, progress } : f)),
+              );
+            },
           });
-          const { uploadUrl, storageKey } = (await presign.json()) as {
-            uploadUrl?: string;
-            storageKey?: string;
-            error?: string;
-          };
-          if (!uploadUrl || !storageKey) throw new Error(presign.statusText);
-
-          let uploadedStorageKey = storageKey;
-          try {
-            await uploadToPresignedUrl({
-              file: item.file,
-              uploadUrl,
-              onProgress: (progress) => {
-                setFiles((prev) =>
-                  prev.map((f) => (f.id === item.id ? { ...f, progress } : f)),
-                );
-              },
-            });
-          } catch {
-            const fallback = await uploadViaServer({
-              file: item.file,
-              projectId,
-              onProgress: (progress) => {
-                setFiles((prev) =>
-                  prev.map((f) => (f.id === item.id ? { ...f, progress } : f)),
-                );
-              },
-            });
-            uploadedStorageKey = fallback.storageKey;
-          }
+          const uploadedStorageKey = upload.storageKey;
 
           const videoId = await createVideo({
             projectId,
