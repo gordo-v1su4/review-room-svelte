@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { X, Bookmark, Trash2 } from "lucide-react";
+import { X, Bookmark, Flag, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { VideoDoc } from "@/lib/smartViews";
@@ -58,6 +58,7 @@ export function VideoDetailsPanel({
   const addCommentClient = useMutation(api.reviewPublic.clientAddComment);
   const updateMeta = useMutation(api.videos.updateMetadata);
   const setMarkedForDeletion = useMutation(api.videos.setMarkedForDeletion);
+  const removeVideo = useMutation(api.videos.remove);
 
   const handleFirstPlay = () => {
     if (!video.viewed) {
@@ -184,23 +185,40 @@ export function VideoDetailsPanel({
         </div>
 
         {mode === "admin" && (
-          <Button
-            variant="ghost"
-            className={cn(
-              "w-full justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-300",
-              video.markedForDeletion &&
-                "border-red-900/70 bg-red-950/20 text-red-300",
-            )}
-            onClick={() =>
-              void setMarkedForDeletion({
-                videoId: video._id,
-                marked: !video.markedForDeletion,
-              })
-            }
-          >
-            <Trash2 className="h-4 w-4" />
-            {video.markedForDeletion ? "Remove delete mark" : "Mark for delete"}
-          </Button>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button
+              variant="ghost"
+              className={cn(
+                "justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-300",
+                video.markedForDeletion &&
+                  "border-red-900/70 bg-red-950/20 text-red-300",
+              )}
+              onClick={() =>
+                void setMarkedForDeletion({
+                  videoId: video._id,
+                  marked: !video.markedForDeletion,
+                })
+              }
+            >
+              <Flag className="h-4 w-4" />
+              {video.markedForDeletion ? "Unmark" : "Mark for delete"}
+            </Button>
+            <Button
+              variant="ghost"
+              className="justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-300"
+              onClick={() => {
+                if (!window.confirm(`Delete "${video.title}" from this review?`)) {
+                  return;
+                }
+                void removeVideo({ videoId: video._id }).then(() => {
+                  onClose();
+                });
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete video
+            </Button>
+          </div>
         )}
 
         <CommentComposer
