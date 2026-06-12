@@ -9,6 +9,27 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [Password, Google, GitHub],
 });
 
+function emailAllowed(email?: string) {
+  const raw = process.env.AUTH_EMAIL_ALLOWLIST?.trim();
+  if (!raw) return true;
+  if (!email) return false;
+
+  const normalizedEmail = email.toLowerCase();
+  const domain = normalizedEmail.split("@")[1];
+  const entries = raw
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+
+  return entries.some((entry) => {
+    if (entry.includes("@") && !entry.startsWith("*@")) {
+      return normalizedEmail === entry;
+    }
+    const normalizedDomain = entry.replace(/^\*@/, "").replace(/^@/, "");
+    return domain === normalizedDomain;
+  });
+}
+
 export const loggedInAppUser = query({
   args: {},
   handler: async (ctx) => {
@@ -35,13 +56,21 @@ export const ensureAdminProfile = mutation({
   handler: async (ctx, args) => {
     const authUserId = await getAuthUserId(ctx);
     if (!authUserId) throw new Error("Not authenticated");
+    const authUser = await ctx.db.get(authUserId);
+    if (!emailAllowed(authUser?.email)) {
+      throw new Error("This email is not allowed to access Review Room");
+    }
     const existing = await ctx.db
       .query("appUsers")
       .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
       .unique();
-    if (existing) return existing._id;
+    if (existing) {
+      if (existing.role !== "admin") {
+        throw new Error("This email is not authorized to access Review Room");
+      }
+      return existing._id;
+    }
 
-    const authUser = await ctx.db.get(authUserId);
     const name =
       args.name ??
       authUser?.name ??

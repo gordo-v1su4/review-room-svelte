@@ -2,6 +2,17 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getProjectForAdmin, requireAdmin } from "./lib/access";
 
+const reviewAppearanceValidator = v.object({
+  gridSize: v.union(v.literal("sm"), v.literal("md"), v.literal("lg")),
+  aspectRatio: v.union(
+    v.literal("video"),
+    v.literal("square"),
+    v.literal("portrait"),
+  ),
+  thumbnailScale: v.union(v.literal("fit"), v.literal("fill")),
+  showCardInfo: v.boolean(),
+});
+
 function randomToken() {
   const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
@@ -32,6 +43,7 @@ export const create = mutation({
     projectId: v.id("projects"),
     passcode: v.optional(v.string()),
     canDownload: v.boolean(),
+    appearance: v.optional(reviewAppearanceValidator),
   },
   handler: async (ctx, args) => {
     await getProjectForAdmin(ctx, args.projectId);
@@ -44,6 +56,7 @@ export const create = mutation({
       token,
       passcodeHash,
       canDownload: args.canDownload,
+      appearance: args.appearance,
       createdAt: Date.now(),
     });
     return { linkId, token, url: `/review/${token}` };

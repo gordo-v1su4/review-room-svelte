@@ -27,7 +27,7 @@ export function VideoStatusPill({
   return (
     <span
       className={cn(
-        "inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-normal",
+        "inline-flex max-w-full rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-normal whitespace-nowrap",
         STYLES[status],
         className,
       )}

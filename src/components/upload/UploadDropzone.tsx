@@ -58,31 +58,32 @@ async function seekVideo(video: HTMLVideoElement, time: number) {
   await seeked;
 }
 
-function drawVideoCover(
+function getPreviewDimensions(
+  sourceWidth: number | undefined,
+  sourceHeight: number | undefined,
+  maxLongEdge: number,
+) {
+  const width = sourceWidth && sourceWidth > 0 ? sourceWidth : 16;
+  const height = sourceHeight && sourceHeight > 0 ? sourceHeight : 9;
+  const longEdge = Math.max(width, height);
+  const scale = maxLongEdge / longEdge;
+
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+function drawVideoFrame(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
   width: number,
   height: number,
   dx = 0,
 ) {
-  const sourceWidth = video.videoWidth || width;
-  const sourceHeight = video.videoHeight || height;
-  const sourceRatio = sourceWidth / sourceHeight;
-  const targetRatio = width / height;
-  let sx = 0;
-  let sy = 0;
-  let sw = sourceWidth;
-  let sh = sourceHeight;
-
-  if (sourceRatio > targetRatio) {
-    sw = sourceHeight * targetRatio;
-    sx = (sourceWidth - sw) / 2;
-  } else {
-    sh = sourceWidth / targetRatio;
-    sy = (sourceHeight - sh) / 2;
-  }
-
-  ctx.drawImage(video, sx, sy, sw, sh, dx, 0, width, height);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(dx, 0, width, height);
+  ctx.drawImage(video, dx, 0, width, height);
 }
 
 function canvasToJpegFile(
@@ -122,18 +123,20 @@ async function generateClientPreviews(file: File): Promise<ClientPreviewResult> 
     const width = video.videoWidth || undefined;
     const height = video.videoHeight || undefined;
 
+    const thumbSize = getPreviewDimensions(width, height, 640);
     const thumbCanvas = document.createElement("canvas");
-    thumbCanvas.width = 640;
-    thumbCanvas.height = 360;
+    thumbCanvas.width = thumbSize.width;
+    thumbCanvas.height = thumbSize.height;
     const thumbCtx = thumbCanvas.getContext("2d");
     if (!thumbCtx) throw new Error("Could not create thumbnail canvas");
 
     await seekVideo(video, Math.min(1, Math.max(0, (durationSec ?? 2) / 2)));
-    drawVideoCover(thumbCtx, video, thumbCanvas.width, thumbCanvas.height);
+    drawVideoFrame(thumbCtx, video, thumbCanvas.width, thumbCanvas.height);
 
     const frameCount = 10;
-    const frameWidth = 320;
-    const frameHeight = 180;
+    const frameSize = getPreviewDimensions(width, height, 320);
+    const frameWidth = frameSize.width;
+    const frameHeight = frameSize.height;
     const spriteCanvas = document.createElement("canvas");
     spriteCanvas.width = frameWidth * frameCount;
     spriteCanvas.height = frameHeight;
@@ -145,7 +148,7 @@ async function generateClientPreviews(file: File): Promise<ClientPreviewResult> 
       const midpoint = (safeDuration * (index + 0.5)) / frameCount;
       const seekSec = Math.max(0, Math.min(safeDuration - 0.05, midpoint));
       await seekVideo(video, seekSec);
-      drawVideoCover(spriteCtx, video, frameWidth, frameHeight, index * frameWidth);
+      drawVideoFrame(spriteCtx, video, frameWidth, frameHeight, index * frameWidth);
     }
 
     const baseName = file.name.replace(/\.[^.]+$/, "");

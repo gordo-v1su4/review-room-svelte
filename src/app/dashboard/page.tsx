@@ -1,19 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { Archive, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
-import { AdminGate } from "@/components/auth/AdminGate";
+import { AdminGate, useAdminAccess } from "@/components/auth/AdminGate";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
-  const { isAuthenticated } = useConvexAuth();
+  const { isAdmin } = useAdminAccess();
   const archiveProject = useMutation(api.projects.archive);
   const projects = useQuery(
     api.projects.listForAdmin,
-    isAuthenticated ? {} : "skip",
+    isAdmin ? {} : "skip",
   );
 
   return (
@@ -56,6 +56,7 @@ export default function DashboardPage() {
                   variant="ghost"
                   size="icon"
                   title="Archive project"
+                  disabled={!p.isOwner}
                   onClick={() => {
                     if (!window.confirm(`Archive "${p.title}"?`)) return;
                     void archiveProject({ projectId: p._id }).then(() => {
@@ -68,6 +69,11 @@ export default function DashboardPage() {
               </div>
               {p.clientName && (
                 <p className="mt-1 text-sm text-zinc-500">{p.clientName}</p>
+              )}
+              {!p.isOwner && (
+                <p className="mt-2 inline-flex rounded-full border border-teal-400/20 bg-teal-400/10 px-2 py-0.5 text-[11px] font-medium text-teal-300">
+                  Shared with you
+                </p>
               )}
               <dl className="mt-4 grid grid-cols-3 gap-2 text-xs text-zinc-500">
                 <div>

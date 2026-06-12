@@ -106,6 +106,7 @@ export const markViewed = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video || video.viewed) return;
+    await getProjectForAdmin(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       viewed: true,
       updatedAt: Date.now(),
@@ -119,6 +120,7 @@ export const setRating = mutation({
     const rating = Math.max(0, Math.min(5, Math.round(args.rating)));
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
+    await getProjectForAdmin(ctx, video.projectId);
     await ctx.db.patch(args.videoId, { rating, updatedAt: Date.now() });
   },
 });
@@ -128,6 +130,7 @@ export const toggleSelect = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
+    await getProjectForAdmin(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       isSelect: !video.isSelect,
       updatedAt: Date.now(),
@@ -138,6 +141,9 @@ export const toggleSelect = mutation({
 export const approve = mutation({
   args: { videoId: v.id("videos") },
   handler: async (ctx, args) => {
+    const video = await ctx.db.get(args.videoId);
+    if (!video) throw new Error("Video not found");
+    await getProjectForAdmin(ctx, video.projectId);
     const now = Date.now();
     await ctx.db.patch(args.videoId, {
       status: "approved",
@@ -150,6 +156,9 @@ export const approve = mutation({
 export const requestChanges = mutation({
   args: { videoId: v.id("videos") },
   handler: async (ctx, args) => {
+    const video = await ctx.db.get(args.videoId);
+    if (!video) throw new Error("Video not found");
+    await getProjectForAdmin(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       status: "needs_changes",
       updatedAt: Date.now(),
@@ -202,6 +211,26 @@ export const setProcessingComplete = mutation({
       processingStatus: args.error ? "error" : "ready",
       updatedAt: Date.now(),
     });
+  },
+});
+
+export const startPreviewRefresh = mutation({
+  args: { videoId: v.id("videos") },
+  handler: async (ctx, args) => {
+    const video = await ctx.db.get(args.videoId);
+    if (!video) throw new Error("Video not found");
+    await getProjectForAdmin(ctx, video.projectId);
+    await ctx.db.patch(args.videoId, {
+      thumbnailKey: undefined,
+      spriteKey: undefined,
+      processingStatus: "processing",
+      updatedAt: Date.now(),
+    });
+    return {
+      storageKey: video.storageKey,
+      previousThumbnailKey: video.thumbnailKey,
+      previousSpriteKey: video.spriteKey,
+    };
   },
 });
 

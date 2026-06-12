@@ -23,23 +23,38 @@ function authErrorMessage(err: unknown, flow: "signIn" | "signUp") {
   return message || (flow === "signIn" ? "Sign in failed" : "Create account failed");
 }
 
+function accessDeniedMessage() {
+  return "That login is not authorized for this workspace.";
+}
+
 export function SignInForm() {
-  const { signIn } = useAuthActions();
+  const { signIn, signOut } = useAuthActions();
   const { isAuthenticated, isLoading } = useConvexAuth();
   const ensureAdmin = useMutation(api.auth.ensureAdminProfile);
   const router = useRouter();
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [loading, setLoading] = useState(false);
   const [pendingName, setPendingName] = useState<string | undefined>();
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "unauthorized") {
+      setAuthNotice(accessDeniedMessage());
+    }
+  }, []);
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
     void ensureAdmin({ name: pendingName })
       .then(() => router.replace("/dashboard"))
-      .catch((err) => {
-        toast.error(err instanceof Error ? err.message : "Could not finish sign-in");
+      .catch(() => {
+        const message = accessDeniedMessage();
+        setAuthNotice(message);
+        toast.error(message);
+        void signOut().finally(() => setLoading(false));
       });
-  }, [isAuthenticated, isLoading, ensureAdmin, pendingName, router]);
+  }, [isAuthenticated, isLoading, ensureAdmin, pendingName, router, signOut]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -47,6 +62,7 @@ export function SignInForm() {
     const formData = new FormData(form);
     formData.set("flow", flow);
     setLoading(true);
+    setAuthNotice(null);
     try {
       const name = (formData.get("name") as string) || undefined;
       setPendingName(name);
@@ -60,6 +76,7 @@ export function SignInForm() {
 
   function handleOAuth(provider: "google" | "github", label: string) {
     setLoading(true);
+    setAuthNotice(null);
     void signIn(provider).catch((err) => {
       toast.error(
         err instanceof Error ? err.message : `${label} sign-in failed`,
@@ -86,6 +103,12 @@ export function SignInForm() {
           </button>
         ))}
       </div>
+
+      {authNotice && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          {authNotice}
+        </div>
+      )}
 
       <form onSubmit={onSubmit} className="space-y-4">
         {flow === "signUp" && (

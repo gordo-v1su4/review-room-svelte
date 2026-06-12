@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { useMutation } from "convex/react";
 import { MessageSquare, Download, Bookmark, Star } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
+import type { CardAspectRatio, ThumbnailScale } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { VideoStatusPill } from "./VideoStatusPill";
@@ -14,18 +15,31 @@ export function VideoCard({
   video,
   selected,
   size = "md",
+  aspectRatio = "video",
+  thumbnailScale = "fill",
+  showCardInfo = true,
+  actionMode = "admin",
+  token,
   onSelect,
 }: {
   video: VideoDoc;
   selected?: boolean;
   size?: "sm" | "md" | "lg";
+  aspectRatio?: CardAspectRatio;
+  thumbnailScale?: ThumbnailScale;
+  showCardInfo?: boolean;
+  actionMode?: "admin" | "client";
+  token?: string;
   onSelect: () => void;
 }) {
   const thumbUrl = useStorageUrl(video.thumbnailKey, video.updatedAt);
   const spriteUrl = useStorageUrl(video.spriteKey, video.updatedAt);
-  const toggleSelect = useMutation(api.videos.toggleSelect);
-  const setRating = useMutation(api.videos.setRating);
+  const toggleSelectAdmin = useMutation(api.videos.toggleSelect);
+  const toggleSelectClient = useMutation(api.reviewPublic.clientToggleSelect);
+  const setRatingAdmin = useMutation(api.videos.setRating);
+  const setRatingClient = useMutation(api.reviewPublic.clientSetRating);
   const [hoverPct, setHoverPct] = useState<number | null>(null);
+  const [spriteAspect, setSpriteAspect] = useState<number | null>(null);
   const spriteFrameCount = 10;
   const scrubFrame =
     hoverPct == null
@@ -34,12 +48,71 @@ export function VideoCard({
           spriteFrameCount - 1,
           Math.max(0, Math.floor(hoverPct * spriteFrameCount)),
         );
-  const scrubPosition =
-    spriteFrameCount <= 1 ? 0 : (scrubFrame / (spriteFrameCount - 1)) * 100;
+  const frameAspect =
+    spriteAspect ??
+    (video.width && video.height ? video.width / video.height : 16 / 9);
+  const containerAspect = aspectRatioToNumber(aspectRatio);
+  const spriteSurfaceStyle = useMemo(
+    () =>
+      getSpriteSurfaceStyle({
+        containerAspect,
+        frameAspect,
+        frameCount: spriteFrameCount,
+        frameIndex: scrubFrame,
+        scale: thumbnailScale,
+        spriteUrl,
+      }),
+    [
+      containerAspect,
+      frameAspect,
+      scrubFrame,
+      spriteFrameCount,
+      spriteUrl,
+      thumbnailScale,
+    ],
+  );
   const titleClass =
     size === "lg"
-      ? "line-clamp-2 text-sm leading-5"
-      : "line-clamp-1 text-[13px] leading-5";
+      ? "line-clamp-2 text-[13px] leading-5"
+      : "line-clamp-1 text-[12px] leading-4";
+
+  useEffect(() => {
+    if (!spriteUrl) {
+      setSpriteAspect(null);
+      return;
+    }
+
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (cancelled || image.naturalHeight <= 0) return;
+      setSpriteAspect(image.naturalWidth / spriteFrameCount / image.naturalHeight);
+    };
+    image.onerror = () => {
+      if (!cancelled) setSpriteAspect(null);
+    };
+    image.src = spriteUrl;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [spriteFrameCount, spriteUrl]);
+
+  function toggleShortlist() {
+    if (actionMode === "client" && token) {
+      void toggleSelectClient({ token, videoId: video._id });
+      return;
+    }
+    void toggleSelectAdmin({ videoId: video._id });
+  }
+
+  function rateVideo(rating: number) {
+    if (actionMode === "client" && token) {
+      void setRatingClient({ token, videoId: video._id, rating });
+      return;
+    }
+    void setRatingAdmin({ videoId: video._id, rating });
+  }
 
   return (
     <article
@@ -60,7 +133,10 @@ export function VideoCard({
       )}
     >
       <div
-        className="relative aspect-video w-full overflow-hidden bg-zinc-950"
+        className={cn(
+          "relative w-full overflow-hidden bg-zinc-950",
+          aspectRatioClass[aspectRatio],
+        )}
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           const pct = (e.clientX - rect.left) / rect.width;
@@ -70,16 +146,19 @@ export function VideoCard({
       >
         {spriteUrl && hoverPct != null ? (
           <div
-            className="h-full w-full bg-cover bg-no-repeat"
-            style={{
-              backgroundImage: `url(${spriteUrl})`,
-              backgroundSize: `${spriteFrameCount * 100}% 100%`,
-              backgroundPosition: `${scrubPosition}% center`,
-            }}
+            className="absolute left-1/2 top-1/2 bg-no-repeat"
+            style={spriteSurfaceStyle}
           />
         ) : thumbUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
+          <img
+            src={thumbUrl}
+            alt=""
+            className={cn(
+              "h-full w-full",
+              thumbnailScale === "fit" ? "object-contain" : "object-cover",
+            )}
+          />
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-zinc-600">
             {video.processingStatus === "processing" ? "Processing..." : "No preview"}
@@ -107,7 +186,7 @@ export function VideoCard({
               "grid h-6 w-6 place-items-center rounded-full text-zinc-300 transition hover:bg-white/10 hover:text-white",
               video.isSelect && "text-sky-300",
             )}
-            onClick={() => void toggleSelect({ videoId: video._id })}
+            onClick={toggleShortlist}
           >
             <Bookmark
               className={cn("h-3 w-3", video.isSelect && "fill-sky-400 text-sky-400")}
@@ -124,7 +203,7 @@ export function VideoCard({
               type="button"
               title={`Rate ${rating}/5`}
               className="grid h-5 w-4 place-items-center text-zinc-400 transition hover:text-yellow-300"
-              onClick={() => void setRating({ videoId: video._id, rating })}
+              onClick={() => rateVideo(rating)}
             >
               <Star
                 className={cn(
@@ -142,33 +221,100 @@ export function VideoCard({
           </span>
         </div>
       </div>
-      <div className={cn("space-y-1.5", size === "sm" ? "p-2.5" : "p-3")}>
-        <p
-          title={video.title}
-          className={cn(
-            "font-medium text-zinc-300 transition-colors group-hover:text-zinc-100",
-            titleClass,
-          )}
-        >
-          {video.title}
-        </p>
-        <div className="flex items-center gap-3 text-xs text-zinc-500">
-          {video.rating > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-yellow-400">
-              <Star className="h-3 w-3 fill-yellow-400" />
-              {video.rating}/5
-            </span>
-          )}
-          {video.commentCount > 0 && (
-            <span className="inline-flex items-center gap-1">
-              <MessageSquare className="h-3 w-3" />
-              {video.commentCount}
-            </span>
-          )}
-          {video.isSelect && <Bookmark className="h-3 w-3 fill-sky-400 text-sky-400" />}
-          {video.downloadEnabled && <Download className="h-3 w-3" />}
+      {showCardInfo && (
+        <div className={cn("space-y-1.5", size === "sm" ? "p-2.5" : "p-3")}>
+          <p
+            title={video.title}
+            className={cn(
+              "font-medium text-zinc-400 transition-colors group-hover:text-zinc-200",
+              titleClass,
+            )}
+          >
+            {video.title}
+          </p>
+          <div className="flex items-center gap-2.5 text-[11px] text-zinc-600">
+            {video.rating > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-yellow-400">
+                <Star className="h-3 w-3 fill-yellow-400" />
+                {video.rating}/5
+              </span>
+            )}
+            {video.commentCount > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <MessageSquare className="h-3 w-3" />
+                {video.commentCount}
+              </span>
+            )}
+            {video.isSelect && (
+              <Bookmark className="h-3 w-3 fill-sky-400 text-sky-400" />
+            )}
+            {video.downloadEnabled && <Download className="h-3 w-3" />}
+          </div>
         </div>
-      </div>
+      )}
     </article>
   );
+}
+
+const aspectRatioClass: Record<CardAspectRatio, string> = {
+  video: "aspect-video",
+  square: "aspect-square",
+  portrait: "aspect-[9/16]",
+};
+
+function aspectRatioToNumber(aspectRatio: CardAspectRatio) {
+  switch (aspectRatio) {
+    case "square":
+      return 1;
+    case "portrait":
+      return 9 / 16;
+    case "video":
+    default:
+      return 16 / 9;
+  }
+}
+
+function getSpriteSurfaceStyle({
+  containerAspect,
+  frameAspect,
+  frameCount,
+  frameIndex,
+  scale,
+  spriteUrl,
+}: {
+  containerAspect: number;
+  frameAspect: number;
+  frameCount: number;
+  frameIndex: number;
+  scale: ThumbnailScale;
+  spriteUrl?: string | null;
+}): CSSProperties {
+  const frameRatio = Math.max(frameAspect, 0.1);
+  const frameIsWider = frameRatio > containerAspect;
+  const width =
+    scale === "fit"
+      ? frameIsWider
+        ? "100%"
+        : `${(frameRatio / containerAspect) * 100}%`
+      : frameIsWider
+        ? `${(frameRatio / containerAspect) * 100}%`
+        : "100%";
+  const height =
+    scale === "fit"
+      ? frameIsWider
+        ? `${(containerAspect / frameRatio) * 100}%`
+        : "100%"
+      : frameIsWider
+        ? "100%"
+        : `${(containerAspect / frameRatio) * 100}%`;
+
+  return {
+    width,
+    height,
+    transform: "translate(-50%, -50%)",
+    backgroundImage: spriteUrl ? `url(${spriteUrl})` : undefined,
+    backgroundSize: `${frameCount * 100}% 100%`,
+    backgroundPosition:
+      frameCount <= 1 ? "0% center" : `${(frameIndex / (frameCount - 1)) * 100}% center`,
+  };
 }

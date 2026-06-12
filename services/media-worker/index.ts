@@ -7,7 +7,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 const PORT = Number(process.env.MEDIA_WORKER_PORT ?? 8787);
 const SECRET = process.env.MEDIA_WORKER_SECRET || "dev";
@@ -176,16 +176,34 @@ async function uploadDerivative(key: string, bytes: Uint8Array) {
   );
 }
 
+async function deleteDerivative(key?: string) {
+  if (!key) return;
+  try {
+    await getS3Client().send(
+      new DeleteObjectCommand({
+        Bucket: S3_BUCKET ?? requireEnv("S3_BUCKET"),
+        Key: key,
+      }),
+    );
+  } catch (error) {
+    console.warn(`Could not delete old derivative ${key}`, error);
+  }
+}
+
 async function processJob(body: {
   videoId: string;
   storageKey: string;
   sourceUrl: string;
+  previousThumbnailKey?: string;
+  previousSpriteKey?: string;
 }) {
   const workDir = join(tmpdir(), `rr-${randomUUID()}`);
   await mkdir(workDir, { recursive: true });
   const input = join(workDir, "input.bin");
-  const thumbKey = body.storageKey.replace(/\.[^.]+$/, "") + "-thumb.jpg";
-  const spriteKey = body.storageKey.replace(/\.[^.]+$/, "") + "-sprite.jpg";
+  const derivativeBase = body.storageKey.replace(/\.[^.]+$/, "");
+  const derivativeRun = `${Date.now()}-${randomUUID().slice(0, 8)}`;
+  const thumbKey = `${derivativeBase}-thumb-${derivativeRun}.jpg`;
+  const spriteKey = `${derivativeBase}-sprite-${derivativeRun}.jpg`;
 
   try {
     const src = await fetch(body.sourceUrl);
@@ -211,6 +229,10 @@ async function processJob(body: {
 
     await uploadDerivative(thumbKey, await Bun.file(thumbPath).bytes());
     await uploadDerivative(spriteKey, await Bun.file(spritePath).bytes());
+    await Promise.all([
+      deleteDerivative(body.previousThumbnailKey),
+      deleteDerivative(body.previousSpriteKey),
+    ]);
 
     await notifyConvex({
       videoId: body.videoId,
@@ -246,6 +268,8 @@ const server = Bun.serve({
         videoId: string;
         storageKey: string;
         sourceUrl: string;
+        previousThumbnailKey?: string;
+        previousSpriteKey?: string;
       };
       void processJob(body);
       return Response.json({ queued: true });

@@ -1,7 +1,15 @@
 "use client";
 
-import { type CSSProperties, useMemo, useRef, useState } from "react";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import * as Popover from "@radix-ui/react-popover";
+import {
+  type CSSProperties,
+  type FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -15,10 +23,13 @@ import {
   Trash2,
   Upload,
   User,
+  UserPlus,
+  Users,
+  X,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { AdminGate } from "@/components/auth/AdminGate";
+import { AdminGate, useAdminAccess } from "@/components/auth/AdminGate";
 import { VideoGrid } from "@/components/video/VideoGrid";
 import { VideoListView } from "@/components/video/VideoListView";
 import { VideoReviewMode } from "@/components/video/VideoReviewMode";
@@ -28,7 +39,14 @@ import { ProjectFilters } from "./ProjectFilters";
 import { VideoGroupedView } from "./VideoGroupedView";
 import { matchesSmartView } from "@/lib/smartViews";
 import { applyFilters, sortVideos, type FilterState } from "@/lib/filters";
-import type { GridSize, SmartViewId, SortKey, WorkspaceLayout } from "@/lib/types";
+import type {
+  CardAspectRatio,
+  GridSize,
+  SmartViewId,
+  SortKey,
+  ThumbnailScale,
+  WorkspaceLayout,
+} from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -40,10 +58,15 @@ type ProjectIdentityPatch = {
   bannerKey?: string;
 };
 
+const WORKSPACE_APPEARANCE_KEY = "review-room.workspace.appearance";
+const GRID_SIZES: GridSize[] = ["sm", "md", "lg"];
+const CARD_ASPECT_RATIOS: CardAspectRatio[] = ["video", "square", "portrait"];
+const THUMBNAIL_SCALES: ThumbnailScale[] = ["fit", "fill"];
+
 export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  const projectQueryArgs = isAuthenticated ? { projectId } : "skip";
+  const { isAdmin, isAuthenticated, isChecking } = useAdminAccess();
+  const projectQueryArgs = isAdmin ? { projectId } : "skip";
   const project = useQuery(api.projects.getById, projectQueryArgs);
   const queriedVideos = useQuery(api.videos.listByProject, projectQueryArgs);
   const videos = useMemo(() => queriedVideos ?? [], [queriedVideos]);
@@ -51,10 +74,15 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const archiveVideos = useMutation(api.videos.archiveByProject);
   const archiveProject = useMutation(api.projects.archive);
   const updateProject = useMutation(api.projects.update);
+  const startPreviewRefresh = useMutation(api.videos.startPreviewRefresh);
 
   const [view, setView] = useState<SmartViewId>("all");
   const [layout, setLayout] = useState<WorkspaceLayout>("grid");
   const [gridSize, setGridSize] = useState<GridSize>("md");
+  const [aspectRatio, setAspectRatio] = useState<CardAspectRatio>("video");
+  const [thumbnailScale, setThumbnailScale] = useState<ThumbnailScale>("fill");
+  const [showCardInfo, setShowCardInfo] = useState(true);
+  const [appearanceReady, setAppearanceReady] = useState(false);
   const [selectedId, setSelectedId] = useState<Id<"videos"> | null>(null);
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
@@ -82,18 +110,63 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     approved: videos.filter((v) => v.status === "approved").length,
   };
 
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(WORKSPACE_APPEARANCE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as {
+          gridSize?: GridSize;
+          aspectRatio?: CardAspectRatio;
+          thumbnailScale?: ThumbnailScale;
+          showCardInfo?: boolean;
+        };
+        if (parsed.gridSize && GRID_SIZES.includes(parsed.gridSize)) {
+          setGridSize(parsed.gridSize);
+        }
+        if (
+          parsed.aspectRatio &&
+          CARD_ASPECT_RATIOS.includes(parsed.aspectRatio)
+        ) {
+          setAspectRatio(parsed.aspectRatio);
+        }
+        if (
+          parsed.thumbnailScale &&
+          THUMBNAIL_SCALES.includes(parsed.thumbnailScale)
+        ) {
+          setThumbnailScale(parsed.thumbnailScale);
+        }
+        if (typeof parsed.showCardInfo === "boolean") {
+          setShowCardInfo(parsed.showCardInfo);
+        }
+      }
+    } finally {
+      setAppearanceReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!appearanceReady) return;
+    window.localStorage.setItem(
+      WORKSPACE_APPEARANCE_KEY,
+      JSON.stringify({ gridSize, aspectRatio, thumbnailScale, showCardInfo }),
+    );
+  }, [appearanceReady, aspectRatio, gridSize, showCardInfo, thumbnailScale]);
+
   async function reprocessPreviews() {
     setReprocessing(true);
     try {
       let ok = 0;
       let failed = 0;
       for (const video of videos) {
+        const job = await startPreviewRefresh({ videoId: video._id });
         const res = await fetch("/api/media/enqueue", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             videoId: video._id,
-            storageKey: video.storageKey,
+            storageKey: job.storageKey,
+            previousThumbnailKey: job.previousThumbnailKey,
+            previousSpriteKey: job.previousSpriteKey,
           }),
         });
         if (res.ok) {
@@ -132,7 +205,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     router.push("/dashboard");
   }
 
-  if (isLoading || !isAuthenticated) {
+  if (isChecking || !isAuthenticated || !isAdmin) {
     return (
       <AdminGate>
         <div className="text-zinc-500">Loading project...</div>
@@ -165,6 +238,12 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
             void createLink({
               projectId,
               canDownload: project.downloadEnabledByDefault,
+              appearance: {
+                gridSize,
+                aspectRatio,
+                thumbnailScale,
+                showCardInfo,
+              },
             }).then((res) => {
               const url =
                 typeof window !== "undefined"
@@ -180,6 +259,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           canClearVideos={videos.length > 0}
           onArchiveProject={() => void archiveCurrentProject()}
           uploadHref={`/dashboard/projects/${projectId}/upload`}
+          canManageMembers={project.isOwner}
         />
 
         <ProjectViewSwitcher videos={videos} active={view} onChange={setView} />
@@ -187,11 +267,17 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
         <ProjectFilters
           layout={layout}
           gridSize={gridSize}
+          aspectRatio={aspectRatio}
+          thumbnailScale={thumbnailScale}
+          showCardInfo={showCardInfo}
           resultCount={filtered.length}
           filters={filters}
           sort={sort}
           onLayout={setLayout}
           onGridSize={setGridSize}
+          onAspectRatio={setAspectRatio}
+          onThumbnailScale={setThumbnailScale}
+          onShowCardInfo={setShowCardInfo}
           onFilters={setFilters}
           onSort={setSort}
           onClear={() =>
@@ -213,6 +299,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                 videos={filtered}
                 selectedId={selectedId ?? undefined}
                 size={gridSize}
+                aspectRatio={aspectRatio}
+                thumbnailScale={thumbnailScale}
+                showCardInfo={showCardInfo}
                 onSelect={(id) => {
                   setSelectedId(id);
                   setPanelExpanded(false);
@@ -230,6 +319,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
               <VideoGroupedView
                 videos={filtered}
                 size={gridSize}
+                aspectRatio={aspectRatio}
+                thumbnailScale={thumbnailScale}
+                showCardInfo={showCardInfo}
                 selectedId={selectedId ?? undefined}
                 onSelect={setSelectedId}
               />
@@ -294,6 +386,7 @@ function ProjectHero({
   canClearVideos,
   onArchiveProject,
   uploadHref,
+  canManageMembers,
 }: {
   title: string;
   clientName?: string;
@@ -316,6 +409,7 @@ function ProjectHero({
   canClearVideos: boolean;
   onArchiveProject: () => void;
   uploadHref: string;
+  canManageMembers: boolean;
 }) {
   const bannerUrl = useStorageUrl(bannerKey, updatedAt);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -392,7 +486,7 @@ function ProjectHero({
     <div className="relative border-b border-zinc-800/60">
       <div className="h-32 sm:h-40" style={heroStyle} />
       <div className="relative -mt-14 px-4 pb-5 sm:-mt-16 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-5">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:gap-5">
           <div className="relative shrink-0">
             <button
               type="button"
@@ -478,11 +572,11 @@ function ProjectHero({
               {title}
             </h1>
             {description && (
-              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-zinc-500">
+              <p className="mt-1 line-clamp-2 max-w-3xl break-words text-[13px] leading-5 text-zinc-500">
                 {description}
               </p>
             )}
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-zinc-600">
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-zinc-600">
               <span className="inline-flex items-center gap-1.5">
                 <User className="h-3 w-3" />
                 {clientName ?? "No client"}
@@ -497,15 +591,25 @@ function ProjectHero({
               </span>
             </div>
           </div>
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
-            <Button variant="secondary" className="w-full gap-2 sm:w-auto" onClick={onShare}>
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-start xl:justify-end">
+            <ProjectMembersPopover
+              projectId={projectId}
+              canManage={canManageMembers}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto"
+              onClick={onShare}
+            >
               <Link2 className="h-4 w-4" />
               <span className="hidden sm:inline">Share review link</span>
               <span className="sm:hidden">Share</span>
             </Button>
             <Button
               variant="secondary"
-              className="w-full gap-2 sm:w-auto"
+              size="sm"
+              className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto"
               disabled={reprocessing}
               onClick={onReprocess}
             >
@@ -515,7 +619,8 @@ function ProjectHero({
             </Button>
             <Button
               variant="secondary"
-              className="w-full gap-2 text-zinc-300 sm:w-auto"
+              size="sm"
+              className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-300 sm:w-auto"
               disabled={!canClearVideos}
               onClick={onClearVideos}
             >
@@ -525,7 +630,9 @@ function ProjectHero({
             </Button>
             <Button
               variant="ghost"
-              className="w-full gap-2 text-zinc-500 sm:w-auto"
+              size="sm"
+              className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-500 sm:w-auto"
+              disabled={!canManageMembers}
               onClick={onArchiveProject}
             >
               <Archive className="h-4 w-4" />
@@ -533,7 +640,7 @@ function ProjectHero({
               <span className="sm:hidden">Archive</span>
             </Button>
             <Link href={uploadHref}>
-              <Button className="w-full gap-2 sm:w-auto">
+              <Button size="sm" className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto">
                 <Upload className="h-4 w-4" />
                 Upload
               </Button>
@@ -548,6 +655,147 @@ function ProjectHero({
         </div>
       </div>
     </div>
+  );
+}
+
+function ProjectMembersPopover({
+  projectId,
+  canManage,
+}: {
+  projectId: Id<"projects">;
+  canManage: boolean;
+}) {
+  const members = useQuery(api.projects.listMembers, { projectId });
+  const addMember = useMutation(api.projects.addMember);
+  const removeMember = useMutation(api.projects.removeMember);
+  const removeAccessRule = useMutation(api.projects.removeAccessRule);
+  const [identifier, setIdentifier] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submitMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const value = identifier.trim();
+    if (!value) return;
+    setSaving(true);
+    try {
+      await addMember({ projectId, identifier: value, role: "editor" });
+      setIdentifier("");
+      toast.success(value.includes("*") ? "Email rule added" : "Member added");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not add user");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto"
+        >
+          <Users className="h-4 w-4" />
+          Members
+        </Button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={8}
+          className="z-50 w-[19rem] max-w-[calc(100vw-1rem)] rounded-lg border border-white/10 bg-zinc-950/50 p-3 text-zinc-200 shadow-2xl shadow-black/45 ring-1 ring-white/5 backdrop-blur-2xl"
+        >
+          <div className="mb-3 border-b border-white/10 pb-2">
+            <p className="text-xs font-medium text-zinc-100">Project members</p>
+            <p className="mt-0.5 text-[11px] text-zinc-500">
+              Add exact emails or domain rules for this project only.
+            </p>
+            <p className="mt-1 text-[10px] leading-4 text-zinc-600">
+              Sign-in is still limited by the backend allowlist.
+            </p>
+          </div>
+
+          <div className="max-h-52 space-y-1 overflow-y-auto pr-1">
+            {!members ? (
+              <p className="py-4 text-center text-xs text-zinc-500">Loading...</p>
+            ) : (
+              members.map((member) => (
+                <div
+                  key={member.entryKey}
+                  className="flex items-center justify-between gap-2 rounded-md border border-white/5 bg-white/[0.03] px-2 py-1.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-zinc-200">
+                      {member.name}
+                    </p>
+                    <p className="truncate text-[10px] text-zinc-500">
+                      {member.isRule ? "Email rule" : member.email ?? member.role}
+                    </p>
+                  </div>
+                  {member.isOwner ? (
+                    <span className="rounded-full bg-teal-400/10 px-2 py-0.5 text-[10px] font-medium text-teal-300">
+                      Owner
+                    </span>
+                  ) : canManage && member.membershipId ? (
+                    <button
+                      type="button"
+                      title="Remove member"
+                      className="grid h-6 w-6 place-items-center rounded text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200"
+                      onClick={() =>
+                        void removeMember({
+                          membershipId: member.membershipId!,
+                        }).then(() => toast.success("Member removed"))
+                      }
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : canManage && member.ruleId ? (
+                    <button
+                      type="button"
+                      title="Remove email rule"
+                      className="grid h-6 w-6 place-items-center rounded text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200"
+                      onClick={() =>
+                        void removeAccessRule({
+                          ruleId: member.ruleId!,
+                        }).then(() => toast.success("Email rule removed"))
+                      }
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : (
+                    <span className="text-[10px] capitalize text-zinc-500">
+                      {member.role}
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          {canManage && (
+            <form onSubmit={submitMember} className="mt-3 flex gap-2">
+              <Input
+                value={identifier}
+                onChange={(event) => setIdentifier(event.target.value)}
+                placeholder="Email, name, or *@domain.com"
+                className="h-8 border-zinc-800/80 bg-black/20 text-xs"
+              />
+              <Button
+                type="submit"
+                size="sm"
+                className="h-8 shrink-0 px-2.5 text-xs"
+                disabled={saving || !identifier.trim()}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Add
+              </Button>
+            </form>
+          )}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

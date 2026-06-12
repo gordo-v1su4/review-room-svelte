@@ -13,6 +13,7 @@ export function VideoPlayer({
   loop = false,
   autoPlay = false,
   onTimeUpdate,
+  onPlay,
   onEnded,
   seekTo,
 }: {
@@ -23,6 +24,7 @@ export function VideoPlayer({
   loop?: boolean;
   autoPlay?: boolean;
   onTimeUpdate?: (sec: number) => void;
+  onPlay?: () => void;
   onEnded?: () => void;
   seekTo?: number | null;
 }) {
@@ -37,6 +39,7 @@ export function VideoPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [displayMode, setDisplayMode] = useState<"timecode" | "frames">("timecode");
+  const [spriteAspect, setSpriteAspect] = useState<number | null>(null);
   const frameRate = Number.isFinite(fps ?? NaN) && (fps ?? 0) > 0 ? fps ?? 24 : 24;
   const totalFrames = Math.max(0, Math.round(duration * frameRate));
   const currentFrame = Math.min(
@@ -53,6 +56,10 @@ export function VideoPlayer({
         );
   const hoverFramePosition =
     spriteFrameCount <= 1 ? 0 : (hoverFrame / (spriteFrameCount - 1)) * 100;
+  const spritePreviewHeight = 96;
+  const spritePreviewWidth = spriteAspect
+    ? Math.max(44, Math.min(172, spritePreviewHeight * spriteAspect))
+    : 160;
 
   useEffect(() => {
     if (seekTo != null && ref.current) {
@@ -67,6 +74,19 @@ export function VideoPlayer({
       if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!spriteUrl) {
+      setSpriteAspect(null);
+      return;
+    }
+    const image = new Image();
+    image.onload = () => {
+      if (!image.naturalWidth || !image.naturalHeight) return;
+      setSpriteAspect(image.naturalWidth / spriteFrameCount / image.naturalHeight);
+    };
+    image.src = spriteUrl;
+  }, [spriteFrameCount, spriteUrl]);
 
   function syncTime(nextTime?: number) {
     const time = nextTime ?? ref.current?.currentTime ?? 0;
@@ -129,6 +149,7 @@ export function VideoPlayer({
             onClick={togglePlayback}
             onPlay={() => {
               setIsPlaying(true);
+              onPlay?.();
               startTicker();
             }}
             onPause={() => {
@@ -171,7 +192,7 @@ export function VideoPlayer({
         {spriteUrl && hoverPct != null && (
           <div
             className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 overflow-hidden rounded border border-zinc-700 bg-zinc-900 shadow-xl"
-            style={{ width: 160, height: 90 }}
+            style={{ width: spritePreviewWidth, height: spritePreviewHeight }}
           >
             <div
               className="h-full w-full bg-cover bg-no-repeat"

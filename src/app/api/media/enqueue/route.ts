@@ -6,6 +6,8 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       videoId: string;
       storageKey: string;
+      previousThumbnailKey?: string;
+      previousSpriteKey?: string;
     };
     const workerUrl =
       process.env.MEDIA_WORKER_URL ??
@@ -31,6 +33,8 @@ export async function POST(request: Request) {
         videoId: body.videoId,
         storageKey: body.storageKey,
         sourceUrl,
+        previousThumbnailKey: body.previousThumbnailKey,
+        previousSpriteKey: body.previousSpriteKey,
       }),
     });
     if (!res.ok) {

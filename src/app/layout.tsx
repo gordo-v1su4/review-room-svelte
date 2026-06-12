@@ -10,6 +10,9 @@ const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 export const metadata: Metadata = {
   title: "Review Room",
   description: "Client-facing video review portal",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

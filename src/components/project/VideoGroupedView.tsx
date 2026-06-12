@@ -2,17 +2,23 @@
 
 import { SMART_VIEWS, matchesSmartView, type VideoDoc } from "@/lib/smartViews";
 import type { SmartViewId } from "@/lib/types";
-import type { GridSize } from "@/lib/types";
+import type { CardAspectRatio, GridSize, ThumbnailScale } from "@/lib/types";
 import { VideoCard } from "@/components/video/VideoCard";
 
 export function VideoGroupedView({
   videos,
   size,
+  aspectRatio = "video",
+  thumbnailScale = "fill",
+  showCardInfo = true,
   selectedId,
   onSelect,
 }: {
   videos: VideoDoc[];
   size: GridSize;
+  aspectRatio?: CardAspectRatio;
+  thumbnailScale?: ThumbnailScale;
+  showCardInfo?: boolean;
   selectedId?: string;
   onSelect: (id: VideoDoc["_id"]) => void;
 }) {
@@ -38,6 +44,9 @@ export function VideoGroupedView({
                   <VideoCard
                     video={video}
                     size={size}
+                    aspectRatio={aspectRatio}
+                    thumbnailScale={thumbnailScale}
+                    showCardInfo={showCardInfo}
                     selected={selectedId === video._id}
                     onSelect={() => onSelect(video._id)}
                   />

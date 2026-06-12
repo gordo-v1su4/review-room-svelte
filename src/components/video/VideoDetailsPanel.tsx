@@ -25,6 +25,9 @@ export function VideoDetailsPanel({
   onToggleExpand,
   token,
   reviewerName,
+  autoPlay = false,
+  loop = false,
+  onEnded,
 }: {
   video: VideoDoc;
   mode: Mode;
@@ -33,6 +36,9 @@ export function VideoDetailsPanel({
   onToggleExpand?: () => void;
   token?: string;
   reviewerName?: string;
+  autoPlay?: boolean;
+  loop?: boolean;
+  onEnded?: () => void;
 }) {
   const [seekTo, setSeekTo] = useState<number | null>(null);
   const [playhead, setPlayhead] = useState(0);
@@ -95,7 +101,11 @@ export function VideoDetailsPanel({
             spriteKey={video.spriteKey}
             version={video.updatedAt}
             fps={video.fps}
+            autoPlay={autoPlay}
+            loop={loop}
+            onPlay={handleFirstPlay}
             onTimeUpdate={setPlayhead}
+            onEnded={onEnded}
             seekTo={seekTo}
           />
         </div>

@@ -28,4 +28,15 @@ export type SortKey =
 
 export type GridSize = "sm" | "md" | "lg";
 
+export type CardAspectRatio = "video" | "square" | "portrait";
+
+export type ThumbnailScale = "fit" | "fill";
+
+export type WorkspaceAppearance = {
+  gridSize: GridSize;
+  aspectRatio: CardAspectRatio;
+  thumbnailScale: ThumbnailScale;
+  showCardInfo: boolean;
+};
+
 export type WorkspaceLayout = "grid" | "grouped" | "list" | "review";

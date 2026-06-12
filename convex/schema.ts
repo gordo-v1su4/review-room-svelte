@@ -10,6 +10,17 @@ const status = v.union(
   v.literal("archived"),
 );
 
+const reviewAppearance = v.object({
+  gridSize: v.union(v.literal("sm"), v.literal("md"), v.literal("lg")),
+  aspectRatio: v.union(
+    v.literal("video"),
+    v.literal("square"),
+    v.literal("portrait"),
+  ),
+  thumbnailScale: v.union(v.literal("fit"), v.literal("fill")),
+  showCardInfo: v.boolean(),
+});
+
 const applicationTables = {
   appUsers: defineTable({
     authUserId: v.id("users"),
@@ -32,6 +43,27 @@ const applicationTables = {
   })
     .index("by_creator", ["createdBy"])
     .index("by_slug", ["slug"]),
+
+  projectMembers: defineTable({
+    projectId: v.id("projects"),
+    appUserId: v.id("appUsers"),
+    role: v.union(v.literal("editor"), v.literal("viewer")),
+    addedBy: v.id("appUsers"),
+    addedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_user", ["appUserId"])
+    .index("by_project_user", ["projectId", "appUserId"]),
+
+  projectAccessRules: defineTable({
+    projectId: v.id("projects"),
+    pattern: v.string(),
+    role: v.union(v.literal("editor"), v.literal("viewer")),
+    addedBy: v.id("appUsers"),
+    addedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_pattern", ["projectId", "pattern"]),
 
   videos: defineTable({
     projectId: v.id("projects"),
@@ -88,6 +120,7 @@ const applicationTables = {
     token: v.string(),
     passcodeHash: v.optional(v.string()),
     canDownload: v.boolean(),
+    appearance: v.optional(reviewAppearance),
     expiresAt: v.optional(v.number()),
     createdAt: v.number(),
   })

@@ -1,7 +1,7 @@
 "use client";
 
 import type { VideoDoc } from "@/lib/smartViews";
-import type { GridSize } from "@/lib/types";
+import type { CardAspectRatio, GridSize, ThumbnailScale } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { VideoCard } from "./VideoCard";
 
@@ -9,12 +9,22 @@ export function VideoGrid({
   videos,
   selectedId,
   size,
+  aspectRatio = "video",
+  thumbnailScale = "fill",
+  showCardInfo = true,
+  actionMode = "admin",
+  token,
   onSelect,
   empty,
 }: {
   videos: VideoDoc[];
   selectedId?: string;
   size: GridSize;
+  aspectRatio?: CardAspectRatio;
+  thumbnailScale?: ThumbnailScale;
+  showCardInfo?: boolean;
+  actionMode?: "admin" | "client";
+  token?: string;
   onSelect: (id: VideoDoc["_id"]) => void;
   empty?: React.ReactNode;
 }) {
@@ -40,6 +50,11 @@ export function VideoGrid({
           key={video._id}
           video={video}
           size={size}
+          aspectRatio={aspectRatio}
+          thumbnailScale={thumbnailScale}
+          showCardInfo={showCardInfo}
+          actionMode={actionMode}
+          token={token}
           selected={selectedId === video._id}
           onSelect={() => onSelect(video._id)}
         />
