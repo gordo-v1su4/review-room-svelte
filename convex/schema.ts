@@ -84,6 +84,7 @@ const applicationTables = {
     isSelect: v.boolean(),
     commentCount: v.number(),
     tags: v.array(v.string()),
+    markedForDeletion: v.optional(v.boolean()),
     downloadEnabled: v.boolean(),
     order: v.number(),
     uploadedBy: v.id("appUsers"),

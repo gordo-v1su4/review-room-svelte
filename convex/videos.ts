@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getProjectForAdmin, requireAdmin } from "./lib/access";
+import { getProjectForAdmin, getProjectForOwner, requireAdmin } from "./lib/access";
 
 const statusValidator = v.union(
   v.literal("awaiting_review"),
@@ -64,6 +64,7 @@ export const createFromUpload = mutation({
       isSelect: false,
       commentCount: 0,
       tags: [],
+      markedForDeletion: false,
       downloadEnabled: project.downloadEnabledByDefault,
       order: maxOrder + 1,
       uploadedBy: admin._id,
@@ -214,6 +215,19 @@ export const setProcessingComplete = mutation({
   },
 });
 
+export const setMarkedForDeletion = mutation({
+  args: { videoId: v.id("videos"), marked: v.boolean() },
+  handler: async (ctx, args) => {
+    const video = await ctx.db.get(args.videoId);
+    if (!video) throw new Error("Video not found");
+    await getProjectForAdmin(ctx, video.projectId);
+    await ctx.db.patch(args.videoId, {
+      markedForDeletion: args.marked,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 export const startPreviewRefresh = mutation({
   args: { videoId: v.id("videos") },
   handler: async (ctx, args) => {
@@ -263,7 +277,7 @@ export const remove = mutation({
 export const archiveByProject = mutation({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    await getProjectForAdmin(ctx, args.projectId);
+    await getProjectForOwner(ctx, args.projectId);
     const now = Date.now();
     const videos = await ctx.db
       .query("videos")

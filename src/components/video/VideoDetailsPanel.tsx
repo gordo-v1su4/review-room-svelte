@@ -57,7 +57,7 @@ export function VideoDetailsPanel({
   const addCommentAdmin = useMutation(api.comments.add);
   const addCommentClient = useMutation(api.reviewPublic.clientAddComment);
   const updateMeta = useMutation(api.videos.updateMetadata);
-  const removeVideo = useMutation(api.videos.remove);
+  const setMarkedForDeletion = useMutation(api.videos.setMarkedForDeletion);
 
   const handleFirstPlay = () => {
     if (!video.viewed) {
@@ -186,16 +186,20 @@ export function VideoDetailsPanel({
         {mode === "admin" && (
           <Button
             variant="ghost"
-            className="w-full justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-300"
-            onClick={() => {
-              if (!window.confirm(`Discard "${video.title}" from this review?`)) return;
-              void removeVideo({ videoId: video._id }).then(() => {
-                onClose();
-              });
-            }}
+            className={cn(
+              "w-full justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-300",
+              video.markedForDeletion &&
+                "border-red-900/70 bg-red-950/20 text-red-300",
+            )}
+            onClick={() =>
+              void setMarkedForDeletion({
+                videoId: video._id,
+                marked: !video.markedForDeletion,
+              })
+            }
           >
             <Trash2 className="h-4 w-4" />
-            Discard video
+            {video.markedForDeletion ? "Remove delete mark" : "Mark for delete"}
           </Button>
         )}
 

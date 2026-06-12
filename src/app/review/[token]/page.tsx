@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 const DEFAULT_APPEARANCE: WorkspaceAppearance = {
   gridSize: "md",
-  aspectRatio: "video",
+  aspectRatio: "square",
   thumbnailScale: "fill",
   showCardInfo: true,
 };

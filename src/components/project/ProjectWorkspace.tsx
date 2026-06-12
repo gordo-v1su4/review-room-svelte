@@ -79,7 +79,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [view, setView] = useState<SmartViewId>("all");
   const [layout, setLayout] = useState<WorkspaceLayout>("grid");
   const [gridSize, setGridSize] = useState<GridSize>("md");
-  const [aspectRatio, setAspectRatio] = useState<CardAspectRatio>("video");
+  const [aspectRatio, setAspectRatio] = useState<CardAspectRatio>("square");
   const [thumbnailScale, setThumbnailScale] = useState<ThumbnailScale>("fill");
   const [showCardInfo, setShowCardInfo] = useState(true);
   const [appearanceReady, setAppearanceReady] = useState(false);
@@ -112,7 +112,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
 
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem(WORKSPACE_APPEARANCE_KEY);
+      const stored = window.localStorage.getItem(
+        `${WORKSPACE_APPEARANCE_KEY}.${projectId}`,
+      );
       if (stored) {
         const parsed = JSON.parse(stored) as {
           gridSize?: GridSize;
@@ -142,15 +144,22 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     } finally {
       setAppearanceReady(true);
     }
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     if (!appearanceReady) return;
     window.localStorage.setItem(
-      WORKSPACE_APPEARANCE_KEY,
+      `${WORKSPACE_APPEARANCE_KEY}.${projectId}`,
       JSON.stringify({ gridSize, aspectRatio, thumbnailScale, showCardInfo }),
     );
-  }, [appearanceReady, aspectRatio, gridSize, showCardInfo, thumbnailScale]);
+  }, [
+    appearanceReady,
+    aspectRatio,
+    gridSize,
+    projectId,
+    showCardInfo,
+    thumbnailScale,
+  ]);
 
   async function reprocessPreviews() {
     setReprocessing(true);
@@ -256,7 +265,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           onReprocess={() => void reprocessPreviews()}
           reprocessing={reprocessing}
           onClearVideos={() => void clearVideos()}
-          canClearVideos={videos.length > 0}
+          canClearVideos={project.isOwner && videos.length > 0}
           onArchiveProject={() => void archiveCurrentProject()}
           uploadHref={`/dashboard/projects/${projectId}/upload`}
           canManageMembers={project.isOwner}

@@ -2,7 +2,7 @@
 
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { useMutation } from "convex/react";
-import { MessageSquare, Download, Bookmark, Star } from "lucide-react";
+import { MessageSquare, Download, Bookmark, Star, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
 import type { CardAspectRatio, ThumbnailScale } from "@/lib/types";
@@ -130,6 +130,9 @@ export function VideoCard({
         selected
           ? "border-sky-300 ring-1 ring-sky-300/50"
           : "border-zinc-800/80 hover:border-zinc-600",
+        video.markedForDeletion &&
+          actionMode === "admin" &&
+          "border-red-900/70 bg-red-950/25 hover:border-red-700/80",
       )}
     >
       <div
@@ -171,9 +174,18 @@ export function VideoCard({
           />
         )}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
+        {video.markedForDeletion && actionMode === "admin" && (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-red-950/55 text-red-100 ring-1 ring-inset ring-red-500/30 backdrop-blur-[1px]">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-red-300/25 bg-black/45 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide">
+              <Trash2 className="h-3 w-3" />
+              Marked for delete
+            </span>
+          </div>
+        )}
         <div
           className={cn(
             "absolute right-2 top-2 flex items-center rounded-full border border-white/10 bg-black/55 p-0.5 opacity-100 shadow-sm backdrop-blur transition-opacity sm:opacity-0",
+            video.markedForDeletion && actionMode === "admin" && "z-30",
             "sm:group-hover:opacity-100 sm:group-focus-within:opacity-100",
             video.isSelect && "opacity-100",
           )}
@@ -194,7 +206,10 @@ export function VideoCard({
           </button>
         </div>
         <div
-          className="absolute left-2 top-2 flex items-center rounded-full border border-white/10 bg-black/55 px-1 py-0.5 opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+          className={cn(
+            "absolute left-2 top-2 flex items-center rounded-full border border-white/10 bg-black/55 px-1 py-0.5 opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-100 group-focus-within:opacity-100",
+            video.markedForDeletion && actionMode === "admin" && "z-30",
+          )}
           onClick={(event) => event.stopPropagation()}
         >
           {[1, 2, 3, 4, 5].map((rating) => (
@@ -214,7 +229,12 @@ export function VideoCard({
             </button>
           ))}
         </div>
-        <div className="absolute bottom-2 left-2 right-2 flex items-end justify-between gap-2">
+        <div
+          className={cn(
+            "absolute bottom-2 left-2 right-2 flex items-end justify-between gap-2",
+            video.markedForDeletion && actionMode === "admin" && "z-30",
+          )}
+        >
           <VideoStatusPill status={video.status} />
           <span className="text-[10px] text-zinc-300">
             {formatDuration(video.durationSec)}
