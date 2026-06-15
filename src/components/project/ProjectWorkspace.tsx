@@ -39,6 +39,7 @@ import { ProjectFilters } from "./ProjectFilters";
 import { VideoGroupedView } from "./VideoGroupedView";
 import { matchesSmartView } from "@/lib/smartViews";
 import { applyFilters, sortVideos, type FilterState } from "@/lib/filters";
+import { isImageAsset } from "@/lib/media";
 import type {
   CardAspectRatio,
   GridSize,
@@ -166,7 +167,12 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     try {
       let ok = 0;
       let failed = 0;
+      let skippedImages = 0;
       for (const video of videos) {
+        if (isImageAsset(video)) {
+          skippedImages++;
+          continue;
+        }
         const job = await startPreviewRefresh({ videoId: video._id });
         const res = await fetch("/api/media/enqueue", {
           method: "POST",
@@ -187,7 +193,11 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
       if (failed) {
         toast.error(`Queued ${ok} previews; ${failed} failed to start`);
       } else {
-        toast.success(`Refreshing previews for ${ok} videos`);
+        toast.success(
+          skippedImages
+            ? `Refreshing previews for ${ok} videos; ${skippedImages} images skipped`
+            : `Refreshing previews for ${ok} videos`,
+        );
       }
     } catch (error) {
       toast.error(
@@ -200,10 +210,10 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
 
   async function clearVideos() {
     if (!videos.length) return;
-    if (!window.confirm(`Archive ${videos.length} videos from this project?`)) return;
+    if (!window.confirm(`Archive ${videos.length} assets from this project?`)) return;
     const result = await archiveVideos({ projectId });
     setSelectedId(null);
-    toast.success(`Archived ${result.archived} videos`);
+    toast.success(`Archived ${result.archived} assets`);
   }
 
   async function archiveCurrentProject() {
@@ -317,7 +327,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                 }}
                 empty={
                   <div className="text-center">
-                    <p>Upload your first videos to start a review.</p>
+                    <p>Upload your first media to start a review.</p>
                     <Link href={`/dashboard/projects/${projectId}/upload`}>
                       <Button className="mt-3">Upload</Button>
                     </Link>
@@ -634,7 +644,7 @@ function ProjectHero({
               onClick={onClearVideos}
             >
               <Trash2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Clear videos</span>
+              <span className="hidden sm:inline">Clear media</span>
               <span className="sm:hidden">Clear</span>
             </Button>
             <Button

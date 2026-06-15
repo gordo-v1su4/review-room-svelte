@@ -8,13 +8,13 @@
 ## 1. Screens
 
 ### A. Admin dashboard — project list
-Top nav, "Projects" title, "New project" CTA, and a grid of project cards. Each card: banner/thumbnail, title, client name, video count, count awaiting review, count with feedback, last updated, share status. Each card reads as a client-facing collection, not a task-list row. Clean, premium, not dense.
+Top nav, "Projects" title, "New project" CTA, and a grid of project cards. Each card: banner/thumbnail, title, client name, media count, count awaiting review, count with feedback, last updated, share status. Each card reads as a client-facing collection, not a task-list row. Clean, premium, not dense.
 
 ### B. Admin workspace — the most important screen
 - **Project header / banner** — banner image, title, client name/description, "Share review link," "Upload." Makes the page feel like a portal.
 - **Smart-view tab bar** (§4) directly under the header, with live counts.
 - **Toolbar** — search, filter, sort, thumbnail-size toggle, optional "Selected only." Light, never cluttered.
-- **Content** — the video grid (default).
+- **Content** — the media grid (default).
 - **Right-side viewer/details panel** (§5) — opens on card select.
 
 ### C. Client review page (`/review/[token]`)
@@ -53,9 +53,9 @@ The second-most-important component after the card. Collapsible, integrated into
 
 **Priority hierarchy:** thumbnail → title → status/review state → rating/select/approved → tags/comments → secondary metadata. Small cards show less; large cards show more. Never overcrowd.
 
-**Shows:** thumbnail or scrub frame; optional duration; title; small status pill; tags; rating; comment count; selected/approved/needs-changes indicator; optional download icon.
+**Shows:** thumbnail or scrub frame; optional duration/type label; title; small status pill; tags; rating; comment count; selected/approved/needs-changes indicator; optional download icon.
 
-**Hover scrub:** when a scrub sprite or preview cache exists, horizontal pointer movement over the thumbnail should seek the visible frame immediately. It should feel like FreeCut's media grid: no popover, no heavy player chrome, just quick visual inspection. If the preview is still processing, keep the thumbnail/processing state stable.
+**Hover scrub:** when a scrub sprite or preview cache exists, horizontal pointer movement over the thumbnail should seek the visible frame immediately. It should feel like FreeCut's media grid: no popover, no heavy player chrome, just quick visual inspection. Still images do not show a scrub cursor. If the preview is still processing, keep the thumbnail/processing state stable.
 
 **States to design:** default · hover · selected · viewed · commented · approved · needs-changes · uploading · processing-thumbnail · error/missing.
 
@@ -72,11 +72,11 @@ A heart/favorite may exist as an internal admin marker, but client-facing langua
 
 ## 8. Comments
 
-Simple and fast: a box, an "Add comment" button, and an optional "use current time" toggle that pins the comment to the playhead and seeks back on click. List below with author + time. Comment count appears on the card; a video with comments visually reads as "feedback received." No threading in MVP.
+Simple and fast: a box, an "Add comment" button, and an optional "use current time" toggle for video that pins the comment to the playhead and seeks back on click. Still images hide the time toggle. List below with author + time when applicable. Comment count appears on the card; an asset with comments visually reads as "feedback received." No threading in MVP.
 
 ## 9. Upload
 
-Sleek, no per-video form. Drag-drop area, multi-file, bounded parallel uploads, per-file progress; states for success / failed / processing-thumbnail / ready. Assets appear in the grid quickly after upload, and admin-side local previews may appear before remote derivatives finish when the browser still has the dropped files.
+Sleek, no per-asset form. Drag-drop area, multi-file video and image uploads, bounded parallel uploads, per-file progress; states for success / failed / processing-thumbnail / ready. Assets appear in the grid quickly after upload, and admin-side local previews may appear before remote derivatives finish when the browser still has the dropped files.
 
 ## 10. Scenes / Analyze (Phase 2)
 
@@ -112,7 +112,7 @@ Two separate, non-overlapping color sources (this avoids the clash where a per-p
 - **Brand accent** (`project.brandColor`) — used *only* for branding: banner treatment and the primary CTA. Never for status.
 - **Semantic palette** (fixed, restrained, brand-independent): `success` (approved), `warning` (needs changes), `info`/`selected`, `danger` (error), plus neutral pills for in-progress states. Status pills always draw from here.
 
-The videos/thumbnails provide essentially all the saturated color on screen; chrome stays neutral. Define tokens: `background, surface, surfaceElevated, border, borderSubtle, textPrimary, textSecondary, textMuted, brandAccent, success, warning, info, danger, selected, approved`.
+The media thumbnails provide essentially all the saturated color on screen; chrome stays neutral. Define tokens: `background, surface, surfaceElevated, border, borderSubtle, textPrimary, textSecondary, textMuted, brandAccent, success, warning, info, danger, selected, approved`.
 
 ### Card / grid style
 Dark cards on dark canvas, soft borders, subtle hover, thumbnail-first, minimal metadata, small status pills, off-white type, muted gray secondary. Polished media tiles, not database rows.
@@ -133,7 +133,7 @@ Desktop-first, degrade gracefully — don't make mobile impossible. **Tablet:** 
 
 ## 16. Empty / loading / error states
 
-Design these as first-class, not afterthoughts. *No videos:* "Upload your first videos to start a review." → Upload. *No filter results:* "No videos match these filters." → Clear filters. *No comments (admin):* "No feedback yet." *(client):* "Leave a note when you're ready." *Uploading:* "Uploading 3 videos…" with progress.
+Design these as first-class, not afterthoughts. *No media:* "Upload your first media to start a review." → Upload. *No filter results:* "No media match these filters." → Clear filters. *No comments (admin):* "No feedback yet." *(client):* "Leave a note when you're ready." *Uploading:* "Uploading 3 files..." with progress.
 
 ## 17. Design priorities (if time is short)
 

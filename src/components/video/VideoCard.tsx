@@ -6,6 +6,7 @@ import { MessageSquare, Download, Bookmark, Star, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
 import type { CardAspectRatio, ThumbnailScale } from "@/lib/types";
+import { isImageAsset, mediaKindLabel } from "@/lib/media";
 import { formatDuration } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { VideoStatusPill } from "./VideoStatusPill";
@@ -32,8 +33,13 @@ export function VideoCard({
   token?: string;
   onSelect: () => void;
 }) {
-  const thumbUrl = useStorageUrl(video.thumbnailKey, video.updatedAt);
+  const isImage = isImageAsset(video);
+  const thumbUrl = useStorageUrl(
+    video.thumbnailKey ?? (isImage ? video.storageKey : undefined),
+    video.updatedAt,
+  );
   const spriteUrl = useStorageUrl(video.spriteKey, video.updatedAt);
+  const canScrub = Boolean(spriteUrl);
   const toggleSelectAdmin = useMutation(api.videos.toggleSelect);
   const toggleSelectClient = useMutation(api.reviewPublic.clientToggleSelect);
   const setRatingAdmin = useMutation(api.videos.setRating);
@@ -141,13 +147,14 @@ export function VideoCard({
           aspectRatioClass[aspectRatio],
         )}
         onMouseMove={(e) => {
+          if (!canScrub) return;
           const rect = e.currentTarget.getBoundingClientRect();
           const pct = (e.clientX - rect.left) / rect.width;
           setHoverPct(Math.min(1, Math.max(0, pct)));
         }}
         onMouseLeave={() => setHoverPct(null)}
       >
-        {spriteUrl && hoverPct != null ? (
+        {canScrub && hoverPct != null ? (
           <div
             className="absolute left-1/2 top-1/2 bg-no-repeat"
             style={spriteSurfaceStyle}
@@ -167,7 +174,7 @@ export function VideoCard({
             {video.processingStatus === "processing" ? "Processing..." : "No preview"}
           </div>
         )}
-        {hoverPct != null && (
+        {canScrub && hoverPct != null && (
           <div
             className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-teal-300 shadow-[0_0_10px_rgba(45,212,191,0.85)]"
             style={{ left: `${hoverPct * 100}%` }}
@@ -237,7 +244,7 @@ export function VideoCard({
         >
           <VideoStatusPill status={video.status} />
           <span className="text-[10px] text-zinc-300">
-            {formatDuration(video.durationSec)}
+            {isImage ? mediaKindLabel(video) : formatDuration(video.durationSec)}
           </span>
         </div>
       </div>

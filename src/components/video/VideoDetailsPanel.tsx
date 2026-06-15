@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { X, Bookmark, Flag, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
 import type { VideoDoc } from "@/lib/smartViews";
+import { isImageAsset, mediaKindLabel } from "@/lib/media";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { VideoPlayer } from "./VideoPlayer";
@@ -42,6 +42,8 @@ export function VideoDetailsPanel({
 }) {
   const [seekTo, setSeekTo] = useState<number | null>(null);
   const [playhead, setPlayhead] = useState(0);
+  const isImage = isImageAsset(video);
+  const assetLabel = mediaKindLabel(video);
   const comments = useQuery(api.comments.listByVideo, { videoId: video._id });
 
   const markViewedAdmin = useMutation(api.videos.markViewed);
@@ -100,6 +102,7 @@ export function VideoDetailsPanel({
           <VideoPlayer
             storageKey={video.storageKey}
             spriteKey={video.spriteKey}
+            mimeType={video.mimeType}
             version={video.updatedAt}
             fps={video.fps}
             autoPlay={autoPlay}
@@ -216,7 +219,7 @@ export function VideoDetailsPanel({
               }}
             >
               <Trash2 className="h-4 w-4" />
-              Delete video
+              Delete {assetLabel}
             </Button>
           </div>
         )}
@@ -243,6 +246,7 @@ export function VideoDetailsPanel({
               });
             }
           }}
+          timecodeEnabled={!isImage}
         />
         <CommentList
           comments={comments ?? []}

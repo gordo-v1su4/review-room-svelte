@@ -16,7 +16,7 @@ export default function UploadPage({
   return (
     <AdminGate>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold">Upload videos</h1>
+        <h1 className="text-xl font-semibold">Upload media</h1>
         <Button variant="secondary" className="w-full sm:w-auto" asChild>
           <Link href={`/dashboard/projects/${projectId}`}>
             Back to workspace

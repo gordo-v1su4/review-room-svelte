@@ -6,6 +6,7 @@ import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { isImageMimeType, isVideoMimeType } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
 type FileState = {
@@ -17,7 +18,7 @@ type FileState = {
 
 type ClientPreviewResult = {
   thumbnail: File;
-  sprite: File;
+  sprite?: File;
   durationSec?: number;
   width?: number;
   height?: number;
@@ -165,6 +166,44 @@ async function generateClientPreviews(file: File): Promise<ClientPreviewResult> 
   }
 }
 
+function loadImageElement(file: File) {
+  return new Promise<{ image: HTMLImageElement; objectUrl: string }>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => resolve({ image, objectUrl });
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Image preview decode failed"));
+    };
+    image.src = objectUrl;
+  });
+}
+
+async function generateClientImagePreview(file: File): Promise<ClientPreviewResult> {
+  const { image, objectUrl } = await loadImageElement(file);
+
+  try {
+    const width = image.naturalWidth || undefined;
+    const height = image.naturalHeight || undefined;
+    const thumbSize = getPreviewDimensions(width, height, 960);
+    const thumbCanvas = document.createElement("canvas");
+    thumbCanvas.width = thumbSize.width;
+    thumbCanvas.height = thumbSize.height;
+    const thumbCtx = thumbCanvas.getContext("2d");
+    if (!thumbCtx) throw new Error("Could not create image thumbnail canvas");
+
+    thumbCtx.fillStyle = "#000";
+    thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+    thumbCtx.drawImage(image, 0, 0, thumbCanvas.width, thumbCanvas.height);
+
+    const baseName = file.name.replace(/\.[^.]+$/, "");
+    const thumbnail = await canvasToJpegFile(thumbCanvas, `${baseName}-thumb.jpg`, 0.88);
+    return { thumbnail, width, height };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 function uploadViaServer({
   file,
   projectId,
@@ -214,13 +253,15 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
 
   const uploadFiles = useCallback(
     async (list: File[]) => {
-      const videoFiles = list.filter((file) => file.type.startsWith("video/"));
-      if (!videoFiles.length) {
-        toast.error("Choose video files to upload.");
+      const mediaFiles = list.filter(
+        (file) => isVideoMimeType(file.type) || isImageMimeType(file.type),
+      );
+      if (!mediaFiles.length) {
+        toast.error("Choose video or image files to upload.");
         return;
       }
 
-      const states: FileState[] = videoFiles.map((file) => ({
+      const states: FileState[] = mediaFiles.map((file) => ({
         id: makeUploadId(file),
         file,
         progress: 0,
@@ -245,42 +286,57 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
             },
           });
           const uploadedStorageKey = upload.storageKey;
+          const isImage = isImageMimeType(item.file.type);
 
           const videoId = await createVideo({
             projectId,
             title: item.file.name.replace(/\.[^.]+$/, ""),
             originalFilename: item.file.name,
             storageKey: uploadedStorageKey,
-            mimeType: item.file.type || "video/mp4",
+            mimeType: item.file.type || "application/octet-stream",
             sizeBytes: item.file.size,
           });
 
           try {
-            const preview = await generateClientPreviews(item.file);
+            const preview = isImage
+              ? await generateClientImagePreview(item.file)
+              : await generateClientPreviews(item.file);
             setFiles((prev) =>
               prev.map((f) => (f.id === item.id ? { ...f, progress: 97 } : f)),
             );
-            const [thumbnailUpload, spriteUpload] = await Promise.all([
-              uploadViaServer({
-                file: preview.thumbnail,
-                projectId,
-                onProgress: () => {},
-              }),
-              uploadViaServer({
-                file: preview.sprite,
-                projectId,
-                onProgress: () => {},
-              }),
-            ]);
+            const thumbnailUpload = await uploadViaServer({
+              file: preview.thumbnail,
+              projectId,
+              onProgress: () => {},
+            });
+            const spriteUpload = preview.sprite
+              ? await uploadViaServer({
+                  file: preview.sprite,
+                  projectId,
+                  onProgress: () => {},
+                })
+              : null;
             await markPreviewReady({
               videoId,
               thumbnailKey: thumbnailUpload.storageKey,
-              spriteKey: spriteUpload.storageKey,
+              spriteKey: spriteUpload?.storageKey,
               durationSec: preview.durationSec,
               width: preview.width,
               height: preview.height,
             });
           } catch {
+            if (isImage) {
+              await markPreviewReady({
+                videoId,
+                thumbnailKey: uploadedStorageKey,
+              });
+              setFiles((prev) =>
+                prev.map((f) =>
+                  f.id === item.id ? { ...f, status: "done", progress: 100 } : f,
+                ),
+              );
+              return;
+            }
             const enqueue = await fetch("/api/media/enqueue", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -353,11 +409,13 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
         }}
       >
         <Upload className="mb-2 h-8 w-8 text-zinc-500" />
-        <span className="text-sm text-zinc-300">Drop videos or click to upload</span>
+        <span className="text-sm text-zinc-300">
+          Drop videos or images, or click to upload
+        </span>
         <span className="mt-1 text-xs text-zinc-500">Batch uploads start immediately</span>
         <input
           type="file"
-          accept="video/*"
+          accept="video/*,image/*"
           multiple
           className="hidden"
           onChange={(e) => {

@@ -77,7 +77,7 @@ export default function DashboardPage() {
               )}
               <dl className="mt-4 grid grid-cols-3 gap-2 text-xs text-zinc-500">
                 <div>
-                  <dt>Videos</dt>
+                  <dt>Media</dt>
                   <dd className="text-zinc-300">{p.videoCount}</dd>
                 </div>
                 <div>

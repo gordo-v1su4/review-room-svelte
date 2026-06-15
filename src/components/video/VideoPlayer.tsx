@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
+import { isImageMimeType } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
 export function VideoPlayer({
   storageKey,
   spriteKey,
+  mimeType,
   version,
   fps,
   loop = false,
@@ -19,6 +21,7 @@ export function VideoPlayer({
 }: {
   storageKey: string;
   spriteKey?: string;
+  mimeType?: string | null;
   version?: string | number | null;
   fps?: number | null;
   loop?: boolean;
@@ -28,8 +31,9 @@ export function VideoPlayer({
   onEnded?: () => void;
   seekTo?: number | null;
 }) {
-  const videoUrl = useStorageUrl(storageKey, version);
+  const mediaUrl = useStorageUrl(storageKey, version);
   const spriteUrl = useStorageUrl(spriteKey, version);
+  const isImage = isImageMimeType(mimeType);
   const ref = useRef<HTMLVideoElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
@@ -116,6 +120,7 @@ export function VideoPlayer({
   }
 
   function seekFromClientX(clientX: number) {
+    if (isImage) return;
     if (!timelineRef.current || !ref.current || !duration) return;
     const rect = timelineRef.current.getBoundingClientRect();
     const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
@@ -126,6 +131,7 @@ export function VideoPlayer({
   }
 
   function togglePlayback() {
+    if (isImage) return;
     const video = ref.current;
     if (!video) return;
     if (video.paused) {
@@ -138,45 +144,55 @@ export function VideoPlayer({
   return (
     <div className="space-y-3">
       <div className="group relative overflow-hidden rounded-lg bg-black">
-        {videoUrl ? (
-          <video
-            ref={ref}
-            src={videoUrl}
-            loop={loop}
-            autoPlay={autoPlay}
-            playsInline
-            className="aspect-video w-full"
-            onClick={togglePlayback}
-            onPlay={() => {
-              setIsPlaying(true);
-              onPlay?.();
-              startTicker();
-            }}
-            onPause={() => {
-              setIsPlaying(false);
-              stopTicker();
-            }}
-            onTimeUpdate={(e) => {
-              syncTime(e.currentTarget.currentTime);
-            }}
-            onLoadedMetadata={(e) => {
-              setDuration(e.currentTarget.duration);
-              syncTime(e.currentTarget.currentTime);
-            }}
-            onSeeking={(e) => syncTime(e.currentTarget.currentTime)}
-            onSeeked={(e) => syncTime(e.currentTarget.currentTime)}
-            onEnded={() => {
-              setIsPlaying(false);
-              stopTicker();
-              onEnded?.();
-            }}
-          />
+        {mediaUrl ? (
+          isImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={mediaUrl}
+              alt=""
+              className="aspect-video w-full object-contain"
+              onLoad={() => onPlay?.()}
+            />
+          ) : (
+            <video
+              ref={ref}
+              src={mediaUrl}
+              loop={loop}
+              autoPlay={autoPlay}
+              playsInline
+              className="aspect-video w-full"
+              onClick={togglePlayback}
+              onPlay={() => {
+                setIsPlaying(true);
+                onPlay?.();
+                startTicker();
+              }}
+              onPause={() => {
+                setIsPlaying(false);
+                stopTicker();
+              }}
+              onTimeUpdate={(e) => {
+                syncTime(e.currentTarget.currentTime);
+              }}
+              onLoadedMetadata={(e) => {
+                setDuration(e.currentTarget.duration);
+                syncTime(e.currentTarget.currentTime);
+              }}
+              onSeeking={(e) => syncTime(e.currentTarget.currentTime)}
+              onSeeked={(e) => syncTime(e.currentTarget.currentTime)}
+              onEnded={() => {
+                setIsPlaying(false);
+                stopTicker();
+                onEnded?.();
+              }}
+            />
+          )
         ) : (
           <div className="flex aspect-video items-center justify-center text-sm text-zinc-500">
             Loading playback…
           </div>
         )}
-        {videoUrl && (
+        {mediaUrl && !isImage && (
           <button
             type="button"
             aria-label={isPlaying ? "Pause" : "Play"}
@@ -189,7 +205,7 @@ export function VideoPlayer({
             {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
           </button>
         )}
-        {spriteUrl && hoverPct != null && (
+        {!isImage && spriteUrl && hoverPct != null && (
           <div
             className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 overflow-hidden rounded border border-zinc-700 bg-zinc-900 shadow-xl"
             style={{ width: spritePreviewWidth, height: spritePreviewHeight }}
@@ -205,7 +221,8 @@ export function VideoPlayer({
           </div>
         )}
       </div>
-      <div className="space-y-3 px-5 pb-4 pt-1">
+      {!isImage && (
+        <div className="space-y-3 px-5 pb-4 pt-1">
         <div
           ref={timelineRef}
           role="slider"
@@ -336,7 +353,8 @@ export function VideoPlayer({
             </button>
           </div>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

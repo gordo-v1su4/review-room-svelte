@@ -31,7 +31,7 @@ export function VideoGrid({
   if (!videos.length) {
     return (
       <div className="mx-4 flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-zinc-800 px-4 text-center text-sm text-zinc-500 sm:mx-6 lg:mx-8">
-        {empty ?? "No videos"}
+        {empty ?? "No media"}
       </div>
     );
   }

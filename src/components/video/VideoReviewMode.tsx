@@ -13,6 +13,7 @@ import {
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
+import { isImageAsset, mediaKindLabel } from "@/lib/media";
 import { cn, formatDuration } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { VideoPlayer } from "./VideoPlayer";
@@ -39,13 +40,14 @@ export function VideoReviewMode({
   if (!videos.length) {
     return (
       <div className="mx-6 flex min-h-[280px] items-center justify-center rounded-lg border border-dashed border-zinc-800 text-sm text-zinc-500 sm:mx-8">
-        No videos match.
+        No media match.
       </div>
     );
   }
 
   const active = videos.find((video) => video._id === activeId) ?? videos[0];
   const activeIndex = videos.findIndex((video) => video._id === active._id);
+  const activeIsImage = isImageAsset(active);
 
   function navigate(delta: number) {
     const next = videos[(activeIndex + delta + videos.length) % videos.length];
@@ -74,7 +76,9 @@ export function VideoReviewMode({
               Playback
             </p>
             <p className="text-xs text-zinc-500">
-              {playbackMode === "loop"
+              {activeIsImage
+                ? "Reviewing the selected image"
+                : playbackMode === "loop"
                 ? "Looping the selected clip"
                 : "Advancing through the strip below"}
             </p>
@@ -121,6 +125,7 @@ export function VideoReviewMode({
             key={active._id}
             storageKey={active.storageKey}
             spriteKey={active.spriteKey}
+            mimeType={active.mimeType}
             version={active.updatedAt}
             fps={active.fps}
             loop={playbackMode === "loop"}
@@ -154,7 +159,8 @@ export function VideoReviewMode({
             </h2>
             <p className="text-[11px] text-zinc-600">
               {activeIndex + 1} / {videos.length} /{" "}
-              {formatDuration(active.durationSec)} / {active.originalFilename}
+              {activeIsImage ? mediaKindLabel(active) : formatDuration(active.durationSec)} /{" "}
+              {active.originalFilename}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
@@ -233,7 +239,11 @@ export function VideoReviewMode({
 }
 
 function ReviewStripThumbnail({ video }: { video: VideoDoc }) {
-  const thumbUrl = useStorageUrl(video.thumbnailKey, video.updatedAt);
+  const isImage = isImageAsset(video);
+  const thumbUrl = useStorageUrl(
+    video.thumbnailKey ?? (isImage ? video.storageKey : undefined),
+    video.updatedAt,
+  );
 
   if (thumbUrl) {
     return (

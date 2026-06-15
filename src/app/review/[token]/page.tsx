@@ -15,6 +15,7 @@ import type {
   ThumbnailScale,
   WorkspaceAppearance,
 } from "@/lib/types";
+import { isImageAsset } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_APPEARANCE: WorkspaceAppearance = {
@@ -133,6 +134,23 @@ export default function ReviewPage({
     }
     setPreviewMode(false);
   }
+
+  useEffect(() => {
+    if (!previewMode || !selected || !isImageAsset(selected)) return;
+    const timer = window.setTimeout(() => {
+      const nextIndex = previewIndex + 1;
+      if (nextIndex < shortlisted.length) {
+        setSelectedId(shortlisted[nextIndex]._id);
+        return;
+      }
+      if (loopPreview && shortlisted.length > 1) {
+        setSelectedId(shortlisted[0]._id);
+        return;
+      }
+      setPreviewMode(false);
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, [loopPreview, previewIndex, previewMode, selected, shortlisted]);
 
   if (!data) {
     return (
@@ -288,8 +306,8 @@ export default function ReviewPage({
             empty={
               <p className="text-zinc-500">
                 {showShortlist
-                  ? "No shortlisted videos yet."
-                  : "No videos in this review yet."}
+                  ? "No shortlisted media yet."
+                  : "No media in this review yet."}
               </p>
             }
           />

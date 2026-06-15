@@ -17,15 +17,15 @@ Read in this order. Each fact lives in one place; the others point here rather t
 
 ## What it is
 
-A clean, client-facing video review portal. The creator uploads many cuts of a project; a client opens a polished link, watches and scrubs quickly, then rates, shortlists, comments, and approves or requests changes. The app organizes itself around what the client does — videos surface into the right groups automatically as their state changes.
+A clean, client-facing media review portal. The creator uploads many cuts and still images for a project; a client opens a polished link, watches or views quickly, then rates, shortlists, comments, and approves or requests changes. The app organizes itself around what the client does — media assets surface into the right groups automatically as their state changes.
 
 It is **not** a video editor. No timeline, no compositing, no color tools, no transcoding pipeline. Pull *playback feel* from the editing references; pull nothing else.
 
 ## North star
 
-> A premium media review room where every asset is easy to watch, sort, discuss, and approve.
+> A premium media review room where every asset is easy to watch or inspect, sort, discuss, and approve.
 
-Calm, editorial, cinematic, dark. The videos are the only real color on screen; the interface is restrained neutral chrome that stays out of the way. It should feel finished enough to send straight to a paying client with no apology.
+Calm, editorial, cinematic, dark. The media is the only real color on screen; the interface is restrained neutral chrome that stays out of the way. It should feel finished enough to send straight to a paying client with no apology.
 
 ## The blend
 

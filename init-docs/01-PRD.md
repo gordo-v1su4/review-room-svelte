@@ -11,19 +11,19 @@
 type UserRole = "admin" | "client";
 ```
 
-- **Admin / creator** — creates projects, uploads videos, edits titles/status/tags, sets the banner, toggles downloads, shares review links, reads feedback.
-- **Client / reviewer** — opens a share link (optional passcode, no account required), watches/scrubs, rates, shortlists, comments, and approves or requests changes. Downloads only if enabled.
+- **Admin / creator** — creates projects, uploads videos and still images, edits titles/status/tags, sets the banner, toggles downloads, shares review links, reads feedback.
+- **Client / reviewer** — opens a share link (optional passcode, no account required), watches/scrubs video or inspects images, rates, shortlists, comments, and approves or requests changes. Downloads only if enabled.
 
 ## 2. Scope
 
 **MVP**
 - Project create / list / workspace.
-- Direct-to-storage upload (presigned), drag/drop batch import, bounded parallel uploads, per-file progress, auto thumbnail + scrub sprite.
+- Direct-to-storage upload (presigned), drag/drop batch import for video and image files, bounded parallel uploads, per-file progress, auto thumbnail + video scrub sprite.
 - Video grid with the card system; hover scrub on every ready card; right-side viewer/details panel.
 - Status + tags + 0–5 rating + shortlist (select) + comments (with optional timecode).
 - Metadata-driven smart views (§4) exposed as tabs.
 - Client review page via share link (+ optional passcode).
-- Per-video download via signed URL when enabled.
+- Per-asset download via signed URL when enabled.
 - Filters/sort over status, facets, tags, dates.
 
 **Not in MVP**
@@ -48,7 +48,7 @@ Drag exists only as an **optional shortcut**: dropping a card into a smart-view 
 
 ## 5. Data model
 
-The single most important modeling rule: **`status` is one workflow field; everything else that drives a view is a separate facet.** Don't collapse "selected", "highly rated", or "has feedback" into status — they're computed/independent and would corrupt the workflow field.
+The single most important modeling rule: **`status` is one workflow field; everything else that drives a view is a separate facet.** Don't collapse "selected", "highly rated", or "has feedback" into status — they're computed/independent and would corrupt the workflow field. Existing code may still call the table/components `videos`; treat records as review media assets and use `mimeType` to distinguish video from still image behavior.
 
 ### Workflow status (exactly one at a time)
 ```ts
@@ -114,9 +114,9 @@ export default defineSchema({
       v.literal("none"), v.literal("queued"),
       v.literal("processing"), v.literal("ready"), v.literal("error"),
     )),
-    mimeType: v.string(),
+    mimeType: v.string(),                      // video/* or image/*
     sizeBytes: v.optional(v.number()),
-    durationSec: v.optional(v.number()),
+    durationSec: v.optional(v.number()),        // video only
     width: v.optional(v.number()), height: v.optional(v.number()), fps: v.optional(v.number()),
     // workflow
     status,
@@ -205,9 +205,10 @@ Helpers: `createPresignedUploadUrl`, `createPresignedDownloadUrl`, `getSignedUrl
 This is the strongest FreeCut influence, but only the parts that serve review. The review app needs instant browsing, hover scrub, and responsive playback; it does **not** need a timeline, compositing surface, edit tools, or export pipeline.
 
 ### Phase A — MVP review media path
-- Upload supports drag/drop and file picker, accepts many videos at once, and runs bounded parallel uploads so a 20–30 clip batch starts populating quickly.
+- Upload supports drag/drop and file picker, accepts many videos or still images at once, and runs bounded parallel uploads so a 20–30 asset batch starts populating quickly.
 - Create Convex metadata as soon as upload completes; set `processingStatus = processing`; the grid should show useful progress/processing states instead of waiting for all media work.
 - Full playback uses native HTML5 `<video>` from a signed URL.
+- Still images use the same asset card, review, rating, shortlist, comment, approval, and download paths. They render as signed `<img>` previews, have no duration/sprite/timeline, and skip ffmpeg preview refresh.
 - Hover scrub uses the ffmpeg-generated `spriteKey` sheet from `services/media-worker`, both on cards and the player scrubber. This is the default low-risk path because it has no decode cost at hover time.
 - If local object URLs are available during the upload session, use them for immediate admin-side preview while the RustFS upload/worker finishes. Persist only object keys and metadata.
 
@@ -263,9 +264,9 @@ Build A→B per phase; each step should run before the next.
 ## 12. Acceptance criteria
 
 MVP is done when:
-1. Admin creates a project and uploads videos to RustFS via presigned URLs; metadata lands in Convex.
-2. Admin can drag/drop a batch of videos; each file shows progress and appears in the workspace as soon as its metadata is ready.
-3. Uploaded videos appear as polished cards in a grid; thumbnail + hover scrub preview work.
+1. Admin creates a project and uploads videos/images to RustFS via presigned URLs; metadata lands in Convex.
+2. Admin can drag/drop a batch of media files; each file shows progress and appears in the workspace as soon as its metadata is ready.
+3. Uploaded assets appear as polished cards in a grid; images show thumbnails and videos show thumbnail + hover scrub preview.
 4. Selecting a card opens the right-side viewer; playback and scrubbing feel instant (Phase A).
 5. Client (link only, no account) can rate, shortlist, comment (with optional timecode), and Approve / Request Changes.
 6. `status` and facets update per §6; smart-view tabs reflect the changes live across sessions.

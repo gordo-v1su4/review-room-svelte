@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Bookmark, Check, Download, MessageSquare, Star } from "lucide-react";
 import type { VideoDoc } from "@/lib/smartViews";
+import { isImageAsset, mediaKindLabel } from "@/lib/media";
 import { cn, formatDuration } from "@/lib/utils";
 import { VideoStatusPill } from "./VideoStatusPill";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
@@ -19,7 +20,7 @@ export function VideoListView({
   if (!videos.length) {
     return (
       <div className="mx-6 flex min-h-[280px] items-center justify-center rounded-lg border border-dashed border-zinc-800 text-sm text-zinc-500 sm:mx-8">
-        No videos match.
+        No media match.
       </div>
     );
   }
@@ -34,7 +35,7 @@ export function VideoListView({
           <div>Tags</div>
           <div>Rating</div>
           <div className="text-right">Notes</div>
-          <div>Duration</div>
+          <div>Length</div>
           <div />
         </div>
         <div className="divide-y divide-zinc-800/40">
@@ -104,7 +105,7 @@ export function VideoListView({
                 )}
               </div>
               <div className="text-[11px] text-zinc-600">
-                {formatDuration(video.durationSec)}
+                {isImageAsset(video) ? mediaKindLabel(video) : formatDuration(video.durationSec)}
               </div>
               <div className="hidden justify-end md:flex">
                 {video.downloadEnabled && (
@@ -120,9 +121,14 @@ export function VideoListView({
 }
 
 function VideoListThumbnail({ video }: { video: VideoDoc }) {
-  const thumbUrl = useStorageUrl(video.thumbnailKey, video.updatedAt);
+  const isImage = isImageAsset(video);
+  const thumbUrl = useStorageUrl(
+    video.thumbnailKey ?? (isImage ? video.storageKey : undefined),
+    video.updatedAt,
+  );
   const spriteUrl = useStorageUrl(video.spriteKey, video.updatedAt);
   const [hoverPct, setHoverPct] = useState<number | null>(null);
+  const canScrub = Boolean(spriteUrl);
   const spriteFrameCount = 10;
   const scrubFrame =
     hoverPct == null
@@ -138,13 +144,14 @@ function VideoListThumbnail({ video }: { video: VideoDoc }) {
     <div
       className="relative h-[63px] w-28 overflow-hidden rounded-md border border-zinc-800 bg-zinc-900"
       onMouseMove={(event) => {
+        if (!canScrub) return;
         const rect = event.currentTarget.getBoundingClientRect();
         const pct = (event.clientX - rect.left) / rect.width;
         setHoverPct(Math.min(1, Math.max(0, pct)));
       }}
       onMouseLeave={() => setHoverPct(null)}
     >
-      {spriteUrl && hoverPct != null ? (
+      {canScrub && hoverPct != null ? (
         <div
           className="h-full w-full bg-cover bg-no-repeat"
           style={{
@@ -161,7 +168,7 @@ function VideoListThumbnail({ video }: { video: VideoDoc }) {
           {video.processingStatus === "processing" ? "Processing" : "Preview"}
         </div>
       )}
-      {hoverPct != null && (
+      {canScrub && hoverPct != null && (
         <div
           className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-teal-300 shadow-[0_0_10px_rgba(45,212,191,0.85)]"
           style={{ left: `${hoverPct * 100}%` }}
@@ -169,7 +176,7 @@ function VideoListThumbnail({ video }: { video: VideoDoc }) {
       )}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-black/80 to-transparent" />
       <span className="absolute bottom-1 right-1 text-[10px] tabular-nums text-zinc-200">
-        {formatDuration(video.durationSec)}
+        {isImage ? mediaKindLabel(video) : formatDuration(video.durationSec)}
       </span>
     </div>
   );

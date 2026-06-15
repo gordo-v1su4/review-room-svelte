@@ -8,10 +8,12 @@ export function CommentComposer({
   onSubmit,
   currentTime,
   disabled,
+  timecodeEnabled = true,
 }: {
   onSubmit: (body: string, timecodeSec?: number) => void;
   currentTime?: number;
   disabled?: boolean;
+  timecodeEnabled?: boolean;
 }) {
   const [body, setBody] = useState("");
   const [useTime, setUseTime] = useState(false);
@@ -25,21 +27,23 @@ export function CommentComposer({
         disabled={disabled}
       />
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-xs text-zinc-400">
-          <input
-            type="checkbox"
-            checked={useTime}
-            onChange={(e) => setUseTime(e.target.checked)}
-            className="rounded border-zinc-700"
-          />
-          Pin to current time
-        </label>
+        {timecodeEnabled && (
+          <label className="flex items-center gap-2 text-xs text-zinc-400">
+            <input
+              type="checkbox"
+              checked={useTime}
+              onChange={(e) => setUseTime(e.target.checked)}
+              className="rounded border-zinc-700"
+            />
+            Pin to current time
+          </label>
+        )}
         <Button
           size="sm"
           variant="secondary"
           disabled={!body.trim() || disabled}
           onClick={() => {
-            onSubmit(body.trim(), useTime ? currentTime : undefined);
+            onSubmit(body.trim(), timecodeEnabled && useTime ? currentTime : undefined);
             setBody("");
           }}
         >
