@@ -50,13 +50,19 @@ import type {
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
 
 type ProjectIdentityPatch = {
   title?: string;
+  clientName?: string;
+  description?: string;
   brandColor?: string;
   bannerKey?: string;
+  clearClientName?: boolean;
+  clearDescription?: boolean;
+  clearBanner?: boolean;
 };
 type ProjectVisibility = "private" | "shared" | "workspace";
 
@@ -471,6 +477,8 @@ function ProjectHero({
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const [identityOpen, setIdentityOpen] = useState(false);
   const [draftTitle, setDraftTitle] = useState(title);
+  const [draftClientName, setDraftClientName] = useState(clientName ?? "");
+  const [draftDescription, setDraftDescription] = useState(description ?? "");
   const [draftColor, setDraftColor] = useState(brandColor ?? "#14b8a6");
   const [savingIdentity, setSavingIdentity] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
@@ -485,18 +493,38 @@ function ProjectHero({
     backgroundPosition: "center",
   } as CSSProperties;
 
-  function openIdentityEditor() {
+  function resetIdentityDrafts() {
     setDraftTitle(title);
+    setDraftClientName(clientName ?? "");
+    setDraftDescription(description ?? "");
     setDraftColor(brandColor ?? "#14b8a6");
+  }
+
+  function openIdentityEditor() {
+    resetIdentityDrafts();
     setIdentityOpen((open) => !open);
+  }
+
+  function showIdentityEditor() {
+    resetIdentityDrafts();
+    setIdentityOpen(true);
   }
 
   async function saveIdentity() {
     const nextTitle = draftTitle.trim();
+    const nextClientName = draftClientName.trim();
+    const nextDescription = draftDescription.trim();
     if (!nextTitle) return;
     setSavingIdentity(true);
     try {
-      await onUpdate({ title: nextTitle, brandColor: draftColor });
+      await onUpdate({
+        title: nextTitle,
+        clientName: nextClientName || undefined,
+        description: nextDescription || undefined,
+        clearClientName: !nextClientName,
+        clearDescription: !nextDescription,
+        brandColor: draftColor,
+      });
       toast.success("Project identity updated");
       setIdentityOpen(false);
     } catch (error) {
@@ -505,6 +533,21 @@ function ProjectHero({
       );
     } finally {
       setSavingIdentity(false);
+    }
+  }
+
+  async function clearBanner() {
+    if (!bannerKey) return;
+    setUploadingBanner(true);
+    try {
+      await onUpdate({ clearBanner: true });
+      toast.success("Project banner removed");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not remove banner",
+      );
+    } finally {
+      setUploadingBanner(false);
     }
   }
 
@@ -558,13 +601,28 @@ function ProjectHero({
               </span>
             </button>
             {identityOpen && canEditProject && (
-              <div className="absolute left-0 top-full z-50 mt-3 w-[min(15.5rem,calc(100vw-2rem))] rounded-lg border border-zinc-700/60 bg-zinc-950/35 p-2.5 shadow-2xl shadow-black/30 ring-1 ring-white/5 backdrop-blur-xl">
+              <div className="absolute left-0 top-full z-50 mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-zinc-700/60 bg-zinc-950/35 p-2.5 shadow-2xl shadow-black/30 ring-1 ring-white/5 backdrop-blur-xl">
                 <div className="space-y-2">
                   <Input
                     value={draftTitle}
                     onChange={(event) => setDraftTitle(event.target.value)}
                     aria-label="Project title"
+                    placeholder="Project title"
                     className="h-8 border-zinc-700/60 bg-zinc-950/35 px-2.5 text-xs backdrop-blur-md"
+                  />
+                  <Input
+                    value={draftClientName}
+                    onChange={(event) => setDraftClientName(event.target.value)}
+                    aria-label="Client name"
+                    placeholder="Client name"
+                    className="h-8 border-zinc-700/60 bg-zinc-950/35 px-2.5 text-xs backdrop-blur-md"
+                  />
+                  <Textarea
+                    value={draftDescription}
+                    onChange={(event) => setDraftDescription(event.target.value)}
+                    aria-label="Project description"
+                    placeholder="Project description"
+                    className="min-h-16 border-zinc-700/60 bg-zinc-950/35 px-2.5 py-2 text-xs backdrop-blur-md"
                   />
                   <div className="flex items-center gap-2">
                     <label className="flex h-8 flex-1 items-center gap-2 rounded-md border border-zinc-700/60 bg-zinc-950/35 px-2 text-[11px] text-zinc-300 backdrop-blur-md">
@@ -587,6 +645,19 @@ function ProjectHero({
                       <ImagePlus className="h-3.5 w-3.5" />
                       Image
                     </Button>
+                    {bannerKey && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 gap-1.5 px-2 text-xs text-zinc-400 hover:text-red-300"
+                        disabled={uploadingBanner}
+                        onClick={() => void clearBanner()}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Remove
+                      </Button>
+                    )}
                     <input
                       ref={bannerInputRef}
                       type="file"
@@ -623,7 +694,20 @@ function ProjectHero({
             <div className="mb-1 flex items-center gap-2 text-[11px] text-zinc-500">
               <span>Projects</span>
               <span className="text-zinc-700">/</span>
-              <span className="truncate text-zinc-400">{clientName ?? "Client"}</span>
+              {canEditProject ? (
+                <button
+                  type="button"
+                  className="truncate text-left text-zinc-400 transition hover:text-zinc-200"
+                  onClick={showIdentityEditor}
+                  title="Edit client name"
+                >
+                  {clientName ?? "Client"}
+                </button>
+              ) : (
+                <span className="truncate text-zinc-400">
+                  {clientName ?? "Client"}
+                </span>
+              )}
             </div>
             <h1 className="text-xl font-semibold tracking-tight text-zinc-100 sm:text-2xl">
               {title}
@@ -636,7 +720,18 @@ function ProjectHero({
             <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-zinc-600">
               <span className="inline-flex items-center gap-1.5">
                 <User className="h-3 w-3" />
-                {clientName ?? "No client"}
+                {canEditProject ? (
+                  <button
+                    type="button"
+                    className="transition hover:text-zinc-300"
+                    onClick={showIdentityEditor}
+                    title="Edit client name"
+                  >
+                    {clientName ?? "No client"}
+                  </button>
+                ) : (
+                  clientName ?? "No client"
+                )}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Clock className="h-3 w-3" />

@@ -194,11 +194,24 @@ export const update = mutation({
     bannerKey: v.optional(v.string()),
     brandColor: v.optional(v.string()),
     downloadEnabledByDefault: v.optional(v.boolean()),
+    clearClientName: v.optional(v.boolean()),
+    clearDescription: v.optional(v.boolean()),
+    clearBanner: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { project } = await getProjectForEditor(ctx, args.projectId);
-    const { projectId: _pid, ...patch } = args;
-    await ctx.db.patch(project._id, { ...patch, updatedAt: Date.now() });
+    const {
+      projectId: _pid,
+      clearClientName,
+      clearDescription,
+      clearBanner,
+      ...patch
+    } = args;
+    const nextPatch: Record<string, unknown> = { ...patch };
+    if (clearClientName) nextPatch.clientName = undefined;
+    if (clearDescription) nextPatch.description = undefined;
+    if (clearBanner) nextPatch.bannerKey = undefined;
+    await ctx.db.patch(project._id, { ...nextPatch, updatedAt: Date.now() });
   },
 });
 
