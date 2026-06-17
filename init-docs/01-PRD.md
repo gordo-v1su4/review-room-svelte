@@ -11,7 +11,7 @@
 type UserRole = "admin" | "client";
 ```
 
-- **Admin / creator** — creates projects, uploads videos and still images, edits titles/status/tags, sets the banner, toggles downloads, shares review links, reads feedback.
+- **Admin / creator** — creates projects, chooses project visibility, uploads videos and still images, edits titles/status/tags, sets the banner, toggles downloads, shares review links, reads feedback.
 - **Client / reviewer** — opens a share link (optional passcode, no account required), watches/scrubs video or inspects images, rates, shortlists, comments, and approves or requests changes. Downloads only if enabled.
 
 ## 2. Scope
@@ -231,7 +231,12 @@ Optional but highly desirable: adapt FreeCut's Analyze flow for review search an
 
 ## 9. Access & sharing
 
-Admin auth for the dashboard; clients reach a project through `reviewLinks.token` (optionally passcode-gated, optionally expiring). Capture the reviewer's display name when they first act. No enterprise permission system in MVP.
+Dashboard access is account-gated first: only users allowed to sign in can reach projects. Project visibility then controls which signed-in users can open a dashboard project:
+- **Private** — default. Only the owner can open, edit, upload, share, archive, or delete.
+- **Shared** — owner plus explicit project members or access rules can open it. Rules can target an exact email (`person@example.com`) or a domain (`*@studio.com`). Shared viewers can review, rate, shortlist, and comment; editors can also upload and edit media metadata.
+- **Workspace** — every signed-in app user can open and review the project. Owners still control access settings, review links, archive, and destructive actions; non-owner viewers do not get upload/edit/delete controls.
+
+Clients without dashboard accounts still reach a project through `reviewLinks.token` (optionally passcode-gated, optionally expiring). Capture the reviewer's display name when they first act. Review links are separate from workspace visibility and remain owner-managed.
 
 ## 10. Routes
 

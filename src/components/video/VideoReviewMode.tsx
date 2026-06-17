@@ -25,10 +25,12 @@ export function VideoReviewMode({
   videos,
   activeId,
   onSelect,
+  canEdit = true,
 }: {
   videos: VideoDoc[];
   activeId?: string;
   onSelect: (id: VideoDoc["_id"]) => void;
+  canEdit?: boolean;
 }) {
   const [playbackMode, setPlaybackMode] = useState<"order" | "loop">("loop");
   const [continuePlayback, setContinuePlayback] = useState(false);
@@ -182,24 +184,28 @@ export function VideoReviewMode({
               />
               {active.isSelect ? "Selected" : "Select"}
             </Button>
-            <Button
-              variant="success"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => void approve({ videoId: active._id })}
-            >
-              <Check className="h-4 w-4" />
-              Approve
-            </Button>
-            <Button
-              variant="warning"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => void requestChanges({ videoId: active._id })}
-            >
-              <X className="h-4 w-4" />
-              Changes
-            </Button>
+            {canEdit && (
+              <>
+                <Button
+                  variant="success"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => void approve({ videoId: active._id })}
+                >
+                  <Check className="h-4 w-4" />
+                  Approve
+                </Button>
+                <Button
+                  variant="warning"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => void requestChanges({ videoId: active._id })}
+                >
+                  <X className="h-4 w-4" />
+                  Changes
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>

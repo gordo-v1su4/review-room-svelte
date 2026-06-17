@@ -2,8 +2,10 @@
 
 import { use } from "react";
 import Link from "next/link";
+import { useQuery } from "convex/react";
+import { api } from "../../../../../../convex/_generated/api";
 import type { Id } from "../../../../../../convex/_generated/dataModel";
-import { AdminGate } from "@/components/auth/AdminGate";
+import { AdminGate, useAdminAccess } from "@/components/auth/AdminGate";
 import { UploadDropzone } from "@/components/upload/UploadDropzone";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +15,14 @@ export default function UploadPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = use(params);
+  const typedProjectId = projectId as Id<"projects">;
+  const { isAdmin } = useAdminAccess();
+  const project = useQuery(
+    api.projects.getById,
+    isAdmin ? { projectId: typedProjectId } : "skip",
+  );
+  const canUpload = project ? project.memberRole !== "viewer" : false;
+
   return (
     <AdminGate>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -23,7 +33,19 @@ export default function UploadPage({
           </Link>
         </Button>
       </div>
-      <UploadDropzone projectId={projectId as Id<"projects">} />
+      {!project ? (
+        <p className="text-sm text-zinc-500">Loading project...</p>
+      ) : canUpload ? (
+        <UploadDropzone projectId={typedProjectId} />
+      ) : (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6">
+          <p className="font-medium text-zinc-100">View-only access</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            This project is shared with you for review. Ask the owner for edit
+            access to upload media.
+          </p>
+        </div>
+      )}
     </AdminGate>
   );
 }

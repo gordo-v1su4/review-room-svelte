@@ -58,6 +58,29 @@ type ProjectIdentityPatch = {
   brandColor?: string;
   bannerKey?: string;
 };
+type ProjectVisibility = "private" | "shared" | "workspace";
+
+const VISIBILITY_OPTIONS: Array<{
+  id: ProjectVisibility;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: "private",
+    label: "Private",
+    description: "Only you can open this project.",
+  },
+  {
+    id: "shared",
+    label: "Shared",
+    description: "Only listed people or domains can open it.",
+  },
+  {
+    id: "workspace",
+    label: "Workspace",
+    description: "Every signed-in app user can open it.",
+  },
+];
 
 const WORKSPACE_APPEARANCE_KEY = "review-room.workspace.appearance";
 const GRID_SIZES: GridSize[] = ["sm", "md", "lg"];
@@ -240,6 +263,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     );
   }
 
+  const canEditProject = project.memberRole !== "viewer";
+  const canManageAccess = project.isOwner;
+
   return (
     <AdminGate>
       <div className="min-h-dvh bg-zinc-950">
@@ -251,6 +277,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           bannerKey={project.bannerKey}
           updatedAt={project.updatedAt}
           projectId={projectId}
+          visibility={(project.visibility ?? "private") as ProjectVisibility}
           counts={counts}
           onUpdate={(patch) => updateProject({ projectId, ...patch })}
           onShare={() =>
@@ -278,7 +305,8 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           canClearVideos={project.isOwner && videos.length > 0}
           onArchiveProject={() => void archiveCurrentProject()}
           uploadHref={`/dashboard/projects/${projectId}/upload`}
-          canManageMembers={project.isOwner}
+          canEditProject={canEditProject}
+          canManageAccess={canManageAccess}
         />
 
         <ProjectViewSwitcher videos={videos} active={view} onChange={setView} />
@@ -328,9 +356,11 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                 empty={
                   <div className="text-center">
                     <p>Upload your first media to start a review.</p>
-                    <Link href={`/dashboard/projects/${projectId}/upload`}>
-                      <Button className="mt-3">Upload</Button>
-                    </Link>
+                    {canEditProject && (
+                      <Link href={`/dashboard/projects/${projectId}/upload`}>
+                        <Button className="mt-3">Upload</Button>
+                      </Link>
+                    )}
                   </div>
                 }
               />
@@ -361,6 +391,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                   setSelectedId(id);
                   setPanelExpanded(false);
                 }}
+                canEdit={canEditProject}
               />
             )}
           </div>
@@ -379,6 +410,8 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                 onClose={() => setSelectedId(null)}
                 onToggleExpand={() => setPanelExpanded((e) => !e)}
                 reviewerName="Admin"
+                canEdit={canEditProject}
+                canDelete={project.isOwner}
               />
             </>
           )}
@@ -396,6 +429,7 @@ function ProjectHero({
   bannerKey,
   updatedAt,
   projectId,
+  visibility,
   counts,
   onUpdate,
   onShare,
@@ -405,7 +439,8 @@ function ProjectHero({
   canClearVideos,
   onArchiveProject,
   uploadHref,
-  canManageMembers,
+  canEditProject,
+  canManageAccess,
 }: {
   title: string;
   clientName?: string;
@@ -414,6 +449,7 @@ function ProjectHero({
   bannerKey?: string;
   updatedAt: number;
   projectId: Id<"projects">;
+  visibility: ProjectVisibility;
   counts: {
     awaiting: number;
     feedback: number;
@@ -428,7 +464,8 @@ function ProjectHero({
   canClearVideos: boolean;
   onArchiveProject: () => void;
   uploadHref: string;
-  canManageMembers: boolean;
+  canEditProject: boolean;
+  canManageAccess: boolean;
 }) {
   const bannerUrl = useStorageUrl(bannerKey, updatedAt);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -509,17 +546,18 @@ function ProjectHero({
           <div className="relative shrink-0">
             <button
               type="button"
+              disabled={!canEditProject}
               className="group grid h-16 w-16 place-items-center rounded-xl text-lg font-semibold text-zinc-950 ring-4 ring-zinc-950 transition hover:brightness-110 sm:h-20 sm:w-20"
               style={{ backgroundColor: accent }}
               onClick={openIdentityEditor}
-              title="Edit project identity"
+              title={canEditProject ? "Edit project identity" : "View-only project"}
             >
               {initials(title)}
               <span className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full border border-zinc-700 bg-zinc-900 text-zinc-300 opacity-0 shadow-sm transition group-hover:opacity-100">
                 <Palette className="h-3.5 w-3.5" />
               </span>
             </button>
-            {identityOpen && (
+            {identityOpen && canEditProject && (
               <div className="absolute left-0 top-full z-50 mt-3 w-[min(15.5rem,calc(100vw-2rem))] rounded-lg border border-zinc-700/60 bg-zinc-950/35 p-2.5 shadow-2xl shadow-black/30 ring-1 ring-white/5 backdrop-blur-xl">
                 <div className="space-y-2">
                   <Input
@@ -611,31 +649,36 @@ function ProjectHero({
             </div>
           </div>
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-start xl:justify-end">
-            <ProjectMembersPopover
+            <ProjectAccessPopover
               projectId={projectId}
-              canManage={canManageMembers}
+              visibility={visibility}
+              canManage={canManageAccess}
             />
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto"
-              onClick={onShare}
-            >
-              <Link2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Share review link</span>
-              <span className="sm:hidden">Share</span>
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto"
-              disabled={reprocessing}
-              onClick={onReprocess}
-            >
-              <RefreshCw className={cn("h-4 w-4", reprocessing && "animate-spin")} />
-              <span className="hidden sm:inline">Refresh previews</span>
-              <span className="sm:hidden">Refresh</span>
-            </Button>
+            {canManageAccess && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto"
+                onClick={onShare}
+              >
+                <Link2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Share review link</span>
+                <span className="sm:hidden">Share</span>
+              </Button>
+            )}
+            {canEditProject && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto"
+                disabled={reprocessing}
+                onClick={onReprocess}
+              >
+                <RefreshCw className={cn("h-4 w-4", reprocessing && "animate-spin")} />
+                <span className="hidden sm:inline">Refresh previews</span>
+                <span className="sm:hidden">Refresh</span>
+              </Button>
+            )}
             <Button
               variant="secondary"
               size="sm"
@@ -651,19 +694,21 @@ function ProjectHero({
               variant="ghost"
               size="sm"
               className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-500 sm:w-auto"
-              disabled={!canManageMembers}
+              disabled={!canManageAccess}
               onClick={onArchiveProject}
             >
               <Archive className="h-4 w-4" />
               <span className="hidden sm:inline">Archive project</span>
               <span className="sm:hidden">Archive</span>
             </Button>
-            <Link href={uploadHref}>
-              <Button size="sm" className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto">
-                <Upload className="h-4 w-4" />
-                Upload
-              </Button>
-            </Link>
+            {canEditProject && (
+              <Link href={uploadHref}>
+                <Button size="sm" className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto">
+                  <Upload className="h-4 w-4" />
+                  Upload
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
@@ -677,19 +722,28 @@ function ProjectHero({
   );
 }
 
-function ProjectMembersPopover({
+function ProjectAccessPopover({
   projectId,
+  visibility,
   canManage,
 }: {
   projectId: Id<"projects">;
+  visibility: ProjectVisibility;
   canManage: boolean;
 }) {
   const members = useQuery(api.projects.listMembers, { projectId });
   const addMember = useMutation(api.projects.addMember);
   const removeMember = useMutation(api.projects.removeMember);
   const removeAccessRule = useMutation(api.projects.removeAccessRule);
+  const setVisibility = useMutation(api.projects.setVisibility);
   const [identifier, setIdentifier] = useState("");
   const [saving, setSaving] = useState(false);
+  const [savingVisibility, setSavingVisibility] =
+    useState<ProjectVisibility | null>(null);
+
+  const activeVisibility =
+    VISIBILITY_OPTIONS.find((option) => option.id === visibility) ??
+    VISIBILITY_OPTIONS[0];
 
   async function submitMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -707,6 +761,27 @@ function ProjectMembersPopover({
     }
   }
 
+  async function updateVisibility(nextVisibility: ProjectVisibility) {
+    if (!canManage || nextVisibility === visibility) return;
+    setSavingVisibility(nextVisibility);
+    try {
+      await setVisibility({ projectId, visibility: nextVisibility });
+      toast.success(
+        nextVisibility === "workspace"
+          ? "Project visible to the workspace"
+          : nextVisibility === "shared"
+            ? "Project set to shared"
+            : "Project set to private",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not update access",
+      );
+    } finally {
+      setSavingVisibility(null);
+    }
+  }
+
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
@@ -717,25 +792,67 @@ function ProjectMembersPopover({
           className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto"
         >
           <Users className="h-4 w-4" />
-          Members
+          Access
         </Button>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
           align="end"
           sideOffset={8}
-          className="z-50 w-[19rem] max-w-[calc(100vw-1rem)] rounded-lg border border-white/10 bg-zinc-950/50 p-3 text-zinc-200 shadow-2xl shadow-black/45 ring-1 ring-white/5 backdrop-blur-2xl"
+          className="z-50 w-[21rem] max-w-[calc(100vw-1rem)] rounded-lg border border-white/10 bg-zinc-950/50 p-3 text-zinc-200 shadow-2xl shadow-black/45 ring-1 ring-white/5 backdrop-blur-2xl"
         >
           <div className="mb-3 border-b border-white/10 pb-2">
-            <p className="text-xs font-medium text-zinc-100">Project members</p>
+            <p className="text-xs font-medium text-zinc-100">Project access</p>
             <p className="mt-0.5 text-[11px] text-zinc-500">
-              Add exact emails or domain rules for this project only.
+              Choose who inside the app can open this project.
             </p>
             <p className="mt-1 text-[10px] leading-4 text-zinc-600">
               Sign-in is still limited by the backend allowlist.
             </p>
           </div>
 
+          <div className="mb-3 space-y-2">
+            {canManage ? (
+              <div className="grid grid-cols-3 gap-1.5">
+                {VISIBILITY_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    disabled={savingVisibility !== null}
+                    onClick={() => void updateVisibility(option.id)}
+                    className={cn(
+                      "rounded-md border px-2 py-1.5 text-left text-[11px] font-medium transition",
+                      visibility === option.id
+                        ? "border-teal-400/40 bg-teal-400/10 text-teal-200"
+                        : "border-white/10 bg-white/[0.03] text-zinc-400 hover:border-white/20 hover:text-zinc-200",
+                    )}
+                  >
+                    {savingVisibility === option.id ? "Saving" : option.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5">
+                <p className="text-[11px] font-medium text-zinc-200">
+                  {activeVisibility.label}
+                </p>
+              </div>
+            )}
+            <p className="text-[10px] leading-4 text-zinc-500">
+              {activeVisibility.description}
+            </p>
+          </div>
+
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[11px] font-medium text-zinc-300">
+              Direct access
+            </p>
+            {visibility === "workspace" && (
+              <span className="rounded-full bg-sky-400/10 px-2 py-0.5 text-[10px] font-medium text-sky-300">
+                Optional
+              </span>
+            )}
+          </div>
           <div className="max-h-52 space-y-1 overflow-y-auto pr-1">
             {!members ? (
               <p className="py-4 text-center text-xs text-zinc-500">Loading...</p>
@@ -794,7 +911,7 @@ function ProjectMembersPopover({
           </div>
 
           {canManage && (
-            <form onSubmit={submitMember} className="mt-3 flex gap-2">
+            <form onSubmit={submitMember} className="mt-3 space-y-2">
               <Input
                 value={identifier}
                 onChange={(event) => setIdentifier(event.target.value)}
@@ -804,11 +921,11 @@ function ProjectMembersPopover({
               <Button
                 type="submit"
                 size="sm"
-                className="h-8 shrink-0 px-2.5 text-xs"
+                className="h-8 w-full gap-1.5 px-2.5 text-xs"
                 disabled={saving || !identifier.trim()}
               >
                 <UserPlus className="h-3.5 w-3.5" />
-                Add
+                Add person or domain
               </Button>
             </form>
           )}

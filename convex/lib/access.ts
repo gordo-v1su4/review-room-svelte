@@ -2,6 +2,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 
+type ProjectAccessRole = "owner" | "editor" | "viewer";
+
 export async function requireAdmin(ctx: QueryCtx | MutationCtx) {
   const authUserId = await getAuthUserId(ctx);
   if (!authUserId) throw new Error("Not authenticated");
@@ -52,7 +54,8 @@ export async function getProjectForAdmin(
       q.eq("projectId", project._id).eq("appUserId", admin._id),
     )
     .unique();
-  if (membership) {
+  const explicitPrivate = project.visibility === "private";
+  if (membership && !explicitPrivate) {
     return {
       admin,
       project,
@@ -69,12 +72,49 @@ export async function getProjectForAdmin(
   const matchingRule = accessRules.find((rule) =>
     matchesAccessPattern(authUser?.email, rule.pattern),
   );
-  if (!matchingRule) throw new Error("Forbidden");
+  if (matchingRule && !explicitPrivate) {
+    return {
+      admin,
+      project,
+      isOwner: false as const,
+      memberRole: matchingRule.role,
+    };
+  }
+
+  if (project.visibility === "workspace") {
+    return {
+      admin,
+      project,
+      isOwner: false as const,
+      memberRole: "viewer" as const,
+    };
+  }
+
+  throw new Error("Forbidden");
+}
+
+export async function getProjectForEditor(
+  ctx: QueryCtx | MutationCtx,
+  projectId: Id<"projects">,
+) {
+  const access = await getProjectForAdmin(ctx, projectId);
+  if (access.memberRole === "viewer") throw new Error("Project editor required");
+  return access;
+}
+
+export async function getProjectForRole(
+  ctx: QueryCtx | MutationCtx,
+  projectId: Id<"projects">,
+  role: ProjectAccessRole,
+) {
+  if (role === "owner") return await getProjectForOwner(ctx, projectId);
+  const access = await getProjectForAdmin(ctx, projectId);
+  if (role === "editor" && access.memberRole === "viewer") {
+    throw new Error("Project editor required");
+  }
   return {
-    admin,
-    project,
-    isOwner: false as const,
-    memberRole: matchingRule.role,
+    admin: access.admin,
+    project: access.project,
   };
 }
 

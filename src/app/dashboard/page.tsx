@@ -8,6 +8,13 @@ import { api } from "../../../convex/_generated/api";
 import { AdminGate, useAdminAccess } from "@/components/auth/AdminGate";
 import { Button } from "@/components/ui/button";
 
+function visibilityBadge(visibility: string | undefined, isOwner: boolean) {
+  if (!isOwner) return "Shared with you";
+  if (visibility === "workspace") return "Workspace";
+  if (visibility === "shared") return "Shared";
+  return "Private";
+}
+
 export default function DashboardPage() {
   const { isAdmin } = useAdminAccess();
   const archiveProject = useMutation(api.projects.archive);
@@ -70,11 +77,9 @@ export default function DashboardPage() {
               {p.clientName && (
                 <p className="mt-1 text-sm text-zinc-500">{p.clientName}</p>
               )}
-              {!p.isOwner && (
-                <p className="mt-2 inline-flex rounded-full border border-teal-400/20 bg-teal-400/10 px-2 py-0.5 text-[11px] font-medium text-teal-300">
-                  Shared with you
-                </p>
-              )}
+              <p className="mt-2 inline-flex rounded-full border border-teal-400/20 bg-teal-400/10 px-2 py-0.5 text-[11px] font-medium text-teal-300">
+                {visibilityBadge(p.visibility, p.isOwner)}
+              </p>
               <dl className="mt-4 grid grid-cols-3 gap-2 text-xs text-zinc-500">
                 <div>
                   <dt>Media</dt>

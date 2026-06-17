@@ -3,11 +3,17 @@ import { mutation, query } from "./_generated/server";
 import {
   getAdminOrNull,
   getProjectForAdmin,
+  getProjectForEditor,
   getProjectForOwner,
   requireAdmin,
 } from "./lib/access";
 
 const memberRoleValidator = v.union(v.literal("editor"), v.literal("viewer"));
+const projectVisibilityValidator = v.union(
+  v.literal("private"),
+  v.literal("shared"),
+  v.literal("workspace"),
+);
 
 function slugify(title: string) {
   return (
@@ -44,6 +50,16 @@ function accessPatternLabel(pattern: string) {
   return pattern.startsWith("*@") ? pattern : pattern;
 }
 
+function normalizeAccessRuleList(value: string[] | undefined) {
+  return Array.from(
+    new Set(
+      (value ?? [])
+        .map((entry) => normalizeAccessPattern(entry))
+        .filter((entry): entry is string => Boolean(entry)),
+    ),
+  );
+}
+
 export const listForAdmin = query({
   args: {},
   handler: async (ctx) => {
@@ -67,11 +83,16 @@ export const listForAdmin = query({
         .filter((rule) => matchesAccessPattern(authUser?.email, rule.pattern))
         .map((rule) => ctx.db.get(rule.projectId)),
     );
+    const workspaceProjects = await ctx.db
+      .query("projects")
+      .filter((q) => q.eq(q.field("visibility"), "workspace"))
+      .collect();
     const projectsById = new Map(
       [
         ...owned,
         ...shared.filter((project) => project !== null),
         ...ruleProjects.filter((project) => project !== null),
+        ...workspaceProjects,
       ].map((project) => [project._id, project]),
     );
     const projects = Array.from(projectsById.values());
@@ -86,6 +107,7 @@ export const listForAdmin = query({
         return {
           ...project,
           isOwner: project.createdBy === admin._id,
+          visibility: project.visibility ?? "private",
           videoCount: visible.length,
           awaitingReview: visible.filter(
             (v) => v.status === "awaiting_review" && !v.viewed,
@@ -105,7 +127,12 @@ export const getById = query({
       ctx,
       args.projectId,
     );
-    return { ...project, isOwner, memberRole };
+    return {
+      ...project,
+      visibility: project.visibility ?? "private",
+      isOwner,
+      memberRole,
+    };
   },
 });
 
@@ -116,27 +143,45 @@ export const create = mutation({
     description: v.optional(v.string()),
     brandColor: v.optional(v.string()),
     downloadEnabledByDefault: v.optional(v.boolean()),
+    visibility: v.optional(projectVisibilityValidator),
+    accessRules: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const admin = await requireAdmin(ctx);
     const now = Date.now();
+    const normalizedRules = normalizeAccessRuleList(args.accessRules);
+    const visibility =
+      normalizedRules.length > 0 && args.visibility !== "workspace"
+        ? "shared"
+        : args.visibility ?? "private";
     let slug = slugify(args.title);
     const existing = await ctx.db
       .query("projects")
       .withIndex("by_slug", (q) => q.eq("slug", slug))
       .first();
     if (existing) slug = `${slug}-${now}`;
-    return await ctx.db.insert("projects", {
+    const projectId = await ctx.db.insert("projects", {
       title: args.title,
       slug,
       clientName: args.clientName,
       description: args.description,
       brandColor: args.brandColor,
       downloadEnabledByDefault: args.downloadEnabledByDefault ?? false,
+      visibility,
       createdBy: admin._id,
       createdAt: now,
       updatedAt: now,
     });
+    for (const pattern of normalizedRules) {
+      await ctx.db.insert("projectAccessRules", {
+        projectId,
+        pattern,
+        role: "viewer",
+        addedBy: admin._id,
+        addedAt: now,
+      });
+    }
+    return projectId;
   },
 });
 
@@ -151,9 +196,23 @@ export const update = mutation({
     downloadEnabledByDefault: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const { project } = await getProjectForAdmin(ctx, args.projectId);
+    const { project } = await getProjectForEditor(ctx, args.projectId);
     const { projectId: _pid, ...patch } = args;
     await ctx.db.patch(project._id, { ...patch, updatedAt: Date.now() });
+  },
+});
+
+export const setVisibility = mutation({
+  args: {
+    projectId: v.id("projects"),
+    visibility: projectVisibilityValidator,
+  },
+  handler: async (ctx, args) => {
+    const { project } = await getProjectForOwner(ctx, args.projectId);
+    await ctx.db.patch(project._id, {
+      visibility: args.visibility,
+      updatedAt: Date.now(),
+    });
   },
 });
 
@@ -264,15 +323,28 @@ export const addMember = mutation({
         .unique();
       if (existingRule) {
         await ctx.db.patch(existingRule._id, { role: args.role ?? "editor" });
+        if (project.visibility !== "workspace") {
+          await ctx.db.patch(project._id, {
+            visibility: "shared",
+            updatedAt: Date.now(),
+          });
+        }
         return existingRule._id;
       }
-      return await ctx.db.insert("projectAccessRules", {
+      const ruleId = await ctx.db.insert("projectAccessRules", {
         projectId: project._id,
         pattern,
         role: args.role ?? "editor",
         addedBy: admin._id,
         addedAt: Date.now(),
       });
+      if (project.visibility !== "workspace") {
+        await ctx.db.patch(project._id, {
+          visibility: "shared",
+          updatedAt: Date.now(),
+        });
+      }
+      return ruleId;
     }
     if (target._id === project.createdBy) {
       throw new Error("That user already owns this project");
@@ -286,16 +358,29 @@ export const addMember = mutation({
       .unique();
     if (existing) {
       await ctx.db.patch(existing._id, { role: args.role ?? "editor" });
+      if (project.visibility !== "workspace") {
+        await ctx.db.patch(project._id, {
+          visibility: "shared",
+          updatedAt: Date.now(),
+        });
+      }
       return existing._id;
     }
 
-    return await ctx.db.insert("projectMembers", {
+    const membershipId = await ctx.db.insert("projectMembers", {
       projectId: project._id,
       appUserId: target._id,
       role: args.role ?? "editor",
       addedBy: admin._id,
       addedAt: Date.now(),
     });
+    if (project.visibility !== "workspace") {
+      await ctx.db.patch(project._id, {
+        visibility: "shared",
+        updatedAt: Date.now(),
+      });
+    }
+    return membershipId;
   },
 });
 

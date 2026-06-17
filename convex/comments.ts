@@ -7,6 +7,7 @@ export const listByVideo = query({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) return [];
+    await getProjectForAdmin(ctx, video.projectId);
     const comments = await ctx.db
       .query("comments")
       .withIndex("by_video", (q) => q.eq("videoId", args.videoId))
@@ -26,9 +27,7 @@ export const add = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
-    if (args.authorRole === "admin") {
-      await getProjectForAdmin(ctx, video.projectId);
-    }
+    if (args.authorRole === "admin") await getProjectForAdmin(ctx, video.projectId);
     await ctx.db.insert("comments", {
       videoId: args.videoId,
       projectId: video.projectId,

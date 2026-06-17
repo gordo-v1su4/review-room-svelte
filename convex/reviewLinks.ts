@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getProjectForAdmin, requireAdmin } from "./lib/access";
+import { getProjectForAdmin, getProjectForOwner } from "./lib/access";
 
 const reviewAppearanceValidator = v.object({
   gridSize: v.union(v.literal("sm"), v.literal("md"), v.literal("lg")),
@@ -30,7 +30,7 @@ async function hashPasscode(passcode: string) {
 export const listByProject = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    await getProjectForAdmin(ctx, args.projectId);
+    await getProjectForOwner(ctx, args.projectId);
     return await ctx.db
       .query("reviewLinks")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))

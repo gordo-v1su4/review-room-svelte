@@ -36,6 +36,9 @@ const applicationTables = {
     bannerKey: v.optional(v.string()),
     brandColor: v.optional(v.string()),
     downloadEnabledByDefault: v.boolean(),
+    visibility: v.optional(
+      v.union(v.literal("private"), v.literal("shared"), v.literal("workspace")),
+    ),
     createdBy: v.id("appUsers"),
     createdAt: v.number(),
     updatedAt: v.number(),

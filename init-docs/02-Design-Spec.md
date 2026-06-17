@@ -8,10 +8,10 @@
 ## 1. Screens
 
 ### A. Admin dashboard — project list
-Top nav, "Projects" title, "New project" CTA, and a grid of project cards. Each card: banner/thumbnail, title, client name, media count, count awaiting review, count with feedback, last updated, share status. Each card reads as a client-facing collection, not a task-list row. Clean, premium, not dense.
+Top nav, "Projects" title, "New project" CTA, and a grid of project cards. Each card: banner/thumbnail, title, client name, media count, count awaiting review, count with feedback, last updated, visibility status (Private, Shared, Workspace, or Shared with you). Each card reads as a client-facing collection, not a task-list row. Clean, premium, not dense.
 
 ### B. Admin workspace — the most important screen
-- **Project header / banner** — banner image, title, client name/description, "Share review link," "Upload." Makes the page feel like a portal.
+- **Project header / banner** — banner image, title, client name/description, "Access," "Share review link," "Upload." Makes the page feel like a portal. Owners use Access to choose Private, Shared, or Workspace visibility and to add exact email or domain rules; non-owners see view/edit affordances based on role.
 - **Smart-view tab bar** (§4) directly under the header, with live counts.
 - **Toolbar** — search, filter, sort, thumbnail-size toggle, optional "Selected only." Light, never cluttered.
 - **Content** — the media grid (default).

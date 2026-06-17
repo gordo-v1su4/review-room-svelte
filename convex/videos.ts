@@ -1,6 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getProjectForAdmin, getProjectForOwner, requireAdmin } from "./lib/access";
+import {
+  getProjectForAdmin,
+  getProjectForEditor,
+  getProjectForOwner,
+} from "./lib/access";
 
 const statusValidator = v.union(
   v.literal("awaiting_review"),
@@ -44,7 +48,7 @@ export const createFromUpload = mutation({
     sizeBytes: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const { admin, project } = await getProjectForAdmin(ctx, args.projectId);
+    const { admin, project } = await getProjectForEditor(ctx, args.projectId);
     const now = Date.now();
     const siblings = await ctx.db
       .query("videos")
@@ -88,7 +92,7 @@ export const updateMetadata = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
-    await getProjectForAdmin(ctx, video.projectId);
+    await getProjectForEditor(ctx, video.projectId);
     const patch: Record<string, unknown> = { updatedAt: Date.now() };
     if (args.title !== undefined) patch.title = args.title;
     if (args.tags !== undefined) patch.tags = args.tags;
@@ -144,7 +148,7 @@ export const approve = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
-    await getProjectForAdmin(ctx, video.projectId);
+    await getProjectForEditor(ctx, video.projectId);
     const now = Date.now();
     await ctx.db.patch(args.videoId, {
       status: "approved",
@@ -159,7 +163,7 @@ export const requestChanges = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
-    await getProjectForAdmin(ctx, video.projectId);
+    await getProjectForEditor(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       status: "needs_changes",
       updatedAt: Date.now(),
@@ -176,7 +180,7 @@ export const applySmartViewDrop = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
-    await getProjectForAdmin(ctx, video.projectId);
+    await getProjectForEditor(ctx, video.projectId);
     const patch: Record<string, unknown> = { updatedAt: Date.now() };
     if (args.status) {
       patch.status = args.status;
@@ -201,7 +205,7 @@ export const setProcessingComplete = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
-    await getProjectForAdmin(ctx, video.projectId);
+    await getProjectForEditor(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       thumbnailKey: args.thumbnailKey,
       spriteKey: args.spriteKey,
@@ -220,7 +224,7 @@ export const setMarkedForDeletion = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
-    await getProjectForAdmin(ctx, video.projectId);
+    await getProjectForEditor(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       markedForDeletion: args.marked,
       updatedAt: Date.now(),
@@ -233,7 +237,7 @@ export const startPreviewRefresh = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
-    await getProjectForAdmin(ctx, video.projectId);
+    await getProjectForEditor(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       thumbnailKey: undefined,
       spriteKey: undefined,
@@ -253,7 +257,7 @@ export const markProcessingFailed = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) return;
-    await getProjectForAdmin(ctx, video.projectId);
+    await getProjectForEditor(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       processingStatus: "error",
       updatedAt: Date.now(),
@@ -266,7 +270,7 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) return;
-    await getProjectForAdmin(ctx, video.projectId);
+    await getProjectForOwner(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       status: "archived",
       updatedAt: Date.now(),

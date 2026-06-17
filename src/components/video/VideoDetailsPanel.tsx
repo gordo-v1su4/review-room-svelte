@@ -28,6 +28,8 @@ export function VideoDetailsPanel({
   autoPlay = false,
   loop = false,
   onEnded,
+  canEdit = mode === "admin",
+  canDelete = mode === "admin",
 }: {
   video: VideoDoc;
   mode: Mode;
@@ -39,6 +41,8 @@ export function VideoDetailsPanel({
   autoPlay?: boolean;
   loop?: boolean;
   onEnded?: () => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }) {
   const [seekTo, setSeekTo] = useState<number | null>(null);
   const [playhead, setPlayhead] = useState(0);
@@ -117,15 +121,19 @@ export function VideoDetailsPanel({
         {mode === "admin" && (
           <div className="space-y-2">
             <VideoStatusPill status={video.status} />
-            <Input
-              defaultValue={video.title}
-              onBlur={(e) =>
-                void updateMeta({
-                  videoId: video._id,
-                  title: e.target.value,
-                })
-              }
-            />
+            {canEdit ? (
+              <Input
+                defaultValue={video.title}
+                onBlur={(e) =>
+                  void updateMeta({
+                    videoId: video._id,
+                    title: e.target.value,
+                  })
+                }
+              />
+            ) : (
+              <p className="text-sm text-zinc-300">{video.title}</p>
+            )}
           </div>
         )}
 
@@ -158,7 +166,8 @@ export function VideoDetailsPanel({
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {(mode === "client" || canEdit) && (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button
             className="flex-1"
             variant="success"
@@ -185,42 +194,47 @@ export function VideoDetailsPanel({
           >
             Request changes
           </Button>
-        </div>
+          </div>
+        )}
 
-        {mode === "admin" && (
+        {mode === "admin" && (canEdit || canDelete) && (
           <div className="grid gap-2 sm:grid-cols-2">
-            <Button
-              variant="ghost"
-              className={cn(
-                "justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-300",
-                video.markedForDeletion &&
-                  "border-red-900/70 bg-red-950/20 text-red-300",
-              )}
-              onClick={() =>
-                void setMarkedForDeletion({
-                  videoId: video._id,
-                  marked: !video.markedForDeletion,
-                })
-              }
-            >
-              <Flag className="h-4 w-4" />
-              {video.markedForDeletion ? "Unmark" : "Mark for delete"}
-            </Button>
-            <Button
-              variant="ghost"
-              className="justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-300"
-              onClick={() => {
-                if (!window.confirm(`Delete "${video.title}" from this review?`)) {
-                  return;
+            {canEdit && (
+              <Button
+                variant="ghost"
+                className={cn(
+                  "justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-300",
+                  video.markedForDeletion &&
+                    "border-red-900/70 bg-red-950/20 text-red-300",
+                )}
+                onClick={() =>
+                  void setMarkedForDeletion({
+                    videoId: video._id,
+                    marked: !video.markedForDeletion,
+                  })
                 }
-                void removeVideo({ videoId: video._id }).then(() => {
-                  onClose();
-                });
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete {assetLabel}
-            </Button>
+              >
+                <Flag className="h-4 w-4" />
+                {video.markedForDeletion ? "Unmark" : "Mark for delete"}
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                variant="ghost"
+                className="justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-300"
+                onClick={() => {
+                  if (!window.confirm(`Delete "${video.title}" from this review?`)) {
+                    return;
+                  }
+                  void removeVideo({ videoId: video._id }).then(() => {
+                    onClose();
+                  });
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete {assetLabel}
+              </Button>
+            )}
           </div>
         )}
 
