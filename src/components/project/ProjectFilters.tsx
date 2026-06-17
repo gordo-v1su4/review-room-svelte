@@ -8,7 +8,6 @@ import {
   ChevronDown,
   Columns3,
   Film,
-  FolderPlus,
   Grid3X3,
   Image,
   List,
@@ -91,9 +90,7 @@ export function ProjectFilters({
   onFilters,
   onSort,
   onClear,
-  onCreateFolder,
   onResetStatus,
-  canCreateFolder = false,
   canResetStatus = false,
 }: {
   layout: WorkspaceLayout;
@@ -113,9 +110,7 @@ export function ProjectFilters({
   onFilters: (f: FilterState) => void;
   onSort: (s: SortKey) => void;
   onClear: () => void;
-  onCreateFolder?: () => void;
   onResetStatus?: () => void;
-  canCreateFolder?: boolean;
   canResetStatus?: boolean;
 }) {
   const active =
@@ -128,11 +123,11 @@ export function ProjectFilters({
     filters.minRating > 0;
 
   return (
-    <div className="no-scrollbar sticky top-14 z-20 flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-zinc-800 bg-zinc-950 px-4 py-2.5 sm:px-6 lg:top-0 lg:px-8">
-      <div className="no-scrollbar flex max-w-full items-center gap-0.5 overflow-x-auto rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
+    <div className="no-scrollbar sticky top-14 z-20 flex h-[3.25rem] flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-zinc-800 bg-zinc-950 px-4 py-2.5 sm:px-6 lg:top-0 lg:px-8">
+      <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
         {[
           { id: "grid", label: "Grid", icon: Grid3X3 },
-          { id: "grouped", label: "Grouped", icon: Columns3 },
+          { id: "grouped", label: "Group", icon: Columns3 },
           { id: "list", label: "List", icon: List },
           { id: "review", label: "Review", icon: SquarePlay },
         ].map((item) => {
@@ -144,14 +139,14 @@ export function ProjectFilters({
               title={item.label}
               onClick={() => onLayout(item.id as WorkspaceLayout)}
               className={cn(
-                "inline-flex h-8 shrink-0 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium transition",
+                "inline-flex h-8 w-[4.6rem] shrink-0 items-center justify-center gap-1.5 rounded px-2 text-[11px] font-medium transition",
                 layout === item.id
                   ? "bg-zinc-800 text-zinc-100"
                   : "text-zinc-500 hover:text-zinc-200",
               )}
             >
               <Icon className="h-3.5 w-3.5" />
-              <span className="hidden md:inline">{item.label}</span>
+              <span>{item.label}</span>
             </button>
           );
         })}
@@ -168,25 +163,15 @@ export function ProjectFilters({
         onShowCardInfo={onShowCardInfo}
       />
 
-      {canCreateFolder && onCreateFolder && (
-        <button
-          type="button"
-          onClick={onCreateFolder}
-          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
-        >
-          <FolderPlus className="h-3.5 w-3.5 text-zinc-500" />
-          New folder
-        </button>
-      )}
-
       {canResetStatus && onResetStatus && (
         <button
           type="button"
           onClick={onResetStatus}
-          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
+          title="Reset status"
+          className="inline-flex h-8 w-[5.4rem] shrink-0 items-center justify-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
         >
           <RotateCcw className="h-3.5 w-3.5 text-zinc-500" />
-          Reset status
+          Reset
         </button>
       )}
 
@@ -196,7 +181,7 @@ export function ProjectFilters({
         onFilters={onFilters}
       />
 
-      <div className="relative min-w-[180px] flex-1 basis-[18rem]">
+      <div className="relative w-[15rem] shrink-0">
         <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
         <Input
           placeholder="Search..."
@@ -215,7 +200,7 @@ export function ProjectFilters({
         className={cn(
           "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[11px] font-medium transition",
           filters.selectedOnly
-            ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
+            ? "border-zinc-700 bg-zinc-800 text-sky-200"
             : "border-zinc-800 bg-zinc-900 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200",
         )}
       >
@@ -228,13 +213,13 @@ export function ProjectFilters({
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 shrink-0 px-2.5 text-xs"
+          className="h-8 shrink-0 border border-zinc-800 bg-zinc-900 px-2.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
           onClick={onClear}
         >
           Clear filters
         </Button>
       )}
-      <span className="ml-auto shrink-0 text-[11px] tabular-nums text-zinc-600">
+      <span className="shrink-0 px-1 text-[11px] tabular-nums text-zinc-600">
         {resultCount}
       </span>
     </div>
@@ -253,7 +238,7 @@ function MediaTypeFilter({
   const current = filters.mediaTypes.length === 1 ? filters.mediaTypes[0] : "all";
 
   return (
-    <div className="no-scrollbar flex max-w-full items-center gap-0.5 overflow-x-auto rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
+    <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
       {MEDIA_TYPE_OPTIONS.map((option) => {
         const Icon = option.icon;
         const active = current === option.id;
@@ -282,7 +267,7 @@ function MediaTypeFilter({
               className={cn(
                 "rounded-full px-1.5 py-0.5 text-[10px] tabular-nums",
                 active
-                  ? "bg-zinc-950/45 text-zinc-300"
+                  ? "bg-zinc-950 text-zinc-300"
                   : "bg-zinc-800 text-zinc-600",
               )}
             >

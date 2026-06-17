@@ -17,7 +17,6 @@ import { toast } from "sonner";
 import {
   Archive,
   Clock,
-  FolderPlus,
   ImagePlus,
   Link2,
   Palette,
@@ -108,7 +107,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const videos = useMemo(() => queriedVideos ?? [], [queriedVideos]);
   const folders = useMemo(() => queriedFolders ?? [], [queriedFolders]);
   const createLink = useMutation(api.reviewLinks.create);
-  const createFolder = useMutation(api.folders.create);
   const archiveVideos = useMutation(api.videos.archiveByProject);
   const archiveProject = useMutation(api.projects.archive);
   const updateProject = useMutation(api.projects.update);
@@ -124,9 +122,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [showCardInfo, setShowCardInfo] = useState(true);
   const [appearanceReady, setAppearanceReady] = useState(false);
   const [selectedId, setSelectedId] = useState<Id<"videos"> | null>(null);
-  const [folderComposerOpen, setFolderComposerOpen] = useState(false);
-  const [folderDraft, setFolderDraft] = useState("");
-  const [creatingFolder, setCreatingFolder] = useState(false);
   const [resettingStatus, setResettingStatus] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
@@ -316,28 +311,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     event.dataTransfer.setData("text/plain", video.title);
   }
 
-  async function createProjectFolder(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmed = folderDraft.trim();
-    if (!trimmed) return;
-
-    setCreatingFolder(true);
-    try {
-      const folderId = await createFolder({
-        projectId,
-        title: trimmed,
-      });
-      setFolderDraft("");
-      setFolderComposerOpen(false);
-      router.push(`/dashboard/projects/${projectId}?folder=${folderId}`);
-      toast.success("Folder created");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not create folder");
-    } finally {
-      setCreatingFolder(false);
-    }
-  }
-
   async function moveVideoToFolder(
     videoId: Id<"videos">,
     folderId: Id<"projectFolders"> | undefined,
@@ -459,49 +432,35 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
               search: "",
             })
           }
-          onCreateFolder={() => setFolderComposerOpen(true)}
           onResetStatus={() => void resetCurrentStatus()}
-          canCreateFolder={canEditProject}
           canResetStatus={canEditProject && filtered.length > 0 && !resettingStatus}
         />
 
         <div className="min-h-[420px]">
           <div className="min-w-0 flex-1">
-            {folderComposerOpen && (
-              <FolderComposer
-                value={folderDraft}
-                saving={creatingFolder}
-                onChange={setFolderDraft}
-                onCancel={() => {
-                  setFolderComposerOpen(false);
-                  setFolderDraft("");
-                }}
-                onSubmit={(event) => void createProjectFolder(event)}
-              />
-            )}
-
-            <FolderShelf
-              folders={folders}
-              videos={videos}
-              activeFolderId={activeFolderId}
-              canEdit={canEditProject}
-              onOpen={(folderId) =>
-                router.push(
-                  folderId
-                    ? `/dashboard/projects/${projectId}?folder=${folderId}`
-                    : `/dashboard/projects/${projectId}`,
-                )
-              }
-              onDropVideo={(videoId, folderId) =>
-                void moveVideoToFolder(videoId, folderId)
-              }
-            />
-
             <div className={cn("flex gap-0", selected && !panelExpanded && "lg:flex-row")}>
               <div className={cn("min-w-0 flex-1", selected && "lg:pr-0")}>
                 {layout === "grid" ? (
                   <VideoGrid
                     videos={filtered}
+                    leadingItems={
+                      <FolderShelf
+                        folders={folders}
+                        videos={videos}
+                        activeFolderId={activeFolderId}
+                        canEdit={canEditProject}
+                        onOpen={(folderId) =>
+                          router.push(
+                            folderId
+                              ? `/dashboard/projects/${projectId}?folder=${folderId}`
+                              : `/dashboard/projects/${projectId}`,
+                          )
+                        }
+                        onDropVideo={(videoId, folderId) =>
+                          void moveVideoToFolder(videoId, folderId)
+                        }
+                      />
+                    }
                     selectedId={selectedId ?? undefined}
                     size={gridSize}
                     aspectRatio={aspectRatio}
@@ -585,65 +544,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
         </div>
       </div>
     </AdminGate>
-  );
-}
-
-function FolderComposer({
-  value,
-  saving,
-  onChange,
-  onCancel,
-  onSubmit,
-}: {
-  value: string;
-  saving: boolean;
-  onChange: (value: string) => void;
-  onCancel: () => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <form
-      onSubmit={onSubmit}
-      className="mx-4 mt-4 flex flex-col gap-2 rounded-lg border border-zinc-800/70 bg-zinc-900/45 p-3 shadow-sm sm:mx-6 sm:flex-row sm:items-center lg:mx-8"
-    >
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-zinc-700/70 bg-zinc-950/60 text-zinc-400">
-          <FolderPlus className="h-4 w-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="mb-1 truncate text-[10px] font-medium uppercase tracking-wider text-zinc-600">
-            New folder in Project root
-          </p>
-          <Input
-            autoFocus
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            placeholder="Folder name"
-            className="h-8 border-zinc-800/70 bg-zinc-950/55 text-xs"
-          />
-        </div>
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 px-2.5 text-xs"
-          disabled={saving}
-          onClick={onCancel}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          size="sm"
-          className="h-8 px-3 text-xs"
-          disabled={saving || !value.trim()}
-        >
-          Create
-        </Button>
-      </div>
-    </form>
   );
 }
 
@@ -821,31 +721,31 @@ function ProjectHero({
               </span>
             </button>
             {identityOpen && canEditProject && (
-              <div className="absolute left-0 top-full z-50 mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-zinc-700/60 bg-zinc-950/35 p-2.5 shadow-2xl shadow-black/30 ring-1 ring-white/5 backdrop-blur-xl">
+              <div className="absolute left-0 top-full z-50 mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 shadow-2xl shadow-black/45">
                 <div className="space-y-2">
                   <Input
                     value={draftTitle}
                     onChange={(event) => setDraftTitle(event.target.value)}
                     aria-label="Project title"
                     placeholder="Project title"
-                    className="h-8 border-zinc-700/60 bg-zinc-950/35 px-2.5 text-xs backdrop-blur-md"
+                    className="h-8 border-zinc-800 bg-zinc-900 px-2.5 text-xs"
                   />
                   <Input
                     value={draftClientName}
                     onChange={(event) => setDraftClientName(event.target.value)}
                     aria-label="Client name"
                     placeholder="Client name"
-                    className="h-8 border-zinc-700/60 bg-zinc-950/35 px-2.5 text-xs backdrop-blur-md"
+                    className="h-8 border-zinc-800 bg-zinc-900 px-2.5 text-xs"
                   />
                   <Textarea
                     value={draftDescription}
                     onChange={(event) => setDraftDescription(event.target.value)}
                     aria-label="Project description"
                     placeholder="Project description"
-                    className="min-h-16 border-zinc-700/60 bg-zinc-950/35 px-2.5 py-2 text-xs backdrop-blur-md"
+                    className="min-h-16 border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs"
                   />
                   <div className="flex items-center gap-2">
-                    <label className="flex h-8 flex-1 items-center gap-2 rounded-md border border-zinc-700/60 bg-zinc-950/35 px-2 text-[11px] text-zinc-300 backdrop-blur-md">
+                    <label className="flex h-8 flex-1 items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2 text-[11px] text-zinc-300">
                       <input
                         type="color"
                         value={draftColor}
@@ -1112,11 +1012,11 @@ function ProjectAccessPopover({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
-          align="end"
+          align="start"
           sideOffset={8}
-          className="z-50 w-[21rem] max-w-[calc(100vw-1rem)] rounded-lg border border-white/10 bg-zinc-950/50 p-3 text-zinc-200 shadow-2xl shadow-black/45 ring-1 ring-white/5 backdrop-blur-2xl"
+          className="z-50 w-[21rem] max-w-[calc(100vw-1rem)] rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-zinc-200 shadow-2xl shadow-black/45"
         >
-          <div className="mb-3 border-b border-white/10 pb-2">
+          <div className="mb-3 border-b border-zinc-800 pb-2">
             <p className="text-xs font-medium text-zinc-100">Project access</p>
             <p className="mt-0.5 text-[11px] text-zinc-500">
               Choose who inside the app can open this project.
@@ -1138,8 +1038,8 @@ function ProjectAccessPopover({
                     className={cn(
                       "rounded-md border px-2 py-1.5 text-left text-[11px] font-medium transition",
                       visibility === option.id
-                        ? "border-teal-400/40 bg-teal-400/10 text-teal-200"
-                        : "border-white/10 bg-white/[0.03] text-zinc-400 hover:border-white/20 hover:text-zinc-200",
+                        ? "border-teal-400 bg-teal-950 text-teal-100"
+                        : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200",
                     )}
                   >
                     {savingVisibility === option.id ? "Saving" : option.label}
@@ -1147,7 +1047,7 @@ function ProjectAccessPopover({
                 ))}
               </div>
             ) : (
-              <div className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5">
+              <div className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1.5">
                 <p className="text-[11px] font-medium text-zinc-200">
                   {activeVisibility.label}
                 </p>
@@ -1175,7 +1075,7 @@ function ProjectAccessPopover({
               members.map((member) => (
                 <div
                   key={member.entryKey}
-                  className="flex items-center justify-between gap-2 rounded-md border border-white/5 bg-white/[0.03] px-2 py-1.5"
+                  className="flex items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1.5"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-xs font-medium text-zinc-200">
@@ -1231,7 +1131,7 @@ function ProjectAccessPopover({
                 value={identifier}
                 onChange={(event) => setIdentifier(event.target.value)}
                 placeholder="Email, name, or *@domain.com"
-                className="h-8 border-zinc-800/80 bg-black/20 text-xs"
+                className="h-8 border-zinc-800 bg-zinc-900 text-xs"
               />
               <Button
                 type="submit"

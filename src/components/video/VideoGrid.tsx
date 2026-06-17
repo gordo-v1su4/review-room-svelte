@@ -8,6 +8,7 @@ import { VideoCard } from "./VideoCard";
 
 export function VideoGrid({
   videos,
+  leadingItems,
   selectedId,
   size,
   aspectRatio = "video",
@@ -20,6 +21,7 @@ export function VideoGrid({
   empty,
 }: {
   videos: VideoDoc[];
+  leadingItems?: React.ReactNode;
   selectedId?: string;
   size: GridSize;
   aspectRatio?: CardAspectRatio;
@@ -31,7 +33,7 @@ export function VideoGrid({
   onSelect: (id: VideoDoc["_id"]) => void;
   empty?: React.ReactNode;
 }) {
-  if (!videos.length) {
+  if (!videos.length && !leadingItems) {
     return (
       <div className="mx-4 flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-zinc-800 px-4 text-center text-sm text-zinc-500 sm:mx-6 lg:mx-8">
         {empty ?? "No media"}
@@ -48,6 +50,7 @@ export function VideoGrid({
 
   return (
     <div className={cn("grid gap-3 p-4 sm:p-6 lg:p-8", gridClass)}>
+      {leadingItems}
       {videos.map((video) => (
         <VideoCard
           key={video._id}

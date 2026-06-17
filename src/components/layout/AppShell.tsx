@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { toast } from "sonner";
 import {
   Clapperboard,
   ChevronsLeft,
@@ -243,9 +244,36 @@ function WorkspaceSidebarFolders({ projectId }: { projectId: Id<"projects"> }) {
     activeFolderParam && activeFolderParam !== "root"
       ? (activeFolderParam as Id<"projectFolders">)
       : null;
+  const router = useRouter();
   const folders = useQuery(api.folders.listByProject, { projectId });
   const videos = useQuery(api.videos.listByProject, { projectId });
   const moveToFolder = useMutation(api.videos.moveToFolder);
+  const createFolder = useMutation(api.folders.create);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [folderDraft, setFolderDraft] = useState("");
+  const [creatingFolder, setCreatingFolder] = useState(false);
+
+  async function createProjectFolder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = folderDraft.trim();
+    if (!trimmed) return;
+
+    setCreatingFolder(true);
+    try {
+      const folderId = await createFolder({
+        projectId,
+        title: trimmed,
+      });
+      setFolderDraft("");
+      setComposerOpen(false);
+      router.push(`/dashboard/projects/${projectId}?folder=${folderId}`);
+      toast.success("Folder created");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create folder");
+    } finally {
+      setCreatingFolder(false);
+    }
+  }
 
   return (
     <SidebarFolders
@@ -253,6 +281,16 @@ function WorkspaceSidebarFolders({ projectId }: { projectId: Id<"projects"> }) {
       folders={folders ?? []}
       videos={videos ?? []}
       activeFolderId={activeFolderId}
+      composerOpen={composerOpen}
+      folderDraft={folderDraft}
+      creatingFolder={creatingFolder}
+      onOpenComposer={() => setComposerOpen(true)}
+      onCancelComposer={() => {
+        setComposerOpen(false);
+        setFolderDraft("");
+      }}
+      onFolderDraft={setFolderDraft}
+      onCreateFolder={createProjectFolder}
       onDropVideo={(videoId, folderId) =>
         void moveToFolder(folderId ? { videoId, folderId } : { videoId })
       }
@@ -265,12 +303,26 @@ function SidebarFolders({
   folders,
   videos,
   activeFolderId,
+  composerOpen,
+  folderDraft,
+  creatingFolder,
+  onOpenComposer,
+  onCancelComposer,
+  onFolderDraft,
+  onCreateFolder,
   onDropVideo,
 }: {
   projectId: Id<"projects">;
   folders: FolderDoc[];
   videos: VideoDoc[];
   activeFolderId: Id<"projectFolders"> | null;
+  composerOpen: boolean;
+  folderDraft: string;
+  creatingFolder: boolean;
+  onOpenComposer: () => void;
+  onCancelComposer: () => void;
+  onFolderDraft: (value: string) => void;
+  onCreateFolder: (event: FormEvent<HTMLFormElement>) => void;
   onDropVideo: (
     videoId: Id<"videos">,
     folderId: Id<"projectFolders"> | undefined,
@@ -281,9 +333,19 @@ function SidebarFolders({
 
   return (
     <div className="mt-5 px-3">
-      <p className="px-2 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
-        Folders
-      </p>
+      <div className="flex items-center justify-between px-2 pb-2">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+          Folders
+        </p>
+        <button
+          type="button"
+          className="grid h-5 w-5 place-items-center rounded border border-zinc-800 bg-zinc-900 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-100"
+          title="Add folder"
+          onClick={onOpenComposer}
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
       <div className="space-y-1">
         <SidebarFolderLink
           href={`/dashboard/projects/${projectId}`}
@@ -294,22 +356,48 @@ function SidebarFolders({
           depth={0}
           onDrop={(videoId) => onDropVideo(videoId, undefined)}
         />
-        {rootFolders.map((folder) => {
-          const active = activeFolderId === folder._id;
-          const count = videos.filter((video) => video.folderId === folder._id).length;
-          return (
-            <SidebarFolderLink
-              key={folder._id}
-              href={`/dashboard/projects/${projectId}?folder=${folder._id}`}
-              label={folder.title}
-              count={count}
-              active={active}
-              icon={active ? "open" : "folder"}
-              depth={0}
-              onDrop={(videoId) => onDropVideo(videoId, folder._id)}
-            />
-          );
-        })}
+        <div className="ml-4 border-l border-zinc-800/90 pl-2">
+          {composerOpen && (
+            <form onSubmit={onCreateFolder} className="mb-1 flex items-center gap-1">
+              <input
+                autoFocus
+                value={folderDraft}
+                onChange={(event) => onFolderDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") onCancelComposer();
+                }}
+                placeholder="Folder name"
+                className="h-7 min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-2 text-[11px] text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-teal-400"
+              />
+              <button
+                type="submit"
+                disabled={creatingFolder || !folderDraft.trim()}
+                className="grid h-7 w-7 place-items-center rounded-md bg-teal-500 text-zinc-950 transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600"
+                title="Create folder"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          )}
+          <div className="space-y-1">
+            {rootFolders.map((folder) => {
+              const active = activeFolderId === folder._id;
+              const count = videos.filter((video) => video.folderId === folder._id).length;
+              return (
+                <SidebarFolderLink
+                  key={folder._id}
+                  href={`/dashboard/projects/${projectId}?folder=${folder._id}`}
+                  label={folder.title}
+                  count={count}
+                  active={active}
+                  icon={active ? "open" : "folder"}
+                  depth={1}
+                  onDrop={(videoId) => onDropVideo(videoId, folder._id)}
+                />
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -361,15 +449,18 @@ function SidebarFolderLink({
         onDrop(videoId as Id<"videos">);
       }}
       className={cn(
-        "flex items-center gap-2 rounded-md py-1.5 pr-2 text-[12px] transition",
+        "relative flex items-center gap-2 rounded-md py-1.5 pr-2 text-[12px] transition",
         dragActive
-          ? "bg-sky-400/15 text-sky-100 ring-1 ring-inset ring-sky-300/25"
+          ? "bg-sky-950 text-sky-100 ring-1 ring-inset ring-sky-300"
           : active
-            ? "bg-sky-400/10 text-sky-200"
+            ? "bg-zinc-800 text-sky-200"
             : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300",
       )}
-      style={{ paddingLeft: `${8 + depth * 12}px` }}
+      style={{ paddingLeft: `${depth === 0 ? 8 : 4}px` }}
     >
+      {depth > 0 && (
+        <span className="absolute -left-2 top-1/2 h-px w-2 bg-zinc-800" />
+      )}
       <Icon className={cn("h-3.5 w-3.5 shrink-0", active ? "text-sky-300" : "text-zinc-600")} />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <span className="text-[10px] tabular-nums text-zinc-600">{count}</span>
