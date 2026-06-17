@@ -1,7 +1,17 @@
 import type { VideoDoc } from "./smartViews";
-import type { SortKey } from "./types";
+import { mediaKind } from "./media";
+import type { MediaKind, SortKey } from "./types";
+
+const STATUS_SORT_ORDER: Record<VideoDoc["status"], number> = {
+  awaiting_review: 0,
+  needs_changes: 1,
+  approved: 2,
+  final: 3,
+  archived: 4,
+};
 
 export type FilterState = {
+  mediaTypes: MediaKind[];
   statuses: string[];
   tags: string[];
   minRating: number;
@@ -17,6 +27,12 @@ export function sortVideos(videos: VideoDoc[], sort: SortKey): VideoDoc[] {
       return copy.sort((a, b) => a.uploadedAt - b.uploadedAt);
     case "rating_desc":
       return copy.sort((a, b) => b.rating - a.rating || b.uploadedAt - a.uploadedAt);
+    case "status":
+      return copy.sort(
+        (a, b) =>
+          STATUS_SORT_ORDER[a.status] - STATUS_SORT_ORDER[b.status] ||
+          b.uploadedAt - a.uploadedAt,
+      );
     case "title":
       return copy.sort((a, b) => a.title.localeCompare(b.title));
     case "recently_reviewed":
@@ -33,6 +49,12 @@ export function sortVideos(videos: VideoDoc[], sort: SortKey): VideoDoc[] {
 
 export function applyFilters(videos: VideoDoc[], filters: FilterState): VideoDoc[] {
   return videos.filter((v) => {
+    if (
+      filters.mediaTypes.length &&
+      !filters.mediaTypes.includes(mediaKind(v))
+    ) {
+      return false;
+    }
     if (filters.statuses.length && !filters.statuses.includes(v.status)) return false;
     if (filters.selectedOnly && !v.isSelect) return false;
     if (filters.hasComments && v.commentCount === 0) return false;
@@ -45,7 +67,13 @@ export function applyFilters(videos: VideoDoc[], filters: FilterState): VideoDoc
     }
     if (filters.search) {
       const q = filters.search.toLowerCase();
-      if (!v.title.toLowerCase().includes(q)) return false;
+      const haystack = [
+        v.title,
+        v.originalFilename,
+        v.mimeType,
+        mediaKind(v),
+      ].join(" ").toLowerCase();
+      if (!haystack.includes(q)) return false;
     }
     return true;
   });

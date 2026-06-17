@@ -18,6 +18,7 @@ type UserRole = "admin" | "client";
 
 **MVP**
 - Project create / list / workspace.
+- Project folders for organizing assets inside a project.
 - Direct-to-storage upload (presigned), drag/drop batch import for video and image files, bounded parallel uploads, per-file progress, auto thumbnail + video scrub sprite.
 - Video grid with the card system; hover scrub on every ready card; right-side viewer/details panel.
 - Status + tags + 0–5 rating + shortlist (select) + comments (with optional timecode).
@@ -25,6 +26,7 @@ type UserRole = "admin" | "client";
 - Client review page via share link (+ optional passcode).
 - Per-asset download via signed URL when enabled.
 - Filters/sort over status, facets, tags, dates.
+- File-type filtering over review media, starting with video and image assets and leaving room for future document-like types.
 
 **Not in MVP**
 - Threaded comments, drawing annotations, frame-accurate comment sync.
@@ -103,8 +105,17 @@ export default defineSchema({
     archived: v.optional(v.boolean()),
   }).index("by_creator", ["createdBy"]).index("by_slug", ["slug"]),
 
+  projectFolders: defineTable({
+    projectId: v.id("projects"),
+    title: v.string(),
+    order: v.number(),
+    createdBy: v.id("users"),
+    createdAt: v.number(), updatedAt: v.number(),
+  }).index("by_project", ["projectId"]),
+
   videos: defineTable({
     projectId: v.id("projects"),
+    folderId: v.optional(v.id("projectFolders")),
     title: v.string(),
     originalFilename: v.string(),
     storageKey: v.string(),                    // object key only — no blobs in Convex
@@ -134,6 +145,7 @@ export default defineSchema({
     approvedAt: v.optional(v.number()),
   })
     .index("by_project", ["projectId"])
+    .index("by_project_folder", ["projectId", "folderId"])
     .index("by_project_status", ["projectId", "status"])
     .index("by_project_uploadedAt", ["projectId", "uploadedAt"]),
 

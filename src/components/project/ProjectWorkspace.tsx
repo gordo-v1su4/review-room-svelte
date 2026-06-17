@@ -3,6 +3,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import {
   type CSSProperties,
+  type DragEvent,
   type FormEvent,
   useEffect,
   useMemo,
@@ -11,15 +12,17 @@ import {
 } from "react";
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   Archive,
   Clock,
+  FolderPlus,
   ImagePlus,
   Link2,
   Palette,
   RefreshCw,
+  RotateCcw,
   Trash2,
   Upload,
   User,
@@ -37,9 +40,10 @@ import { VideoDetailsPanel } from "@/components/video/VideoDetailsPanel";
 import { ProjectViewSwitcher } from "./ProjectViewSwitcher";
 import { ProjectFilters } from "./ProjectFilters";
 import { VideoGroupedView } from "./VideoGroupedView";
+import { FolderShelf } from "./FolderShelf";
 import { matchesSmartView } from "@/lib/smartViews";
 import { applyFilters, sortVideos, type FilterState } from "@/lib/filters";
-import { isImageAsset } from "@/lib/media";
+import { isImageAsset, mediaKind } from "@/lib/media";
 import type {
   CardAspectRatio,
   GridSize,
@@ -95,16 +99,22 @@ const THUMBNAIL_SCALES: ThumbnailScale[] = ["fit", "fill"];
 
 export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAdmin, isAuthenticated, isChecking } = useAdminAccess();
   const projectQueryArgs = isAdmin ? { projectId } : "skip";
   const project = useQuery(api.projects.getById, projectQueryArgs);
   const queriedVideos = useQuery(api.videos.listByProject, projectQueryArgs);
+  const queriedFolders = useQuery(api.folders.listByProject, projectQueryArgs);
   const videos = useMemo(() => queriedVideos ?? [], [queriedVideos]);
+  const folders = useMemo(() => queriedFolders ?? [], [queriedFolders]);
   const createLink = useMutation(api.reviewLinks.create);
+  const createFolder = useMutation(api.folders.create);
   const archiveVideos = useMutation(api.videos.archiveByProject);
   const archiveProject = useMutation(api.projects.archive);
   const updateProject = useMutation(api.projects.update);
   const startPreviewRefresh = useMutation(api.videos.startPreviewRefresh);
+  const moveToFolder = useMutation(api.videos.moveToFolder);
+  const resetStatus = useMutation(api.videos.resetStatus);
 
   const [view, setView] = useState<SmartViewId>("all");
   const [layout, setLayout] = useState<WorkspaceLayout>("grid");
@@ -114,10 +124,15 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [showCardInfo, setShowCardInfo] = useState(true);
   const [appearanceReady, setAppearanceReady] = useState(false);
   const [selectedId, setSelectedId] = useState<Id<"videos"> | null>(null);
+  const [folderComposerOpen, setFolderComposerOpen] = useState(false);
+  const [folderDraft, setFolderDraft] = useState("");
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [resettingStatus, setResettingStatus] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
   const [filters, setFilters] = useState<FilterState>({
+    mediaTypes: [],
     statuses: [],
     tags: [],
     minRating: 0,
@@ -125,13 +140,39 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     hasComments: false,
     search: "",
   });
+  const folderParam = searchParams.get("folder");
+  const activeFolderId =
+    folderParam && folderParam !== "root"
+      ? (folderParam as Id<"projectFolders">)
+      : null;
+
+  const folderScopedVideos = useMemo(
+    () =>
+      videos.filter((video) =>
+        activeFolderId ? video.folderId === activeFolderId : !video.folderId,
+      ),
+    [activeFolderId, videos],
+  );
+
+  const viewScopedVideos = useMemo(
+    () => folderScopedVideos.filter((v) => matchesSmartView(v, view)),
+    [folderScopedVideos, view],
+  );
 
   const filtered = useMemo(() => {
-    let list = videos.filter((v) => matchesSmartView(v, view));
+    let list = viewScopedVideos;
     list = applyFilters(list, filters);
     return sortVideos(list, sort);
-  }, [videos, view, filters, sort]);
+  }, [filters, sort, viewScopedVideos]);
 
+  const activeFolder = activeFolderId
+    ? folders.find((folder) => folder._id === activeFolderId)
+    : null;
+  const mediaTypeCounts = {
+    all: viewScopedVideos.length,
+    video: viewScopedVideos.filter((asset) => mediaKind(asset) === "video").length,
+    image: viewScopedVideos.filter((asset) => mediaKind(asset) === "image").length,
+  };
   const selected = videos.find((v) => v._id === selectedId) ?? null;
   const counts = {
     awaiting: videos.filter((v) => v.status === "awaiting_review" && !v.viewed).length,
@@ -269,6 +310,75 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     );
   }
 
+  function beginVideoDrag(event: DragEvent<HTMLElement>, video: (typeof videos)[number]) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/review-room-video-id", video._id);
+    event.dataTransfer.setData("text/plain", video.title);
+  }
+
+  async function createProjectFolder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = folderDraft.trim();
+    if (!trimmed) return;
+
+    setCreatingFolder(true);
+    try {
+      const folderId = await createFolder({
+        projectId,
+        title: trimmed,
+      });
+      setFolderDraft("");
+      setFolderComposerOpen(false);
+      router.push(`/dashboard/projects/${projectId}?folder=${folderId}`);
+      toast.success("Folder created");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create folder");
+    } finally {
+      setCreatingFolder(false);
+    }
+  }
+
+  async function moveVideoToFolder(
+    videoId: Id<"videos">,
+    folderId: Id<"projectFolders"> | undefined,
+  ) {
+    try {
+      await moveToFolder(
+        folderId ? { videoId, folderId } : { videoId },
+      );
+      const folder = folderId
+        ? folders.find((item) => item._id === folderId)
+        : null;
+      toast.success(folder ? `Moved to ${folder.title}` : "Moved to project root");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not move media");
+    }
+  }
+
+  async function resetCurrentStatus() {
+    if (!filtered.length) return;
+    const scope = activeFolder ? `"${activeFolder.title}"` : "Project root";
+    if (
+      !window.confirm(
+        `Reset status for ${filtered.length} assets in ${scope}? They will return to Awaiting Review. Files and comments will stay.`,
+      )
+    ) {
+      return;
+    }
+
+    setResettingStatus(true);
+    try {
+      for (const video of filtered) {
+        await resetStatus({ videoId: video._id });
+      }
+      toast.success(`Reset status for ${filtered.length} assets`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not reset status");
+    } finally {
+      setResettingStatus(false);
+    }
+  }
+
   const canEditProject = project.memberRole !== "viewer";
   const canManageAccess = project.isOwner;
 
@@ -315,7 +425,11 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           canManageAccess={canManageAccess}
         />
 
-        <ProjectViewSwitcher videos={videos} active={view} onChange={setView} />
+        <ProjectViewSwitcher
+          videos={folderScopedVideos}
+          active={view}
+          onChange={setView}
+        />
 
         <ProjectFilters
           layout={layout}
@@ -324,6 +438,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           thumbnailScale={thumbnailScale}
           showCardInfo={showCardInfo}
           resultCount={filtered.length}
+          mediaTypeCounts={mediaTypeCounts}
           filters={filters}
           sort={sort}
           onLayout={setLayout}
@@ -335,6 +450,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           onSort={setSort}
           onClear={() =>
             setFilters({
+              mediaTypes: [],
               statuses: [],
               tags: [],
               minRating: 0,
@@ -343,87 +459,191 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
               search: "",
             })
           }
+          onCreateFolder={() => setFolderComposerOpen(true)}
+          onResetStatus={() => void resetCurrentStatus()}
+          canCreateFolder={canEditProject}
+          canResetStatus={canEditProject && filtered.length > 0 && !resettingStatus}
         />
 
-        <div className={cn("flex gap-0", selected && !panelExpanded && "lg:flex-row")}>
-          <div className={cn("min-w-0 flex-1", selected && "lg:pr-0")}>
-            {layout === "grid" ? (
-              <VideoGrid
-                videos={filtered}
-                selectedId={selectedId ?? undefined}
-                size={gridSize}
-                aspectRatio={aspectRatio}
-                thumbnailScale={thumbnailScale}
-                showCardInfo={showCardInfo}
-                onSelect={(id) => {
-                  setSelectedId(id);
-                  setPanelExpanded(false);
+        <div className="min-h-[420px]">
+          <div className="min-w-0 flex-1">
+            {folderComposerOpen && (
+              <FolderComposer
+                value={folderDraft}
+                saving={creatingFolder}
+                onChange={setFolderDraft}
+                onCancel={() => {
+                  setFolderComposerOpen(false);
+                  setFolderDraft("");
                 }}
-                empty={
-                  <div className="text-center">
-                    <p>Upload your first media to start a review.</p>
-                    {canEditProject && (
-                      <Link href={`/dashboard/projects/${projectId}/upload`}>
-                        <Button className="mt-3">Upload</Button>
-                      </Link>
-                    )}
-                  </div>
-                }
-              />
-            ) : layout === "grouped" ? (
-              <VideoGroupedView
-                videos={filtered}
-                size={gridSize}
-                aspectRatio={aspectRatio}
-                thumbnailScale={thumbnailScale}
-                showCardInfo={showCardInfo}
-                selectedId={selectedId ?? undefined}
-                onSelect={setSelectedId}
-              />
-            ) : layout === "list" ? (
-              <VideoListView
-                videos={filtered}
-                selectedId={selectedId ?? undefined}
-                onSelect={(id) => {
-                  setSelectedId(id);
-                  setPanelExpanded(false);
-                }}
-              />
-            ) : (
-              <VideoReviewMode
-                videos={filtered}
-                activeId={selectedId ?? undefined}
-                onSelect={(id) => {
-                  setSelectedId(id);
-                  setPanelExpanded(false);
-                }}
-                canEdit={canEditProject}
+                onSubmit={(event) => void createProjectFolder(event)}
               />
             )}
+
+            <FolderShelf
+              folders={folders}
+              videos={videos}
+              activeFolderId={activeFolderId}
+              canEdit={canEditProject}
+              onOpen={(folderId) =>
+                router.push(
+                  folderId
+                    ? `/dashboard/projects/${projectId}?folder=${folderId}`
+                    : `/dashboard/projects/${projectId}`,
+                )
+              }
+              onDropVideo={(videoId, folderId) =>
+                void moveVideoToFolder(videoId, folderId)
+              }
+            />
+
+            <div className={cn("flex gap-0", selected && !panelExpanded && "lg:flex-row")}>
+              <div className={cn("min-w-0 flex-1", selected && "lg:pr-0")}>
+                {layout === "grid" ? (
+                  <VideoGrid
+                    videos={filtered}
+                    selectedId={selectedId ?? undefined}
+                    size={gridSize}
+                    aspectRatio={aspectRatio}
+                    thumbnailScale={thumbnailScale}
+                    showCardInfo={showCardInfo}
+                    onDragStart={canEditProject ? beginVideoDrag : undefined}
+                    onSelect={(id) => {
+                      setSelectedId(id);
+                      setPanelExpanded(false);
+                    }}
+                    empty={
+                      <div className="text-center">
+                        <p>
+                          {activeFolder
+                            ? "No media in this folder."
+                            : "Upload your first media to start a review."}
+                        </p>
+                        {canEditProject && !activeFolder && (
+                          <Link href={`/dashboard/projects/${projectId}/upload`}>
+                            <Button className="mt-3">Upload</Button>
+                          </Link>
+                        )}
+                      </div>
+                    }
+                  />
+                ) : layout === "grouped" ? (
+                  <VideoGroupedView
+                    videos={filtered}
+                    size={gridSize}
+                    aspectRatio={aspectRatio}
+                    thumbnailScale={thumbnailScale}
+                    showCardInfo={showCardInfo}
+                    selectedId={selectedId ?? undefined}
+                    onDragStart={canEditProject ? beginVideoDrag : undefined}
+                    onSelect={setSelectedId}
+                  />
+                ) : layout === "list" ? (
+                  <VideoListView
+                    videos={filtered}
+                    selectedId={selectedId ?? undefined}
+                    onDragStart={canEditProject ? beginVideoDrag : undefined}
+                    onSelect={(id) => {
+                      setSelectedId(id);
+                      setPanelExpanded(false);
+                    }}
+                  />
+                ) : (
+                  <VideoReviewMode
+                    videos={filtered}
+                    activeId={selectedId ?? undefined}
+                    onSelect={(id) => {
+                      setSelectedId(id);
+                      setPanelExpanded(false);
+                    }}
+                    canEdit={canEditProject}
+                  />
+                )}
+              </div>
+              {selected && layout !== "review" && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Close video details"
+                    className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm lg:hidden"
+                    onClick={() => setSelectedId(null)}
+                  />
+                  <VideoDetailsPanel
+                    video={selected}
+                    mode="admin"
+                    expanded={panelExpanded}
+                    onClose={() => setSelectedId(null)}
+                    onToggleExpand={() => setPanelExpanded((e) => !e)}
+                    reviewerName="Admin"
+                    canEdit={canEditProject}
+                    canDelete={project.isOwner}
+                  />
+                </>
+              )}
+            </div>
           </div>
-          {selected && layout !== "review" && (
-            <>
-              <button
-                type="button"
-                aria-label="Close video details"
-                className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm lg:hidden"
-                onClick={() => setSelectedId(null)}
-              />
-              <VideoDetailsPanel
-                video={selected}
-                mode="admin"
-                expanded={panelExpanded}
-                onClose={() => setSelectedId(null)}
-                onToggleExpand={() => setPanelExpanded((e) => !e)}
-                reviewerName="Admin"
-                canEdit={canEditProject}
-                canDelete={project.isOwner}
-              />
-            </>
-          )}
         </div>
       </div>
     </AdminGate>
+  );
+}
+
+function FolderComposer({
+  value,
+  saving,
+  onChange,
+  onCancel,
+  onSubmit,
+}: {
+  value: string;
+  saving: boolean;
+  onChange: (value: string) => void;
+  onCancel: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form
+      onSubmit={onSubmit}
+      className="mx-4 mt-4 flex flex-col gap-2 rounded-lg border border-zinc-800/70 bg-zinc-900/45 p-3 shadow-sm sm:mx-6 sm:flex-row sm:items-center lg:mx-8"
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-zinc-700/70 bg-zinc-950/60 text-zinc-400">
+          <FolderPlus className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="mb-1 truncate text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+            New folder in Project root
+          </p>
+          <Input
+            autoFocus
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="Folder name"
+            className="h-8 border-zinc-800/70 bg-zinc-950/55 text-xs"
+          />
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2.5 text-xs"
+          disabled={saving}
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          size="sm"
+          className="h-8 px-3 text-xs"
+          disabled={saving || !value.trim()}
+        >
+          Create
+        </Button>
+      </div>
+    </form>
   );
 }
 

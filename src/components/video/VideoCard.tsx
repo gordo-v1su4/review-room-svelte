@@ -1,6 +1,12 @@
 "use client";
 
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  type DragEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useMutation } from "convex/react";
 import { MessageSquare, Download, Bookmark, Star, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -21,6 +27,7 @@ export function VideoCard({
   showCardInfo = true,
   actionMode = "admin",
   token,
+  onDragStart,
   onSelect,
 }: {
   video: VideoDoc;
@@ -31,6 +38,7 @@ export function VideoCard({
   showCardInfo?: boolean;
   actionMode?: "admin" | "client";
   token?: string;
+  onDragStart?: (event: DragEvent<HTMLElement>, video: VideoDoc) => void;
   onSelect: () => void;
 }) {
   const isImage = isImageAsset(video);
@@ -129,7 +137,9 @@ export function VideoCard({
     <article
       role="button"
       tabIndex={0}
+      draggable={Boolean(onDragStart)}
       onClick={onSelect}
+      onDragStart={(event) => onDragStart?.(event, video)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
@@ -138,6 +148,7 @@ export function VideoCard({
       }}
       className={cn(
         "group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border bg-zinc-900/80 text-left transition-all",
+        onDragStart && "cursor-grab active:cursor-grabbing",
         selected
           ? "border-sky-300 ring-1 ring-sky-300/50"
           : "border-zinc-800/80 hover:border-zinc-600",

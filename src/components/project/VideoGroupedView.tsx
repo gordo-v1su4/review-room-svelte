@@ -1,5 +1,6 @@
 "use client";
 
+import type { DragEvent } from "react";
 import { SMART_VIEWS, matchesSmartView, type VideoDoc } from "@/lib/smartViews";
 import type { SmartViewId } from "@/lib/types";
 import type { CardAspectRatio, GridSize, ThumbnailScale } from "@/lib/types";
@@ -12,6 +13,7 @@ export function VideoGroupedView({
   thumbnailScale = "fill",
   showCardInfo = true,
   selectedId,
+  onDragStart,
   onSelect,
 }: {
   videos: VideoDoc[];
@@ -20,6 +22,7 @@ export function VideoGroupedView({
   thumbnailScale?: ThumbnailScale;
   showCardInfo?: boolean;
   selectedId?: string;
+  onDragStart?: (event: DragEvent<HTMLElement>, video: VideoDoc) => void;
   onSelect: (id: VideoDoc["_id"]) => void;
 }) {
   const sections = SMART_VIEWS.filter((v) => v.id !== "all");
@@ -47,6 +50,7 @@ export function VideoGroupedView({
                     aspectRatio={aspectRatio}
                     thumbnailScale={thumbnailScale}
                     showCardInfo={showCardInfo}
+                    onDragStart={onDragStart}
                     selected={selectedId === video._id}
                     onSelect={() => onSelect(video._id)}
                   />

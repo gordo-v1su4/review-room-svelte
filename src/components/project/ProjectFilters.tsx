@@ -7,9 +7,13 @@ import {
   Check,
   ChevronDown,
   Columns3,
+  Film,
+  FolderPlus,
   Grid3X3,
+  Image,
   List,
   Rows3,
+  RotateCcw,
   Search,
   SlidersHorizontal,
   SquarePlay,
@@ -18,6 +22,7 @@ import type { FilterState } from "@/lib/filters";
 import type {
   CardAspectRatio,
   GridSize,
+  MediaKind,
   SortKey,
   ThumbnailScale,
   WorkspaceLayout,
@@ -29,6 +34,7 @@ import { cn } from "@/lib/utils";
 const SORTS: { id: SortKey; label: string }[] = [
   { id: "newest", label: "Newest" },
   { id: "oldest", label: "Oldest" },
+  { id: "status", label: "Status" },
   { id: "rating_desc", label: "Rating" },
   { id: "title", label: "Title" },
   { id: "most_comments", label: "Most comments" },
@@ -55,6 +61,18 @@ const THUMBNAIL_SCALES: { id: ThumbnailScale; label: string }[] = [
   { id: "fill", label: "Fill" },
 ];
 
+type MediaTypeFilterId = "all" | Extract<MediaKind, "video" | "image">;
+
+const MEDIA_TYPE_OPTIONS: Array<{
+  id: MediaTypeFilterId;
+  label: string;
+  icon?: typeof Film;
+}> = [
+  { id: "all", label: "All" },
+  { id: "video", label: "Videos", icon: Film },
+  { id: "image", label: "Images", icon: Image },
+];
+
 export function ProjectFilters({
   layout,
   gridSize,
@@ -62,6 +80,7 @@ export function ProjectFilters({
   thumbnailScale,
   showCardInfo,
   resultCount,
+  mediaTypeCounts,
   filters,
   sort,
   onLayout,
@@ -72,6 +91,10 @@ export function ProjectFilters({
   onFilters,
   onSort,
   onClear,
+  onCreateFolder,
+  onResetStatus,
+  canCreateFolder = false,
+  canResetStatus = false,
 }: {
   layout: WorkspaceLayout;
   gridSize: GridSize;
@@ -79,6 +102,7 @@ export function ProjectFilters({
   thumbnailScale: ThumbnailScale;
   showCardInfo: boolean;
   resultCount: number;
+  mediaTypeCounts: Record<"all" | "video" | "image", number>;
   filters: FilterState;
   sort: SortKey;
   onLayout: (layout: WorkspaceLayout) => void;
@@ -89,16 +113,23 @@ export function ProjectFilters({
   onFilters: (f: FilterState) => void;
   onSort: (s: SortKey) => void;
   onClear: () => void;
+  onCreateFolder?: () => void;
+  onResetStatus?: () => void;
+  canCreateFolder?: boolean;
+  canResetStatus?: boolean;
 }) {
   const active =
     filters.search ||
+    filters.mediaTypes.length > 0 ||
+    filters.statuses.length > 0 ||
+    filters.tags.length > 0 ||
     filters.selectedOnly ||
     filters.hasComments ||
     filters.minRating > 0;
 
   return (
-    <div className="sticky top-14 z-20 flex flex-wrap items-center gap-2 border-b border-zinc-800/60 bg-zinc-950/90 px-4 py-2.5 backdrop-blur sm:px-6 lg:top-0 lg:px-8">
-      <div className="no-scrollbar flex max-w-full items-center gap-0.5 overflow-x-auto rounded-md border border-zinc-800/60 bg-zinc-900/60 p-0.5">
+    <div className="no-scrollbar sticky top-14 z-20 flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-zinc-800 bg-zinc-950 px-4 py-2.5 sm:px-6 lg:top-0 lg:px-8">
+      <div className="no-scrollbar flex max-w-full items-center gap-0.5 overflow-x-auto rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
         {[
           { id: "grid", label: "Grid", icon: Grid3X3 },
           { id: "grouped", label: "Grouped", icon: Columns3 },
@@ -137,13 +168,41 @@ export function ProjectFilters({
         onShowCardInfo={onShowCardInfo}
       />
 
-      <div className="relative order-3 min-w-full flex-1 sm:order-none sm:min-w-[220px] sm:max-w-sm">
+      {canCreateFolder && onCreateFolder && (
+        <button
+          type="button"
+          onClick={onCreateFolder}
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
+        >
+          <FolderPlus className="h-3.5 w-3.5 text-zinc-500" />
+          New folder
+        </button>
+      )}
+
+      {canResetStatus && onResetStatus && (
+        <button
+          type="button"
+          onClick={onResetStatus}
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
+        >
+          <RotateCcw className="h-3.5 w-3.5 text-zinc-500" />
+          Reset status
+        </button>
+      )}
+
+      <MediaTypeFilter
+        filters={filters}
+        counts={mediaTypeCounts}
+        onFilters={onFilters}
+      />
+
+      <div className="relative min-w-[180px] flex-1 basis-[18rem]">
         <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
         <Input
           placeholder="Search..."
           value={filters.search}
           onChange={(e) => onFilters({ ...filters, search: e.target.value })}
-          className="h-8 border-zinc-800/60 bg-zinc-900/60 pl-7 text-xs"
+          className="h-8 border-zinc-800 bg-zinc-900 pl-7 text-xs"
         />
       </div>
 
@@ -157,7 +216,7 @@ export function ProjectFilters({
           "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[11px] font-medium transition",
           filters.selectedOnly
             ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
-            : "border-zinc-800/60 bg-zinc-900/60 text-zinc-500 hover:text-zinc-200",
+            : "border-zinc-800 bg-zinc-900 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200",
         )}
       >
         <Bookmark
@@ -166,13 +225,72 @@ export function ProjectFilters({
         Selected
       </button>
       {active && (
-        <Button variant="ghost" size="sm" onClick={onClear}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 shrink-0 px-2.5 text-xs"
+          onClick={onClear}
+        >
           Clear filters
         </Button>
       )}
-      <span className="ml-auto text-[11px] tabular-nums text-zinc-600">
+      <span className="ml-auto shrink-0 text-[11px] tabular-nums text-zinc-600">
         {resultCount}
       </span>
+    </div>
+  );
+}
+
+function MediaTypeFilter({
+  filters,
+  counts,
+  onFilters,
+}: {
+  filters: FilterState;
+  counts: Record<"all" | "video" | "image", number>;
+  onFilters: (filters: FilterState) => void;
+}) {
+  const current = filters.mediaTypes.length === 1 ? filters.mediaTypes[0] : "all";
+
+  return (
+    <div className="no-scrollbar flex max-w-full items-center gap-0.5 overflow-x-auto rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
+      {MEDIA_TYPE_OPTIONS.map((option) => {
+        const Icon = option.icon;
+        const active = current === option.id;
+
+        return (
+          <button
+            key={option.id}
+            type="button"
+            aria-pressed={active}
+            onClick={() =>
+              onFilters({
+                ...filters,
+                mediaTypes: option.id === "all" ? [] : [option.id],
+              })
+            }
+            className={cn(
+              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium transition",
+              active
+                ? "bg-zinc-800 text-zinc-100"
+                : "text-zinc-500 hover:text-zinc-200",
+            )}
+          >
+            {Icon && <Icon className="h-3.5 w-3.5" />}
+            <span>{option.label}</span>
+            <span
+              className={cn(
+                "rounded-full px-1.5 py-0.5 text-[10px] tabular-nums",
+                active
+                  ? "bg-zinc-950/45 text-zinc-300"
+                  : "bg-zinc-800 text-zinc-600",
+              )}
+            >
+              {counts[option.id === "all" ? "all" : option.id]}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -201,7 +319,7 @@ function AppearancePopover({
       <Popover.Trigger asChild>
         <button
           type="button"
-          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-white/10 bg-zinc-900/45 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm backdrop-blur-xl transition hover:border-white/15 hover:bg-zinc-800/55 hover:text-zinc-100"
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
         >
           <Rows3 className="h-3.5 w-3.5" />
           Appearance
@@ -212,7 +330,7 @@ function AppearancePopover({
         <Popover.Content
           align="start"
           sideOffset={8}
-          className="z-50 w-[15.25rem] max-w-[calc(100vw-1rem)] rounded-lg border border-white/10 bg-zinc-950/25 p-2 text-zinc-200 shadow-2xl shadow-black/45 ring-1 ring-white/5 backdrop-blur-2xl"
+          className="z-50 w-[15.25rem] max-w-[calc(100vw-1rem)] rounded-lg border border-zinc-800 bg-zinc-950 p-2 text-zinc-200 shadow-2xl shadow-black/45"
         >
           <div className="mb-1.5 border-b border-white/10 pb-1.5">
             <p className="text-[10px] font-medium leading-none text-zinc-400">
@@ -310,7 +428,7 @@ function SortPopover({
       <Popover.Trigger asChild>
         <button
           type="button"
-          className="inline-flex h-8 min-w-32 shrink-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-zinc-950/20 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm backdrop-blur-xl transition hover:border-white/15 hover:bg-white/5 hover:text-zinc-100"
+          className="inline-flex h-8 min-w-32 shrink-0 items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
         >
           <span className="inline-flex items-center gap-1.5">
             <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-500" />
@@ -323,7 +441,7 @@ function SortPopover({
         <Popover.Content
           align="start"
           sideOffset={8}
-          className="z-50 w-48 overflow-hidden rounded-lg border border-white/10 bg-zinc-950/20 p-1.5 text-zinc-200 shadow-2xl shadow-black/45 ring-1 ring-white/5 backdrop-blur-2xl"
+          className="z-50 w-48 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-zinc-200 shadow-2xl shadow-black/45"
         >
           {SORTS.map((item) => (
             <button
@@ -334,7 +452,7 @@ function SortPopover({
                 "flex h-7 w-full items-center justify-between rounded-md px-2.5 text-left text-[10px] transition",
                 sort === item.id
                   ? "bg-teal-400 text-zinc-950"
-                  : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100",
+                  : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100",
               )}
             >
               {item.label}
@@ -374,7 +492,7 @@ function SegmentGroup({
   return (
     <div
       className={cn(
-        "grid w-[5.35rem] justify-self-end gap-px rounded-md border border-white/10 bg-black/15 p-0.5",
+        "grid w-[5.35rem] justify-self-end gap-px rounded-md border border-zinc-800 bg-zinc-900 p-0.5",
         columns === 2 ? "grid-cols-2" : "grid-cols-3",
       )}
     >
@@ -407,7 +525,7 @@ function SegmentButton({
         "inline-flex h-[18px] min-w-0 items-center justify-center gap-0.5 rounded-[4px] px-0.5 text-[9px] font-semibold leading-none text-zinc-300 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-200/80",
         active
           ? "bg-teal-400 text-zinc-950 shadow-sm ring-1 ring-teal-200/70"
-          : "hover:bg-white/5 hover:text-zinc-100",
+          : "hover:bg-zinc-800 hover:text-zinc-100",
       )}
     >
       {children}
