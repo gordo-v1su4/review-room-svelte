@@ -130,12 +130,25 @@ export function VideoPlayer({
     syncTime(nextTime);
   }
 
+  function playVideo(video: HTMLVideoElement) {
+    video.play().catch((error: unknown) => {
+      if (
+        error instanceof DOMException &&
+        error.name === "AbortError" &&
+        error.message.includes("interrupted")
+      ) {
+        return;
+      }
+      console.error("Video playback failed", error);
+    });
+  }
+
   function togglePlayback() {
     if (isImage) return;
     const video = ref.current;
     if (!video) return;
     if (video.paused) {
-      void video.play();
+      playVideo(video);
     } else {
       video.pause();
     }

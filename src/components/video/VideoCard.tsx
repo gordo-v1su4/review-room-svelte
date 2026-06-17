@@ -46,6 +46,7 @@ export function VideoCard({
   const setRatingClient = useMutation(api.reviewPublic.clientSetRating);
   const [hoverPct, setHoverPct] = useState<number | null>(null);
   const [spriteAspect, setSpriteAspect] = useState<number | null>(null);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
   const spriteFrameCount = 10;
   const scrubFrame =
     hoverPct == null
@@ -81,6 +82,10 @@ export function VideoCard({
     size === "lg"
       ? "line-clamp-2 text-[13px] leading-5"
       : "line-clamp-1 text-[12px] leading-4";
+
+  useEffect(() => {
+    setThumbnailFailed(false);
+  }, [thumbUrl]);
 
   useEffect(() => {
     if (!spriteUrl) {
@@ -159,11 +164,12 @@ export function VideoCard({
             className="absolute left-1/2 top-1/2 bg-no-repeat"
             style={spriteSurfaceStyle}
           />
-        ) : thumbUrl ? (
+        ) : thumbUrl && !thumbnailFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumbUrl}
             alt=""
+            onError={() => setThumbnailFailed(true)}
             className={cn(
               "h-full w-full",
               thumbnailScale === "fit" ? "object-contain" : "object-cover",

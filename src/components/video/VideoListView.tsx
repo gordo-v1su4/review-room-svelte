@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bookmark, Check, Download, MessageSquare, Star } from "lucide-react";
 import type { VideoDoc } from "@/lib/smartViews";
 import { isImageAsset, mediaKindLabel } from "@/lib/media";
@@ -128,6 +128,7 @@ function VideoListThumbnail({ video }: { video: VideoDoc }) {
   );
   const spriteUrl = useStorageUrl(video.spriteKey, video.updatedAt);
   const [hoverPct, setHoverPct] = useState<number | null>(null);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
   const canScrub = Boolean(spriteUrl);
   const spriteFrameCount = 10;
   const scrubFrame =
@@ -139,6 +140,10 @@ function VideoListThumbnail({ video }: { video: VideoDoc }) {
         );
   const scrubPosition =
     spriteFrameCount <= 1 ? 0 : (scrubFrame / (spriteFrameCount - 1)) * 100;
+
+  useEffect(() => {
+    setThumbnailFailed(false);
+  }, [thumbUrl]);
 
   return (
     <div
@@ -160,9 +165,14 @@ function VideoListThumbnail({ video }: { video: VideoDoc }) {
             backgroundPosition: `${scrubPosition}% center`,
           }}
         />
-      ) : thumbUrl ? (
+      ) : thumbUrl && !thumbnailFailed ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
+        <img
+          src={thumbUrl}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setThumbnailFailed(true)}
+        />
       ) : (
         <div className="grid h-full place-items-center text-[10px] text-zinc-700">
           {video.processingStatus === "processing" ? "Processing" : "Preview"}

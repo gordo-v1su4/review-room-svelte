@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bookmark,
   Check,
@@ -250,11 +250,21 @@ function ReviewStripThumbnail({ video }: { video: VideoDoc }) {
     video.thumbnailKey ?? (isImage ? video.storageKey : undefined),
     video.updatedAt,
   );
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
-  if (thumbUrl) {
+  useEffect(() => {
+    setThumbnailFailed(false);
+  }, [thumbUrl]);
+
+  if (thumbUrl && !thumbnailFailed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
+      <img
+        src={thumbUrl}
+        alt=""
+        className="h-full w-full object-cover"
+        onError={() => setThumbnailFailed(true)}
+      />
     );
   }
 
