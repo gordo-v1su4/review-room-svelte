@@ -1,5 +1,6 @@
 "use client";
 
+import type { DragEvent } from "react";
 import type { VideoDoc } from "@/lib/smartViews";
 import type { CardAspectRatio, GridSize, ThumbnailScale } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ export function VideoGrid({
   showCardInfo = true,
   actionMode = "admin",
   token,
+  onDragStart,
   onSelect,
   empty,
 }: {
@@ -25,6 +27,7 @@ export function VideoGrid({
   showCardInfo?: boolean;
   actionMode?: "admin" | "client";
   token?: string;
+  onDragStart?: (event: DragEvent<HTMLElement>, video: VideoDoc) => void;
   onSelect: (id: VideoDoc["_id"]) => void;
   empty?: React.ReactNode;
 }) {
@@ -55,6 +58,7 @@ export function VideoGrid({
           showCardInfo={showCardInfo}
           actionMode={actionMode}
           token={token}
+          onDragStart={onDragStart}
           selected={selectedId === video._id}
           onSelect={() => onSelect(video._id)}
         />

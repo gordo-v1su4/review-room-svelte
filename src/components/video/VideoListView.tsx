@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type DragEvent, useEffect, useState } from "react";
 import { Bookmark, Check, Download, MessageSquare, Star } from "lucide-react";
 import type { VideoDoc } from "@/lib/smartViews";
 import { isImageAsset, mediaKindLabel } from "@/lib/media";
@@ -11,10 +11,12 @@ import { useStorageUrl } from "@/hooks/useStorageUrl";
 export function VideoListView({
   videos,
   selectedId,
+  onDragStart,
   onSelect,
 }: {
   videos: VideoDoc[];
   selectedId?: string;
+  onDragStart?: (event: DragEvent<HTMLElement>, video: VideoDoc) => void;
   onSelect: (id: VideoDoc["_id"]) => void;
 }) {
   if (!videos.length) {
@@ -43,9 +45,12 @@ export function VideoListView({
             <button
               key={video._id}
               type="button"
+              draggable={Boolean(onDragStart)}
               onClick={() => onSelect(video._id)}
+              onDragStart={(event) => onDragStart?.(event, video)}
               className={cn(
                 "grid w-full grid-cols-[112px_minmax(0,1fr)] gap-3 px-3 py-3 text-left transition md:grid-cols-[116px_minmax(0,2fr)_132px_minmax(0,1fr)_110px_72px_78px_40px] md:items-center md:py-2.5",
+                onDragStart && "cursor-grab active:cursor-grabbing",
                 selectedId === video._id
                   ? "bg-zinc-800/45"
                   : "hover:bg-zinc-900/60",

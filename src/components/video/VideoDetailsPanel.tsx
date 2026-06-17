@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { X, Bookmark, Flag, Trash2 } from "lucide-react";
+import { X, Bookmark, Flag, RotateCcw, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
 import { isImageAsset, mediaKindLabel } from "@/lib/media";
@@ -64,6 +64,7 @@ export function VideoDetailsPanel({
   const addCommentClient = useMutation(api.reviewPublic.clientAddComment);
   const updateMeta = useMutation(api.videos.updateMetadata);
   const setMarkedForDeletion = useMutation(api.videos.setMarkedForDeletion);
+  const resetStatus = useMutation(api.videos.resetStatus);
   const removeVideo = useMutation(api.videos.remove);
 
   const handleFirstPlay = () => {
@@ -199,6 +200,16 @@ export function VideoDetailsPanel({
 
         {mode === "admin" && (canEdit || canDelete) && (
           <div className="grid gap-2 sm:grid-cols-2">
+            {canEdit && (
+              <Button
+                variant="ghost"
+                className="justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-200"
+                onClick={() => void resetStatus({ videoId: video._id })}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reset status
+              </Button>
+            )}
             {canEdit && (
               <Button
                 variant="ghost"

@@ -171,6 +171,24 @@ export const requestChanges = mutation({
   },
 });
 
+export const resetStatus = mutation({
+  args: { videoId: v.id("videos") },
+  handler: async (ctx, args) => {
+    const video = await ctx.db.get(args.videoId);
+    if (!video) throw new Error("Video not found");
+    await getProjectForEditor(ctx, video.projectId);
+    await ctx.db.patch(args.videoId, {
+      status: "awaiting_review",
+      viewed: false,
+      rating: 0,
+      isSelect: false,
+      markedForDeletion: false,
+      approvedAt: undefined,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 export const applySmartViewDrop = mutation({
   args: {
     videoId: v.id("videos"),
@@ -188,6 +206,30 @@ export const applySmartViewDrop = mutation({
     }
     if (args.isSelect !== undefined) patch.isSelect = args.isSelect;
     await ctx.db.patch(args.videoId, patch);
+  },
+});
+
+export const moveToFolder = mutation({
+  args: {
+    videoId: v.id("videos"),
+    folderId: v.optional(v.id("projectFolders")),
+  },
+  handler: async (ctx, args) => {
+    const video = await ctx.db.get(args.videoId);
+    if (!video) throw new Error("Video not found");
+    await getProjectForEditor(ctx, video.projectId);
+
+    if (args.folderId) {
+      const folder = await ctx.db.get(args.folderId);
+      if (!folder || folder.projectId !== video.projectId) {
+        throw new Error("Folder not found");
+      }
+    }
+
+    await ctx.db.patch(args.videoId, {
+      folderId: args.folderId,
+      updatedAt: Date.now(),
+    });
   },
 });
 

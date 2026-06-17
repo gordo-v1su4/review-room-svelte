@@ -14,7 +14,8 @@ Top nav, "Projects" title, "New project" CTA, and a grid of project cards. Each 
 - **Project header / banner** — banner image, title, client name/description, "Access," "Share review link," "Upload." Makes the page feel like a portal. Owners use Access to choose Private, Shared, or Workspace visibility and to add exact email or domain rules; non-owners see view/edit affordances based on role.
 - **Smart-view tab bar** (§4) directly under the header, with live counts.
 - **Toolbar** — search, filter, sort, thumbnail-size toggle, optional "Selected only." Light, never cluttered.
-- **Content** — the media grid (default).
+- **Content** — the media grid (default), with project folders shown as first-class items above loose assets.
+- **Folder navigation** — the existing app sidebar shows the project root plus one level of project folders.
 - **Right-side viewer/details panel** (§5) — opens on card select.
 
 ### C. Client review page (`/review/[token]`)
@@ -84,7 +85,11 @@ A FreeCut-inspired Scenes view can sit beside Media when Phase C lands. It is a 
 
 ## 11. Filtering & sorting
 
-Available but visually light — a filter popover, active-filter chips, and "clear all," plus the smart-view tabs as the fast path. **Filters:** status, review state/facets, tags, rating, selected, has-comments, uploaded/updated date. **Sorts:** newest, oldest, rating high→low, title, recently reviewed, most comments.
+Available but visually light — file-type toggles in the main toolbar, a filter popover, active-filter chips, and "clear all," plus the smart-view tabs as the fast path. **Filters:** media type (video/image first, extensible later), status, review state/facets, tags, rating, selected, has-comments, uploaded/updated date. **Sorts:** newest, oldest, status, rating high→low, title, recently reviewed, most comments.
+
+## 11a. Folders
+
+Folders are lightweight one-level project organization, not a replacement for smart views. The project root shows folder tiles above loose assets; opening a folder scopes the grid and smart-view counts to that folder. Admins can create root-level folders and drag media cards onto folder tiles or the existing app sidebar folder entries to move assets. The sidebar root entry accepts drops to move assets back out of a folder. Client review links can remain grid-first unless folder navigation is explicitly enabled later.
 
 ## 12. Visual direction & token system
 

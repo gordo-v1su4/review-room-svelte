@@ -204,7 +204,7 @@ async function generateClientImagePreview(file: File): Promise<ClientPreviewResu
   }
 }
 
-function uploadViaServer({
+function uploadViaPresignedUrl({
   file,
   projectId,
   onProgress,
@@ -213,34 +213,55 @@ function uploadViaServer({
   projectId: Id<"projects">;
   onProgress: (progress: number) => void;
 }) {
-  return new Promise<{ storageKey: string }>((resolve, reject) => {
-    const formData = new FormData();
-    formData.set("projectId", projectId);
-    formData.set("file", file);
+  return new Promise<{ storageKey: string }>(async (resolve, reject) => {
+    const contentType = file.type || "application/octet-stream";
+    let storageKey: string | undefined;
+    let uploadUrl: string | undefined;
+
+    try {
+      const response = await fetch("/api/storage/presign-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          filename: file.name,
+          contentType,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        uploadUrl?: string;
+        storageKey?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.uploadUrl || !payload.storageKey) {
+        throw new Error(payload.error || "Could not prepare upload");
+      }
+
+      uploadUrl = payload.uploadUrl;
+      storageKey = payload.storageKey;
+    } catch (error) {
+      reject(error instanceof Error ? error : new Error("Could not prepare upload"));
+      return;
+    }
 
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/storage/upload");
+    xhr.open("PUT", uploadUrl);
+    xhr.setRequestHeader("Content-Type", contentType);
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable) return;
       onProgress(Math.max(10, Math.round((event.loaded / event.total) * 90)));
     };
     xhr.onload = () => {
-      let payload: { storageKey?: string; error?: string } = {};
-      try {
-        payload = JSON.parse(xhr.responseText) as typeof payload;
-      } catch {
-        payload = {};
-      }
-
-      if (xhr.status >= 200 && xhr.status < 300 && payload.storageKey) {
+      if (xhr.status >= 200 && xhr.status < 300 && storageKey) {
         onProgress(95);
-        resolve({ storageKey: payload.storageKey });
+        resolve({ storageKey });
       } else {
-        reject(new Error(payload.error || `Upload failed with HTTP ${xhr.status}`));
+        reject(new Error(`Upload failed with HTTP ${xhr.status}`));
       }
     };
-    xhr.onerror = () => reject(new Error("Upload failed"));
-    xhr.send(formData);
+    xhr.onerror = () => reject(new Error("Direct upload failed"));
+    xhr.send(file);
   });
 }
 
@@ -276,7 +297,7 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
               f.id === item.id ? { ...f, status: "uploading", progress: 10 } : f,
             ),
           );
-          const upload = await uploadViaServer({
+          const upload = await uploadViaPresignedUrl({
             file: item.file,
             projectId,
             onProgress: (progress) => {
@@ -304,13 +325,13 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
             setFiles((prev) =>
               prev.map((f) => (f.id === item.id ? { ...f, progress: 97 } : f)),
             );
-            const thumbnailUpload = await uploadViaServer({
+            const thumbnailUpload = await uploadViaPresignedUrl({
               file: preview.thumbnail,
               projectId,
               onProgress: () => {},
             });
             const spriteUpload = preview.sprite
-              ? await uploadViaServer({
+              ? await uploadViaPresignedUrl({
                   file: preview.sprite,
                   projectId,
                   onProgress: () => {},

@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useConvexAuth, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import {
   Clapperboard,
   ChevronsLeft,
   ChevronsRight,
   Folder,
+  FolderOpen,
   Inbox,
   LogOut,
   Plus,
@@ -18,6 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
+import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { useAdminAccess } from "@/components/auth/AdminGate";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,6 +34,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isReview = pathname?.startsWith("/review");
   const isSignIn = pathname?.startsWith("/sign-in");
   const isWorkspace = /^\/dashboard\/projects\/[^/]+$/.test(pathname ?? "");
+  const workspaceProjectId = isWorkspace
+    ? (pathname?.split("/").at(-1) as Id<"projects"> | undefined)
+    : undefined;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarReady, setSidebarReady] = useState(false);
   const projects = useQuery(
@@ -140,6 +145,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
+          {workspaceProjectId && !sidebarCollapsed && (
+            <Suspense fallback={null}>
+              <WorkspaceSidebarFolders projectId={workspaceProjectId} />
+            </Suspense>
+          )}
+
           <div className={cn("mt-auto space-y-3 p-3", sidebarCollapsed && "px-2")}>
             <Button
               variant="ghost"
@@ -219,6 +230,150 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+  );
+}
+
+type FolderDoc = Doc<"projectFolders">;
+type VideoDoc = Doc<"videos">;
+
+function WorkspaceSidebarFolders({ projectId }: { projectId: Id<"projects"> }) {
+  const searchParams = useSearchParams();
+  const activeFolderParam = searchParams.get("folder");
+  const activeFolderId =
+    activeFolderParam && activeFolderParam !== "root"
+      ? (activeFolderParam as Id<"projectFolders">)
+      : null;
+  const folders = useQuery(api.folders.listByProject, { projectId });
+  const videos = useQuery(api.videos.listByProject, { projectId });
+  const moveToFolder = useMutation(api.videos.moveToFolder);
+
+  return (
+    <SidebarFolders
+      projectId={projectId}
+      folders={folders ?? []}
+      videos={videos ?? []}
+      activeFolderId={activeFolderId}
+      onDropVideo={(videoId, folderId) =>
+        void moveToFolder(folderId ? { videoId, folderId } : { videoId })
+      }
+    />
+  );
+}
+
+function SidebarFolders({
+  projectId,
+  folders,
+  videos,
+  activeFolderId,
+  onDropVideo,
+}: {
+  projectId: Id<"projects">;
+  folders: FolderDoc[];
+  videos: VideoDoc[];
+  activeFolderId: Id<"projectFolders"> | null;
+  onDropVideo: (
+    videoId: Id<"videos">,
+    folderId: Id<"projectFolders"> | undefined,
+  ) => void;
+}) {
+  const rootFolders = folders;
+  const rootCount = videos.filter((video) => !video.folderId).length;
+
+  return (
+    <div className="mt-5 px-3">
+      <p className="px-2 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+        Folders
+      </p>
+      <div className="space-y-1">
+        <SidebarFolderLink
+          href={`/dashboard/projects/${projectId}`}
+          label="Project root"
+          count={rootCount}
+          active={!activeFolderId}
+          icon="root"
+          depth={0}
+          onDrop={(videoId) => onDropVideo(videoId, undefined)}
+        />
+        {rootFolders.map((folder) => {
+          const active = activeFolderId === folder._id;
+          const count = videos.filter((video) => video.folderId === folder._id).length;
+          return (
+            <SidebarFolderLink
+              key={folder._id}
+              href={`/dashboard/projects/${projectId}?folder=${folder._id}`}
+              label={folder.title}
+              count={count}
+              active={active}
+              icon={active ? "open" : "folder"}
+              depth={0}
+              onDrop={(videoId) => onDropVideo(videoId, folder._id)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SidebarFolderLink({
+  href,
+  label,
+  count,
+  active,
+  icon,
+  depth,
+  onDrop,
+}: {
+  href: string;
+  label: string;
+  count: number;
+  active: boolean;
+  icon: "root" | "folder" | "open";
+  depth: number;
+  onDrop: (videoId: Id<"videos">) => void;
+}) {
+  const Icon = icon === "root" ? Inbox : icon === "open" ? FolderOpen : Folder;
+  const [dragActive, setDragActive] = useState(false);
+
+  return (
+    <Link
+      href={href}
+      title={label}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        setDragActive(true);
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }}
+      onDragLeave={(event) => {
+        if (event.relatedTarget && event.currentTarget.contains(event.relatedTarget as Node)) {
+          return;
+        }
+        setDragActive(false);
+      }}
+      onDrop={(event) => {
+        setDragActive(false);
+        const videoId = event.dataTransfer.getData("application/review-room-video-id");
+        if (!videoId) return;
+        event.preventDefault();
+        onDrop(videoId as Id<"videos">);
+      }}
+      className={cn(
+        "flex items-center gap-2 rounded-md py-1.5 pr-2 text-[12px] transition",
+        dragActive
+          ? "bg-sky-400/15 text-sky-100 ring-1 ring-inset ring-sky-300/25"
+          : active
+            ? "bg-sky-400/10 text-sky-200"
+            : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300",
+      )}
+      style={{ paddingLeft: `${8 + depth * 12}px` }}
+    >
+      <Icon className={cn("h-3.5 w-3.5 shrink-0", active ? "text-sky-300" : "text-zinc-600")} />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="text-[10px] tabular-nums text-zinc-600">{count}</span>
+    </Link>
   );
 }
 

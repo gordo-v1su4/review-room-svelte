@@ -21,6 +21,7 @@ export type SmartViewId =
 export type SortKey =
   | "newest"
   | "oldest"
+  | "status"
   | "rating_desc"
   | "title"
   | "recently_reviewed"
@@ -31,6 +32,8 @@ export type GridSize = "sm" | "md" | "lg";
 export type CardAspectRatio = "video" | "square" | "portrait";
 
 export type ThumbnailScale = "fit" | "fill";
+
+export type MediaKind = "video" | "image" | "other";
 
 export type WorkspaceAppearance = {
   gridSize: GridSize;

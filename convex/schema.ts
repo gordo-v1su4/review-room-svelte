@@ -68,8 +68,18 @@ const applicationTables = {
     .index("by_project", ["projectId"])
     .index("by_project_pattern", ["projectId", "pattern"]),
 
+  projectFolders: defineTable({
+    projectId: v.id("projects"),
+    title: v.string(),
+    order: v.number(),
+    createdBy: v.id("appUsers"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_project", ["projectId"]),
+
   videos: defineTable({
     projectId: v.id("projects"),
+    folderId: v.optional(v.id("projectFolders")),
     title: v.string(),
     originalFilename: v.string(),
     storageKey: v.string(),
@@ -104,6 +114,7 @@ const applicationTables = {
     ),
   })
     .index("by_project", ["projectId"])
+    .index("by_project_folder", ["projectId", "folderId"])
     .index("by_project_status", ["projectId", "status"])
     .index("by_project_uploadedAt", ["projectId", "uploadedAt"]),
 
