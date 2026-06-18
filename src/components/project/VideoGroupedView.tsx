@@ -1,12 +1,20 @@
 "use client";
 
 import type { DragEvent } from "react";
+import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { SMART_VIEWS, matchesSmartView, type VideoDoc } from "@/lib/smartViews";
 import type { SmartViewId } from "@/lib/types";
 import type { CardAspectRatio, GridSize, ThumbnailScale } from "@/lib/types";
 import { VideoCard } from "@/components/video/VideoCard";
+import { folderCounts, FolderTile } from "./FolderShelf";
+import { projectAccent } from "@/lib/projectAccent";
+
+type FolderDoc = Doc<"projectFolders">;
 
 export function VideoGroupedView({
+  folders = [],
+  folderVideos = [],
+  brandColor,
   videos,
   size,
   aspectRatio = "video",
@@ -14,8 +22,13 @@ export function VideoGroupedView({
   showCardInfo = true,
   selectedId,
   onDragStart,
+  onOpenFolder,
+  onDropVideo,
   onSelect,
 }: {
+  folders?: FolderDoc[];
+  folderVideos?: VideoDoc[];
+  brandColor?: string;
   videos: VideoDoc[];
   size: GridSize;
   aspectRatio?: CardAspectRatio;
@@ -23,9 +36,15 @@ export function VideoGroupedView({
   showCardInfo?: boolean;
   selectedId?: string;
   onDragStart?: (event: DragEvent<HTMLElement>, video: VideoDoc) => void;
+  onOpenFolder?: (id: Id<"projectFolders">) => void;
+  onDropVideo?: (
+    videoId: Id<"videos">,
+    folderId: Id<"projectFolders"> | undefined,
+  ) => void;
   onSelect: (id: VideoDoc["_id"]) => void;
 }) {
   const sections = SMART_VIEWS.filter((v) => v.id !== "all");
+  const accent = projectAccent(brandColor);
   const cardWidth =
     size === "sm"
       ? "w-[calc(50%_-_0.375rem)] min-w-[150px] sm:w-[180px]"
@@ -35,6 +54,26 @@ export function VideoGroupedView({
 
   return (
     <div className="space-y-8 p-4 sm:p-6 lg:p-8">
+      {folders.length > 0 && (
+        <section>
+          <h3 className="mb-3 text-sm font-medium text-zinc-400">Folders</h3>
+          <div className="flex flex-wrap gap-3 sm:gap-4">
+            {folders.map((folder) => (
+              <div key={folder._id} className={cardWidth}>
+                <FolderTile
+                  folder={folder}
+                  active={false}
+                  accent={accent}
+                  counts={folderCounts(folderVideos, folder._id)}
+                  canEdit={Boolean(onDropVideo)}
+                  onOpen={() => onOpenFolder?.(folder._id)}
+                  onDrop={(videoId) => onDropVideo?.(videoId, folder._id)}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       {sections.map((section) => {
         const items = videos.filter((v) => matchesSmartView(v, section.id));
         if (!items.length) return null;

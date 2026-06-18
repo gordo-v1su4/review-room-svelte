@@ -1,25 +1,40 @@
 "use client";
 
 import { type DragEvent, useEffect, useState } from "react";
-import { Bookmark, Check, Download, MessageSquare, Star } from "lucide-react";
+import { Bookmark, Check, Download, Folder, MessageSquare, Star } from "lucide-react";
+import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import type { VideoDoc } from "@/lib/smartViews";
 import { isImageAsset, mediaKindLabel } from "@/lib/media";
 import { cn, formatDuration } from "@/lib/utils";
 import { VideoStatusPill } from "./VideoStatusPill";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
+import { folderCounts, folderItemLabel } from "@/components/project/FolderShelf";
+
+type FolderDoc = Doc<"projectFolders">;
 
 export function VideoListView({
+  folders = [],
+  folderVideos = [],
   videos,
   selectedId,
   onDragStart,
+  onOpenFolder,
+  onDropVideo,
   onSelect,
 }: {
+  folders?: FolderDoc[];
+  folderVideos?: VideoDoc[];
   videos: VideoDoc[];
   selectedId?: string;
   onDragStart?: (event: DragEvent<HTMLElement>, video: VideoDoc) => void;
+  onOpenFolder?: (id: Id<"projectFolders">) => void;
+  onDropVideo?: (
+    videoId: Id<"videos">,
+    folderId: Id<"projectFolders"> | undefined,
+  ) => void;
   onSelect: (id: VideoDoc["_id"]) => void;
 }) {
-  if (!videos.length) {
+  if (!videos.length && !folders.length) {
     return (
       <div className="mx-6 flex min-h-[280px] items-center justify-center rounded-lg border border-dashed border-zinc-800 text-sm text-zinc-500 sm:mx-8">
         No media match.
@@ -41,6 +56,16 @@ export function VideoListView({
           <div />
         </div>
         <div className="divide-y divide-zinc-800/40">
+          {folders.map((folder) => (
+            <FolderListRow
+              key={folder._id}
+              folder={folder}
+              counts={folderCounts(folderVideos, folder._id)}
+              onOpen={() => onOpenFolder?.(folder._id)}
+              onDrop={(videoId) => onDropVideo?.(videoId, folder._id)}
+              canDrop={Boolean(onDropVideo)}
+            />
+          ))}
           {videos.map((video) => (
             <button
               key={video._id}
@@ -122,6 +147,83 @@ export function VideoListView({
         </div>
       </div>
     </div>
+  );
+}
+
+function FolderListRow({
+  folder,
+  counts,
+  canDrop,
+  onOpen,
+  onDrop,
+}: {
+  folder: FolderDoc;
+  counts: { total: number; images: number; videos: number };
+  canDrop: boolean;
+  onOpen: () => void;
+  onDrop: (videoId: Id<"videos">) => void;
+}) {
+  const [dragActive, setDragActive] = useState(false);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      onDragEnter={(event) => {
+        if (!canDrop) return;
+        event.preventDefault();
+        setDragActive(true);
+      }}
+      onDragOver={(event) => {
+        if (!canDrop) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }}
+      onDragLeave={(event) => {
+        if (event.relatedTarget && event.currentTarget.contains(event.relatedTarget as Node)) {
+          return;
+        }
+        setDragActive(false);
+      }}
+      onDrop={(event) => {
+        setDragActive(false);
+        const videoId = event.dataTransfer.getData("application/review-room-video-id");
+        if (!videoId) return;
+        event.preventDefault();
+        onDrop(videoId as Id<"videos">);
+      }}
+      className={cn(
+        "grid w-full grid-cols-[112px_minmax(0,1fr)] gap-3 px-3 py-3 text-left transition md:grid-cols-[116px_minmax(0,2fr)_132px_minmax(0,1fr)_110px_72px_78px_40px] md:items-center md:py-2.5",
+        dragActive ? "bg-zinc-800/60" : "hover:bg-zinc-900/60",
+      )}
+    >
+      <div className="relative h-[63px] w-28 overflow-hidden rounded-md border border-zinc-800 bg-zinc-950">
+        <span className="absolute inset-1.5 rounded border border-zinc-800 bg-zinc-900/80" />
+        <Folder className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 text-zinc-400" />
+      </div>
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-sm font-medium text-zinc-100">
+            {folder.title}
+          </span>
+        </div>
+        <div className="truncate text-[11px] text-zinc-600">
+          {folderItemLabel(counts.total)}
+        </div>
+      </div>
+      <div className="col-start-2 md:col-start-auto">
+        <span className="inline-flex rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+          Folder
+        </span>
+      </div>
+      <div className="col-span-2 min-w-0 text-[11px] text-zinc-600 md:col-span-1">
+        {counts.videos} video / {counts.images} image
+      </div>
+      <div className="text-[11px] text-zinc-800">-</div>
+      <div className="text-left text-[11px] text-zinc-800 md:text-right">-</div>
+      <div className="text-[11px] text-zinc-600">Folder</div>
+      <div />
+    </button>
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Folder } from "lucide-react";
+import { Folder, MoreHorizontal } from "lucide-react";
 import { useState, type DragEvent } from "react";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import type { VideoDoc } from "@/lib/smartViews";
@@ -58,7 +58,7 @@ export function FolderShelf({
   );
 }
 
-function FolderTile({
+export function FolderTile({
   folder,
   active,
   accent,
@@ -105,44 +105,37 @@ function FolderTile({
         onDrop(videoId);
       }}
       className={cn(
-        "group relative flex min-h-[14.25rem] min-w-0 flex-col justify-end overflow-hidden rounded-lg border text-left shadow-sm transition",
+        "group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border bg-zinc-900/80 text-left transition-all",
         dragActive
-          ? "border-[var(--project-accent)] bg-zinc-900"
+          ? "border-[var(--project-accent)] ring-1 ring-[var(--project-accent-ring)]"
           : active
-            ? "border-[var(--project-accent)] bg-zinc-900"
-            : "border-zinc-800/70 bg-zinc-900/45 hover:border-zinc-700 hover:bg-zinc-900/75",
+            ? "border-[var(--project-accent)]"
+            : "border-zinc-800/80 hover:border-zinc-600",
       )}
     >
-      <span
-        className="absolute left-0 top-0 h-9 w-32 rounded-br-lg border-b border-r border-zinc-700"
-        style={{ backgroundColor: accent }}
-      />
-      <span className="absolute inset-x-0 bottom-0 top-7 rounded-lg rounded-tl-none border-t border-zinc-700 bg-zinc-900" />
-      <span className="absolute inset-x-2 top-10 h-[7.8rem] rounded-md border border-zinc-700 bg-zinc-800" />
-      <span
-        className={cn(
-          "relative z-10 mx-auto mb-9 grid h-12 w-12 shrink-0 place-items-center rounded-md border",
-          active
-            ? "border-zinc-700 bg-zinc-950"
-            : "border-zinc-700 bg-zinc-950 text-zinc-400 group-hover:text-zinc-200",
-        )}
-        style={{ color: active ? accent : undefined }}
-      >
-        <Folder className="h-6 w-6" />
+      <span className="relative block aspect-square w-full overflow-hidden bg-zinc-950">
+        <span className="absolute inset-2 rounded-md border border-zinc-800 bg-zinc-900/80 shadow-inner transition group-hover:border-zinc-700 group-hover:bg-zinc-900" />
+        <Folder className="absolute left-1/2 top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 text-zinc-400 transition group-hover:text-zinc-200" />
       </span>
-      <span className="relative z-10 block min-w-0 border-t border-zinc-800 bg-zinc-900 px-3 py-3">
-        <span className="block truncate text-sm font-medium text-zinc-200">
+      <span className="block min-w-0 space-y-1.5 p-3">
+        <span className="block truncate text-[12px] font-medium leading-4 text-zinc-300 transition group-hover:text-zinc-100">
           {folder.title}
         </span>
-        <span className="mt-1 block text-[11px] text-zinc-500">
-          {counts.total} assets / {counts.videos} video / {counts.images} image
+        <span className="flex items-center justify-between gap-2 text-[11px] text-zinc-600">
+          <span>{folderItemLabel(counts.total)}</span>
+          <MoreHorizontal className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
         </span>
       </span>
     </button>
   );
 }
 
-function folderCounts(videos: VideoDoc[], folderId: Id<"projectFolders">) {
+export function folderItemLabel(total: number) {
+  if (total === 0) return "No items";
+  return `${total} ${total === 1 ? "item" : "items"}`;
+}
+
+export function folderCounts(videos: VideoDoc[], folderId: Id<"projectFolders">) {
   const assets = videos.filter((video) => video.folderId === folderId);
   return {
     total: assets.length,

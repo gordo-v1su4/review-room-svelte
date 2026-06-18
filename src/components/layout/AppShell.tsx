@@ -459,11 +459,11 @@ function SidebarFolderLink({
         onDrop(videoId as Id<"videos">);
       }}
       className={cn(
-        "relative flex items-center gap-2 rounded-md py-1.5 pr-2 text-[12px] transition",
+        "relative flex items-center gap-2 rounded-sm py-1.5 pr-2 text-[12px] transition",
         dragActive
           ? "bg-zinc-900 text-zinc-100"
           : active
-            ? "bg-zinc-900 text-[var(--project-accent)]"
+            ? "bg-[var(--project-accent-muted)] text-zinc-300"
             : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300",
       )}
       style={{ paddingLeft: `${depth === 0 ? 8 : 4}px` }}
@@ -472,11 +472,20 @@ function SidebarFolderLink({
         <span className="absolute -left-2 top-1/2 h-px w-2 bg-zinc-800" />
       )}
       <Icon
-        className={cn("h-3.5 w-3.5 shrink-0", !active && "text-zinc-600")}
-        style={{ color: active ? accent : undefined }}
+        className={cn(
+          "h-3.5 w-3.5 shrink-0",
+          active ? "text-zinc-400" : "text-zinc-600",
+        )}
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="text-[10px] tabular-nums text-zinc-600">{count}</span>
+      <span
+        className={cn(
+          "text-[10px] tabular-nums",
+          active ? "text-zinc-500" : "text-zinc-600",
+        )}
+      >
+        {count}
+      </span>
     </Link>
   );
 }

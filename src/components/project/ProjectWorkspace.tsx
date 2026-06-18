@@ -490,6 +490,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                   />
                 ) : layout === "grouped" ? (
                   <VideoGroupedView
+                    folders={activeFolderId ? [] : folders}
+                    folderVideos={videos}
+                    brandColor={project.brandColor}
                     videos={filtered}
                     size={gridSize}
                     aspectRatio={aspectRatio}
@@ -497,13 +500,37 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     showCardInfo={showCardInfo}
                     selectedId={selectedId ?? undefined}
                     onDragStart={canEditProject ? beginVideoDrag : undefined}
+                    onOpenFolder={(folderId) =>
+                      router.push(
+                        `/dashboard/projects/${projectId}?folder=${folderId}`,
+                      )
+                    }
+                    onDropVideo={
+                      canEditProject
+                        ? (videoId, folderId) =>
+                            void moveVideoToFolder(videoId, folderId)
+                        : undefined
+                    }
                     onSelect={setSelectedId}
                   />
                 ) : layout === "list" ? (
                   <VideoListView
+                    folders={activeFolderId ? [] : folders}
+                    folderVideos={videos}
                     videos={filtered}
                     selectedId={selectedId ?? undefined}
                     onDragStart={canEditProject ? beginVideoDrag : undefined}
+                    onOpenFolder={(folderId) =>
+                      router.push(
+                        `/dashboard/projects/${projectId}?folder=${folderId}`,
+                      )
+                    }
+                    onDropVideo={
+                      canEditProject
+                        ? (videoId, folderId) =>
+                            void moveVideoToFolder(videoId, folderId)
+                        : undefined
+                    }
                     onSelect={(id) => {
                       setSelectedId(id);
                       setPanelExpanded(false);
