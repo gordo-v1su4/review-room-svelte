@@ -9,6 +9,14 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [Password, Google, GitHub],
 });
 
+export const oauthProviders = query({
+  args: {},
+  handler: async () => ({
+    google: Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET),
+    github: Boolean(process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET),
+  }),
+});
+
 function emailAllowed(email?: string) {
   const raw = process.env.AUTH_EMAIL_ALLOWLIST?.trim();
   if (!raw) return true;

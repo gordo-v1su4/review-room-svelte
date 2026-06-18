@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useConvexAuth, useMutation } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ export function SignInForm() {
   const { signIn, signOut } = useAuthActions();
   const { isAuthenticated, isLoading } = useConvexAuth();
   const ensureAdmin = useMutation(api.auth.ensureAdminProfile);
+  const oauthProviders = useQuery(api.auth.oauthProviders);
   const router = useRouter();
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [loading, setLoading] = useState(false);
@@ -85,6 +86,10 @@ export function SignInForm() {
     });
   }
 
+  const showGithub = oauthProviders?.github ?? false;
+  const showGoogle = oauthProviders?.google ?? false;
+  const hasOAuth = showGithub || showGoogle;
+
   return (
     <div className="mx-auto w-full max-w-md space-y-6">
       <div className="flex gap-2 rounded-lg bg-zinc-900 p-1">
@@ -121,37 +126,45 @@ export function SignInForm() {
         </Button>
       </form>
 
-      <div className="relative text-center text-xs text-zinc-500">
-        <span className="bg-[var(--background)] px-2 relative z-10">
-          Or continue with
-        </span>
-        <div className="absolute inset-x-0 top-1/2 border-t border-zinc-800" />
-      </div>
+      {hasOAuth && (
+        <>
+          <div className="relative text-center text-xs text-zinc-500">
+            <span className="relative z-10 bg-[var(--background)] px-2">
+              Or continue with
+            </span>
+            <div className="absolute inset-x-0 top-1/2 border-t border-zinc-800" />
+          </div>
 
-      <div className="grid gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          className="w-full justify-center"
-          disabled={loading || isLoading}
-          onClick={() => handleOAuth("github", "GitHub")}
-        >
-          <Github className="h-4 w-4" />
-          GitHub
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          className="w-full justify-center"
-          disabled={loading || isLoading}
-          onClick={() => handleOAuth("google", "Google")}
-        >
-          <span className="grid h-4 w-4 place-items-center text-sm font-semibold leading-none text-zinc-50">
-            G
-          </span>
-          Google
-        </Button>
-      </div>
+          <div className="grid gap-2">
+            {showGithub && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full justify-center"
+                disabled={loading || isLoading}
+                onClick={() => handleOAuth("github", "GitHub")}
+              >
+                <Github className="h-4 w-4" />
+                GitHub
+              </Button>
+            )}
+            {showGoogle && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full justify-center"
+                disabled={loading || isLoading}
+                onClick={() => handleOAuth("google", "Google")}
+              >
+                <span className="grid h-4 w-4 place-items-center text-sm font-semibold leading-none text-zinc-50">
+                  G
+                </span>
+                Google
+              </Button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
