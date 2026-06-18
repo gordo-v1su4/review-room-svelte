@@ -23,6 +23,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { useAdminAccess } from "@/components/auth/AdminGate";
 import { Button } from "@/components/ui/button";
+import { projectAccent, projectAccentStyle } from "@/lib/projectAccent";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_STORAGE_KEY = "review-room.sidebar.collapsed";
@@ -44,6 +45,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     api.projects.listForAdmin,
     isAuthenticated && isAdmin && !isReview ? {} : "skip",
   );
+  const workspaceProject = workspaceProjectId
+    ? projects?.find((project) => project._id === workspaceProjectId)
+    : undefined;
 
   useEffect(() => {
     setSidebarCollapsed(
@@ -124,31 +128,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
             <div className="space-y-1">
               {(projects ?? []).slice(0, 5).map((project) => (
-                <Link
+                <RecentProjectLink
                   key={project._id}
                   href={`/dashboard/projects/${project._id}`}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[12px] transition",
-                    pathname === `/dashboard/projects/${project._id}`
-                      ? "bg-zinc-800/60 text-zinc-100"
-                      : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "h-4 w-4 shrink-0 rounded",
-                      projectAccentClass(project.title),
-                    )}
-                  />
-                  <span className="truncate">{project.title}</span>
-                </Link>
+                  title={project.title}
+                  brandColor={project.brandColor}
+                  active={pathname === `/dashboard/projects/${project._id}`}
+                />
               ))}
             </div>
           </div>
 
           {workspaceProjectId && !sidebarCollapsed && (
             <Suspense fallback={null}>
-              <WorkspaceSidebarFolders projectId={workspaceProjectId} />
+              <WorkspaceSidebarFolders
+                projectId={workspaceProjectId}
+                brandColor={workspaceProject?.brandColor}
+              />
             </Suspense>
           )}
 
@@ -237,7 +233,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 type FolderDoc = Doc<"projectFolders">;
 type VideoDoc = Doc<"videos">;
 
-function WorkspaceSidebarFolders({ projectId }: { projectId: Id<"projects"> }) {
+function WorkspaceSidebarFolders({
+  projectId,
+  brandColor,
+}: {
+  projectId: Id<"projects">;
+  brandColor?: string;
+}) {
   const searchParams = useSearchParams();
   const activeFolderParam = searchParams.get("folder");
   const activeFolderId =
@@ -278,6 +280,7 @@ function WorkspaceSidebarFolders({ projectId }: { projectId: Id<"projects"> }) {
   return (
     <SidebarFolders
       projectId={projectId}
+      brandColor={brandColor}
       folders={folders ?? []}
       videos={videos ?? []}
       activeFolderId={activeFolderId}
@@ -300,6 +303,7 @@ function WorkspaceSidebarFolders({ projectId }: { projectId: Id<"projects"> }) {
 
 function SidebarFolders({
   projectId,
+  brandColor,
   folders,
   videos,
   activeFolderId,
@@ -313,6 +317,7 @@ function SidebarFolders({
   onDropVideo,
 }: {
   projectId: Id<"projects">;
+  brandColor?: string;
   folders: FolderDoc[];
   videos: VideoDoc[];
   activeFolderId: Id<"projectFolders"> | null;
@@ -330,9 +335,10 @@ function SidebarFolders({
 }) {
   const rootFolders = folders;
   const rootCount = videos.filter((video) => !video.folderId).length;
+  const accent = projectAccent(brandColor);
 
   return (
-    <div className="mt-5 px-3">
+    <div className="mt-5 px-3" style={projectAccentStyle(accent)}>
       <div className="flex items-center justify-between px-2 pb-2">
         <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">
           Folders
@@ -352,6 +358,7 @@ function SidebarFolders({
           label="Project root"
           count={rootCount}
           active={!activeFolderId}
+          accent={accent}
           icon="root"
           depth={0}
           onDrop={(videoId) => onDropVideo(videoId, undefined)}
@@ -390,6 +397,7 @@ function SidebarFolders({
                   label={folder.title}
                   count={count}
                   active={active}
+                  accent={accent}
                   icon={active ? "open" : "folder"}
                   depth={1}
                   onDrop={(videoId) => onDropVideo(videoId, folder._id)}
@@ -408,6 +416,7 @@ function SidebarFolderLink({
   label,
   count,
   active,
+  accent,
   icon,
   depth,
   onDrop,
@@ -416,6 +425,7 @@ function SidebarFolderLink({
   label: string;
   count: number;
   active: boolean;
+  accent: string;
   icon: "root" | "folder" | "open";
   depth: number;
   onDrop: (videoId: Id<"videos">) => void;
@@ -451,9 +461,9 @@ function SidebarFolderLink({
       className={cn(
         "relative flex items-center gap-2 rounded-md py-1.5 pr-2 text-[12px] transition",
         dragActive
-          ? "bg-sky-950 text-sky-100 ring-1 ring-inset ring-sky-300"
+          ? "bg-zinc-900 text-zinc-100"
           : active
-            ? "bg-zinc-800 text-sky-200"
+            ? "bg-zinc-900 text-[var(--project-accent)]"
             : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300",
       )}
       style={{ paddingLeft: `${depth === 0 ? 8 : 4}px` }}
@@ -461,25 +471,47 @@ function SidebarFolderLink({
       {depth > 0 && (
         <span className="absolute -left-2 top-1/2 h-px w-2 bg-zinc-800" />
       )}
-      <Icon className={cn("h-3.5 w-3.5 shrink-0", active ? "text-sky-300" : "text-zinc-600")} />
+      <Icon
+        className={cn("h-3.5 w-3.5 shrink-0", !active && "text-zinc-600")}
+        style={{ color: active ? accent : undefined }}
+      />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <span className="text-[10px] tabular-nums text-zinc-600">{count}</span>
     </Link>
   );
 }
 
-const projectAccentClasses = [
-  "bg-cyan-400/85",
-  "bg-teal-400/85",
-  "bg-sky-400/85",
-  "bg-emerald-400/85",
-  "bg-blue-400/85",
-  "bg-zinc-400/85",
-];
+function RecentProjectLink({
+  href,
+  title,
+  brandColor,
+  active,
+}: {
+  href: string;
+  title: string;
+  brandColor?: string;
+  active: boolean;
+}) {
+  const accent = projectAccent(brandColor);
 
-function projectAccentClass(title: string) {
-  const hash = title.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  return projectAccentClasses[hash % projectAccentClasses.length] ?? "bg-teal-400/85";
+  return (
+    <Link
+      href={href}
+      style={projectAccentStyle(accent)}
+      className={cn(
+        "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[12px] transition",
+        active
+          ? "bg-zinc-900 text-zinc-100"
+          : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300",
+      )}
+    >
+      <span
+        className="h-4 w-4 shrink-0 rounded"
+        style={{ backgroundColor: accent }}
+      />
+      <span className="truncate">{title}</span>
+    </Link>
+  );
 }
 
 function SideLink({

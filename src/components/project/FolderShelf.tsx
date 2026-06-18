@@ -5,6 +5,7 @@ import { useState, type DragEvent } from "react";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import type { VideoDoc } from "@/lib/smartViews";
 import { mediaKind } from "@/lib/media";
+import { projectAccent, projectAccentStyle } from "@/lib/projectAccent";
 import { cn } from "@/lib/utils";
 
 type FolderDoc = Doc<"projectFolders">;
@@ -13,6 +14,7 @@ export function FolderShelf({
   folders,
   videos,
   activeFolderId,
+  brandColor,
   canEdit,
   onOpen,
   onDropVideo,
@@ -20,6 +22,7 @@ export function FolderShelf({
   folders: FolderDoc[];
   videos: VideoDoc[];
   activeFolderId: Id<"projectFolders"> | null;
+  brandColor?: string;
   canEdit: boolean;
   onOpen: (folderId: Id<"projectFolders"> | null) => void;
   onDropVideo: (
@@ -33,29 +36,32 @@ export function FolderShelf({
   const visibleFolders = activeFolderId
     ? []
     : folders;
+  const accent = projectAccent(brandColor);
 
   if (!visibleFolders.length || activeFolder) return null;
 
   return (
-    <>
+    <div className="contents" style={projectAccentStyle(accent)}>
       {visibleFolders.map((folder) => (
         <FolderTile
           key={folder._id}
           folder={folder}
           active={false}
+          accent={accent}
           counts={folderCounts(videos, folder._id)}
           canEdit={canEdit}
           onOpen={() => onOpen(folder._id)}
           onDrop={(videoId) => onDropVideo(videoId, folder._id)}
         />
       ))}
-    </>
+    </div>
   );
 }
 
 function FolderTile({
   folder,
   active,
+  accent,
   counts,
   canEdit,
   onOpen,
@@ -63,6 +69,7 @@ function FolderTile({
 }: {
   folder: FolderDoc;
   active: boolean;
+  accent: string;
   counts: { total: number; images: number; videos: number };
   canEdit: boolean;
   onOpen: () => void;
@@ -100,22 +107,26 @@ function FolderTile({
       className={cn(
         "group relative flex min-h-[14.25rem] min-w-0 flex-col justify-end overflow-hidden rounded-lg border text-left shadow-sm transition",
         dragActive
-          ? "border-sky-300 bg-sky-950 ring-1 ring-sky-300"
+          ? "border-[var(--project-accent)] bg-zinc-900"
           : active
-          ? "border-sky-300 bg-zinc-800"
-          : "border-zinc-800/70 bg-zinc-900/45 hover:border-zinc-700 hover:bg-zinc-900/75",
+            ? "border-[var(--project-accent)] bg-zinc-900"
+            : "border-zinc-800/70 bg-zinc-900/45 hover:border-zinc-700 hover:bg-zinc-900/75",
       )}
     >
-      <span className="absolute left-0 top-0 h-9 w-32 rounded-br-lg border-b border-r border-zinc-700 bg-zinc-800" />
+      <span
+        className="absolute left-0 top-0 h-9 w-32 rounded-br-lg border-b border-r border-zinc-700"
+        style={{ backgroundColor: accent }}
+      />
       <span className="absolute inset-x-0 bottom-0 top-7 rounded-lg rounded-tl-none border-t border-zinc-700 bg-zinc-900" />
       <span className="absolute inset-x-2 top-10 h-[7.8rem] rounded-md border border-zinc-700 bg-zinc-800" />
       <span
         className={cn(
           "relative z-10 mx-auto mb-9 grid h-12 w-12 shrink-0 place-items-center rounded-md border",
           active
-            ? "border-sky-300 bg-sky-950 text-sky-200"
+            ? "border-zinc-700 bg-zinc-950"
             : "border-zinc-700 bg-zinc-950 text-zinc-400 group-hover:text-zinc-200",
         )}
+        style={{ color: active ? accent : undefined }}
       >
         <Folder className="h-6 w-6" />
       </span>

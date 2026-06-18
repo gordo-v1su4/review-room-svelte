@@ -56,6 +56,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
+import { DEFAULT_PROJECT_ACCENT, hexToRgba, projectAccent } from "@/lib/projectAccent";
 
 type ProjectIdentityPatch = {
   title?: string;
@@ -448,6 +449,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                         folders={folders}
                         videos={videos}
                         activeFolderId={activeFolderId}
+                        brandColor={project.brandColor}
                         canEdit={canEditProject}
                         onOpen={(folderId) =>
                           router.push(
@@ -599,11 +601,13 @@ function ProjectHero({
   const [draftTitle, setDraftTitle] = useState(title);
   const [draftClientName, setDraftClientName] = useState(clientName ?? "");
   const [draftDescription, setDraftDescription] = useState(description ?? "");
-  const [draftColor, setDraftColor] = useState(brandColor ?? "#14b8a6");
+  const [draftColor, setDraftColor] = useState(
+    brandColor ?? DEFAULT_PROJECT_ACCENT,
+  );
   const [savingIdentity, setSavingIdentity] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
 
-  const accent = brandColor ?? "#14b8a6";
+  const accent = projectAccent(brandColor);
   const heroStyle = {
     "--project-accent": accent,
     backgroundImage: bannerUrl
@@ -617,7 +621,7 @@ function ProjectHero({
     setDraftTitle(title);
     setDraftClientName(clientName ?? "");
     setDraftDescription(description ?? "");
-    setDraftColor(brandColor ?? "#14b8a6");
+    setDraftColor(brandColor ?? DEFAULT_PROJECT_ACCENT);
   }
 
   function openIdentityEditor() {
@@ -1181,16 +1185,4 @@ function initials(value: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
-}
-
-function hexToRgba(hex: string, alpha: number) {
-  const normalized = hex.replace("#", "");
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
-    return `rgba(20,184,166,${alpha})`;
-  }
-  const value = Number.parseInt(normalized, 16);
-  const red = (value >> 16) & 255;
-  const green = (value >> 8) & 255;
-  const blue = value & 255;
-  return `rgba(${red},${green},${blue},${alpha})`;
 }
