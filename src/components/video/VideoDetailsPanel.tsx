@@ -80,7 +80,7 @@ export function VideoDetailsPanel({
   return (
     <aside
       className={cn(
-        "review-panel-drawer fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] flex-col rounded-t-xl border-t border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/60 lg:static lg:z-auto lg:h-full lg:max-h-none lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none",
+        "review-panel-drawer fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] flex-col rounded-t-xl border-t border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/60 lg:sticky lg:top-[3.25rem] lg:z-auto lg:h-[calc(100dvh-3.25rem)] lg:max-h-none lg:self-start lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none",
         expanded ? "w-full max-w-none" : "w-full lg:max-w-md lg:w-[420px]",
       )}
     >
