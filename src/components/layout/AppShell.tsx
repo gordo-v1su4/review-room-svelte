@@ -66,7 +66,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-dvh bg-[var(--background)] text-zinc-50">
+    <div className="flex h-dvh bg-[var(--background)] text-zinc-50">
       {isAuthenticated && isAdmin && (
         <aside
           className={cn(
