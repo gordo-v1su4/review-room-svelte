@@ -3,12 +3,13 @@
 import {
   type CSSProperties,
   type DragEvent,
+  type MouseEvent,
   useEffect,
   useMemo,
   useState,
 } from "react";
 import { useMutation } from "convex/react";
-import { MessageSquare, Download, Bookmark, Star, Trash2 } from "lucide-react";
+import { MessageSquare, Download, Bookmark, Maximize2, Star, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
 import type { CardAspectRatio, ThumbnailScale } from "@/lib/types";
@@ -29,6 +30,7 @@ export function VideoCard({
   token,
   onDragStart,
   onSelect,
+  onOpenImagePreview,
 }: {
   video: VideoDoc;
   selected?: boolean;
@@ -40,6 +42,7 @@ export function VideoCard({
   token?: string;
   onDragStart?: (event: DragEvent<HTMLElement>, video: VideoDoc) => void;
   onSelect: () => void;
+  onOpenImagePreview?: () => void;
 }) {
   const isImage = isImageAsset(video);
   const thumbUrl = useStorageUrl(
@@ -133,12 +136,20 @@ export function VideoCard({
     void setRatingAdmin({ videoId: video._id, rating });
   }
 
+  function openImagePreview(event?: MouseEvent<HTMLElement>) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!isImage || !onOpenImagePreview) return;
+    onOpenImagePreview();
+  }
+
   return (
     <article
       role="button"
       tabIndex={0}
       draggable={Boolean(onDragStart)}
       onClick={onSelect}
+      onDoubleClick={(event) => openImagePreview(event)}
       onDragStart={(event) => onDragStart?.(event, video)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -197,7 +208,6 @@ export function VideoCard({
             style={{ left: `${hoverPct * 100}%` }}
           />
         )}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
         {video.markedForDeletion && actionMode === "admin" && (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-red-950/55 text-red-100 ring-1 ring-inset ring-red-500/30 backdrop-blur-[1px]">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-red-300/25 bg-black/45 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide">
@@ -208,13 +218,24 @@ export function VideoCard({
         )}
         <div
           className={cn(
-            "absolute right-2 top-2 flex items-center rounded-full border border-white/10 bg-black/55 p-0.5 opacity-100 shadow-sm backdrop-blur transition-opacity sm:opacity-0",
+            "absolute right-2 top-2 flex items-center gap-0.5 rounded-full border border-white/10 bg-black/55 p-0.5 opacity-100 shadow-sm backdrop-blur transition-opacity sm:opacity-0",
             video.markedForDeletion && actionMode === "admin" && "z-30",
             "sm:group-hover:opacity-100 sm:group-focus-within:opacity-100",
             video.isSelect && "opacity-100",
           )}
           onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
         >
+          {isImage && onOpenImagePreview && (
+            <button
+              type="button"
+              title="Preview image"
+              className="grid h-6 w-6 place-items-center rounded-full text-zinc-300 transition hover:bg-white/10 hover:text-white"
+              onClick={openImagePreview}
+            >
+              <Maximize2 className="h-3 w-3" />
+            </button>
+          )}
           <button
             type="button"
             title={video.isSelect ? "Remove from selected" : "Select"}
@@ -235,6 +256,7 @@ export function VideoCard({
             video.markedForDeletion && actionMode === "admin" && "z-30",
           )}
           onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
         >
           {[1, 2, 3, 4, 5].map((rating) => (
             <button
@@ -260,7 +282,7 @@ export function VideoCard({
           )}
         >
           <VideoStatusPill status={video.status} />
-          <span className="text-[10px] text-zinc-300">
+          <span className="text-[10px] text-zinc-500">
             {isImage ? mediaKindLabel(video) : formatDuration(video.durationSec)}
           </span>
         </div>
@@ -270,7 +292,7 @@ export function VideoCard({
           <p
             title={video.title}
             className={cn(
-              "font-medium text-zinc-400 transition-colors group-hover:text-zinc-200",
+              "font-medium text-zinc-500 transition-colors group-hover:text-zinc-300",
               titleClass,
             )}
           >

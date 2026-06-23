@@ -18,6 +18,7 @@ export function VideoGrid({
   token,
   onDragStart,
   onSelect,
+  onOpenImagePreview,
   empty,
 }: {
   videos: VideoDoc[];
@@ -31,6 +32,7 @@ export function VideoGrid({
   token?: string;
   onDragStart?: (event: DragEvent<HTMLElement>, video: VideoDoc) => void;
   onSelect: (id: VideoDoc["_id"]) => void;
+  onOpenImagePreview?: (video: VideoDoc) => void;
   empty?: React.ReactNode;
 }) {
   if (!videos.length && !leadingItems) {
@@ -64,6 +66,9 @@ export function VideoGrid({
           onDragStart={onDragStart}
           selected={selectedId === video._id}
           onSelect={() => onSelect(video._id)}
+          onOpenImagePreview={
+            onOpenImagePreview ? () => onOpenImagePreview(video) : undefined
+          }
         />
       ))}
     </div>
