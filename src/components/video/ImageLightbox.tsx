@@ -64,7 +64,7 @@ export function ImageLightbox({
     <Dialog.Root open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-md" />
-        <Dialog.Content className="fixed inset-0 z-[90] grid grid-rows-[auto_minmax(0,1fr)] bg-zinc-950/35 text-zinc-50 outline-none">
+        <Dialog.Content className="fixed inset-0 z-[90] grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-zinc-950/35 text-zinc-50 outline-none">
           <div className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 bg-black/30 px-4 py-3 backdrop-blur sm:px-6">
             <div className="min-w-0">
               <Dialog.Title className="truncate text-sm font-medium text-zinc-100">
@@ -103,13 +103,14 @@ export function ImageLightbox({
               </Dialog.Close>
             </div>
           </div>
-          <div className="grid min-h-0 place-items-center px-3 py-4 sm:px-8 sm:py-8">
+          <div className="grid h-full min-h-0 place-items-center overflow-hidden px-3 py-4 sm:px-8 sm:py-6">
             {imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={imageUrl}
                 alt={video?.title ?? ""}
-                className="max-h-full max-w-full object-contain shadow-2xl shadow-black/60"
+                className="block h-auto w-auto max-w-full object-contain shadow-2xl shadow-black/60"
+                style={{ maxHeight: "calc(100dvh - 8rem)" }}
               />
             ) : (
               <div className="text-sm text-zinc-500">Loading image...</div>
