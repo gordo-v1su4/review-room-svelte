@@ -10,7 +10,7 @@ const LABELS: Record<VideoStatus, string> = {
 };
 
 const STYLES: Record<VideoStatus, string> = {
-  awaiting_review: "bg-zinc-800 text-zinc-300",
+  awaiting_review: "border border-teal-400/15 bg-teal-950/30 text-teal-300/70",
   needs_changes: "bg-amber-950/80 text-amber-300",
   approved: "bg-emerald-950/80 text-emerald-300",
   final: "bg-sky-950/80 text-sky-300",

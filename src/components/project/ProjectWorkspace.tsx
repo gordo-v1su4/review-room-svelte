@@ -36,6 +36,7 @@ import { VideoGrid } from "@/components/video/VideoGrid";
 import { VideoListView } from "@/components/video/VideoListView";
 import { VideoReviewMode } from "@/components/video/VideoReviewMode";
 import { VideoDetailsPanel } from "@/components/video/VideoDetailsPanel";
+import { ImageLightbox } from "@/components/video/ImageLightbox";
 import { ProjectViewSwitcher } from "./ProjectViewSwitcher";
 import { ProjectFilters } from "./ProjectFilters";
 import { VideoGroupedView } from "./VideoGroupedView";
@@ -123,6 +124,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [showCardInfo, setShowCardInfo] = useState(true);
   const [appearanceReady, setAppearanceReady] = useState(false);
   const [selectedId, setSelectedId] = useState<Id<"videos"> | null>(null);
+  const [previewImageId, setPreviewImageId] = useState<Id<"videos"> | null>(null);
   const [resettingStatus, setResettingStatus] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
@@ -170,6 +172,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     image: viewScopedVideos.filter((asset) => mediaKind(asset) === "image").length,
   };
   const selected = videos.find((v) => v._id === selectedId) ?? null;
+  const previewImage = videos.find((v) => v._id === previewImageId) ?? null;
   const counts = {
     awaiting: videos.filter((v) => v.status === "awaiting_review" && !v.viewed).length,
     feedback: videos.filter((v) => v.commentCount > 0).length,
@@ -473,6 +476,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                       setSelectedId(id);
                       setPanelExpanded(false);
                     }}
+                    onOpenImagePreview={(video) => setPreviewImageId(video._id)}
                     empty={
                       <div className="text-center">
                         <p>
@@ -512,6 +516,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                         : undefined
                     }
                     onSelect={setSelectedId}
+                    onOpenImagePreview={(video) => setPreviewImageId(video._id)}
                   />
                 ) : layout === "list" ? (
                   <VideoListView
@@ -571,6 +576,11 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
             </div>
           </div>
         </div>
+        <ImageLightbox
+          video={previewImage}
+          mode="admin"
+          onClose={() => setPreviewImageId(null)}
+        />
       </div>
     </AdminGate>
   );

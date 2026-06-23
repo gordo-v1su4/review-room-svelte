@@ -25,6 +25,7 @@ export function VideoGroupedView({
   onOpenFolder,
   onDropVideo,
   onSelect,
+  onOpenImagePreview,
 }: {
   folders?: FolderDoc[];
   folderVideos?: VideoDoc[];
@@ -42,6 +43,7 @@ export function VideoGroupedView({
     folderId: Id<"projectFolders"> | undefined,
   ) => void;
   onSelect: (id: VideoDoc["_id"]) => void;
+  onOpenImagePreview?: (video: VideoDoc) => void;
 }) {
   const sections = SMART_VIEWS.filter((v) => v.id !== "all");
   const accent = projectAccent(brandColor);
@@ -92,6 +94,11 @@ export function VideoGroupedView({
                     onDragStart={onDragStart}
                     selected={selectedId === video._id}
                     onSelect={() => onSelect(video._id)}
+                    onOpenImagePreview={
+                      onOpenImagePreview
+                        ? () => onOpenImagePreview(video)
+                        : undefined
+                    }
                   />
                 </div>
               ))}

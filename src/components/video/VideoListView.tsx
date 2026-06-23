@@ -291,8 +291,7 @@ function VideoListThumbnail({ video }: { video: VideoDoc }) {
           style={{ left: `${hoverPct * 100}%` }}
         />
       )}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-black/80 to-transparent" />
-      <span className="absolute bottom-1 right-1 text-[10px] tabular-nums text-zinc-200">
+      <span className="absolute bottom-1 right-1 text-[10px] tabular-nums text-zinc-500">
         {isImage ? mediaKindLabel(video) : formatDuration(video.durationSec)}
       </span>
     </div>

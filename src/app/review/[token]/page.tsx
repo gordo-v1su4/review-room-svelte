@@ -7,6 +7,7 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { VideoGrid } from "@/components/video/VideoGrid";
 import { VideoDetailsPanel } from "@/components/video/VideoDetailsPanel";
+import { ImageLightbox } from "@/components/video/ImageLightbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type {
@@ -75,6 +76,7 @@ export default function ReviewPage({
   const [nameSubmitted, setNameSubmitted] = useState(false);
   const [initialSelectionDone, setInitialSelectionDone] = useState(false);
   const [selectedId, setSelectedId] = useState<Id<"videos"> | null>(null);
+  const [previewImageId, setPreviewImageId] = useState<Id<"videos"> | null>(null);
   const [showShortlist, setShowShortlist] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [loopPreview, setLoopPreview] = useState(false);
@@ -92,6 +94,10 @@ export default function ReviewPage({
   const selected = useMemo(
     () => videos.find((v) => v._id === selectedId) ?? null,
     [videos, selectedId],
+  );
+  const previewImage = useMemo(
+    () => videos.find((v) => v._id === previewImageId) ?? null,
+    [previewImageId, videos],
   );
   const shortlisted = useMemo(
     () => videos.filter((video) => video.isSelect),
@@ -303,6 +309,7 @@ export default function ReviewPage({
             actionMode="client"
             token={token}
             onSelect={setSelectedId}
+            onOpenImagePreview={(video) => setPreviewImageId(video._id)}
             empty={
               <p className="text-zinc-500">
                 {showShortlist
@@ -325,6 +332,12 @@ export default function ReviewPage({
           />
         )}
       </div>
+      <ImageLightbox
+        video={previewImage}
+        mode="client"
+        token={token}
+        onClose={() => setPreviewImageId(null)}
+      />
     </div>
   );
 }
