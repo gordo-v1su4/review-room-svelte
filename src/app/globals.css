@@ -46,6 +46,16 @@ body {
   border-color: var(--border);
 }
 
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: rgb(153 246 228 / 0.82);
+  caret-color: rgb(45 212 191);
+  box-shadow: 0 0 0 1000px #18181b inset;
+  transition: background-color 9999s ease-out;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
