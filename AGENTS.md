@@ -1,6 +1,6 @@
 # review-room — Agent Guide
 
-Planning repo for a client-facing video review portal (working title: **Review Room**). Application code has not started yet; treat the docs below as the current source of truth.
+Client-facing media review portal (working title: **Review Room**). Application code now lives in this repo; treat the docs below as product guidance and update the doc that owns a decision when behavior changes.
 
 ## Shared setup
 
@@ -24,8 +24,8 @@ Do not duplicate facts across docs; update the doc that owns the topic.
 
 - **Not a video editor** — no timeline, compositing, color tools, or transcoding pipeline in MVP.
 - **Feel** — calm, editorial, cinematic, dark. Video is the hero; UI stays restrained.
-- **Roles** — admin/creator vs client/reviewer (see PRD §1).
-- **MVP focus** — upload, review playback, ratings, shortlist, comments, smart views, share links.
+- **Roles** — admin/creator vs client/reviewer (see PRD §1 and §9). Clients may review/comment in the signed-in dashboard when shared, but production controls remain admin-only.
+- **MVP focus** — upload, review playback, ratings, shortlist, comments, smart views, table view, feedback Inbox, share links.
 
 ## Commands
 
@@ -52,6 +52,9 @@ Homelab env: copy from pindeck with `scripts/use-homelab-env.ps1`, then add `S3_
 
 - Metadata in Convex only; blobs in RustFS (keys on `videos`)
 - Smart views = queries over `status` + facets (see PRD §4–5)
+- Asset class drives media behavior: only `VID` / `video/*` assets get video playback controls; `IMG`, `CTX`, and `STB` render as still-image review assets.
+- Project folders are one-level real folders; date folders stay flat. Videos/Images/Contact Sheets/Storyboards are smart metadata collections, not nested folders.
+- Folder create/rename/move/cover upload, uploads, archive, and destructive production controls are admin-only in UI and Convex mutations.
 - Brand color on banner/CTA only; status pills use semantic tokens
 - Self-hosted Convex/RustFS per `docs/adr/001-infrastructure.md` (pindeck reference)
 

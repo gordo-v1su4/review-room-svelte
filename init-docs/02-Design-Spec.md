@@ -26,7 +26,7 @@ A calmer, stripped subset of the workspace. Header with banner, title, a one-lin
 
 ## 2. Admin vs client
 
-Same components, different surface. **Admin** adds: upload, edit status/tags/title, share link, download settings, delete/archive, advanced filters, internal metadata. **Client** sees only: watch, rate, shortlist, comment, Approve / Request Changes, download-if-allowed. Client UI is quieter and uses human labels, never internal status strings.
+Same components, different surface. **Admin** adds: upload, edit status/tags/title, share link, download settings, folder create/rename/move/cover controls, delete/archive, advanced filters, internal metadata. **Client** sees only: watch, rate, shortlist, comment, Approve / Request Changes, table/grid/review views, download-if-allowed. Client UI is quieter and uses human labels, never internal status strings.
 
 ## 3. Views — trimmed for MVP
 
@@ -35,7 +35,7 @@ Don't design four heavyweight layouts. The card and the right-side panel carry t
 - **Grid (default, MVP)** — responsive cards, small/medium/large sizing, hover scrub affordance, clear selected state, good empty/loading states. Most-used view.
 - **Review / focus (MVP)** — large player with prev/next, metadata, comments, actions; implemented as the *expanded state of the right-side panel*, not a separate screen. Optional filmstrip of nearby videos.
 - **Grouped (optional, low cost)** — the smart views rendered as stacked sections (each a wrapping row of the *same* cards). Communicates "generated from metadata," not a board. Avoid column-and-drag as the primary metaphor; drag is the optional override from PRD §4.
-- **Table (MVP / operational)** — compact ShotGrid/FTrack-style production view powered by TanStack Table. Shows thumbnail/latest visual, asset code/name, asset class, status, review attention state, rating, note count, latest note, note date, updated date, and duration. It should sort like a lightweight Airtable while still reading as a cinematic media review surface, not a raw spreadsheet.
+- **Table (MVP / operational)** — compact ShotGrid/FTrack-style production view powered by TanStack Table. Shows thumbnail/latest visual, asset code/name, asset class, status, review attention state, rating, note count, latest actionable note, note date, updated date, and duration. At project root, Table is the all-project action board; folder and smart-folder selections narrow it. It should sort like a lightweight Airtable while still reading as a cinematic media review surface, not a raw spreadsheet.
 
 ## 4. Smart-view tabs
 
@@ -76,7 +76,7 @@ A heart/favorite may exist as an internal admin marker, but client-facing langua
 
 ## 8. Comments
 
-Simple and fast: a box, an "Add comment" button, and an optional "use current time" toggle for video that pins the comment to the playhead and seeks back on click. Still images hide the time toggle. List below with author initials, name, production/reviewer color, and time when applicable. Comment count appears on the card; an asset with comments visually reads as "feedback received." New comments also mark the asset as needing attention until an admin reviews it. Admins can react with a tiny fixed emoji set (thumbs up, thumbs down, fire, heart) instead of replying when acknowledgement is enough. No threading in MVP.
+Simple and fast: a box, an "Add comment" button, and an optional "use current time" toggle for video that pins the comment to the playhead and seeks back on click. Still images hide the time toggle. List below with author initials, name, production/reviewer color, and time when applicable. Comment count appears on the card; an asset with comments visually reads as "feedback received." New comments also mark the asset as needing attention until an admin reviews it. Admins can react with a tiny fixed emoji set (thumbs up, thumbs down, fire, heart) or mark comments handled instead of replying when acknowledgement is enough. In table view, favor open notes from the other side and collapse extra history behind "N more notes" rather than turning the row into a full transcript. No threading in MVP.
 
 ## 9. Upload
 
@@ -92,7 +92,7 @@ Available but visually light — file-type toggles in the main toolbar, a filter
 
 ## 11a. Folders
 
-Folders are lightweight one-level project organization, not a replacement for smart views. Uploads default into a flat `YYYYMMDD` date folder. Do not create nested Videos/Images/Contact Sheets folders inside a date folder; use `VID`, `IMG`, `CTX`, and `STB` asset-class filters instead. The sidebar can show master collections such as Videos, Images, Contact Sheets, and Storyboards as automatic metadata views. These smart folders must look distinct from real folders, auto-count their contents, and not accept drag/drop, rename, delete, or manual placement. Later client bundles/playlists can use the same pattern for saved groupings without moving files. The project root shows folder tiles above loose assets; opening a folder scopes the grid and smart-view counts to that folder. Admins can create and rename root-level date/manual folders and drag media cards onto folder tiles or the existing app sidebar folder entries to move assets. The sidebar root entry accepts drops to move assets back out of a folder. Client review links can remain grid-first unless folder navigation is explicitly enabled later.
+Folders are lightweight one-level project organization, not a replacement for smart views. Uploads default into a flat `YYYYMMDD` date folder. Do not create nested Videos/Images/Contact Sheets folders inside a date folder; use `VID`, `IMG`, `CTX`, and `STB` asset-class filters instead. The sidebar can show master collections such as Videos, Images, Contact Sheets, and Storyboards as automatic metadata views. These smart folders must look distinct from real folders, auto-count their contents, and not accept drag/drop, rename, delete, or manual placement. Later client bundles/playlists can use the same pattern for saved groupings without moving files. The project root shows folder tiles above loose assets; opening a folder scopes the grid and smart-view counts to that folder. Admins can create and rename root-level date/manual folders, upload/reset a folder cover image from the folder edit control, and drag media cards onto folder tiles or the existing app sidebar folder entries to move assets. Folder covers fall back to the newest image asset inside the folder when no custom cover is set. The sidebar root entry accepts drops to move assets back out of a folder. Clients see folder names/covers but do not get folder edit or drag/drop management controls. Client review links can remain grid-first unless folder navigation is explicitly enabled later.
 
 ## 12. Visual direction & token system
 

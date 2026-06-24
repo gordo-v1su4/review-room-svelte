@@ -39,7 +39,7 @@ isProject: false
 
 **Source of truth:** [init-docs/00-Creative-Brief.md](init-docs/00-Creative-Brief.md), [init-docs/01-PRD.md](init-docs/01-PRD.md), [init-docs/02-Design-Spec.md](init-docs/02-Design-Spec.md)
 
-**Current state:** Planning repo only — no application code. Stack per PRD §3, with **your homelab infra overriding cloud defaults** (see Infrastructure section below).
+**Current state:** Application code is active in this repo. MVP stages are implemented on the Review Room app stack per PRD §3, with **your homelab infra overriding cloud defaults** (see Infrastructure section below). Use this plan as delivery/history guidance and keep PRD/Design Spec as the product source of truth.
 
 **Story points:** Fibonacci (1, 2, 3, 5, 8, 13). Relative complexity for one experienced dev/agent session, not calendar days. **MVP total: ~171 SP** across 10 stages (~6–9 two-week sprints at 20–30 SP/sprint if executed sequentially).
 
@@ -84,7 +84,9 @@ The init-docs mention Vercel + `*.convex.cloud` and “local RustFS” as a dev 
 | Core loop     | Upload → grid cards → right panel playback → rate/shortlist/comment → Approve/Request Changes | freecut WebCodecs engine, List view, version stacks, exports, expiring links, branding themes |
 | Organizing    | Metadata-driven smart-view tabs; optional drag sets mapped fields only                        | Saved custom views, activity log                                                              |
 | Playback      | HTML5 + signed URL + ffmpeg sprite scrub (Phase A)                                            | Phase B freecut port behind same player interface                                             |
-| Client access | Share link + optional passcode; display name on first action                                  | Email notifications, teams/orgs                                                               |
+| Client access | Share link or shared signed-in workspace; display name on first action                        | Email notifications, richer teams/orgs                                                        |
+| Feedback      | Comments, author initials, small reactions, Mark handled, in-app Inbox, Table action board    | Scheduled daily digest worker, email delivery, AI/manual note summaries                       |
+| Organization  | Flat date folders, smart type folders, immutable asset codes, admin folder covers             | Custom bundles/playlists, version stacks                                                      |
 
 
 **North star (non-negotiable):** Dark, editorial, cinematic; video is hero; not spreadsheet/Kanban/task-manager. **Modeling rule:** `status` is workflow only; facets (`viewed`, `rating`, `isSelect`, `commentCount`) drive smart views — never collapse into status.
@@ -432,6 +434,8 @@ From PRD §2 Phase 2 and Design Spec deferred items (~80+ SP if estimated later)
 - Approval history
 - Feedback export (CSV/JSON/PDF)
 - Scheduled daily feedback digest worker/cron: optionally persist/send one daily summary per project, feed admin/client inbox notifications, and later plug in email or AI note summaries without duplicating source comments.
+- Table note prioritization: show open notes from the other side first, collapse extra comments behind "N more notes," and clear attention only through Mark handled / all-comments-handled state.
+- Client notification rules: no email notice for a user's own comment; future email digests should exclude self-notifications and summarize per project/day.
 - Expiring links (schema field exists; UI/rules deferred)
 - Per-project branding themes beyond `brandColor`
 - Activity log

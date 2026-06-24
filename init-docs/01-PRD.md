@@ -11,8 +11,8 @@
 type UserRole = "admin" | "client";
 ```
 
-- **Admin / creator** — creates projects, chooses project visibility, uploads videos and still images, edits titles/status/tags, sets the banner, toggles downloads, shares review links, reads feedback.
-- **Client / reviewer** — opens a share link (optional passcode, no account required), watches/scrubs video or inspects images, rates, shortlists, comments, and approves or requests changes. Downloads only if enabled.
+- **Admin / creator** — creates projects, chooses project visibility, uploads videos and still images, edits titles/status/tags, sets the banner, toggles downloads, manages folders/folder covers, shares review links, reads and handles feedback.
+- **Client / reviewer** — opens a share link or a shared signed-in workspace, watches/scrubs video or inspects images, rates, shortlists, comments, and approves or requests changes. Downloads only if enabled. Clients do not get production controls such as upload, folder rename/move/cover edit, archive, clear media, or destructive actions.
 
 ## 2. Scope
 
@@ -55,10 +55,13 @@ The single most important modeling rule: **`status` is one workflow field; every
 ### Workflow status (exactly one at a time)
 ```ts
 type VideoStatus =
+  | "not_started"       // production has not begun / placeholder state
+  | "in_progress"       // production work in progress, not ready for client decision
   | "awaiting_review"   // default on upload
   | "needs_changes"     // reviewer decision: changes requested
   | "approved"          // reviewer decision: approved
   | "final"             // admin lock / download-ready
+  | "omitted"           // intentionally omitted / mark for delete equivalent
   | "archived";         // hidden from default views
 ```
 
@@ -70,11 +73,14 @@ type VideoStatus =
 - `isSelect: boolean` — shortlist.
 - `assetClass: "VID" | "IMG" | "CTX" | "STB"` — video, image, contact/context sheet, storyboard.
 - `assetNumber: number` / `assetCode: string` — immutable project-wide upload identifier, e.g. `VID_20260623_00001`. Numbers are never reused, even after delete/archive.
+- Media behavior follows `assetClass` plus `mimeType`: `VID` / `video/*` assets use video playback and scrub controls; `IMG`, `CTX`, and `STB` use still-image rendering even when they share the same card/table/panel components.
 
 ### Smart views = a query over status + facets
 | View (tab) | Rule | Droppable? |
 |---|---|---|
 | All | — | — |
+| Not Started | `status = not_started` | ✓ (sets `status`) |
+| In Progress | `status = in_progress` | ✓ (sets `status`) |
 | Awaiting Review | `status = awaiting_review` AND `viewed = false` | — |
 | In Review | `status = awaiting_review` AND `viewed = true` | — |
 | Needs Attention | `feedbackNeedsAttention = true` | — |
@@ -84,6 +90,7 @@ type VideoStatus =
 | Needs Changes | `status = needs_changes` | ✓ (sets `status`) |
 | Approved | `status = approved` | ✓ (sets `status`) |
 | Final | `status = final` | ✓ (sets `status`) |
+| Omit | `status = omitted` | ✓ (sets `status`) |
 
 ### Convex schema (sketch)
 ```ts
@@ -91,8 +98,10 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 const status = v.union(
+  v.literal("not_started"), v.literal("in_progress"),
   v.literal("awaiting_review"), v.literal("needs_changes"),
-  v.literal("approved"), v.literal("final"), v.literal("archived"),
+  v.literal("approved"), v.literal("final"),
+  v.literal("omitted"), v.literal("archived"),
 );
 
 export default defineSchema({
@@ -113,6 +122,7 @@ export default defineSchema({
   projectFolders: defineTable({
     projectId: v.id("projects"),
     title: v.string(),
+    coverImageKey: v.optional(v.string()),     // admin-chosen folder tile cover
     order: v.number(),
     createdBy: v.id("users"),
     createdAt: v.number(), updatedAt: v.number(),
@@ -212,6 +222,7 @@ Keep status changes tied to *decisions*; let facets carry everything else. On re
 - **First play / open** → `viewed = true`. No status change.
 - **Comment added** → insert comment, `commentCount++`, set `feedbackNeedsAttention = true`. No forced workflow status change; comments surface in "Needs Attention", "Has Feedback", and the in-app Inbox.
 - **Comment completed** → admin can mark individual comments complete, Frame.io-style. When all comments on an asset are complete, set `feedbackNeedsAttention = false`; reactions remain a small fixed emoji set for quick acknowledgement.
+- **Table note display** → the table is an action board, not a raw chat log. Prefer open notes from the other side; collapse extra history behind an "N more notes" affordance when expanded behavior is added.
 - **Rating set** → store `rating` (surfaces in "Highly Rated" at ≥4).
 - **Shortlist toggled** → `isSelect = !isSelect`.
 - **Approve** → `status = approved`, `approvedAt = now`.
@@ -220,7 +231,7 @@ Keep status changes tied to *decisions*; let facets carry everything else. On re
 
 Defaults on upload: `status: "awaiting_review"`, `viewed: false`, `rating: 0`, `isSelect: false`, `commentCount: 0`, `feedbackNeedsAttention: false`, `downloadEnabled: project.downloadEnabledByDefault`.
 
-Upload naming: every upload first reserves the next project-wide number and writes an immutable `assetCode` using `CLASS_YYYYMMDD_00001`. Date folders stay flat: all assets for a day live directly in the `YYYYMMDD` folder, while `VID` / `IMG` / `CTX` / `STB` drive master collections like Videos, Images, Contact Sheets, and Storyboards.
+Upload naming: every admin upload first reserves the next project-wide number and writes an immutable `assetCode` using `CLASS_YYYYMMDD_00001`. Date folders stay flat: all assets for a day live directly in the `YYYYMMDD` folder, while `VID` / `IMG` / `CTX` / `STB` drive master collections like Videos, Images, Contact Sheets, and Storyboards.
 
 Collections / bundles: folders are not the only way to gather assets. Type collections are automatic from `assetClass`; later custom bundles/playlists can be saved metadata views based on tags, selected assets, reviewer, client cut, or delivery purpose. An asset can appear in many collections without moving out of its original date folder.
 
@@ -271,7 +282,7 @@ Optional but highly desirable: adapt FreeCut's Analyze flow for review search an
 
 Dashboard access is account-gated first: only users allowed to sign in can reach projects. Project visibility then controls which signed-in users can open a dashboard project:
 - **Private** — default. Only the owner can open, edit, upload, share, archive, or delete.
-- **Shared** — owner plus explicit project members or access rules can open it. Rules can target an exact email (`person@example.com`) or a domain (`*@studio.com`). Shared viewers can review, rate, shortlist, and comment; editors can also upload and edit media metadata.
+- **Shared** — owner plus explicit project members or access rules can open it. Rules can target an exact email (`person@example.com`) or a domain (`*@studio.com`). Shared signed-in clients can review, rate, shortlist, and comment in the dashboard-style workspace. Upload, folder management, archive, clear media, and destructive production controls remain admin-role only even if a project is broadly shared.
 - **Workspace** — every signed-in app user can open and review the project. Owners still control access settings, review links, archive, and destructive actions; non-owner viewers do not get upload/edit/delete controls.
 
 Clients without dashboard accounts still reach a project through `reviewLinks.token` (optionally passcode-gated, optionally expiring). Capture the reviewer's display name when they first act. Review links are separate from workspace visibility and remain owner-managed.
