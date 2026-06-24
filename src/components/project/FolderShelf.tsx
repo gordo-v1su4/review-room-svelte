@@ -1,6 +1,6 @@
 "use client";
 
-import { Folder, MoreHorizontal } from "lucide-react";
+import { Folder, Pencil } from "lucide-react";
 import { useState, type DragEvent } from "react";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import type { VideoDoc } from "@/lib/smartViews";
@@ -18,6 +18,7 @@ export function FolderShelf({
   canEdit,
   onOpen,
   onDropVideo,
+  onRenameFolder,
 }: {
   folders: FolderDoc[];
   videos: VideoDoc[];
@@ -29,6 +30,7 @@ export function FolderShelf({
     videoId: Id<"videos">,
     folderId: Id<"projectFolders"> | undefined,
   ) => void;
+  onRenameFolder?: (folderId: Id<"projectFolders">, title: string) => void;
 }) {
   const activeFolder = activeFolderId
     ? folders.find((folder) => folder._id === activeFolderId)
@@ -52,6 +54,7 @@ export function FolderShelf({
           canEdit={canEdit}
           onOpen={() => onOpen(folder._id)}
           onDrop={(videoId) => onDropVideo(videoId, folder._id)}
+          onRename={onRenameFolder}
         />
       ))}
     </div>
@@ -66,6 +69,7 @@ export function FolderTile({
   canEdit,
   onOpen,
   onDrop,
+  onRename,
 }: {
   folder: FolderDoc;
   active: boolean;
@@ -74,13 +78,18 @@ export function FolderTile({
   canEdit: boolean;
   onOpen: () => void;
   onDrop: (videoId: Id<"videos">) => void;
+  onRename?: (folderId: Id<"projectFolders">, title: string) => void;
 }) {
   const [dragActive, setDragActive] = useState(false);
 
+  function requestRename() {
+    const nextTitle = window.prompt("Rename folder", folder.title)?.trim();
+    if (!nextTitle || nextTitle === folder.title) return;
+    onRename?.(folder._id, nextTitle);
+  }
+
   return (
-    <button
-      type="button"
-      onClick={onOpen}
+    <div
       onDragEnter={(event) => {
         if (!canEdit) return;
         event.preventDefault();
@@ -113,20 +122,35 @@ export function FolderTile({
             : "border-zinc-800/80 hover:border-zinc-600",
       )}
     >
-      <span className="relative block aspect-square w-full overflow-hidden bg-zinc-950">
-        <span className="absolute inset-2 rounded-md border border-zinc-800 bg-zinc-900/80 shadow-inner transition group-hover:border-zinc-700 group-hover:bg-zinc-900" />
-        <Folder className="absolute left-1/2 top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 text-zinc-400 transition group-hover:text-zinc-200" />
-      </span>
-      <span className="block min-w-0 space-y-1.5 p-3">
-        <span className="block truncate text-[12px] font-medium leading-4 text-zinc-300 transition group-hover:text-zinc-100">
-          {folder.title}
+      {canEdit && onRename && (
+        <button
+          type="button"
+          title="Rename folder"
+          className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-md border border-zinc-800 bg-zinc-950/90 text-zinc-500 opacity-0 shadow-sm transition hover:border-zinc-700 hover:text-zinc-100 group-hover:opacity-100"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            requestRename();
+          }}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      )}
+      <button type="button" onClick={onOpen} className="block w-full text-left">
+        <span className="relative block aspect-square w-full overflow-hidden bg-zinc-950">
+          <span className="absolute inset-2 rounded-md border border-zinc-800 bg-zinc-900/80 shadow-inner transition group-hover:border-zinc-700 group-hover:bg-zinc-900" />
+          <Folder className="absolute left-1/2 top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 text-zinc-400 transition group-hover:text-zinc-200" />
         </span>
-        <span className="flex items-center justify-between gap-2 text-[11px] text-zinc-600">
-          <span>{folderItemLabel(counts.total)}</span>
-          <MoreHorizontal className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+        <span className="block min-w-0 space-y-1.5 p-3">
+          <span className="block truncate text-[12px] font-medium leading-4 text-zinc-300 transition group-hover:text-zinc-100">
+            {folder.title}
+          </span>
+          <span className="flex items-center justify-between gap-2 text-[11px] text-zinc-600">
+            <span>{folderItemLabel(counts.total)}</span>
+          </span>
         </span>
-      </span>
-    </button>
+      </button>
+    </div>
   );
 }
 

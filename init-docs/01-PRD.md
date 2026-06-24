@@ -18,7 +18,7 @@ type UserRole = "admin" | "client";
 
 **MVP**
 - Project create / list / workspace.
-- Project folders for organizing assets inside a project.
+- Project date folders for ingest organization, plus metadata-driven collections for type and review groupings.
 - Direct-to-storage upload (presigned), drag/drop batch import for video and image files, bounded parallel uploads, per-file progress, auto thumbnail + video scrub sprite.
 - Video grid with the card system; hover scrub on every ready card; right-side viewer/details panel.
 - Status + tags + 0–5 rating + shortlist (select) + comments (with optional timecode).
@@ -31,7 +31,7 @@ type UserRole = "admin" | "client";
 **Not in MVP**
 - Threaded comments, drawing annotations, frame-accurate comment sync.
 - Transcoding, proxy generation, batch download.
-- Teams/orgs, enterprise permissions, email notifications.
+- Teams/orgs, enterprise permissions, outbound email notifications. The app can still provide an in-app feedback Inbox/digest.
 - The full freecut editor/timeline/export surface.
 - Browser-local AI scene captions/search unless explicitly pulled forward from §8 Phase C.
 
@@ -40,7 +40,7 @@ type UserRole = "admin" | "client";
 
 ## 3. Stack
 
-Next.js (App Router) · React · TypeScript · Tailwind · shadcn/ui · TanStack Query if needed for client orchestration · **Convex** for all metadata/state/reactivity · S3-compatible storage (**RustFS** on homelab, abstracted for later swap). TanStack Table only inside the deferred List view, never as the primary UI. **Default infra:** self-hosted Convex + homelab RustFS (see [docs/adr/001-infrastructure.md](../docs/adr/001-infrastructure.md); [pindeck](https://github.com/gordo-v1su4/pindeck) is the reference wiring). Deploy: Vercel frontend pointing at homelab backends; any background image/ffmpeg work runs as a separate always-on worker, not on Vercel. Do not use `*.convex.cloud` or throwaway S3 buckets unless explicitly opted in.
+Next.js (App Router) · React · TypeScript · Tailwind · shadcn/ui · TanStack Query if needed for client orchestration · **TanStack Table** for the operational review table · **Convex** for all metadata/state/reactivity · S3-compatible storage (**RustFS** on homelab, abstracted for later swap). The grid remains the primary media surface; TanStack Table powers the ShotGrid/FTrack-style table for sorting assets, feedback, dates, and review state. **Default infra:** self-hosted Convex + homelab RustFS (see [docs/adr/001-infrastructure.md](../docs/adr/001-infrastructure.md); [pindeck](https://github.com/gordo-v1su4/pindeck) is the reference wiring). Deploy: Vercel frontend pointing at homelab backends; any background image/ffmpeg work runs as a separate always-on worker, not on Vercel. Do not use `*.convex.cloud` or throwaway S3 buckets unless explicitly opted in.
 
 ## 4. Organizing model — metadata-driven, drag optional
 
@@ -65,8 +65,11 @@ type VideoStatus =
 ### Facets (independent; drive smart views + filters)
 - `viewed: boolean` — set true on first play/open.
 - `commentCount: number` — `> 0` ⇒ "Has Feedback".
+- `feedbackNeedsAttention: boolean` — `true` ⇒ "Needs Attention" and Inbox follow-up.
 - `rating: 0–5` — `≥ 4` ⇒ "Highly Rated".
 - `isSelect: boolean` — shortlist.
+- `assetClass: "VID" | "IMG" | "CTX" | "STB"` — video, image, contact/context sheet, storyboard.
+- `assetNumber: number` / `assetCode: string` — immutable project-wide upload identifier, e.g. `VID_20260623_00001`. Numbers are never reused, even after delete/archive.
 
 ### Smart views = a query over status + facets
 | View (tab) | Rule | Droppable? |
@@ -74,6 +77,7 @@ type VideoStatus =
 | All | — | — |
 | Awaiting Review | `status = awaiting_review` AND `viewed = false` | — |
 | In Review | `status = awaiting_review` AND `viewed = true` | — |
+| Needs Attention | `feedbackNeedsAttention = true` | — |
 | Has Feedback | `commentCount > 0` | — |
 | Selected | `isSelect = true` | ✓ (sets `isSelect`) |
 | Highly Rated | `rating ≥ 4` | — |
@@ -100,6 +104,7 @@ export default defineSchema({
     bannerKey: v.optional(v.string()),
     brandColor: v.optional(v.string()),        // BRAND ONLY — never the status palette
     downloadEnabledByDefault: v.boolean(),
+    nextAssetNumber: v.optional(v.number()),   // project-wide immutable sequence
     createdBy: v.id("users"),
     createdAt: v.number(), updatedAt: v.number(),
     archived: v.optional(v.boolean()),
@@ -116,6 +121,11 @@ export default defineSchema({
   videos: defineTable({
     projectId: v.id("projects"),
     folderId: v.optional(v.id("projectFolders")),
+    assetClass: v.optional(v.union(
+      v.literal("VID"), v.literal("IMG"), v.literal("CTX"), v.literal("STB"),
+    )),
+    assetNumber: v.optional(v.number()),
+    assetCode: v.optional(v.string()),
     title: v.string(),
     originalFilename: v.string(),
     storageKey: v.string(),                    // object key only — no blobs in Convex
@@ -136,6 +146,8 @@ export default defineSchema({
     rating: v.number(),                        // 0–5, 0 = unrated
     isSelect: v.boolean(),
     commentCount: v.number(),
+    feedbackNeedsAttention: v.optional(v.boolean()),
+    feedbackAcknowledgedAt: v.optional(v.number()),
     // misc
     tags: v.array(v.string()),
     downloadEnabled: v.boolean(),
@@ -158,6 +170,15 @@ export default defineSchema({
     timecodeSec: v.optional(v.number()),       // optional pinned playhead
     createdAt: v.number(),
   }).index("by_video", ["videoId"]).index("by_project", ["projectId"]),
+
+  commentReactions: defineTable({
+    commentId: v.id("comments"),
+    videoId: v.id("videos"),
+    projectId: v.id("projects"),
+    appUserId: v.id("users"),
+    emoji: v.union(v.literal("thumbs_up"), v.literal("thumbs_down"), v.literal("fire"), v.literal("heart")),
+    createdAt: v.number(),
+  }).index("by_comment", ["commentId"]).index("by_project", ["projectId"]),
 
   videoScenes: defineTable({                   // Phase C: browser-local Analyze output
     videoId: v.id("videos"),
@@ -189,14 +210,19 @@ Function surface is the obvious CRUD over these tables (`projects.*`, `videos.*`
 Keep status changes tied to *decisions*; let facets carry everything else. On reviewer action:
 
 - **First play / open** → `viewed = true`. No status change.
-- **Comment added** → insert comment, `commentCount++`. No forced status change (surfaces in "Has Feedback").
+- **Comment added** → insert comment, `commentCount++`, set `feedbackNeedsAttention = true`. No forced workflow status change; comments surface in "Needs Attention", "Has Feedback", and the in-app Inbox.
+- **Comment completed** → admin can mark individual comments complete, Frame.io-style. When all comments on an asset are complete, set `feedbackNeedsAttention = false`; reactions remain a small fixed emoji set for quick acknowledgement.
 - **Rating set** → store `rating` (surfaces in "Highly Rated" at ≥4).
 - **Shortlist toggled** → `isSelect = !isSelect`.
 - **Approve** → `status = approved`, `approvedAt = now`.
 - **Request Changes** → `status = needs_changes`.
 - **Admin override** → may set any `status`, or drag a card into a droppable section (§4) to set the mapped field.
 
-Defaults on upload: `status: "awaiting_review"`, `viewed: false`, `rating: 0`, `isSelect: false`, `commentCount: 0`, `downloadEnabled: project.downloadEnabledByDefault`.
+Defaults on upload: `status: "awaiting_review"`, `viewed: false`, `rating: 0`, `isSelect: false`, `commentCount: 0`, `feedbackNeedsAttention: false`, `downloadEnabled: project.downloadEnabledByDefault`.
+
+Upload naming: every upload first reserves the next project-wide number and writes an immutable `assetCode` using `CLASS_YYYYMMDD_00001`. Date folders stay flat: all assets for a day live directly in the `YYYYMMDD` folder, while `VID` / `IMG` / `CTX` / `STB` drive master collections like Videos, Images, Contact Sheets, and Storyboards.
+
+Collections / bundles: folders are not the only way to gather assets. Type collections are automatic from `assetClass`; later custom bundles/playlists can be saved metadata views based on tags, selected assets, reviewer, client cut, or delivery purpose. An asset can appear in many collections without moving out of its original date folder.
 
 ## 7. Storage
 

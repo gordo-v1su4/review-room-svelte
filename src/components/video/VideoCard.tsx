@@ -13,7 +13,7 @@ import { MessageSquare, Download, Bookmark, Maximize2, Star, Trash2 } from "luci
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
 import type { CardAspectRatio, ThumbnailScale } from "@/lib/types";
-import { isImageAsset, mediaKindLabel } from "@/lib/media";
+import { assetClassLabel, isImageAsset, mediaKindLabel } from "@/lib/media";
 import { formatDuration } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { VideoStatusPill } from "./VideoStatusPill";
@@ -283,12 +283,24 @@ export function VideoCard({
         >
           <VideoStatusPill status={video.status} />
           <span className="text-[10px] text-zinc-500">
-            {isImage ? mediaKindLabel(video) : formatDuration(video.durationSec)}
+            {video.assetClass ? video.assetClass : isImage ? mediaKindLabel(video) : formatDuration(video.durationSec)}
           </span>
         </div>
       </div>
       {showCardInfo && (
         <div className={cn("space-y-1.5", size === "sm" ? "p-2.5" : "p-3")}>
+          {video.assetCode && (
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate rounded-full border border-zinc-800 bg-zinc-950 px-2 py-0.5 text-[10px] font-medium tracking-wide text-zinc-400">
+                {video.assetCode}
+              </span>
+              {video.feedbackNeedsAttention && (
+                <span className="rounded-full bg-sky-400/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">
+                  New notes
+                </span>
+              )}
+            </div>
+          )}
           <p
             title={video.title}
             className={cn(
@@ -306,7 +318,12 @@ export function VideoCard({
               </span>
             )}
             {video.commentCount > 0 && (
-              <span className="inline-flex items-center gap-1">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1",
+                  video.feedbackNeedsAttention && "text-sky-300",
+                )}
+              >
                 <MessageSquare className="h-3 w-3" />
                 {video.commentCount}
               </span>
@@ -315,6 +332,9 @@ export function VideoCard({
               <Bookmark className="h-3 w-3 fill-sky-400 text-sky-400" />
             )}
             {video.downloadEnabled && <Download className="h-3 w-3" />}
+            {video.assetClass && (
+              <span title={assetClassLabel(video.assetClass)}>{video.assetClass}</span>
+            )}
           </div>
         </div>
       )}

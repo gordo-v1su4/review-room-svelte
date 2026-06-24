@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { FilterState } from "@/lib/filters";
 import type {
+  AssetClass,
   CardAspectRatio,
   GridSize,
   MediaKind,
@@ -72,6 +73,13 @@ const MEDIA_TYPE_OPTIONS: Array<{
   { id: "image", label: "Images", icon: Image },
 ];
 
+const ASSET_CLASS_OPTIONS: Array<{ id: AssetClass; label: string }> = [
+  { id: "VID", label: "VID" },
+  { id: "IMG", label: "IMG" },
+  { id: "CTX", label: "CTX" },
+  { id: "STB", label: "STB" },
+];
+
 export function ProjectFilters({
   layout,
   gridSize,
@@ -80,6 +88,7 @@ export function ProjectFilters({
   showCardInfo,
   resultCount,
   mediaTypeCounts,
+  assetClassCounts,
   filters,
   sort,
   onLayout,
@@ -100,6 +109,7 @@ export function ProjectFilters({
   showCardInfo: boolean;
   resultCount: number;
   mediaTypeCounts: Record<"all" | "video" | "image", number>;
+  assetClassCounts: Record<"all" | AssetClass, number>;
   filters: FilterState;
   sort: SortKey;
   onLayout: (layout: WorkspaceLayout) => void;
@@ -116,6 +126,7 @@ export function ProjectFilters({
   const active =
     filters.search ||
     filters.mediaTypes.length > 0 ||
+    filters.assetClasses.length > 0 ||
     filters.statuses.length > 0 ||
     filters.tags.length > 0 ||
     filters.selectedOnly ||
@@ -128,7 +139,7 @@ export function ProjectFilters({
         {[
           { id: "grid", label: "Grid", icon: Grid3X3 },
           { id: "grouped", label: "Group", icon: Columns3 },
-          { id: "list", label: "List", icon: List },
+          { id: "table", label: "Table", icon: List },
           { id: "review", label: "Review", icon: SquarePlay },
         ].map((item) => {
           const Icon = item.icon;
@@ -178,6 +189,12 @@ export function ProjectFilters({
       <MediaTypeFilter
         filters={filters}
         counts={mediaTypeCounts}
+        onFilters={onFilters}
+      />
+
+      <AssetClassFilter
+        filters={filters}
+        counts={assetClassCounts}
         onFilters={onFilters}
       />
 
@@ -272,6 +289,58 @@ function MediaTypeFilter({
               )}
             >
               {counts[option.id === "all" ? "all" : option.id]}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AssetClassFilter({
+  filters,
+  counts,
+  onFilters,
+}: {
+  filters: FilterState;
+  counts: Record<"all" | AssetClass, number>;
+  onFilters: (filters: FilterState) => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
+      {ASSET_CLASS_OPTIONS.map((option) => {
+        const active = filters.assetClasses.includes(option.id);
+        return (
+          <button
+            key={option.id}
+            type="button"
+            aria-pressed={active}
+            title={option.label}
+            onClick={() =>
+              onFilters({
+                ...filters,
+                assetClasses: active
+                  ? filters.assetClasses.filter((item) => item !== option.id)
+                  : [...filters.assetClasses, option.id],
+              })
+            }
+            className={cn(
+              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium transition",
+              active
+                ? "bg-teal-400 text-zinc-950"
+                : "text-zinc-500 hover:text-zinc-200",
+            )}
+          >
+            {option.label}
+            <span
+              className={cn(
+                "rounded-full px-1.5 py-0.5 text-[10px] tabular-nums",
+                active
+                  ? "bg-zinc-950/15 text-zinc-950"
+                  : "bg-zinc-800 text-zinc-600",
+              )}
+            >
+              {counts[option.id]}
             </span>
           </button>
         );

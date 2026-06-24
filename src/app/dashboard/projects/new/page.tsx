@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../../../convex/_generated/api";
-import { AdminGate } from "@/components/auth/AdminGate";
+import { AdminGate, useAdminAccess } from "@/components/auth/AdminGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -45,6 +45,7 @@ function parseAccessRules(value: FormDataEntryValue | null) {
 export default function NewProjectPage() {
   const create = useMutation(api.projects.create);
   const router = useRouter();
+  const { isAdmin, isChecking } = useAdminAccess();
   const [loading, setLoading] = useState(false);
   const [visibility, setVisibility] = useState<ProjectVisibility>("private");
 
@@ -69,6 +70,14 @@ export default function NewProjectPage() {
 
   return (
     <AdminGate>
+      {!isChecking && !isAdmin ? (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6">
+          <p className="font-medium text-zinc-100">Admin access required</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            Project creation is limited to the production team.
+          </p>
+        </div>
+      ) : (
       <div className="pl-0 sm:pl-6 lg:pl-8">
         <h1 className="text-2xl font-semibold">New project</h1>
         <form onSubmit={onSubmit} className="mt-8 max-w-lg space-y-4">
@@ -119,6 +128,7 @@ export default function NewProjectPage() {
           </Button>
         </form>
       </div>
+      )}
     </AdminGate>
   );
 }

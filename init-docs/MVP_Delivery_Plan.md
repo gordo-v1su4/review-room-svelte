@@ -431,10 +431,12 @@ From PRD §2 Phase 2 and Design Spec deferred items (~80+ SP if estimated later)
 - Version stacks / comparison
 - Approval history
 - Feedback export (CSV/JSON/PDF)
+- Scheduled daily feedback digest worker/cron: optionally persist/send one daily summary per project, feed admin/client inbox notifications, and later plug in email or AI note summaries without duplicating source comments.
 - Expiring links (schema field exists; UI/rules deferred)
 - Per-project branding themes beyond `brandColor`
 - Activity log
-- `VideoList` / TanStack Table production list view
+- Password reset / forgot-password flow for Convex Auth sign-in
+- Advanced version stacks/history beyond the current TanStack Table production view
 - Light mode (optional, deferred)
 
 ---

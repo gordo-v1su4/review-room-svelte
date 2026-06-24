@@ -1,17 +1,21 @@
 import type { VideoDoc } from "./smartViews";
 import { mediaKind } from "./media";
-import type { MediaKind, SortKey } from "./types";
+import type { AssetClass, MediaKind, SortKey } from "./types";
 
 const STATUS_SORT_ORDER: Record<VideoDoc["status"], number> = {
-  awaiting_review: 0,
-  needs_changes: 1,
-  approved: 2,
-  final: 3,
-  archived: 4,
+  not_started: 0,
+  in_progress: 1,
+  awaiting_review: 2,
+  needs_changes: 3,
+  approved: 4,
+  final: 5,
+  omitted: 6,
+  archived: 7,
 };
 
 export type FilterState = {
   mediaTypes: MediaKind[];
+  assetClasses: AssetClass[];
   statuses: string[];
   tags: string[];
   minRating: number;
@@ -52,6 +56,12 @@ export function applyFilters(videos: VideoDoc[], filters: FilterState): VideoDoc
     if (
       filters.mediaTypes.length &&
       !filters.mediaTypes.includes(mediaKind(v))
+    ) {
+      return false;
+    }
+    if (
+      filters.assetClasses.length &&
+      !filters.assetClasses.includes(v.assetClass ?? (mediaKind(v) === "video" ? "VID" : "IMG"))
     ) {
       return false;
     }

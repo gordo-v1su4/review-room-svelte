@@ -16,10 +16,10 @@ export default function UploadPage({
 }) {
   const { projectId } = use(params);
   const typedProjectId = projectId as Id<"projects">;
-  const { isAdmin } = useAdminAccess();
+  const { appUser } = useAdminAccess();
   const project = useQuery(
     api.projects.getById,
-    isAdmin ? { projectId: typedProjectId } : "skip",
+    appUser ? { projectId: typedProjectId } : "skip",
   );
   const canUpload = project ? project.memberRole !== "viewer" : false;
 

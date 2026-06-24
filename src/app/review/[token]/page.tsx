@@ -224,8 +224,6 @@ export default function ReviewPage({
     );
   }
 
-  const reviewerName = savedName ?? name.trim();
-
   return (
     <div className="min-h-dvh bg-zinc-950 text-zinc-50">
       <header className="border-b border-zinc-800 px-6 py-8">
@@ -324,7 +322,6 @@ export default function ReviewPage({
             video={selected}
             mode="client"
             token={token}
-            reviewerName={reviewerName}
             autoPlay={previewMode}
             loop={previewMode && loopPreview && shortlisted.length === 1}
             onEnded={advancePreview}

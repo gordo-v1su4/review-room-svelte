@@ -46,3 +46,32 @@ export const create = mutation({
     return folderId;
   },
 });
+
+export const rename = mutation({
+  args: {
+    folderId: v.id("projectFolders"),
+    title: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const folder = await ctx.db.get(args.folderId);
+    if (!folder) throw new Error("Folder not found");
+    const { project } = await getProjectForEditor(ctx, folder.projectId);
+    const title = args.title.trim();
+    if (!title) throw new Error("Folder name is required");
+
+    const siblings = await ctx.db
+      .query("projectFolders")
+      .withIndex("by_project", (q) => q.eq("projectId", project._id))
+      .collect();
+    const duplicate = siblings.find(
+      (item) =>
+        item._id !== folder._id &&
+        item.title.trim().toLowerCase() === title.toLowerCase(),
+    );
+    if (duplicate) throw new Error("A folder with that name already exists");
+
+    const now = Date.now();
+    await ctx.db.patch(folder._id, { title, updatedAt: now });
+    await ctx.db.patch(project._id, { updatedAt: now });
+  },
+});

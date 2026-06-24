@@ -5,13 +5,24 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Github } from "lucide-react";
+import { Eye, EyeOff, Github } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 function authErrorMessage(err: unknown, flow: "signIn" | "signUp") {
   const message = err instanceof Error ? err.message : "";
+  if (message.includes("Account") && message.includes("already exists")) {
+    return "That account already exists. Switch to Sign in.";
+  }
+  if (message.includes("InvalidSecret")) {
+    return flow === "signIn"
+      ? "That password does not match this account."
+      : "Use a password with at least 8 characters.";
+  }
+  if (message.includes("Invalid password")) {
+    return "Use a password with at least 8 characters.";
+  }
   if (
     message.includes("InvalidAccountId") ||
     message.includes("Invalid credentials")
@@ -30,13 +41,14 @@ function accessDeniedMessage() {
 export function SignInForm() {
   const { signIn, signOut } = useAuthActions();
   const { isAuthenticated, isLoading } = useConvexAuth();
-  const ensureAdmin = useMutation(api.auth.ensureAdminProfile);
+  const ensureAppProfile = useMutation(api.auth.ensureAppProfile);
   const oauthProviders = useQuery(api.auth.oauthProviders);
   const router = useRouter();
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [loading, setLoading] = useState(false);
   const [pendingName, setPendingName] = useState<string | undefined>();
   const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -47,7 +59,7 @@ export function SignInForm() {
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
-    void ensureAdmin({ name: pendingName })
+    void ensureAppProfile({ name: pendingName })
       .then(() => router.replace("/dashboard"))
       .catch(() => {
         const message = accessDeniedMessage();
@@ -55,7 +67,7 @@ export function SignInForm() {
         toast.error(message);
         void signOut().finally(() => setLoading(false));
       });
-  }, [isAuthenticated, isLoading, ensureAdmin, pendingName, router, signOut]);
+  }, [isAuthenticated, isLoading, ensureAppProfile, pendingName, router, signOut]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -70,7 +82,12 @@ export function SignInForm() {
       await signIn("password", formData);
       setLoading(false);
     } catch (err) {
-      toast.error(authErrorMessage(err, flow));
+      const message = authErrorMessage(err, flow);
+      if (message.includes("already exists")) {
+        setFlow("signIn");
+      }
+      setAuthNotice(message);
+      toast.error(message);
       setLoading(false);
     }
   }
@@ -117,10 +134,42 @@ export function SignInForm() {
 
       <form onSubmit={onSubmit} className="space-y-4">
         {flow === "signUp" && (
-          <Input name="name" placeholder="Your name" />
+          <Input
+            name="name"
+            placeholder="Your name"
+            className="caret-teal-400 text-teal-200/80 focus-visible:ring-teal-500/35"
+          />
         )}
-        <Input name="email" type="email" placeholder="Email" required />
-        <Input name="password" type="password" placeholder="Password" required />
+        <Input
+          name="email"
+          type="email"
+          placeholder="Email"
+          required
+          className="caret-teal-400 text-teal-200/80 focus-visible:ring-teal-500/35"
+        />
+        <div className="relative">
+          <Input
+            name="password"
+            type={showPassword ? "text" : "password"}
+            placeholder="Password"
+            required
+            className="pr-10 caret-teal-400 text-teal-200/80 focus-visible:ring-teal-500/35"
+          />
+          <button
+            type="button"
+            title={showPassword ? "Hide password" : "Show password"}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
+            onClick={() => setShowPassword((visible) => !visible)}
+            className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md text-zinc-500 transition hover:bg-zinc-800 hover:text-teal-300/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-400/50"
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Eye className="h-4 w-4" aria-hidden="true" />
+            )}
+          </button>
+        </div>
         <Button type="submit" className="w-full" disabled={loading || isLoading}>
           {loading ? "…" : flow === "signIn" ? "Sign in" : "Create account"}
         </Button>

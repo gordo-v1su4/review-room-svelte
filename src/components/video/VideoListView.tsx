@@ -85,8 +85,13 @@ export function VideoListView({
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className="truncate text-sm font-medium text-zinc-100">
-                    {video.title}
+                    {video.assetCode ?? video.title}
                   </span>
+                  {video.feedbackNeedsAttention && (
+                    <span className="shrink-0 rounded-full bg-sky-400/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">
+                      New
+                    </span>
+                  )}
                   {video.isSelect && (
                     <Bookmark className="h-3.5 w-3.5 shrink-0 fill-sky-400 text-sky-400" />
                   )}
@@ -95,6 +100,7 @@ export function VideoListView({
                   )}
                 </div>
                 <div className="truncate text-[11px] text-zinc-600">
+                  {video.title !== video.assetCode && `${video.title} · `}
                   {video.originalFilename}
                 </div>
               </div>
@@ -135,7 +141,7 @@ export function VideoListView({
                 )}
               </div>
               <div className="text-[11px] text-zinc-600">
-                {isImageAsset(video) ? mediaKindLabel(video) : formatDuration(video.durationSec)}
+                {video.assetClass ?? (isImageAsset(video) ? mediaKindLabel(video) : formatDuration(video.durationSec))}
               </div>
               <div className="hidden justify-end md:flex">
                 {video.downloadEnabled && (

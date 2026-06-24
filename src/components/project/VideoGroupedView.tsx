@@ -24,6 +24,7 @@ export function VideoGroupedView({
   onDragStart,
   onOpenFolder,
   onDropVideo,
+  onRenameFolder,
   onSelect,
   onOpenImagePreview,
 }: {
@@ -42,6 +43,7 @@ export function VideoGroupedView({
     videoId: Id<"videos">,
     folderId: Id<"projectFolders"> | undefined,
   ) => void;
+  onRenameFolder?: (folderId: Id<"projectFolders">, title: string) => void;
   onSelect: (id: VideoDoc["_id"]) => void;
   onOpenImagePreview?: (video: VideoDoc) => void;
 }) {
@@ -70,6 +72,7 @@ export function VideoGroupedView({
                   canEdit={Boolean(onDropVideo)}
                   onOpen={() => onOpenFolder?.(folder._id)}
                   onDrop={(videoId) => onDropVideo?.(videoId, folder._id)}
+                  onRename={onRenameFolder}
                 />
               </div>
             ))}
