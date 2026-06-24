@@ -9,21 +9,27 @@ export function isVideoMimeType(mimeType?: string | null) {
   return Boolean(mimeType?.startsWith("video/"));
 }
 
-export function isImageAsset(asset: Pick<VideoDoc, "mimeType">) {
+type MediaAssetLike = Pick<VideoDoc, "mimeType"> & {
+  assetClass?: AssetClass | null;
+};
+
+export function isImageAsset(asset: MediaAssetLike) {
+  if (asset.assetClass && asset.assetClass !== "VID") return true;
   return isImageMimeType(asset.mimeType);
 }
 
-export function isVideoAsset(asset: Pick<VideoDoc, "mimeType">) {
+export function isVideoAsset(asset: MediaAssetLike) {
+  if (asset.assetClass && asset.assetClass !== "VID") return false;
   return isVideoMimeType(asset.mimeType);
 }
 
-export function mediaKind(asset: Pick<VideoDoc, "mimeType">): MediaKind {
+export function mediaKind(asset: MediaAssetLike): MediaKind {
   if (isImageAsset(asset)) return "image";
   if (isVideoAsset(asset)) return "video";
   return "other";
 }
 
-export function mediaKindLabel(asset: Pick<VideoDoc, "mimeType">) {
+export function mediaKindLabel(asset: MediaAssetLike) {
   return mediaKind(asset);
 }
 

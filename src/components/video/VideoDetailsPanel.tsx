@@ -133,6 +133,7 @@ export function VideoDetailsPanel({
             storageKey={video.storageKey}
             spriteKey={video.spriteKey}
             mimeType={video.mimeType}
+            assetClass={video.assetClass}
             version={video.updatedAt}
             fps={video.fps}
             autoPlay={autoPlay}

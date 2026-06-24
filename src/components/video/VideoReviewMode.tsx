@@ -128,6 +128,7 @@ export function VideoReviewMode({
             storageKey={active.storageKey}
             spriteKey={active.spriteKey}
             mimeType={active.mimeType}
+            assetClass={active.assetClass}
             version={active.updatedAt}
             fps={active.fps}
             loop={playbackMode === "loop"}
