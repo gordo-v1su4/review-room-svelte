@@ -2,20 +2,34 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { X, Bookmark, Flag, RotateCcw, Trash2 } from "lucide-react";
+import { X, Bookmark, CheckCircle2, Flag, MessageSquare, RotateCcw, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
-import { isImageAsset, mediaKindLabel } from "@/lib/media";
+import { assetClassLabel, isImageAsset, mediaKindLabel } from "@/lib/media";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { VideoPlayer } from "./VideoPlayer";
 import { VideoStatusPill } from "./VideoStatusPill";
 import { VideoRatingControl } from "./VideoRatingControl";
-import { CommentList } from "@/components/comments/CommentList";
+import {
+  CommentList,
+  type CommentReactionEmoji,
+} from "@/components/comments/CommentList";
 import { CommentComposer } from "@/components/comments/CommentComposer";
 import { cn } from "@/lib/utils";
+import type { VideoStatus } from "@/lib/types";
 
 type Mode = "admin" | "client";
+
+const STATUS_OPTIONS: Array<{ value: VideoStatus; label: string }> = [
+  { value: "not_started", label: "Not started" },
+  { value: "in_progress", label: "In progress" },
+  { value: "awaiting_review", label: "Awaiting review" },
+  { value: "needs_changes", label: "Needs changes" },
+  { value: "approved", label: "Approved" },
+  { value: "final", label: "Final" },
+  { value: "omitted", label: "Omit" },
+];
 
 export function VideoDetailsPanel({
   video,
@@ -24,12 +38,12 @@ export function VideoDetailsPanel({
   onClose,
   onToggleExpand,
   token,
-  reviewerName,
   autoPlay = false,
   loop = false,
   onEnded,
   canEdit = mode === "admin",
   canDelete = mode === "admin",
+  canManageFeedback = mode === "admin",
 }: {
   video: VideoDoc;
   mode: Mode;
@@ -37,18 +51,26 @@ export function VideoDetailsPanel({
   onClose: () => void;
   onToggleExpand?: () => void;
   token?: string;
-  reviewerName?: string;
   autoPlay?: boolean;
   loop?: boolean;
   onEnded?: () => void;
   canEdit?: boolean;
   canDelete?: boolean;
+  canManageFeedback?: boolean;
 }) {
   const [seekTo, setSeekTo] = useState<number | null>(null);
   const [playhead, setPlayhead] = useState(0);
   const isImage = isImageAsset(video);
   const assetLabel = mediaKindLabel(video);
-  const comments = useQuery(api.comments.listByVideo, { videoId: video._id });
+  const adminComments = useQuery(
+    api.comments.listByVideo,
+    mode === "admin" ? { videoId: video._id } : "skip",
+  );
+  const clientComments = useQuery(
+    api.reviewPublic.listCommentsByVideo,
+    mode === "client" && token ? { token, videoId: video._id } : "skip",
+  );
+  const comments = mode === "admin" ? adminComments : clientComments;
 
   const markViewedAdmin = useMutation(api.videos.markViewed);
   const markViewedClient = useMutation(api.reviewPublic.clientMarkViewed);
@@ -62,6 +84,9 @@ export function VideoDetailsPanel({
   const requestChangesClient = useMutation(api.reviewPublic.clientRequestChanges);
   const addCommentAdmin = useMutation(api.comments.add);
   const addCommentClient = useMutation(api.reviewPublic.clientAddComment);
+  const toggleReaction = useMutation(api.comments.toggleReaction);
+  const toggleCommentComplete = useMutation(api.comments.toggleComplete);
+  const acknowledgeFeedback = useMutation(api.videos.acknowledgeFeedback);
   const updateMeta = useMutation(api.videos.updateMetadata);
   const setMarkedForDeletion = useMutation(api.videos.setMarkedForDeletion);
   const resetStatus = useMutation(api.videos.resetStatus);
@@ -108,6 +133,7 @@ export function VideoDetailsPanel({
             storageKey={video.storageKey}
             spriteKey={video.spriteKey}
             mimeType={video.mimeType}
+            assetClass={video.assetClass}
             version={video.updatedAt}
             fps={video.fps}
             autoPlay={autoPlay}
@@ -121,7 +147,40 @@ export function VideoDetailsPanel({
 
         {mode === "admin" && (
           <div className="space-y-2">
-            <VideoStatusPill status={video.status} />
+            <div className="flex flex-wrap items-center gap-2">
+              <VideoStatusPill status={video.status} />
+              {video.assetCode && (
+                <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                  {video.assetCode}
+                </span>
+              )}
+              {video.assetClass && (
+                <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] font-medium text-zinc-500">
+                  {assetClassLabel(video.assetClass)}
+                </span>
+              )}
+            </div>
+            {canEdit && (
+              <label className="flex items-center gap-2 text-[11px] text-zinc-500">
+                <span className="shrink-0">Status</span>
+                <select
+                  value={video.status}
+                  onChange={(event) =>
+                    void updateMeta({
+                      videoId: video._id,
+                      status: event.target.value as VideoStatus,
+                    })
+                  }
+                  className="h-8 min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-2 text-xs text-zinc-200 outline-none transition focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/25"
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {canEdit ? (
               <Input
                 defaultValue={video.title}
@@ -135,6 +194,31 @@ export function VideoDetailsPanel({
             ) : (
               <p className="text-sm text-zinc-300">{video.title}</p>
             )}
+          </div>
+        )}
+
+        {mode === "admin" && canManageFeedback && video.feedbackNeedsAttention && (
+          <div className="rounded-lg border border-sky-400/25 bg-sky-400/10 p-3">
+            <div className="flex items-start gap-2">
+              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-sky-100">
+                  Feedback needs attention
+                </p>
+                <p className="mt-0.5 text-[11px] text-sky-200/65">
+                  React to notes or mark them handled when they no longer need follow-up.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 border border-sky-300/20 px-2 text-[11px] text-sky-100 hover:bg-sky-300/10"
+                onClick={() => void acknowledgeFeedback({ videoId: video._id })}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Mark all handled
+              </Button>
+            </div>
           </div>
         )}
 
@@ -252,20 +336,16 @@ export function VideoDetailsPanel({
         <CommentComposer
           currentTime={playhead}
           onSubmit={(body, timecodeSec) => {
-            const name = reviewerName ?? "Reviewer";
             if (mode === "client" && token) {
               void addCommentClient({
                 token,
                 videoId: video._id,
-                authorName: name,
                 body,
                 timecodeSec,
               });
             } else {
               void addCommentAdmin({
                 videoId: video._id,
-                authorName: name,
-                authorRole: "admin",
                 body,
                 timecodeSec,
               });
@@ -276,6 +356,14 @@ export function VideoDetailsPanel({
         <CommentList
           comments={comments ?? []}
           onSeek={(sec) => setSeekTo(sec)}
+          canReact={canManageFeedback}
+          onToggleReaction={(commentId, emoji: CommentReactionEmoji) =>
+            void toggleReaction({ commentId, emoji })
+          }
+          canComplete={canManageFeedback}
+          onToggleComplete={(commentId) =>
+            void toggleCommentComplete({ commentId })
+          }
         />
       </div>
     </aside>

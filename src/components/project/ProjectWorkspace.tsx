@@ -33,7 +33,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { AdminGate, useAdminAccess } from "@/components/auth/AdminGate";
 import { VideoGrid } from "@/components/video/VideoGrid";
-import { VideoListView } from "@/components/video/VideoListView";
+import { VideoTableView } from "@/components/video/VideoTableView";
 import { VideoReviewMode } from "@/components/video/VideoReviewMode";
 import { VideoDetailsPanel } from "@/components/video/VideoDetailsPanel";
 import { ImageLightbox } from "@/components/video/ImageLightbox";
@@ -45,6 +45,7 @@ import { matchesSmartView } from "@/lib/smartViews";
 import { applyFilters, sortVideos, type FilterState } from "@/lib/filters";
 import { isImageAsset, mediaKind } from "@/lib/media";
 import type {
+  AssetClass,
   CardAspectRatio,
   GridSize,
   SmartViewId,
@@ -97,12 +98,13 @@ const WORKSPACE_APPEARANCE_KEY = "review-room.workspace.appearance";
 const GRID_SIZES: GridSize[] = ["sm", "md", "lg"];
 const CARD_ASPECT_RATIOS: CardAspectRatio[] = ["video", "square", "portrait"];
 const THUMBNAIL_SCALES: ThumbnailScale[] = ["fit", "fill"];
+const ASSET_CLASSES: AssetClass[] = ["VID", "IMG", "CTX", "STB"];
 
 export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAdmin, isAuthenticated, isChecking } = useAdminAccess();
-  const projectQueryArgs = isAdmin ? { projectId } : "skip";
+  const { appUser, isAuthenticated, isChecking } = useAdminAccess();
+  const projectQueryArgs = appUser ? { projectId } : "skip";
   const project = useQuery(api.projects.getById, projectQueryArgs);
   const queriedVideos = useQuery(api.videos.listByProject, projectQueryArgs);
   const queriedFolders = useQuery(api.folders.listByProject, projectQueryArgs);
@@ -114,6 +116,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const updateProject = useMutation(api.projects.update);
   const startPreviewRefresh = useMutation(api.videos.startPreviewRefresh);
   const moveToFolder = useMutation(api.videos.moveToFolder);
+  const renameFolderMutation = useMutation(api.folders.rename);
   const resetStatus = useMutation(api.videos.resetStatus);
 
   const [view, setView] = useState<SmartViewId>("all");
@@ -131,6 +134,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [sort, setSort] = useState<SortKey>("newest");
   const [filters, setFilters] = useState<FilterState>({
     mediaTypes: [],
+    assetClasses: [],
     statuses: [],
     tags: [],
     minRating: 0,
@@ -143,13 +147,22 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     folderParam && folderParam !== "root"
       ? (folderParam as Id<"projectFolders">)
       : null;
+  const assetClassParam = searchParams.get("assetClass");
+  const routeAssetClass = ASSET_CLASSES.includes(assetClassParam as AssetClass)
+    ? (assetClassParam as AssetClass)
+    : null;
+  const videoParam = searchParams.get("video");
 
   const folderScopedVideos = useMemo(
     () =>
-      videos.filter((video) =>
-        activeFolderId ? video.folderId === activeFolderId : !video.folderId,
-      ),
-    [activeFolderId, videos],
+      routeAssetClass
+        ? videos
+        : layout === "table" && !activeFolderId
+          ? videos
+        : videos.filter((video) =>
+            activeFolderId ? video.folderId === activeFolderId : !video.folderId,
+          ),
+    [activeFolderId, layout, routeAssetClass, videos],
   );
 
   const viewScopedVideos = useMemo(
@@ -171,6 +184,17 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     video: viewScopedVideos.filter((asset) => mediaKind(asset) === "video").length,
     image: viewScopedVideos.filter((asset) => mediaKind(asset) === "image").length,
   };
+  const assetClassCounts = {
+    all: viewScopedVideos.length,
+    VID: viewScopedVideos.filter(
+      (asset) => (asset.assetClass ?? (mediaKind(asset) === "video" ? "VID" : "IMG")) === "VID",
+    ).length,
+    IMG: viewScopedVideos.filter(
+      (asset) => (asset.assetClass ?? (mediaKind(asset) === "video" ? "VID" : "IMG")) === "IMG",
+    ).length,
+    CTX: viewScopedVideos.filter((asset) => asset.assetClass === "CTX").length,
+    STB: viewScopedVideos.filter((asset) => asset.assetClass === "STB").length,
+  };
   const selected = videos.find((v) => v._id === selectedId) ?? null;
   const previewImage = videos.find((v) => v._id === previewImageId) ?? null;
   const counts = {
@@ -179,6 +203,16 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     selected: videos.filter((v) => v.isSelect).length,
     approved: videos.filter((v) => v.status === "approved").length,
   };
+
+  useEffect(() => {
+    if (!videoParam || !videos.length) return;
+    const deepLinkedVideo = videos.find((video) => video._id === videoParam);
+    if (!deepLinkedVideo) return;
+    setSelectedId((current) =>
+      current === deepLinkedVideo._id ? current : deepLinkedVideo._id,
+    );
+    setPanelExpanded(false);
+  }, [videoParam, videos]);
 
   useEffect(() => {
     try {
@@ -230,6 +264,19 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     showCardInfo,
     thumbnailScale,
   ]);
+
+  useEffect(() => {
+    setFilters((current) => {
+      const nextAssetClasses = routeAssetClass ? [routeAssetClass] : [];
+      if (
+        current.assetClasses.length === nextAssetClasses.length &&
+        current.assetClasses[0] === nextAssetClasses[0]
+      ) {
+        return current;
+      }
+      return { ...current, assetClasses: nextAssetClasses };
+    });
+  }, [routeAssetClass]);
 
   async function reprocessPreviews() {
     setReprocessing(true);
@@ -293,7 +340,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     router.push("/dashboard");
   }
 
-  if (isChecking || !isAuthenticated || !isAdmin) {
+  if (isChecking || !isAuthenticated || !appUser) {
     return (
       <AdminGate>
         <div className="text-zinc-500">Loading project...</div>
@@ -332,6 +379,15 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     }
   }
 
+  async function renameFolder(folderId: Id<"projectFolders">, title: string) {
+    try {
+      await renameFolderMutation({ folderId, title });
+      toast.success("Folder renamed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not rename folder");
+    }
+  }
+
   async function resetCurrentStatus() {
     if (!filtered.length) return;
     const scope = activeFolder ? `"${activeFolder.title}"` : "Project root";
@@ -356,8 +412,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     }
   }
 
-  const canEditProject = project.memberRole !== "viewer";
-  const canManageAccess = project.isOwner;
+  const canEditProject = appUser.role === "admin" && project.memberRole !== "viewer";
+  const canOrganizeFolders = canEditProject;
+  const canManageAccess = appUser.role === "admin" && project.isOwner;
 
   return (
     <AdminGate>
@@ -395,7 +452,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           onReprocess={() => void reprocessPreviews()}
           reprocessing={reprocessing}
           onClearVideos={() => void clearVideos()}
-          canClearVideos={project.isOwner && videos.length > 0}
+          canClearVideos={canManageAccess && videos.length > 0}
           onArchiveProject={() => void archiveCurrentProject()}
           uploadHref={`/dashboard/projects/${projectId}/upload`}
           canEditProject={canEditProject}
@@ -416,6 +473,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           showCardInfo={showCardInfo}
           resultCount={filtered.length}
           mediaTypeCounts={mediaTypeCounts}
+          assetClassCounts={assetClassCounts}
           filters={filters}
           sort={sort}
           onLayout={setLayout}
@@ -428,6 +486,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           onClear={() =>
             setFilters({
               mediaTypes: [],
+              assetClasses: [],
               statuses: [],
               tags: [],
               minRating: 0,
@@ -449,11 +508,11 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     videos={filtered}
                     leadingItems={
                       <FolderShelf
-                        folders={folders}
+                        folders={routeAssetClass ? [] : folders}
                         videos={videos}
                         activeFolderId={activeFolderId}
                         brandColor={project.brandColor}
-                        canEdit={canEditProject}
+                        canEdit={canOrganizeFolders}
                         onOpen={(folderId) =>
                           router.push(
                             folderId
@@ -464,6 +523,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                         onDropVideo={(videoId, folderId) =>
                           void moveVideoToFolder(videoId, folderId)
                         }
+                        onRenameFolder={(folderId, title) =>
+                          void renameFolder(folderId, title)
+                        }
                       />
                     }
                     selectedId={selectedId ?? undefined}
@@ -471,7 +533,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     aspectRatio={aspectRatio}
                     thumbnailScale={thumbnailScale}
                     showCardInfo={showCardInfo}
-                    onDragStart={canEditProject ? beginVideoDrag : undefined}
+                    onDragStart={canOrganizeFolders ? beginVideoDrag : undefined}
                     onSelect={(id) => {
                       setSelectedId(id);
                       setPanelExpanded(false);
@@ -494,7 +556,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                   />
                 ) : layout === "grouped" ? (
                   <VideoGroupedView
-                    folders={activeFolderId ? [] : folders}
+                    folders={activeFolderId || routeAssetClass ? [] : folders}
                     folderVideos={videos}
                     brandColor={project.brandColor}
                     videos={filtered}
@@ -503,39 +565,31 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     thumbnailScale={thumbnailScale}
                     showCardInfo={showCardInfo}
                     selectedId={selectedId ?? undefined}
-                    onDragStart={canEditProject ? beginVideoDrag : undefined}
+                    onDragStart={canOrganizeFolders ? beginVideoDrag : undefined}
                     onOpenFolder={(folderId) =>
                       router.push(
                         `/dashboard/projects/${projectId}?folder=${folderId}`,
                       )
                     }
                     onDropVideo={
-                      canEditProject
+                      canOrganizeFolders
                         ? (videoId, folderId) =>
                             void moveVideoToFolder(videoId, folderId)
+                        : undefined
+                    }
+                    onRenameFolder={
+                      canOrganizeFolders
+                        ? (folderId, title) => void renameFolder(folderId, title)
                         : undefined
                     }
                     onSelect={setSelectedId}
                     onOpenImagePreview={(video) => setPreviewImageId(video._id)}
                   />
-                ) : layout === "list" ? (
-                  <VideoListView
-                    folders={activeFolderId ? [] : folders}
-                    folderVideos={videos}
+                ) : layout === "table" ? (
+                  <VideoTableView
+                    projectId={projectId}
                     videos={filtered}
                     selectedId={selectedId ?? undefined}
-                    onDragStart={canEditProject ? beginVideoDrag : undefined}
-                    onOpenFolder={(folderId) =>
-                      router.push(
-                        `/dashboard/projects/${projectId}?folder=${folderId}`,
-                      )
-                    }
-                    onDropVideo={
-                      canEditProject
-                        ? (videoId, folderId) =>
-                            void moveVideoToFolder(videoId, folderId)
-                        : undefined
-                    }
                     onSelect={(id) => {
                       setSelectedId(id);
                       setPanelExpanded(false);
@@ -567,9 +621,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     expanded={panelExpanded}
                     onClose={() => setSelectedId(null)}
                     onToggleExpand={() => setPanelExpanded((e) => !e)}
-                    reviewerName="Admin"
                     canEdit={canEditProject}
                     canDelete={project.isOwner}
+                    canManageFeedback={canEditProject}
                   />
                 </>
               )}
@@ -935,28 +989,31 @@ function ProjectHero({
                 <span className="sm:hidden">Refresh</span>
               </Button>
             )}
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-300 sm:w-auto"
-              disabled={!canClearVideos}
-              onClick={onClearVideos}
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Clear media</span>
-              <span className="sm:hidden">Clear</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-500 sm:w-auto"
-              disabled={!canManageAccess}
-              onClick={onArchiveProject}
-            >
-              <Archive className="h-4 w-4" />
-              <span className="hidden sm:inline">Archive project</span>
-              <span className="sm:hidden">Archive</span>
-            </Button>
+            {canEditProject && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-300 sm:w-auto"
+                disabled={!canClearVideos}
+                onClick={onClearVideos}
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Clear media</span>
+                <span className="sm:hidden">Clear</span>
+              </Button>
+            )}
+            {canManageAccess && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-500 sm:w-auto"
+                onClick={onArchiveProject}
+              >
+                <Archive className="h-4 w-4" />
+                <span className="hidden sm:inline">Archive project</span>
+                <span className="sm:hidden">Archive</span>
+              </Button>
+            )}
             {canEditProject && (
               <Link href={uploadHref}>
                 <Button size="sm" className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto">

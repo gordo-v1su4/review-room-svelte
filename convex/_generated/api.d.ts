@@ -12,6 +12,7 @@ import type * as auth from "../auth.js";
 import type * as comments from "../comments.js";
 import type * as folders from "../folders.js";
 import type * as http from "../http.js";
+import type * as inbox from "../inbox.js";
 import type * as lib_access from "../lib/access.js";
 import type * as projects from "../projects.js";
 import type * as reviewLinks from "../reviewLinks.js";
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   comments: typeof comments;
   folders: typeof folders;
   http: typeof http;
+  inbox: typeof inbox;
   "lib/access": typeof lib_access;
   projects: typeof projects;
   reviewLinks: typeof reviewLinks;

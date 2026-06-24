@@ -4,24 +4,34 @@ import type { Id } from "../_generated/dataModel";
 
 type ProjectAccessRole = "owner" | "editor" | "viewer";
 
-export async function requireAdmin(ctx: QueryCtx | MutationCtx) {
+export async function requireAppUser(ctx: QueryCtx | MutationCtx) {
   const authUserId = await getAuthUserId(ctx);
   if (!authUserId) throw new Error("Not authenticated");
   const appUser = await ctx.db
     .query("appUsers")
     .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
     .unique();
-  if (!appUser || appUser.role !== "admin") throw new Error("Admin required");
+  if (!appUser) throw new Error("Workspace user required");
   return appUser;
 }
 
-export async function getAdminOrNull(ctx: QueryCtx | MutationCtx) {
+export async function requireAdmin(ctx: QueryCtx | MutationCtx) {
+  const appUser = await requireAppUser(ctx);
+  if (appUser.role !== "admin") throw new Error("Admin required");
+  return appUser;
+}
+
+export async function getAppUserOrNull(ctx: QueryCtx | MutationCtx) {
   const authUserId = await getAuthUserId(ctx);
   if (!authUserId) return null;
-  const appUser = await ctx.db
+  return await ctx.db
     .query("appUsers")
     .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
     .unique();
+}
+
+export async function getAdminOrNull(ctx: QueryCtx | MutationCtx) {
+  const appUser = await getAppUserOrNull(ctx);
   return appUser?.role === "admin" ? appUser : null;
 }
 
@@ -41,7 +51,7 @@ export async function getProjectForAdmin(
   ctx: QueryCtx | MutationCtx,
   projectId: Id<"projects">,
 ) {
-  const admin = await requireAdmin(ctx);
+  const admin = await requireAppUser(ctx);
   const project = await ctx.db.get(projectId);
   if (!project || project.archived) throw new Error("Project not found");
   if (project.createdBy === admin._id) {

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
+  getAppUserOrNull,
   getAdminOrNull,
   getProjectForAdmin,
   getProjectForEditor,
@@ -63,7 +64,7 @@ function normalizeAccessRuleList(value: string[] | undefined) {
 export const listForAdmin = query({
   args: {},
   handler: async (ctx) => {
-    const admin = await getAdminOrNull(ctx);
+    const admin = await getAppUserOrNull(ctx);
     if (!admin) return [];
     const authUser = await ctx.db.get(admin.authUserId);
     const owned = await ctx.db
@@ -168,6 +169,7 @@ export const create = mutation({
       brandColor: args.brandColor,
       downloadEnabledByDefault: args.downloadEnabledByDefault ?? false,
       visibility,
+      nextAssetNumber: 1,
       createdBy: admin._id,
       createdAt: now,
       updatedAt: now,

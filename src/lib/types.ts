@@ -1,22 +1,31 @@
 export type VideoStatus =
+  | "not_started"
+  | "in_progress"
   | "awaiting_review"
   | "needs_changes"
   | "approved"
   | "final"
+  | "omitted"
   | "archived";
 
 export type UserRole = "admin" | "client";
 
+export type AssetClass = "VID" | "IMG" | "CTX" | "STB";
+
 export type SmartViewId =
   | "all"
+  | "not_started"
+  | "in_progress"
   | "awaiting_review"
   | "in_review"
+  | "needs_attention"
   | "has_feedback"
   | "selected"
   | "highly_rated"
   | "needs_changes"
   | "approved"
-  | "final";
+  | "final"
+  | "omitted";
 
 export type SortKey =
   | "newest"
@@ -42,4 +51,4 @@ export type WorkspaceAppearance = {
   showCardInfo: boolean;
 };
 
-export type WorkspaceLayout = "grid" | "grouped" | "list" | "review";
+export type WorkspaceLayout = "grid" | "grouped" | "table" | "review";

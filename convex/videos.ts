@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 import {
   getProjectForAdmin,
   getProjectForEditor,
@@ -7,12 +9,112 @@ import {
 } from "./lib/access";
 
 const statusValidator = v.union(
+  v.literal("not_started"),
+  v.literal("in_progress"),
   v.literal("awaiting_review"),
   v.literal("needs_changes"),
   v.literal("approved"),
   v.literal("final"),
+  v.literal("omitted"),
   v.literal("archived"),
 );
+
+const assetClassValidator = v.union(
+  v.literal("VID"),
+  v.literal("IMG"),
+  v.literal("CTX"),
+  v.literal("STB"),
+);
+
+function normalizeDateKey(value: string) {
+  if (!/^\d{8}$/.test(value)) throw new Error("Upload date must be YYYYMMDD");
+  return value;
+}
+
+function originalExtension(filename: string) {
+  const match = filename.match(/\.([a-zA-Z0-9]{1,12})$/);
+  return match ? `.${match[1].toLowerCase()}` : "";
+}
+
+async function getOrCreateDateFolder(
+  ctx: MutationCtx,
+  projectId: Id<"projects">,
+  adminId: Id<"appUsers">,
+  dateKey: string,
+) {
+  const folders = await ctx.db
+    .query("projectFolders")
+    .withIndex("by_project", (q) => q.eq("projectId", projectId))
+    .collect();
+  const existing = folders.find((folder) => folder.title === dateKey);
+  if (existing) return existing._id;
+
+  const maxOrder = folders.reduce(
+    (max, folder) => Math.max(max, folder.order),
+    0,
+  );
+  const now = Date.now();
+  return await ctx.db.insert("projectFolders", {
+    projectId,
+    title: dateKey,
+    order: maxOrder + 1,
+    createdBy: adminId,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+async function nextAssetNumber(
+  ctx: MutationCtx,
+  project: { _id: Id<"projects">; nextAssetNumber?: number },
+) {
+  if (typeof project.nextAssetNumber === "number" && project.nextAssetNumber > 0) {
+    return project.nextAssetNumber;
+  }
+  const siblings = await ctx.db
+    .query("videos")
+    .withIndex("by_project", (q) => q.eq("projectId", project._id))
+    .collect();
+  const maxExisting = siblings.reduce(
+    (max, video) => Math.max(max, video.assetNumber ?? video.order ?? 0),
+    0,
+  );
+  return maxExisting + 1;
+}
+
+export const reserveAssetUpload = mutation({
+  args: {
+    projectId: v.id("projects"),
+    originalFilename: v.string(),
+    mimeType: v.string(),
+    assetClass: assetClassValidator,
+    uploadDateKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { admin, project } = await getProjectForEditor(ctx, args.projectId);
+    if (admin.role !== "admin") throw new Error("Admin required");
+    const dateKey = normalizeDateKey(args.uploadDateKey);
+    const number = await nextAssetNumber(ctx, project);
+    const assetCode = `${args.assetClass}_${dateKey}_${String(number).padStart(5, "0")}`;
+    const folderId = await getOrCreateDateFolder(
+      ctx,
+      project._id,
+      admin._id,
+      dateKey,
+    );
+    await ctx.db.patch(project._id, {
+      nextAssetNumber: number + 1,
+      updatedAt: Date.now(),
+    });
+    return {
+      folderId,
+      assetClass: args.assetClass,
+      assetNumber: number,
+      assetCode,
+      uploadFilename: `${assetCode}${originalExtension(args.originalFilename)}`,
+    };
+  },
+});
 
 export const listByProject = query({
   args: { projectId: v.id("projects") },
@@ -41,15 +143,26 @@ export const getById = query({
 export const createFromUpload = mutation({
   args: {
     projectId: v.id("projects"),
-    title: v.string(),
+    title: v.optional(v.string()),
     originalFilename: v.string(),
     storageKey: v.string(),
     mimeType: v.string(),
+    folderId: v.optional(v.id("projectFolders")),
+    assetClass: assetClassValidator,
+    assetNumber: v.number(),
+    assetCode: v.string(),
     sizeBytes: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { admin, project } = await getProjectForEditor(ctx, args.projectId);
+    if (admin.role !== "admin") throw new Error("Admin required");
     const now = Date.now();
+    if (args.folderId) {
+      const folder = await ctx.db.get(args.folderId);
+      if (!folder || folder.projectId !== project._id) {
+        throw new Error("Folder not found");
+      }
+    }
     const siblings = await ctx.db
       .query("videos")
       .withIndex("by_project", (q) => q.eq("projectId", project._id))
@@ -57,7 +170,11 @@ export const createFromUpload = mutation({
     const maxOrder = siblings.reduce((m, v) => Math.max(m, v.order), 0);
     const videoId = await ctx.db.insert("videos", {
       projectId: project._id,
-      title: args.title,
+      folderId: args.folderId,
+      assetClass: args.assetClass,
+      assetNumber: args.assetNumber,
+      assetCode: args.assetCode,
+      title: args.assetCode,
       originalFilename: args.originalFilename,
       storageKey: args.storageKey,
       mimeType: args.mimeType,
@@ -69,6 +186,7 @@ export const createFromUpload = mutation({
       commentCount: 0,
       tags: [],
       markedForDeletion: false,
+      feedbackNeedsAttention: false,
       downloadEnabled: project.downloadEnabledByDefault,
       order: maxOrder + 1,
       uploadedBy: admin._id,
@@ -183,8 +301,37 @@ export const resetStatus = mutation({
       rating: 0,
       isSelect: false,
       markedForDeletion: false,
+      feedbackNeedsAttention: false,
+      feedbackAcknowledgedAt: Date.now(),
       approvedAt: undefined,
       updatedAt: Date.now(),
+    });
+  },
+});
+
+export const acknowledgeFeedback = mutation({
+  args: { videoId: v.id("videos") },
+  handler: async (ctx, args) => {
+    const video = await ctx.db.get(args.videoId);
+    if (!video) throw new Error("Video not found");
+    const { admin } = await getProjectForAdmin(ctx, video.projectId);
+    const now = Date.now();
+    const comments = await ctx.db
+      .query("comments")
+      .withIndex("by_video", (q) => q.eq("videoId", args.videoId))
+      .collect();
+    for (const comment of comments) {
+      if (!comment.completedAt) {
+        await ctx.db.patch(comment._id, {
+          completedAt: now,
+          completedBy: admin._id,
+        });
+      }
+    }
+    await ctx.db.patch(args.videoId, {
+      feedbackNeedsAttention: false,
+      feedbackAcknowledgedAt: now,
+      updatedAt: now,
     });
   },
 });
@@ -217,7 +364,8 @@ export const moveToFolder = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
-    await getProjectForEditor(ctx, video.projectId);
+    const { admin } = await getProjectForEditor(ctx, video.projectId);
+    if (admin.role !== "admin") throw new Error("Admin required");
 
     if (args.folderId) {
       const folder = await ctx.db.get(args.folderId);

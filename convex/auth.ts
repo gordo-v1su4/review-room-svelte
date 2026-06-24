@@ -92,3 +92,29 @@ export const ensureAdminProfile = mutation({
     });
   },
 });
+
+export const ensureAppProfile = mutation({
+  args: { name: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const authUserId = await getAuthUserId(ctx);
+    if (!authUserId) throw new Error("Not authenticated");
+    const authUser = await ctx.db.get(authUserId);
+    const existing = await ctx.db
+      .query("appUsers")
+      .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
+      .unique();
+    if (existing) return existing._id;
+
+    const name =
+      args.name ??
+      authUser?.name ??
+      authUser?.email?.split("@")[0] ??
+      "Client";
+
+    return await ctx.db.insert("appUsers", {
+      authUserId,
+      name,
+      role: "client",
+    });
+  },
+});

@@ -7,23 +7,28 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
+  Check,
   Clapperboard,
   ChevronsLeft,
   ChevronsRight,
   Folder,
   FolderOpen,
+  Image as ImageIcon,
   Inbox,
   LogOut,
+  Pencil,
   Plus,
   Settings,
   Sparkles,
   Users,
+  X,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { useAdminAccess } from "@/components/auth/AdminGate";
 import { Button } from "@/components/ui/button";
 import { projectAccent, projectAccentStyle } from "@/lib/projectAccent";
+import type { AssetClass } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_STORAGE_KEY = "review-room.sidebar.collapsed";
@@ -31,11 +36,13 @@ const SIDEBAR_STORAGE_KEY = "review-room.sidebar.collapsed";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isAuthenticated } = useConvexAuth();
-  const { isAdmin } = useAdminAccess();
+  const { appUser, isAdmin } = useAdminAccess();
   const { signOut } = useAuthActions();
   const isReview = pathname?.startsWith("/review");
   const isSignIn = pathname?.startsWith("/sign-in");
-  const isWorkspace = /^\/dashboard\/projects\/[^/]+$/.test(pathname ?? "");
+  const isWorkspace =
+    /^\/dashboard\/projects\/[^/]+$/.test(pathname ?? "") &&
+    pathname !== "/dashboard/projects/new";
   const workspaceProjectId = isWorkspace
     ? (pathname?.split("/").at(-1) as Id<"projects"> | undefined)
     : undefined;
@@ -43,7 +50,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarReady, setSidebarReady] = useState(false);
   const projects = useQuery(
     api.projects.listForAdmin,
-    isAuthenticated && isAdmin && !isReview ? {} : "skip",
+    isAuthenticated && appUser && !isReview ? {} : "skip",
   );
   const workspaceProject = workspaceProjectId
     ? projects?.find((project) => project._id === workspaceProjectId)
@@ -67,7 +74,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh bg-[var(--background)] text-zinc-50">
-      {isAuthenticated && isAdmin && (
+      {isAuthenticated && appUser && (
         <aside
           className={cn(
             "hidden shrink-0 flex-col border-r border-zinc-800/70 bg-zinc-950 transition-[width] duration-200 lg:flex",
@@ -103,7 +110,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               collapsed={sidebarCollapsed}
             />
             <SideLink
-              href="/dashboard"
+              href="/dashboard/inbox"
+              active={pathname === "/dashboard/inbox"}
               icon={<Inbox className="h-4 w-4" />}
               label="Inbox"
               collapsed={sidebarCollapsed}
@@ -144,6 +152,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <WorkspaceSidebarFolders
                 projectId={workspaceProjectId}
                 brandColor={workspaceProject?.brandColor}
+                canEdit={isAdmin}
               />
             </Suspense>
           )}
@@ -162,17 +171,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <ChevronsLeft className="h-4 w-4" />
               )}
             </Button>
-            <Link href="/dashboard/projects/new">
-              <Button
-                className={cn("w-full gap-2", sidebarCollapsed && "px-0")}
-                size="sm"
-                variant="secondary"
-                title="New project"
-              >
-                <Plus className="h-4 w-4" />
-                <span className={cn(sidebarCollapsed && "hidden")}>New project</span>
-              </Button>
-            </Link>
+            {isAdmin && (
+              <Link href="/dashboard/projects/new">
+                <Button
+                  className={cn("w-full gap-2", sidebarCollapsed && "px-0")}
+                  size="sm"
+                  variant="secondary"
+                  title="New project"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className={cn(sidebarCollapsed && "hidden")}>New project</span>
+                </Button>
+              </Link>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -197,14 +208,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Clapperboard className="h-4 w-4 text-teal-400" />
               Review Room
             </Link>
-            {isAuthenticated && isAdmin && (
+            {isAuthenticated && appUser && (
               <div className="flex min-w-0 items-center gap-1.5">
-                <Button size="sm" className="h-8 gap-1.5 px-2.5" asChild>
-                  <Link href="/dashboard/projects/new">
-                    <Plus className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">New</span>
-                  </Link>
-                </Button>
+                {isAdmin && (
+                  <Button size="sm" className="h-8 gap-1.5 px-2.5" asChild>
+                    <Link href="/dashboard/projects/new">
+                      <Plus className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">New</span>
+                    </Link>
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -232,13 +245,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 type FolderDoc = Doc<"projectFolders">;
 type VideoDoc = Doc<"videos">;
+const SIDEBAR_ASSET_CLASSES: AssetClass[] = ["VID", "IMG", "CTX", "STB"];
+const COLLECTION_LABELS: Record<AssetClass, string> = {
+  VID: "Videos",
+  IMG: "Images",
+  CTX: "Contact sheets",
+  STB: "Storyboards",
+};
 
 function WorkspaceSidebarFolders({
   projectId,
   brandColor,
+  canEdit,
 }: {
   projectId: Id<"projects">;
   brandColor?: string;
+  canEdit: boolean;
 }) {
   const searchParams = useSearchParams();
   const activeFolderParam = searchParams.get("folder");
@@ -246,11 +268,18 @@ function WorkspaceSidebarFolders({
     activeFolderParam && activeFolderParam !== "root"
       ? (activeFolderParam as Id<"projectFolders">)
       : null;
+  const assetClassParam = searchParams.get("assetClass");
+  const activeAssetClass = SIDEBAR_ASSET_CLASSES.includes(
+    assetClassParam as AssetClass,
+  )
+    ? (assetClassParam as AssetClass)
+    : null;
   const router = useRouter();
   const folders = useQuery(api.folders.listByProject, { projectId });
   const videos = useQuery(api.videos.listByProject, { projectId });
   const moveToFolder = useMutation(api.videos.moveToFolder);
   const createFolder = useMutation(api.folders.create);
+  const renameFolder = useMutation(api.folders.rename);
   const [composerOpen, setComposerOpen] = useState(false);
   const [folderDraft, setFolderDraft] = useState("");
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -277,6 +306,15 @@ function WorkspaceSidebarFolders({
     }
   }
 
+  async function renameProjectFolder(folderId: Id<"projectFolders">, title: string) {
+    try {
+      await renameFolder({ folderId, title });
+      toast.success("Folder renamed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not rename folder");
+    }
+  }
+
   return (
     <SidebarFolders
       projectId={projectId}
@@ -284,6 +322,8 @@ function WorkspaceSidebarFolders({
       folders={folders ?? []}
       videos={videos ?? []}
       activeFolderId={activeFolderId}
+      activeAssetClass={activeAssetClass}
+      canEdit={canEdit}
       composerOpen={composerOpen}
       folderDraft={folderDraft}
       creatingFolder={creatingFolder}
@@ -295,7 +335,11 @@ function WorkspaceSidebarFolders({
       onFolderDraft={setFolderDraft}
       onCreateFolder={createProjectFolder}
       onDropVideo={(videoId, folderId) =>
+        canEdit &&
         void moveToFolder(folderId ? { videoId, folderId } : { videoId })
+      }
+      onRenameFolder={(folderId, title) =>
+        void renameProjectFolder(folderId, title)
       }
     />
   );
@@ -307,6 +351,8 @@ function SidebarFolders({
   folders,
   videos,
   activeFolderId,
+  activeAssetClass,
+  canEdit,
   composerOpen,
   folderDraft,
   creatingFolder,
@@ -315,12 +361,15 @@ function SidebarFolders({
   onFolderDraft,
   onCreateFolder,
   onDropVideo,
+  onRenameFolder,
 }: {
   projectId: Id<"projects">;
   brandColor?: string;
   folders: FolderDoc[];
   videos: VideoDoc[];
   activeFolderId: Id<"projectFolders"> | null;
+  activeAssetClass: AssetClass | null;
+  canEdit: boolean;
   composerOpen: boolean;
   folderDraft: string;
   creatingFolder: boolean;
@@ -332,10 +381,39 @@ function SidebarFolders({
     videoId: Id<"videos">,
     folderId: Id<"projectFolders"> | undefined,
   ) => void;
+  onRenameFolder: (folderId: Id<"projectFolders">, title: string) => void;
 }) {
+  const [editingFolderId, setEditingFolderId] = useState<Id<"projectFolders"> | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const rootFolders = folders;
   const rootCount = videos.filter((video) => !video.folderId).length;
   const accent = projectAccent(brandColor);
+  const collectionCounts = Object.fromEntries(
+    SIDEBAR_ASSET_CLASSES.map((assetClass) => [
+      assetClass,
+      videos.filter((video) => sidebarAssetClass(video) === assetClass).length,
+    ]),
+  ) as Record<AssetClass, number>;
+
+  function startRename(folder: FolderDoc) {
+    setEditingFolderId(folder._id);
+    setRenameDraft(folder.title);
+  }
+
+  function cancelRename() {
+    setEditingFolderId(null);
+    setRenameDraft("");
+  }
+
+  function submitRename(folder: FolderDoc) {
+    const nextTitle = renameDraft.trim();
+    if (!nextTitle || nextTitle === folder.title) {
+      cancelRename();
+      return;
+    }
+    onRenameFolder(folder._id, nextTitle);
+    cancelRename();
+  }
 
   return (
     <div className="mt-5 px-3" style={projectAccentStyle(accent)}>
@@ -343,14 +421,16 @@ function SidebarFolders({
         <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">
           Folders
         </p>
-        <button
-          type="button"
-          className="grid h-5 w-5 place-items-center rounded border border-zinc-800 bg-zinc-900 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-100"
-          title="Add folder"
-          onClick={onOpenComposer}
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            className="grid h-5 w-5 place-items-center rounded border border-zinc-800 bg-zinc-900 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-100"
+            title="Add folder"
+            onClick={onOpenComposer}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
       <div className="space-y-1">
         <SidebarFolderLink
@@ -361,10 +441,25 @@ function SidebarFolders({
           accent={accent}
           icon="root"
           depth={0}
-          onDrop={(videoId) => onDropVideo(videoId, undefined)}
+          onDrop={canEdit ? (videoId) => onDropVideo(videoId, undefined) : undefined}
         />
+        <div className="border-b border-zinc-800/70 pb-1 pt-1">
+          <p className="px-2 pb-1 text-[9px] font-medium uppercase tracking-wider text-teal-400/55">
+            Smart folders
+          </p>
+          {SIDEBAR_ASSET_CLASSES.map((assetClass) => (
+            <SidebarCollectionLink
+              key={assetClass}
+              href={`/dashboard/projects/${projectId}?assetClass=${assetClass}`}
+              label={COLLECTION_LABELS[assetClass]}
+              assetClass={assetClass}
+              count={collectionCounts[assetClass]}
+              active={activeAssetClass === assetClass}
+            />
+          ))}
+        </div>
         <div className="ml-4 border-l border-zinc-800/90 pl-2">
-          {composerOpen && (
+          {canEdit && composerOpen && (
             <form onSubmit={onCreateFolder} className="mb-1 flex items-center gap-1">
               <input
                 autoFocus
@@ -390,18 +485,71 @@ function SidebarFolders({
             {rootFolders.map((folder) => {
               const active = activeFolderId === folder._id;
               const count = videos.filter((video) => video.folderId === folder._id).length;
+              const isEditing = editingFolderId === folder._id;
               return (
-                <SidebarFolderLink
-                  key={folder._id}
-                  href={`/dashboard/projects/${projectId}?folder=${folder._id}`}
-                  label={folder.title}
-                  count={count}
-                  active={active}
-                  accent={accent}
-                  icon={active ? "open" : "folder"}
-                  depth={1}
-                  onDrop={(videoId) => onDropVideo(videoId, folder._id)}
-                />
+                <div key={folder._id} className="group flex items-center gap-1">
+                  <div className="min-w-0 flex-1">
+                    {isEditing ? (
+                      <form
+                        className="flex items-center gap-1 py-0.5"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          submitRename(folder);
+                        }}
+                      >
+                        <input
+                          autoFocus
+                          value={renameDraft}
+                          onChange={(event) => setRenameDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") cancelRename();
+                          }}
+                          className="h-7 min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-2 text-[11px] text-zinc-200 outline-none focus:border-teal-400"
+                        />
+                        <button
+                          type="submit"
+                          title="Save folder name"
+                          className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-teal-500 text-zinc-950"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Cancel rename"
+                          className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-500 hover:text-zinc-100"
+                          onClick={cancelRename}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </form>
+                    ) : (
+                      <SidebarFolderLink
+                        href={`/dashboard/projects/${projectId}?folder=${folder._id}`}
+                        label={folder.title}
+                        count={count}
+                        active={active}
+                        accent={accent}
+                        icon={active ? "open" : "folder"}
+                        depth={1}
+                        onDrop={
+                          canEdit
+                            ? (videoId) => onDropVideo(videoId, folder._id)
+                            : undefined
+                        }
+                      />
+                    )}
+                  </div>
+                  {canEdit && !isEditing && (
+                    <button
+                      type="button"
+                      title="Rename folder"
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded text-zinc-600 opacity-0 transition hover:bg-zinc-900 hover:text-zinc-200 group-hover:opacity-100"
+                      onClick={() => startRename(folder)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -409,6 +557,46 @@ function SidebarFolders({
       </div>
     </div>
   );
+}
+
+function SidebarCollectionLink({
+  href,
+  label,
+  assetClass,
+  count,
+  active,
+}: {
+  href: string;
+  label: string;
+  assetClass: AssetClass;
+  count: number;
+  active: boolean;
+}) {
+  const Icon =
+    assetClass === "VID" ? Clapperboard : assetClass === "IMG" ? ImageIcon : Folder;
+  return (
+    <Link
+      href={href}
+      title={label}
+      className={cn(
+        "flex items-center gap-2 rounded-sm border px-2 py-1.5 text-[12px] transition",
+        active
+          ? "border-teal-400/30 bg-teal-400/10 text-teal-100"
+          : "border-transparent text-zinc-500 hover:border-teal-400/10 hover:bg-teal-400/[0.045] hover:text-zinc-300",
+      )}
+    >
+      <Icon className={cn("h-3.5 w-3.5 shrink-0", active ? "text-teal-300" : "text-teal-500/45")} />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className={cn("text-[10px] tabular-nums", active ? "text-teal-300/80" : "text-zinc-600")}>
+        {count}
+      </span>
+    </Link>
+  );
+}
+
+function sidebarAssetClass(video: VideoDoc): AssetClass {
+  if (video.assetClass) return video.assetClass;
+  return video.mimeType.startsWith("video/") ? "VID" : "IMG";
 }
 
 function SidebarFolderLink({
@@ -428,7 +616,7 @@ function SidebarFolderLink({
   accent: string;
   icon: "root" | "folder" | "open";
   depth: number;
-  onDrop: (videoId: Id<"videos">) => void;
+  onDrop?: (videoId: Id<"videos">) => void;
 }) {
   const Icon = icon === "root" ? Inbox : icon === "open" ? FolderOpen : Folder;
   const [dragActive, setDragActive] = useState(false);
@@ -438,20 +626,24 @@ function SidebarFolderLink({
       href={href}
       title={label}
       onDragEnter={(event) => {
+        if (!onDrop) return;
         event.preventDefault();
         setDragActive(true);
       }}
       onDragOver={(event) => {
+        if (!onDrop) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
       }}
       onDragLeave={(event) => {
+        if (!onDrop) return;
         if (event.relatedTarget && event.currentTarget.contains(event.relatedTarget as Node)) {
           return;
         }
         setDragActive(false);
       }}
       onDrop={(event) => {
+        if (!onDrop) return;
         setDragActive(false);
         const videoId = event.dataTransfer.getData("application/review-room-video-id");
         if (!videoId) return;

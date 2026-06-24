@@ -3,11 +3,28 @@ import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
 const status = v.union(
+  v.literal("not_started"),
+  v.literal("in_progress"),
   v.literal("awaiting_review"),
   v.literal("needs_changes"),
   v.literal("approved"),
   v.literal("final"),
+  v.literal("omitted"),
   v.literal("archived"),
+);
+
+const assetClass = v.union(
+  v.literal("VID"),
+  v.literal("IMG"),
+  v.literal("CTX"),
+  v.literal("STB"),
+);
+
+const reactionEmoji = v.union(
+  v.literal("thumbs_up"),
+  v.literal("thumbs_down"),
+  v.literal("fire"),
+  v.literal("heart"),
 );
 
 const reviewAppearance = v.object({
@@ -39,6 +56,7 @@ const applicationTables = {
     visibility: v.optional(
       v.union(v.literal("private"), v.literal("shared"), v.literal("workspace")),
     ),
+    nextAssetNumber: v.optional(v.number()),
     createdBy: v.id("appUsers"),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -71,6 +89,7 @@ const applicationTables = {
   projectFolders: defineTable({
     projectId: v.id("projects"),
     title: v.string(),
+    coverImageKey: v.optional(v.string()),
     order: v.number(),
     createdBy: v.id("appUsers"),
     createdAt: v.number(),
@@ -80,6 +99,9 @@ const applicationTables = {
   videos: defineTable({
     projectId: v.id("projects"),
     folderId: v.optional(v.id("projectFolders")),
+    assetClass: v.optional(assetClass),
+    assetNumber: v.optional(v.number()),
+    assetCode: v.optional(v.string()),
     title: v.string(),
     originalFilename: v.string(),
     storageKey: v.string(),
@@ -98,6 +120,8 @@ const applicationTables = {
     commentCount: v.number(),
     tags: v.array(v.string()),
     markedForDeletion: v.optional(v.boolean()),
+    feedbackNeedsAttention: v.optional(v.boolean()),
+    feedbackAcknowledgedAt: v.optional(v.number()),
     downloadEnabled: v.boolean(),
     order: v.number(),
     uploadedBy: v.id("appUsers"),
@@ -125,9 +149,23 @@ const applicationTables = {
     authorRole: v.union(v.literal("admin"), v.literal("client")),
     body: v.string(),
     timecodeSec: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    completedBy: v.optional(v.id("appUsers")),
     createdAt: v.number(),
   })
     .index("by_video", ["videoId"])
+    .index("by_project", ["projectId"]),
+
+  commentReactions: defineTable({
+    commentId: v.id("comments"),
+    videoId: v.id("videos"),
+    projectId: v.id("projects"),
+    appUserId: v.id("appUsers"),
+    emoji: reactionEmoji,
+    createdAt: v.number(),
+  })
+    .index("by_comment", ["commentId"])
+    .index("by_comment_user_emoji", ["commentId", "appUserId", "emoji"])
     .index("by_project", ["projectId"]),
 
   reviewLinks: defineTable({

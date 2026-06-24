@@ -3,13 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
-import { isImageMimeType } from "@/lib/media";
+import { isImageAsset } from "@/lib/media";
+import type { AssetClass } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function VideoPlayer({
   storageKey,
   spriteKey,
   mimeType,
+  assetClass,
   version,
   fps,
   loop = false,
@@ -22,6 +24,7 @@ export function VideoPlayer({
   storageKey: string;
   spriteKey?: string;
   mimeType?: string | null;
+  assetClass?: AssetClass | null;
   version?: string | number | null;
   fps?: number | null;
   loop?: boolean;
@@ -33,7 +36,10 @@ export function VideoPlayer({
 }) {
   const mediaUrl = useStorageUrl(storageKey, version);
   const spriteUrl = useStorageUrl(spriteKey, version);
-  const isImage = isImageMimeType(mimeType);
+  const isImage = isImageAsset({
+    mimeType: mimeType ?? "application/octet-stream",
+    assetClass,
+  });
   const ref = useRef<HTMLVideoElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);

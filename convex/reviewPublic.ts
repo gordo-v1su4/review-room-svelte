@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import type { QueryCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 
 async function getLink(ctx: QueryCtx, token: string) {
   const link = await ctx.db
@@ -48,6 +49,34 @@ export const getReviewerName = query({
     return session?.displayName ?? null;
   },
 });
+
+async function reviewerNameForToken(ctx: QueryCtx | MutationCtx, token: string) {
+  const session = await ctx.db
+    .query("reviewerSessions")
+    .withIndex("by_token", (q) => q.eq("token", token))
+    .unique();
+  return session?.displayName ?? "Reviewer";
+}
+
+async function withReactionSummaries(ctx: QueryCtx, comments: Doc<"comments">[]) {
+  return await Promise.all(
+    comments.map(async (comment) => {
+      const reactions = await ctx.db
+        .query("commentReactions")
+        .withIndex("by_comment", (q) => q.eq("commentId", comment._id))
+        .collect();
+      return {
+        ...comment,
+        reactions: {
+          thumbs_up: reactions.filter((r) => r.emoji === "thumbs_up").length,
+          thumbs_down: reactions.filter((r) => r.emoji === "thumbs_down").length,
+          fire: reactions.filter((r) => r.emoji === "fire").length,
+          heart: reactions.filter((r) => r.emoji === "heart").length,
+        },
+      };
+    }),
+  );
+}
 
 export const setReviewerName = mutation({
   args: { token: v.string(), displayName: v.string() },
@@ -146,11 +175,29 @@ export const clientRequestChanges = mutation({
   },
 });
 
+export const listCommentsByVideo = query({
+  args: { token: v.string(), videoId: v.id("videos") },
+  handler: async (ctx, args) => {
+    const link = await getLink(ctx, args.token);
+    const video = await ctx.db.get(args.videoId);
+    if (!video || video.projectId !== link.projectId) {
+      throw new Error("Video not found");
+    }
+    const comments = await ctx.db
+      .query("comments")
+      .withIndex("by_video", (q) => q.eq("videoId", args.videoId))
+      .collect();
+    return await withReactionSummaries(
+      ctx,
+      comments.sort((a, b) => b.createdAt - a.createdAt),
+    );
+  },
+});
+
 export const clientAddComment = mutation({
   args: {
     token: v.string(),
     videoId: v.id("videos"),
-    authorName: v.string(),
     body: v.string(),
     timecodeSec: v.optional(v.number()),
   },
@@ -160,10 +207,11 @@ export const clientAddComment = mutation({
     if (!video || video.projectId !== link.projectId) {
       throw new Error("Video not found");
     }
+    const authorName = await reviewerNameForToken(ctx, args.token);
     await ctx.db.insert("comments", {
       videoId: args.videoId,
       projectId: video.projectId,
-      authorName: args.authorName,
+      authorName,
       authorRole: "client",
       body: args.body,
       timecodeSec: args.timecodeSec,
@@ -171,6 +219,8 @@ export const clientAddComment = mutation({
     });
     await ctx.db.patch(args.videoId, {
       commentCount: video.commentCount + 1,
+      feedbackNeedsAttention: true,
+      feedbackAcknowledgedAt: undefined,
       updatedAt: Date.now(),
     });
   },

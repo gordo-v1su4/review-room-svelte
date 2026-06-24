@@ -16,32 +16,38 @@ function visibilityBadge(visibility: string | undefined, isOwner: boolean) {
 }
 
 export default function DashboardPage() {
-  const { isAdmin } = useAdminAccess();
+  const { appUser, isAdmin } = useAdminAccess();
   const archiveProject = useMutation(api.projects.archive);
   const projects = useQuery(
     api.projects.listForAdmin,
-    isAdmin ? {} : "skip",
+    appUser ? {} : "skip",
   );
 
   return (
     <AdminGate>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-        <Link href="/dashboard/projects/new">
-          <Button className="w-full gap-2 sm:w-auto">
-            <Plus className="h-4 w-4" />
-            New project
-          </Button>
-        </Link>
+        {isAdmin && (
+          <Link href="/dashboard/projects/new">
+            <Button className="w-full gap-2 sm:w-auto">
+              <Plus className="h-4 w-4" />
+              New project
+            </Button>
+          </Link>
+        )}
       </div>
       {!projects ? (
         <p className="mt-8 text-zinc-500">Loading…</p>
       ) : projects.length === 0 ? (
         <div className="mt-16 text-center">
-          <p className="text-zinc-400">No projects yet.</p>
-          <Link href="/dashboard/projects/new">
-            <Button className="mt-4">Create your first project</Button>
-          </Link>
+          <p className="text-zinc-400">
+            {isAdmin ? "No projects yet." : "No shared projects yet."}
+          </p>
+          {isAdmin && (
+            <Link href="/dashboard/projects/new">
+              <Button className="mt-4">Create your first project</Button>
+            </Link>
+          )}
         </div>
       ) : (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

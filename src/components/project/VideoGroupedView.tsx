@@ -6,7 +6,7 @@ import { SMART_VIEWS, matchesSmartView, type VideoDoc } from "@/lib/smartViews";
 import type { SmartViewId } from "@/lib/types";
 import type { CardAspectRatio, GridSize, ThumbnailScale } from "@/lib/types";
 import { VideoCard } from "@/components/video/VideoCard";
-import { folderCounts, FolderTile } from "./FolderShelf";
+import { folderCounts, folderCoverAsset, FolderTile } from "./FolderShelf";
 import { projectAccent } from "@/lib/projectAccent";
 
 type FolderDoc = Doc<"projectFolders">;
@@ -24,6 +24,7 @@ export function VideoGroupedView({
   onDragStart,
   onOpenFolder,
   onDropVideo,
+  onRenameFolder,
   onSelect,
   onOpenImagePreview,
 }: {
@@ -42,6 +43,7 @@ export function VideoGroupedView({
     videoId: Id<"videos">,
     folderId: Id<"projectFolders"> | undefined,
   ) => void;
+  onRenameFolder?: (folderId: Id<"projectFolders">, title: string) => void;
   onSelect: (id: VideoDoc["_id"]) => void;
   onOpenImagePreview?: (video: VideoDoc) => void;
 }) {
@@ -67,9 +69,11 @@ export function VideoGroupedView({
                   active={false}
                   accent={accent}
                   counts={folderCounts(folderVideos, folder._id)}
+                  coverAsset={folderCoverAsset(folderVideos, folder)}
                   canEdit={Boolean(onDropVideo)}
                   onOpen={() => onOpenFolder?.(folder._id)}
                   onDrop={(videoId) => onDropVideo?.(videoId, folder._id)}
+                  onRename={onRenameFolder}
                 />
               </div>
             ))}

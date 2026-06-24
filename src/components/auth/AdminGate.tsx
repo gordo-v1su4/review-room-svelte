@@ -1,9 +1,8 @@
 "use client";
 
-import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { api } from "../../../convex/_generated/api";
 
 export function useAdminAccess() {
@@ -25,10 +24,8 @@ export function useAdminAccess() {
 }
 
 export function AdminGate({ children }: { children: React.ReactNode }) {
-  const { isAdmin, isAuthenticated, isChecking, isLoading } = useAdminAccess();
-  const { signOut } = useAuthActions();
+  const { appUser, isAuthenticated, isChecking, isLoading } = useAdminAccess();
   const router = useRouter();
-  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -36,16 +33,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, isLoading, router]);
 
-  useEffect(() => {
-    if (isChecking || !isAuthenticated || isAdmin || redirecting) return;
-
-    setRedirecting(true);
-    void signOut().finally(() => {
-      router.replace("/sign-in?error=unauthorized");
-    });
-  }, [isAdmin, isAuthenticated, isChecking, redirecting, router, signOut]);
-
-  if (isChecking || !isAuthenticated || !isAdmin) {
+  if (isChecking || !isAuthenticated || !appUser) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-sm text-zinc-500">
         Loading…
