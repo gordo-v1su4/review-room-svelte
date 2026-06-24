@@ -21,7 +21,10 @@ export default function UploadPage({
     api.projects.getById,
     appUser ? { projectId: typedProjectId } : "skip",
   );
-  const canUpload = project ? project.memberRole !== "viewer" : false;
+  const canUpload =
+    appUser?.role === "admin" && project
+      ? project.memberRole !== "viewer"
+      : false;
 
   return (
     <AdminGate>

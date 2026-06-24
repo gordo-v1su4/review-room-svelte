@@ -24,6 +24,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const { admin, project } = await getProjectForEditor(ctx, args.projectId);
+    if (admin.role !== "admin") throw new Error("Admin required");
     const title = args.title.trim();
     if (!title) throw new Error("Folder name is required");
 
@@ -55,7 +56,8 @@ export const rename = mutation({
   handler: async (ctx, args) => {
     const folder = await ctx.db.get(args.folderId);
     if (!folder) throw new Error("Folder not found");
-    const { project } = await getProjectForEditor(ctx, folder.projectId);
+    const { admin, project } = await getProjectForEditor(ctx, folder.projectId);
+    if (admin.role !== "admin") throw new Error("Admin required");
     const title = args.title.trim();
     if (!title) throw new Error("Folder name is required");
 
@@ -72,6 +74,27 @@ export const rename = mutation({
 
     const now = Date.now();
     await ctx.db.patch(folder._id, { title, updatedAt: now });
+    await ctx.db.patch(project._id, { updatedAt: now });
+  },
+});
+
+export const setCover = mutation({
+  args: {
+    folderId: v.id("projectFolders"),
+    coverImageKey: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const folder = await ctx.db.get(args.folderId);
+    if (!folder) throw new Error("Folder not found");
+    const { admin, project } = await getProjectForEditor(ctx, folder.projectId);
+    if (admin.role !== "admin") throw new Error("Admin required");
+    const coverImageKey = args.coverImageKey?.trim();
+
+    const now = Date.now();
+    await ctx.db.patch(folder._id, {
+      coverImageKey: coverImageKey || undefined,
+      updatedAt: now,
+    });
     await ctx.db.patch(project._id, { updatedAt: now });
   },
 });

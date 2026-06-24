@@ -92,6 +92,7 @@ export const reserveAssetUpload = mutation({
   },
   handler: async (ctx, args) => {
     const { admin, project } = await getProjectForEditor(ctx, args.projectId);
+    if (admin.role !== "admin") throw new Error("Admin required");
     const dateKey = normalizeDateKey(args.uploadDateKey);
     const number = await nextAssetNumber(ctx, project);
     const assetCode = `${args.assetClass}_${dateKey}_${String(number).padStart(5, "0")}`;
@@ -154,6 +155,7 @@ export const createFromUpload = mutation({
   },
   handler: async (ctx, args) => {
     const { admin, project } = await getProjectForEditor(ctx, args.projectId);
+    if (admin.role !== "admin") throw new Error("Admin required");
     const now = Date.now();
     if (args.folderId) {
       const folder = await ctx.db.get(args.folderId);
@@ -362,7 +364,8 @@ export const moveToFolder = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
-    await getProjectForEditor(ctx, video.projectId);
+    const { admin } = await getProjectForEditor(ctx, video.projectId);
+    if (admin.role !== "admin") throw new Error("Admin required");
 
     if (args.folderId) {
       const folder = await ctx.db.get(args.folderId);

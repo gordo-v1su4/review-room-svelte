@@ -157,10 +157,12 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     () =>
       routeAssetClass
         ? videos
+        : layout === "table" && !activeFolderId
+          ? videos
         : videos.filter((video) =>
             activeFolderId ? video.folderId === activeFolderId : !video.folderId,
           ),
-    [activeFolderId, routeAssetClass, videos],
+    [activeFolderId, layout, routeAssetClass, videos],
   );
 
   const viewScopedVideos = useMemo(
@@ -410,8 +412,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     }
   }
 
-  const canEditProject = project.memberRole !== "viewer";
-  const canManageAccess = project.isOwner;
+  const canEditProject = appUser.role === "admin" && project.memberRole !== "viewer";
+  const canOrganizeFolders = canEditProject;
+  const canManageAccess = appUser.role === "admin" && project.isOwner;
 
   return (
     <AdminGate>
@@ -449,7 +452,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           onReprocess={() => void reprocessPreviews()}
           reprocessing={reprocessing}
           onClearVideos={() => void clearVideos()}
-          canClearVideos={project.isOwner && videos.length > 0}
+          canClearVideos={canManageAccess && videos.length > 0}
           onArchiveProject={() => void archiveCurrentProject()}
           uploadHref={`/dashboard/projects/${projectId}/upload`}
           canEditProject={canEditProject}
@@ -509,7 +512,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                         videos={videos}
                         activeFolderId={activeFolderId}
                         brandColor={project.brandColor}
-                        canEdit={canEditProject}
+                        canEdit={canOrganizeFolders}
                         onOpen={(folderId) =>
                           router.push(
                             folderId
@@ -530,7 +533,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     aspectRatio={aspectRatio}
                     thumbnailScale={thumbnailScale}
                     showCardInfo={showCardInfo}
-                    onDragStart={canEditProject ? beginVideoDrag : undefined}
+                    onDragStart={canOrganizeFolders ? beginVideoDrag : undefined}
                     onSelect={(id) => {
                       setSelectedId(id);
                       setPanelExpanded(false);
@@ -562,20 +565,20 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     thumbnailScale={thumbnailScale}
                     showCardInfo={showCardInfo}
                     selectedId={selectedId ?? undefined}
-                    onDragStart={canEditProject ? beginVideoDrag : undefined}
+                    onDragStart={canOrganizeFolders ? beginVideoDrag : undefined}
                     onOpenFolder={(folderId) =>
                       router.push(
                         `/dashboard/projects/${projectId}?folder=${folderId}`,
                       )
                     }
                     onDropVideo={
-                      canEditProject
+                      canOrganizeFolders
                         ? (videoId, folderId) =>
                             void moveVideoToFolder(videoId, folderId)
                         : undefined
                     }
                     onRenameFolder={
-                      canEditProject
+                      canOrganizeFolders
                         ? (folderId, title) => void renameFolder(folderId, title)
                         : undefined
                     }
@@ -986,28 +989,31 @@ function ProjectHero({
                 <span className="sm:hidden">Refresh</span>
               </Button>
             )}
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-300 sm:w-auto"
-              disabled={!canClearVideos}
-              onClick={onClearVideos}
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Clear media</span>
-              <span className="sm:hidden">Clear</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-500 sm:w-auto"
-              disabled={!canManageAccess}
-              onClick={onArchiveProject}
-            >
-              <Archive className="h-4 w-4" />
-              <span className="hidden sm:inline">Archive project</span>
-              <span className="sm:hidden">Archive</span>
-            </Button>
+            {canEditProject && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-300 sm:w-auto"
+                disabled={!canClearVideos}
+                onClick={onClearVideos}
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Clear media</span>
+                <span className="sm:hidden">Clear</span>
+              </Button>
+            )}
+            {canManageAccess && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-500 sm:w-auto"
+                onClick={onArchiveProject}
+              >
+                <Archive className="h-4 w-4" />
+                <span className="hidden sm:inline">Archive project</span>
+                <span className="sm:hidden">Archive</span>
+              </Button>
+            )}
             {canEditProject && (
               <Link href={uploadHref}>
                 <Button size="sm" className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto">

@@ -89,6 +89,7 @@ const applicationTables = {
   projectFolders: defineTable({
     projectId: v.id("projects"),
     title: v.string(),
+    coverImageKey: v.optional(v.string()),
     order: v.number(),
     createdBy: v.id("appUsers"),
     createdAt: v.number(),
