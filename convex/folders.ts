@@ -2,6 +2,11 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getProjectForAdmin, getProjectForEditor } from "./lib/access";
 
+const folderRemovalDisposition = v.union(
+  v.literal("move_to_root"),
+  v.literal("archive_assets"),
+);
+
 export const listByProject = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
@@ -96,5 +101,44 @@ export const setCover = mutation({
       updatedAt: now,
     });
     await ctx.db.patch(project._id, { updatedAt: now });
+  },
+});
+
+export const remove = mutation({
+  args: {
+    folderId: v.id("projectFolders"),
+    assetDisposition: folderRemovalDisposition,
+  },
+  handler: async (ctx, args) => {
+    const folder = await ctx.db.get(args.folderId);
+    if (!folder) throw new Error("Folder not found");
+    const { admin, project } = await getProjectForEditor(ctx, folder.projectId);
+    if (admin.role !== "admin") throw new Error("Admin required");
+
+    const now = Date.now();
+    const assets = await ctx.db
+      .query("videos")
+      .withIndex("by_project_folder", (q) =>
+        q.eq("projectId", project._id).eq("folderId", folder._id),
+      )
+      .collect();
+
+    for (const asset of assets) {
+      await ctx.db.patch(asset._id, {
+        folderId: undefined,
+        ...(args.assetDisposition === "archive_assets"
+          ? { status: "archived" as const }
+          : {}),
+        updatedAt: now,
+      });
+    }
+
+    await ctx.db.delete(folder._id);
+    await ctx.db.patch(project._id, { updatedAt: now });
+
+    return {
+      moved: args.assetDisposition === "move_to_root" ? assets.length : 0,
+      archived: args.assetDisposition === "archive_assets" ? assets.length : 0,
+    };
   },
 });

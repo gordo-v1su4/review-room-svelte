@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Folder, ImagePlus, Pencil, Trash2, X } from "lucide-react";
+import { Archive, Check, Folder, ImagePlus, Pencil, Trash2, X } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ export function FolderShelf({
   onOpen,
   onDropVideo,
   onRenameFolder,
+  onRemoveFolder,
 }: {
   folders: FolderDoc[];
   videos: VideoDoc[];
@@ -35,6 +36,11 @@ export function FolderShelf({
     folderId: Id<"projectFolders"> | undefined,
   ) => void;
   onRenameFolder?: (folderId: Id<"projectFolders">, title: string) => void;
+  onRemoveFolder?: (
+    folderId: Id<"projectFolders">,
+    title: string,
+    assetDisposition: "move_to_root" | "archive_assets",
+  ) => void;
 }) {
   const activeFolder = activeFolderId
     ? folders.find((folder) => folder._id === activeFolderId)
@@ -60,6 +66,7 @@ export function FolderShelf({
           onOpen={() => onOpen(folder._id)}
           onDrop={(videoId) => onDropVideo(videoId, folder._id)}
           onRename={onRenameFolder}
+          onRemove={onRemoveFolder}
         />
       ))}
     </div>
@@ -76,6 +83,7 @@ export function FolderTile({
   onOpen,
   onDrop,
   onRename,
+  onRemove,
 }: {
   folder: FolderDoc;
   active: boolean;
@@ -86,9 +94,15 @@ export function FolderTile({
   onOpen: () => void;
   onDrop: (videoId: Id<"videos">) => void;
   onRename?: (folderId: Id<"projectFolders">, title: string) => void;
+  onRemove?: (
+    folderId: Id<"projectFolders">,
+    title: string,
+    assetDisposition: "move_to_root" | "archive_assets",
+  ) => void;
 }) {
   const [dragActive, setDragActive] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [renameDraft, setRenameDraft] = useState(folder.title);
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -100,6 +114,7 @@ export function FolderTile({
 
   function startRename() {
     setRenameDraft(folder.title);
+    setRemoving(false);
     setRenaming(true);
   }
 
@@ -199,18 +214,64 @@ export function FolderTile({
       )}
     >
       {canEdit && onRename && (
-        <button
-          type="button"
-          title="Rename folder"
-          className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-md border border-zinc-800 bg-zinc-950/90 text-zinc-500 opacity-0 shadow-sm transition hover:border-zinc-700 hover:text-zinc-100 group-hover:opacity-100"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            startRename();
-          }}
+        <div className="absolute right-2 top-2 z-10 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+          <button
+            type="button"
+            title="Rename folder"
+            className="grid h-7 w-7 place-items-center rounded-md border border-zinc-800 bg-zinc-950/90 text-zinc-500 shadow-sm transition hover:border-zinc-700 hover:text-zinc-100"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              startRename();
+            }}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          {onRemove && (
+            <button
+              type="button"
+              title="Remove folder"
+              className="grid h-7 w-7 place-items-center rounded-md border border-zinc-800 bg-zinc-950/90 text-zinc-500 shadow-sm transition hover:border-zinc-700 hover:text-red-300"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setRenaming(false);
+                setRemoving((current) => !current);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+      {removing && onRemove && (
+        <div
+          className="absolute right-2 top-11 z-20 w-44 rounded-md border border-zinc-800 bg-zinc-950 p-1 shadow-2xl shadow-black/50"
+          onClick={(event) => event.stopPropagation()}
         >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] text-zinc-300 transition hover:bg-zinc-900 hover:text-zinc-100"
+            onClick={() => {
+              setRemoving(false);
+              onRemove(folder._id, folder.title, "move_to_root");
+            }}
+          >
+            <Folder className="h-3.5 w-3.5 text-zinc-500" />
+            Move media to root
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] text-red-300 transition hover:bg-red-950/30"
+            onClick={() => {
+              setRemoving(false);
+              onRemove(folder._id, folder.title, "archive_assets");
+            }}
+          >
+            <Archive className="h-3.5 w-3.5" />
+            Archive media
+          </button>
+        </div>
       )}
       <button type="button" onClick={onOpen} className="block w-full text-left">
         <span className="relative block aspect-square w-full overflow-hidden bg-zinc-950">
