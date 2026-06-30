@@ -8,9 +8,9 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import {
   ASSET_CLASS_LABELS,
-  assetClassForMimeType,
-  isImageMimeType,
-  isVideoMimeType,
+  isImageFileType,
+  isVideoFileType,
+  normalizedMediaMimeType,
 } from "@/lib/media";
 import type { AssetClass } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,13 @@ type ClientPreviewResult = {
   width?: number;
   height?: number;
 };
+
+const UPLOAD_ASSET_CLASSES: AssetClass[] = ["VID", "IMG", "CTX", "STB"];
+
+function assetClassForUpload(file: File, selectedAssetClass: AssetClass) {
+  if (isVideoFileType(file.type, file.name)) return "VID";
+  return selectedAssetClass === "VID" ? "IMG" : selectedAssetClass;
+}
 
 function makeUploadId(file: File) {
   return `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`;
@@ -219,15 +226,18 @@ function uploadViaPresignedUrl({
   file,
   projectId,
   filename,
+  contentType,
   onProgress,
 }: {
   file: File;
   projectId: Id<"projects">;
   filename?: string;
+  contentType?: string;
   onProgress: (progress: number) => void;
 }) {
   return new Promise<{ storageKey: string }>(async (resolve, reject) => {
-    const contentType = file.type || "application/octet-stream";
+    const uploadContentType =
+      contentType ?? normalizedMediaMimeType(file.type, filename ?? file.name);
     let storageKey: string | undefined;
     let uploadUrl: string | undefined;
 
@@ -238,7 +248,7 @@ function uploadViaPresignedUrl({
         body: JSON.stringify({
           projectId,
           filename: filename ?? file.name,
-          contentType,
+          contentType: uploadContentType,
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
@@ -260,7 +270,7 @@ function uploadViaPresignedUrl({
 
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", uploadUrl);
-    xhr.setRequestHeader("Content-Type", contentType);
+    xhr.setRequestHeader("Content-Type", uploadContentType);
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable) return;
       onProgress(Math.max(10, Math.round((event.loaded / event.total) * 90)));
@@ -285,12 +295,14 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
   const markProcessingFailed = useMutation(api.videos.markProcessingFailed);
   const [files, setFiles] = useState<FileState[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [imageAssetClass, setImageAssetClass] = useState<Extract<AssetClass, "IMG" | "CTX" | "STB">>("IMG");
+  const [selectedAssetClass, setSelectedAssetClass] = useState<AssetClass>("VID");
 
   const uploadFiles = useCallback(
     async (list: File[]) => {
       const mediaFiles = list.filter(
-        (file) => isVideoMimeType(file.type) || isImageMimeType(file.type),
+        (file) =>
+          isVideoFileType(file.type, file.name) ||
+          isImageFileType(file.type, file.name),
       );
       if (!mediaFiles.length) {
         toast.error("Choose video or image files to upload.");
@@ -300,7 +312,7 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
       const states: FileState[] = mediaFiles.map((file) => ({
         id: makeUploadId(file),
         file,
-        assetClass: isVideoMimeType(file.type) ? "VID" : imageAssetClass,
+        assetClass: assetClassForUpload(file, selectedAssetClass),
         progress: 0,
         status: "pending",
       }));
@@ -316,7 +328,7 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
           const reservation = await reserveUpload({
             projectId,
             originalFilename: item.file.name,
-            mimeType: item.file.type || "application/octet-stream",
+            mimeType: normalizedMediaMimeType(item.file.type, item.file.name),
             assetClass: item.assetClass,
             uploadDateKey: localDateKey(),
           });
@@ -324,6 +336,7 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
             file: item.file,
             projectId,
             filename: reservation.uploadFilename,
+            contentType: normalizedMediaMimeType(item.file.type, item.file.name),
             onProgress: (progress) => {
               setFiles((prev) =>
                 prev.map((f) => (f.id === item.id ? { ...f, progress } : f)),
@@ -331,13 +344,13 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
             },
           });
           const uploadedStorageKey = upload.storageKey;
-          const isImage = isImageMimeType(item.file.type);
+          const isImage = item.assetClass !== "VID";
 
           const videoId = await createVideo({
             projectId,
             originalFilename: item.file.name,
             storageKey: uploadedStorageKey,
-            mimeType: item.file.type || "application/octet-stream",
+            mimeType: normalizedMediaMimeType(item.file.type, item.file.name),
             folderId: reservation.folderId,
             assetClass: reservation.assetClass,
             assetNumber: reservation.assetNumber,
@@ -430,7 +443,7 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
         }),
       );
     },
-    [createVideo, imageAssetClass, markPreviewReady, markProcessingFailed, projectId, reserveUpload],
+    [createVideo, markPreviewReady, markProcessingFailed, projectId, reserveUpload, selectedAssetClass],
   );
 
   return (
@@ -469,18 +482,18 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
           className="mt-4 flex flex-wrap items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950/70 p-1"
           onClick={(event) => event.preventDefault()}
         >
-          {(["IMG", "CTX", "STB"] as const).map((assetClass) => (
+          {UPLOAD_ASSET_CLASSES.map((assetClass) => (
             <button
               key={assetClass}
               type="button"
-              aria-pressed={imageAssetClass === assetClass}
+              aria-pressed={selectedAssetClass === assetClass}
               className={cn(
                 "h-7 rounded-md px-2.5 text-[11px] font-medium transition",
-                imageAssetClass === assetClass
+                selectedAssetClass === assetClass
                   ? "bg-teal-400 text-zinc-950"
                   : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200",
               )}
-              onClick={() => setImageAssetClass(assetClass)}
+              onClick={() => setSelectedAssetClass(assetClass)}
             >
               {ASSET_CLASS_LABELS[assetClass]}
             </button>
@@ -505,7 +518,7 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
               <div className="flex items-center justify-between gap-3">
                 <span className="truncate text-zinc-300">{f.file.name}</span>
                 <span className="shrink-0 rounded-full border border-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-500">
-                  {assetClassForMimeType(f.file.type) === "VID" ? "VID" : f.assetClass}
+                  {f.assetClass}
                 </span>
                 <span className="shrink-0 capitalize">{f.status}</span>
               </div>

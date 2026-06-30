@@ -235,6 +235,8 @@ Upload naming: every admin upload first reserves the next project-wide number an
 
 Collections / bundles: folders are not the only way to gather assets. Type collections are automatic from `assetClass`; later custom bundles/playlists can be saved metadata views based on tags, selected assets, reviewer, client cut, or delivery purpose. An asset can appear in many collections without moving out of its original date folder.
 
+Folder removal: deleting a real `projectFolders` entry must force an admin choice for its contents. **Move media to Project root** clears `folderId` and keeps the assets visible in root plus smart folders. **Archive media** clears `folderId`, sets `status = archived`, and removes those assets from the default workspace, client review, and smart-folder counts. Smart folders themselves are metadata views and cannot be deleted, renamed, or used as physical destinations.
+
 ## 7. Storage
 
 S3-compatible behind a thin abstraction so RustFS today swaps to R2/S3/MinIO later. Presigned URLs for up/download; **secret keys stay server-side** (Next.js route handler), never in client or Convex calls. Convex stores only keys + metadata. Path-style addressing for RustFS.

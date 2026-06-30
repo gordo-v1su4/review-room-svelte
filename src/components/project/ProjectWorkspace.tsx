@@ -117,6 +117,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const startPreviewRefresh = useMutation(api.videos.startPreviewRefresh);
   const moveToFolder = useMutation(api.videos.moveToFolder);
   const renameFolderMutation = useMutation(api.folders.rename);
+  const removeFolderMutation = useMutation(api.folders.remove);
   const resetStatus = useMutation(api.videos.resetStatus);
 
   const [view, setView] = useState<SmartViewId>("all");
@@ -388,6 +389,34 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     }
   }
 
+  async function removeFolder(
+    folderId: Id<"projectFolders">,
+    title: string,
+    assetDisposition: "move_to_root" | "archive_assets",
+  ) {
+    const count = videos.filter((video) => video.folderId === folderId).length;
+    const action =
+      assetDisposition === "archive_assets"
+        ? `Archive ${count} media ${count === 1 ? "asset" : "assets"} and delete "${title}"?`
+        : `Delete "${title}" and move ${count} media ${count === 1 ? "asset" : "assets"} to Project root?`;
+    if (count > 0 && !window.confirm(action)) return;
+    if (count === 0 && !window.confirm(`Delete folder "${title}"?`)) return;
+
+    try {
+      const result = await removeFolderMutation({ folderId, assetDisposition });
+      if (activeFolderId === folderId) router.push(`/dashboard/projects/${projectId}`);
+      toast.success(
+        result.archived
+          ? `Archived ${result.archived} and removed folder`
+          : result.moved
+            ? `Moved ${result.moved} to Project root`
+            : "Folder removed",
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not remove folder");
+    }
+  }
+
   async function resetCurrentStatus() {
     if (!filtered.length) return;
     const scope = activeFolder ? `"${activeFolder.title}"` : "Project root";
@@ -526,6 +555,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                         onRenameFolder={(folderId, title) =>
                           void renameFolder(folderId, title)
                         }
+                        onRemoveFolder={(folderId, title, assetDisposition) =>
+                          void removeFolder(folderId, title, assetDisposition)
+                        }
                       />
                     }
                     selectedId={selectedId ?? undefined}
@@ -580,6 +612,12 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     onRenameFolder={
                       canOrganizeFolders
                         ? (folderId, title) => void renameFolder(folderId, title)
+                        : undefined
+                    }
+                    onRemoveFolder={
+                      canOrganizeFolders
+                        ? (folderId, title, assetDisposition) =>
+                            void removeFolder(folderId, title, assetDisposition)
                         : undefined
                     }
                     onSelect={setSelectedId}

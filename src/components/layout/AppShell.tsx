@@ -7,6 +7,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
+  Archive,
   Check,
   Clapperboard,
   ChevronsLeft,
@@ -20,6 +21,7 @@ import {
   Plus,
   Settings,
   Sparkles,
+  Trash2,
   Users,
   X,
 } from "lucide-react";
@@ -280,6 +282,7 @@ function WorkspaceSidebarFolders({
   const moveToFolder = useMutation(api.videos.moveToFolder);
   const createFolder = useMutation(api.folders.create);
   const renameFolder = useMutation(api.folders.rename);
+  const removeFolder = useMutation(api.folders.remove);
   const [composerOpen, setComposerOpen] = useState(false);
   const [folderDraft, setFolderDraft] = useState("");
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -315,6 +318,34 @@ function WorkspaceSidebarFolders({
     }
   }
 
+  async function removeProjectFolder(
+    folderId: Id<"projectFolders">,
+    title: string,
+    assetDisposition: "move_to_root" | "archive_assets",
+  ) {
+    const count = (videos ?? []).filter((video) => video.folderId === folderId).length;
+    const action =
+      assetDisposition === "archive_assets"
+        ? `Archive ${count} media ${count === 1 ? "asset" : "assets"} and delete "${title}"?`
+        : `Delete "${title}" and move ${count} media ${count === 1 ? "asset" : "assets"} to Project root?`;
+    if (count > 0 && !window.confirm(action)) return;
+    if (count === 0 && !window.confirm(`Delete folder "${title}"?`)) return;
+
+    try {
+      const result = await removeFolder({ folderId, assetDisposition });
+      if (activeFolderId === folderId) router.push(`/dashboard/projects/${projectId}`);
+      toast.success(
+        result.archived
+          ? `Archived ${result.archived} and removed folder`
+          : result.moved
+            ? `Moved ${result.moved} to Project root`
+            : "Folder removed",
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not remove folder");
+    }
+  }
+
   return (
     <SidebarFolders
       projectId={projectId}
@@ -341,6 +372,9 @@ function WorkspaceSidebarFolders({
       onRenameFolder={(folderId, title) =>
         void renameProjectFolder(folderId, title)
       }
+      onRemoveFolder={(folderId, title, assetDisposition) =>
+        void removeProjectFolder(folderId, title, assetDisposition)
+      }
     />
   );
 }
@@ -362,6 +396,7 @@ function SidebarFolders({
   onCreateFolder,
   onDropVideo,
   onRenameFolder,
+  onRemoveFolder,
 }: {
   projectId: Id<"projects">;
   brandColor?: string;
@@ -382,8 +417,14 @@ function SidebarFolders({
     folderId: Id<"projectFolders"> | undefined,
   ) => void;
   onRenameFolder: (folderId: Id<"projectFolders">, title: string) => void;
+  onRemoveFolder: (
+    folderId: Id<"projectFolders">,
+    title: string,
+    assetDisposition: "move_to_root" | "archive_assets",
+  ) => void;
 }) {
   const [editingFolderId, setEditingFolderId] = useState<Id<"projectFolders"> | null>(null);
+  const [removingFolderId, setRemovingFolderId] = useState<Id<"projectFolders"> | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const rootFolders = folders;
   const rootCount = videos.filter((video) => !video.folderId).length;
@@ -540,14 +581,57 @@ function SidebarFolders({
                     )}
                   </div>
                   {canEdit && !isEditing && (
-                    <button
-                      type="button"
-                      title="Rename folder"
-                      className="grid h-6 w-6 shrink-0 place-items-center rounded text-zinc-600 opacity-0 transition hover:bg-zinc-900 hover:text-zinc-200 group-hover:opacity-100"
-                      onClick={() => startRename(folder)}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </button>
+                    <div className="relative flex shrink-0 items-center">
+                      <button
+                        type="button"
+                        title="Rename folder"
+                        className="grid h-6 w-6 place-items-center rounded text-zinc-600 opacity-0 transition hover:bg-zinc-900 hover:text-zinc-200 group-hover:opacity-100"
+                        onClick={() => {
+                          setRemovingFolderId(null);
+                          startRename(folder);
+                        }}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Remove folder"
+                        className="grid h-6 w-6 place-items-center rounded text-zinc-600 opacity-0 transition hover:bg-zinc-900 hover:text-red-300 group-hover:opacity-100"
+                        onClick={() =>
+                          setRemovingFolderId((current) =>
+                            current === folder._id ? null : folder._id,
+                          )
+                        }
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                      {removingFolderId === folder._id && (
+                        <div className="absolute right-0 top-7 z-50 w-44 rounded-md border border-zinc-800 bg-zinc-950 p-1 shadow-2xl shadow-black/50">
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] text-zinc-300 transition hover:bg-zinc-900 hover:text-zinc-100"
+                            onClick={() => {
+                              setRemovingFolderId(null);
+                              onRemoveFolder(folder._id, folder.title, "move_to_root");
+                            }}
+                          >
+                            <FolderOpen className="h-3.5 w-3.5 text-zinc-500" />
+                            Move media to root
+                          </button>
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] text-red-300 transition hover:bg-red-950/30"
+                            onClick={() => {
+                              setRemovingFolderId(null);
+                              onRemoveFolder(folder._id, folder.title, "archive_assets");
+                            }}
+                          >
+                            <Archive className="h-3.5 w-3.5" />
+                            Archive media
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               );
