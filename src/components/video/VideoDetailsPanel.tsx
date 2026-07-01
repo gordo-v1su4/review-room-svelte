@@ -1,13 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import * as Popover from "@radix-ui/react-popover";
 import { useMutation, useQuery } from "convex/react";
-import { X, Bookmark, CheckCircle2, Flag, MessageSquare, RotateCcw, Trash2 } from "lucide-react";
+import {
+  X,
+  Bookmark,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Flag,
+  MessageSquare,
+  Trash2,
+} from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
 import { assetClassLabel, isImageAsset, mediaKindLabel } from "@/lib/media";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { VideoPlayer } from "./VideoPlayer";
 import { VideoStatusPill } from "./VideoStatusPill";
 import { VideoRatingControl } from "./VideoRatingControl";
@@ -16,6 +25,7 @@ import {
   type CommentReactionEmoji,
 } from "@/components/comments/CommentList";
 import { CommentComposer } from "@/components/comments/CommentComposer";
+import { AuthorBadge } from "@/components/comments/AuthorBadge";
 import { cn } from "@/lib/utils";
 import type { VideoStatus } from "@/lib/types";
 
@@ -71,6 +81,10 @@ export function VideoDetailsPanel({
     mode === "client" && token ? { token, videoId: video._id } : "skip",
   );
   const comments = mode === "admin" ? adminComments : clientComments;
+  const uploader = useQuery(
+    api.videos.getUploader,
+    mode === "admin" ? { videoId: video._id } : "skip",
+  );
 
   const markViewedAdmin = useMutation(api.videos.markViewed);
   const markViewedClient = useMutation(api.reviewPublic.clientMarkViewed);
@@ -89,8 +103,10 @@ export function VideoDetailsPanel({
   const acknowledgeFeedback = useMutation(api.videos.acknowledgeFeedback);
   const updateMeta = useMutation(api.videos.updateMetadata);
   const setMarkedForDeletion = useMutation(api.videos.setMarkedForDeletion);
-  const resetStatus = useMutation(api.videos.resetStatus);
   const removeVideo = useMutation(api.videos.remove);
+  const statusLabel =
+    STATUS_OPTIONS.find((option) => option.value === video.status)?.label ??
+    video.status;
 
   const handleFirstPlay = () => {
     if (!video.viewed) {
@@ -160,39 +176,74 @@ export function VideoDetailsPanel({
                 </span>
               )}
             </div>
-            {canEdit && (
-              <label className="flex items-center gap-2 text-[11px] text-zinc-500">
-                <span className="shrink-0">Status</span>
-                <select
-                  value={video.status}
-                  onChange={(event) =>
-                    void updateMeta({
-                      videoId: video._id,
-                      status: event.target.value as VideoStatus,
-                    })
-                  }
-                  className="h-8 min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-2 text-xs text-zinc-200 outline-none transition focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/25"
-                >
-                  {STATUS_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
             {canEdit ? (
-              <Input
-                defaultValue={video.title}
-                onBlur={(e) =>
-                  void updateMeta({
-                    videoId: video._id,
-                    title: e.target.value,
-                  })
-                }
-              />
+              <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                <span className="shrink-0">Status</span>
+                <Popover.Root>
+                  <Popover.Trigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex h-8 min-w-0 flex-1 items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900/70 px-2.5 text-left text-xs font-medium text-zinc-200 outline-none transition hover:border-zinc-700 hover:bg-zinc-800 focus-visible:border-teal-400/60 focus-visible:ring-1 focus-visible:ring-teal-400/25"
+                      aria-label="Change media status"
+                    >
+                      <span className="truncate">{statusLabel}</span>
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                    </button>
+                  </Popover.Trigger>
+                  <Popover.Portal>
+                    <Popover.Content
+                      align="end"
+                      sideOffset={6}
+                      className="z-50 w-[var(--radix-popover-trigger-width)] min-w-48 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-zinc-200 shadow-2xl shadow-black/45"
+                    >
+                      {STATUS_OPTIONS.map((option) => {
+                        const selected = option.value === video.status;
+
+                        return (
+                          <Popover.Close asChild key={option.value}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void updateMeta({
+                                  videoId: video._id,
+                                  status: option.value,
+                                })
+                              }
+                              className={cn(
+                                "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-teal-300/80",
+                                selected
+                                  ? "border border-teal-400/35 bg-teal-400/12 text-teal-100"
+                                  : "border border-transparent text-zinc-400 hover:bg-teal-400/10 hover:text-teal-100",
+                              )}
+                            >
+                              <span className="truncate">{option.label}</span>
+                              {selected && <Check className="h-3.5 w-3.5 shrink-0" />}
+                            </button>
+                          </Popover.Close>
+                        );
+                      })}
+                    </Popover.Content>
+                  </Popover.Portal>
+                </Popover.Root>
+              </div>
             ) : (
-              <p className="text-sm text-zinc-300">{video.title}</p>
+              <p className="text-xs text-zinc-500">Status: {statusLabel}</p>
+            )}
+            {uploader ? (
+              <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500">
+                <span className="shrink-0">Uploaded by</span>
+                <AuthorBadge
+                  name={uploader.name}
+                  role={uploader.role}
+                  compact
+                  className="min-w-0"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-zinc-600">
+                <span className="h-5 w-5 rounded-full border border-zinc-800 bg-zinc-950" />
+                Loading uploader...
+              </div>
             )}
           </div>
         )}
@@ -284,16 +335,6 @@ export function VideoDetailsPanel({
 
         {mode === "admin" && (canEdit || canDelete) && (
           <div className="grid gap-2 sm:grid-cols-2">
-            {canEdit && (
-              <Button
-                variant="ghost"
-                className="justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-200"
-                onClick={() => void resetStatus({ videoId: video._id })}
-              >
-                <RotateCcw className="h-4 w-4" />
-                Reset status
-              </Button>
-            )}
             {canEdit && (
               <Button
                 variant="ghost"

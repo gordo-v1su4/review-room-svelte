@@ -12,7 +12,6 @@ import {
   Image,
   List,
   Rows3,
-  RotateCcw,
   Search,
   SlidersHorizontal,
   SquarePlay,
@@ -27,7 +26,6 @@ import type {
   ThumbnailScale,
   WorkspaceLayout,
 } from "@/lib/types";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -98,9 +96,6 @@ export function ProjectFilters({
   onShowCardInfo,
   onFilters,
   onSort,
-  onClear,
-  onResetStatus,
-  canResetStatus = false,
 }: {
   layout: WorkspaceLayout;
   gridSize: GridSize;
@@ -119,20 +114,7 @@ export function ProjectFilters({
   onShowCardInfo: (show: boolean) => void;
   onFilters: (f: FilterState) => void;
   onSort: (s: SortKey) => void;
-  onClear: () => void;
-  onResetStatus?: () => void;
-  canResetStatus?: boolean;
 }) {
-  const active =
-    filters.search ||
-    filters.mediaTypes.length > 0 ||
-    filters.assetClasses.length > 0 ||
-    filters.statuses.length > 0 ||
-    filters.tags.length > 0 ||
-    filters.selectedOnly ||
-    filters.hasComments ||
-    filters.minRating > 0;
-
   return (
     <div className="no-scrollbar sticky top-14 z-20 flex h-[3.25rem] flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-zinc-800 bg-zinc-950 px-4 py-2.5 sm:px-6 lg:top-0 lg:px-8">
       <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
@@ -174,18 +156,6 @@ export function ProjectFilters({
         onShowCardInfo={onShowCardInfo}
       />
 
-      {canResetStatus && onResetStatus && (
-        <button
-          type="button"
-          onClick={onResetStatus}
-          title="Reset status"
-          className="inline-flex h-8 w-[5.4rem] shrink-0 items-center justify-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
-        >
-          <RotateCcw className="h-3.5 w-3.5 text-zinc-500" />
-          Reset
-        </button>
-      )}
-
       <MediaTypeFilter
         filters={filters}
         counts={mediaTypeCounts}
@@ -226,16 +196,6 @@ export function ProjectFilters({
         />
         Selected
       </button>
-      {active && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 shrink-0 border border-zinc-800 bg-zinc-900 px-2.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
-          onClick={onClear}
-        >
-          Clear filters
-        </Button>
-      )}
       <span className="shrink-0 px-1 text-[11px] tabular-nums text-zinc-600">
         {resultCount}
       </span>
@@ -503,10 +463,10 @@ function SortPopover({
               type="button"
               onClick={() => onSort(item.id)}
               className={cn(
-                "flex h-7 w-full items-center justify-between rounded-md px-2.5 text-left text-[10px] transition",
+                "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-teal-300/80",
                 sort === item.id
-                  ? "bg-teal-400 text-zinc-950"
-                  : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100",
+                  ? "border border-teal-400/35 bg-teal-400/12 text-teal-100"
+                  : "border border-transparent text-zinc-400 hover:bg-teal-400/10 hover:text-teal-100",
               )}
             >
               {item.label}

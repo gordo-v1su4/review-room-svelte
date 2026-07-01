@@ -91,8 +91,8 @@ export function VideoCard({
   );
   const titleClass =
     size === "lg"
-      ? "line-clamp-2 text-[13px] leading-5"
-      : "line-clamp-1 text-[12px] leading-4";
+      ? "line-clamp-2 text-xs leading-4"
+      : "line-clamp-1 text-[11px] leading-4";
 
   useEffect(() => {
     setThumbnailFailed(false);
@@ -288,10 +288,10 @@ export function VideoCard({
         </div>
       </div>
       {showCardInfo && (
-        <div className={cn("space-y-1.5", size === "sm" ? "p-2.5" : "p-3")}>
+        <div className={cn("space-y-1.5", size === "sm" ? "p-2" : "p-2.5")}>
           {video.assetCode && (
             <div className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate rounded-full border border-zinc-800 bg-zinc-950 px-2 py-0.5 text-[10px] font-medium tracking-wide text-zinc-400">
+              <span className="truncate rounded-full border border-zinc-800 bg-zinc-950/80 px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-zinc-500">
                 {video.assetCode}
               </span>
               {video.feedbackNeedsAttention && (
@@ -304,13 +304,13 @@ export function VideoCard({
           <p
             title={video.title}
             className={cn(
-              "font-medium text-zinc-500 transition-colors group-hover:text-zinc-300",
+              "font-medium text-zinc-400 transition-colors group-hover:text-zinc-200",
               titleClass,
             )}
           >
             {video.title}
           </p>
-          <div className="flex items-center gap-2.5 text-[11px] text-zinc-600">
+          <div className="flex items-center gap-2 text-[10px] text-zinc-600">
             {video.rating > 0 && (
               <span className="inline-flex items-center gap-0.5 text-yellow-400">
                 <Star className="h-3 w-3 fill-yellow-400" />
