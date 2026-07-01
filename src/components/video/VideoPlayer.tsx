@@ -48,8 +48,18 @@ export function VideoPlayer({
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [displayMode, setDisplayMode] = useState<"timecode" | "frames">("timecode");
   const [spriteAspect, setSpriteAspect] = useState<number | null>(null);
   const frameRate = Number.isFinite(fps ?? NaN) && (fps ?? 0) > 0 ? fps ?? 24 : 24;
+  const totalFrames = Math.max(0, Math.round(duration * frameRate));
+  const currentFrame = Math.min(
+    totalFrames,
+    Math.max(0, Math.floor(currentTime * frameRate)),
+  );
+  const readout =
+    displayMode === "timecode"
+      ? `${formatEditorialTimecode(currentTime, frameRate)} / ${formatEditorialTimecode(duration, frameRate)}`
+      : `${currentFrame.toLocaleString()} / ${totalFrames.toLocaleString()} fr`;
   const spriteFrameCount = 10;
   const hoverFrame =
     hoverPct == null
@@ -319,23 +329,36 @@ export function VideoPlayer({
             style={{ left: `${(currentTime / (duration || 1)) * 100}%` }}
           />
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+        <div className="flex min-w-0 items-center gap-3 text-xs text-zinc-500">
           <button
             type="button"
             onClick={togglePlayback}
-            className="inline-flex h-9 w-28 items-center justify-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/70 px-4 font-medium text-zinc-200 transition hover:bg-zinc-800"
+            className="inline-flex h-7 w-20 shrink-0 items-center justify-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/70 px-2 font-medium text-zinc-200 transition hover:bg-zinc-800"
           >
             {isPlaying ? (
-              <Pause className="h-3.5 w-3.5" />
+              <Pause className="h-3 w-3" />
             ) : (
-              <Play className="h-3.5 w-3.5 fill-current" />
+              <Play className="h-3 w-3 fill-current" />
             )}
             {isPlaying ? "Pause" : "Play"}
           </button>
-          <p className="font-mono text-[12px] tabular-nums text-zinc-400">
-            {formatEditorialTimecode(currentTime, frameRate)} /{" "}
-            {formatEditorialTimecode(duration, frameRate)}
-          </p>
+          <button
+            type="button"
+            onClick={() =>
+              setDisplayMode((mode) =>
+                mode === "timecode" ? "frames" : "timecode",
+              )
+            }
+            aria-label={
+              displayMode === "timecode" ? "Show frames" : "Show timecode"
+            }
+            title={
+              displayMode === "timecode" ? "Show frames" : "Show timecode"
+            }
+            className="inline-flex h-7 min-w-0 items-center truncate rounded-md px-1.5 font-mono text-[12px] tabular-nums text-zinc-400 transition hover:bg-zinc-900 hover:text-teal-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-300/70"
+          >
+            {readout}
+          </button>
         </div>
         </div>
       )}
