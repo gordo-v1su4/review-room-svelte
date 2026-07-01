@@ -48,14 +48,8 @@ export function VideoPlayer({
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [displayMode, setDisplayMode] = useState<"timecode" | "frames">("timecode");
   const [spriteAspect, setSpriteAspect] = useState<number | null>(null);
   const frameRate = Number.isFinite(fps ?? NaN) && (fps ?? 0) > 0 ? fps ?? 24 : 24;
-  const totalFrames = Math.max(0, Math.round(duration * frameRate));
-  const currentFrame = Math.min(
-    totalFrames,
-    Math.max(0, Math.floor(currentTime * frameRate)),
-  );
   const spriteFrameCount = 10;
   const hoverFrame =
     hoverPct == null
@@ -325,7 +319,7 @@ export function VideoPlayer({
             style={{ left: `${(currentTime / (duration || 1)) * 100}%` }}
           />
         </div>
-        <div className="grid grid-cols-[auto_auto] items-center gap-3 text-xs text-zinc-500 sm:flex sm:flex-wrap sm:gap-4">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
           <button
             type="button"
             onClick={togglePlayback}
@@ -338,39 +332,10 @@ export function VideoPlayer({
             )}
             {isPlaying ? "Pause" : "Play"}
           </button>
-          <p className="order-3 col-span-2 w-full font-mono text-[12px] tabular-nums text-zinc-400 sm:order-none sm:w-[27ch]">
-            {displayMode === "timecode"
-              ? `${formatEditorialTimecode(currentTime, frameRate)} / ${formatEditorialTimecode(duration, frameRate)}`
-              : `${currentFrame.toLocaleString()} / ${totalFrames.toLocaleString()} fr`}
+          <p className="font-mono text-[12px] tabular-nums text-zinc-400">
+            {formatEditorialTimecode(currentTime, frameRate)} /{" "}
+            {formatEditorialTimecode(duration, frameRate)}
           </p>
-          <div className="flex rounded-md border border-zinc-800 bg-zinc-950 p-0.5">
-            <button
-              type="button"
-              aria-pressed={displayMode === "timecode"}
-              onClick={() => setDisplayMode("timecode")}
-              className={cn(
-                "h-6 rounded px-2 font-mono text-[10px] uppercase transition",
-                displayMode === "timecode"
-                  ? "bg-zinc-800 text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-300",
-              )}
-            >
-              TC
-            </button>
-            <button
-              type="button"
-              aria-pressed={displayMode === "frames"}
-              onClick={() => setDisplayMode("frames")}
-              className={cn(
-                "h-6 rounded px-2 font-mono text-[10px] uppercase transition",
-                displayMode === "frames"
-                  ? "bg-zinc-800 text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-300",
-              )}
-            >
-              FR
-            </button>
-          </div>
         </div>
         </div>
       )}

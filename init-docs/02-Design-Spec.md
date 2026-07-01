@@ -16,7 +16,7 @@ Sidebar Inbox shows a simple in-app digest of review notes grouped by project an
 ### B. Admin workspace — the most important screen
 - **Project header / banner** — banner image, title, client name/description, "Access," "Share review link," "Upload." Makes the page feel like a portal. Owners use Access to choose Private, Shared, or Workspace visibility and to add exact email or domain rules; non-owners see view/edit affordances based on role.
 - **Smart-view tab bar** (§4) directly under the header, with live counts.
-- **Toolbar** — search, filter, sort, thumbnail-size toggle, optional "Selected only." Light, never cluttered.
+- **Toolbar** — search, filter, sort, thumbnail-size toggle, optional "Selected only." Light, never cluttered. Do not put destructive or bulk status-reset actions in this toolbar.
 - **Content** — the media grid (default), with project folders shown as first-class items above loose assets.
 - **Folder navigation** — the existing app sidebar shows the project root plus one level of project folders.
 - **Right-side viewer/details panel** (§5) — opens on card select.
@@ -26,7 +26,7 @@ A calmer, stripped subset of the workspace. Header with banner, title, a one-lin
 
 ## 2. Admin vs client
 
-Same components, different surface. **Admin** adds: upload, edit status/tags/title, share link, download settings, folder create/rename/move/cover controls, delete/archive, advanced filters, internal metadata. **Client** sees only: watch, rate, shortlist, comment, Approve / Request Changes, table/grid/review views, download-if-allowed. Client UI is quieter and uses human labels, never internal status strings.
+Same components, different surface. **Admin** adds: upload, edit status/tags, share link, download settings, folder create/rename/move/cover controls, delete/archive, advanced filters, internal metadata. Uploaded filenames/asset codes are read-only ingest metadata. **Client** sees only: watch, rate, shortlist, comment, Approve / Request Changes, table/grid/review views, download-if-allowed. Client UI is quieter and uses human labels, never internal status strings.
 
 ## 3. Views — trimmed for MVP
 
@@ -49,7 +49,7 @@ Tab definitions and which ones accept drops are in PRD §4–5.
 ## 5. Right-side viewer / details panel
 
 The second-most-important component after the card. Collapsible, integrated into the dark workspace — **not** a white modal.
-- **Contents:** large player; title; status; tags; uploader attribution for admins; rating; shortlist toggle; **Approve / Request Changes**; comments; download (if enabled); admin-only controls when admin.
+- **Contents:** large player; title in the panel header; status; tags; compact one-line uploader attribution for admins; rating; shortlist toggle; **Approve / Request Changes**; comments; download (if enabled); admin-only controls when admin. Do not duplicate the uploaded asset name in a form field. Status changes use the status dropdown/select; do not add a separate "reset status" button.
 - **States:** closed (grid full width) · open (grid left, panel right) · expanded (player dominant) · optional fullscreen playback.
 - Smooth, fast open/close. Prefer this panel and drawers/popovers over blocking modals everywhere.
 
@@ -88,7 +88,7 @@ A FreeCut-inspired Scenes view can sit beside Media when Phase C lands. It is a 
 
 ## 11. Filtering & sorting
 
-Available but visually light — file-type toggles in the main toolbar, a filter popover, active-filter chips, and "clear all," plus the smart-view tabs as the fast path. **Filters:** media type (video/image first, extensible later), status, review state/facets, tags, rating, selected, has-comments, uploaded/updated date. **Sorts:** newest, oldest, status, rating high→low, title, recently reviewed, most comments.
+Available but visually light — file-type toggles in the main toolbar, a filter popover, active-filter chips, and "clear all," plus the smart-view tabs as the fast path. Dropdown menus use the shared dark popover treatment with subtle teal selected and hover states, never the browser/OS default blue. **Filters:** media type (video/image first, extensible later), status, review state/facets, tags, rating, selected, has-comments, uploaded/updated date. **Sorts:** newest, oldest, status, rating high→low, title, recently reviewed, most comments.
 
 ## 11a. Folders
 

@@ -21,7 +21,6 @@ import {
   Link2,
   Palette,
   RefreshCw,
-  RotateCcw,
   Trash2,
   Upload,
   User,
@@ -119,7 +118,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const moveToFolder = useMutation(api.videos.moveToFolder);
   const renameFolderMutation = useMutation(api.folders.rename);
   const removeFolderMutation = useMutation(api.folders.remove);
-  const resetStatus = useMutation(api.videos.resetStatus);
 
   const [view, setView] = useState<SmartViewId>("all");
   const [layout, setLayout] = useState<WorkspaceLayout>("grid");
@@ -130,7 +128,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [appearanceReady, setAppearanceReady] = useState(false);
   const [selectedId, setSelectedId] = useState<Id<"videos"> | null>(null);
   const [previewImageId, setPreviewImageId] = useState<Id<"videos"> | null>(null);
-  const [resettingStatus, setResettingStatus] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
@@ -424,30 +421,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     }
   }
 
-  async function resetCurrentStatus() {
-    if (!filtered.length) return;
-    const scope = activeFolder ? `"${activeFolder.title}"` : "Project root";
-    if (
-      !window.confirm(
-        `Reset status for ${filtered.length} assets in ${scope}? They will return to Awaiting Review. Files and comments will stay.`,
-      )
-    ) {
-      return;
-    }
-
-    setResettingStatus(true);
-    try {
-      for (const video of filtered) {
-        await resetStatus({ videoId: video._id });
-      }
-      toast.success(`Reset status for ${filtered.length} assets`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not reset status");
-    } finally {
-      setResettingStatus(false);
-    }
-  }
-
   const canEditProject = appUser.role === "admin" && project.memberRole !== "viewer";
   const canOrganizeFolders = canEditProject;
   const canManageAccess = appUser.role === "admin" && project.isOwner;
@@ -523,20 +496,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           onShowCardInfo={setShowCardInfo}
           onFilters={setFilters}
           onSort={setSort}
-          onClear={() =>
-            setFilters({
-              mediaTypes: [],
-              assetClasses: [],
-              statuses: [],
-              tags: [],
-              minRating: 0,
-              selectedOnly: false,
-              hasComments: false,
-              search: "",
-            })
-          }
-          onResetStatus={() => void resetCurrentStatus()}
-          canResetStatus={canEditProject && filtered.length > 0 && !resettingStatus}
         />
 
         <div className="min-h-[420px]">

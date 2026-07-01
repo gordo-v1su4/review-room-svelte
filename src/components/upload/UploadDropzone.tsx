@@ -532,8 +532,8 @@ export function UploadDropzone({
                         className={cn(
                           "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-teal-300/80",
                           isSelected
-                            ? "bg-teal-400 text-zinc-950"
-                            : "text-zinc-400 hover:bg-teal-400/15 hover:text-teal-100",
+                            ? "border border-teal-400/35 bg-teal-400/12 text-teal-100"
+                            : "border border-transparent text-zinc-400 hover:bg-teal-400/10 hover:text-teal-100",
                         )}
                       >
                         <span className="truncate">{option.label}</span>

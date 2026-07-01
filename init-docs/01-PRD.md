@@ -11,7 +11,7 @@
 type UserRole = "admin" | "client";
 ```
 
-- **Admin / creator** — creates projects, chooses project visibility, uploads videos and still images, edits titles/status/tags, sets the banner, toggles downloads, manages folders/folder covers, shares review links, reads and handles feedback.
+- **Admin / creator** — creates projects, chooses project visibility, uploads videos and still images, edits status/tags, sets the banner, toggles downloads, manages folders/folder covers, shares review links, reads and handles feedback. Uploaded asset names/codes are stable ingest metadata, not editable fields.
 - **Client / reviewer** — opens a share link or a shared signed-in workspace, watches/scrubs video or inspects images, rates, shortlists, comments, and approves or requests changes. Downloads only if enabled. Clients do not get production controls such as upload, folder rename/move/cover edit, archive, clear media, or destructive actions.
 
 ## 2. Scope
@@ -72,7 +72,7 @@ type VideoStatus =
 - `rating: 0–5` — `≥ 4` ⇒ "Highly Rated".
 - `isSelect: boolean` — shortlist.
 - `assetClass: "VID" | "IMG" | "CTX" | "STB"` — video, image, contact/context sheet, storyboard.
-- `assetNumber: number` / `assetCode: string` — immutable project-wide upload identifier, e.g. `VID_20260623_00001`. Numbers are never reused, even after delete/archive.
+- `assetNumber: number` / `assetCode: string` — immutable project-wide upload identifier, e.g. `VID_20260623_00001`. Numbers are never reused, even after delete/archive. The visible asset title defaults to this upload code and should not be editable in the review UI.
 - Media behavior follows `assetClass` plus `mimeType`: `VID` / `video/*` assets use video playback and scrub controls; `IMG`, `CTX`, and `STB` use still-image rendering even when they share the same card/table/panel components.
 
 ### Smart views = a query over status + facets
@@ -121,7 +121,7 @@ export default defineSchema({
 
   projectFolders: defineTable({
     projectId: v.id("projects"),
-    title: v.string(),
+    title: v.string(),                         // upload-derived display name; not editable in review UI
     coverImageKey: v.optional(v.string()),     // admin-chosen folder tile cover
     order: v.number(),
     createdBy: v.id("users"),

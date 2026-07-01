@@ -227,7 +227,6 @@ export const createFromUpload = mutation({
 export const updateMetadata = mutation({
   args: {
     videoId: v.id("videos"),
-    title: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
     status: v.optional(statusValidator),
     downloadEnabled: v.optional(v.boolean()),
@@ -237,7 +236,6 @@ export const updateMetadata = mutation({
     if (!video) throw new Error("Video not found");
     await getProjectForEditor(ctx, video.projectId);
     const patch: Record<string, unknown> = { updatedAt: Date.now() };
-    if (args.title !== undefined) patch.title = args.title;
     if (args.tags !== undefined) patch.tags = args.tags;
     if (args.status !== undefined) {
       patch.status = args.status;
@@ -309,26 +307,6 @@ export const requestChanges = mutation({
     await getProjectForEditor(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       status: "needs_changes",
-      updatedAt: Date.now(),
-    });
-  },
-});
-
-export const resetStatus = mutation({
-  args: { videoId: v.id("videos") },
-  handler: async (ctx, args) => {
-    const video = await ctx.db.get(args.videoId);
-    if (!video) throw new Error("Video not found");
-    await getProjectForEditor(ctx, video.projectId);
-    await ctx.db.patch(args.videoId, {
-      status: "awaiting_review",
-      viewed: false,
-      rating: 0,
-      isSelect: false,
-      markedForDeletion: false,
-      feedbackNeedsAttention: false,
-      feedbackAcknowledgedAt: Date.now(),
-      approvedAt: undefined,
       updatedAt: Date.now(),
     });
   },
