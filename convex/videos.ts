@@ -85,6 +85,7 @@ async function nextAssetNumber(
 export const reserveAssetUpload = mutation({
   args: {
     projectId: v.id("projects"),
+    folderId: v.optional(v.id("projectFolders")),
     originalFilename: v.string(),
     mimeType: v.string(),
     assetClass: assetClassValidator,
@@ -96,12 +97,20 @@ export const reserveAssetUpload = mutation({
     const dateKey = normalizeDateKey(args.uploadDateKey);
     const number = await nextAssetNumber(ctx, project);
     const assetCode = `${args.assetClass}_${dateKey}_${String(number).padStart(5, "0")}`;
-    const folderId = await getOrCreateDateFolder(
-      ctx,
-      project._id,
-      admin._id,
-      dateKey,
-    );
+    let folderId = args.folderId;
+    if (folderId) {
+      const folder = await ctx.db.get(folderId);
+      if (!folder || folder.projectId !== project._id) {
+        throw new Error("Folder not found");
+      }
+    } else {
+      folderId = await getOrCreateDateFolder(
+        ctx,
+        project._id,
+        admin._id,
+        dateKey,
+      );
+    }
     await ctx.db.patch(project._id, {
       nextAssetNumber: number + 1,
       updatedAt: Date.now(),
@@ -137,6 +146,22 @@ export const getById = query({
     if (!video) throw new Error("Video not found");
     await getProjectForAdmin(ctx, video.projectId);
     return video;
+  },
+});
+
+export const getUploader = query({
+  args: { videoId: v.id("videos") },
+  handler: async (ctx, args) => {
+    const video = await ctx.db.get(args.videoId);
+    if (!video) throw new Error("Video not found");
+    await getProjectForAdmin(ctx, video.projectId);
+    const uploader = await ctx.db.get(video.uploadedBy);
+
+    return {
+      name: uploader?.name ?? "Unknown uploader",
+      role: uploader?.role ?? "admin",
+      uploadedAt: video.uploadedAt,
+    };
   },
 });
 

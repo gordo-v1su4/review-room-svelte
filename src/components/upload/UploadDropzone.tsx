@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import * as Popover from "@radix-ui/react-popover";
 import { useMutation } from "convex/react";
-import { Upload } from "lucide-react";
+import { Check, ChevronDown, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
+import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import {
   ASSET_CLASS_LABELS,
   isImageFileType,
@@ -32,6 +33,7 @@ type ClientPreviewResult = {
 };
 
 const UPLOAD_ASSET_CLASSES: AssetClass[] = ["VID", "IMG", "CTX", "STB"];
+const DATE_FOLDER_VALUE = "__date__";
 
 function assetClassForUpload(file: File, selectedAssetClass: AssetClass) {
   if (isVideoFileType(file.type, file.name)) return "VID";
@@ -288,7 +290,15 @@ function uploadViaPresignedUrl({
   });
 }
 
-export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
+export function UploadDropzone({
+  projectId,
+  folders,
+  initialFolderId,
+}: {
+  projectId: Id<"projects">;
+  folders: Doc<"projectFolders">[];
+  initialFolderId?: Id<"projectFolders"> | null;
+}) {
   const reserveUpload = useMutation(api.videos.reserveAssetUpload);
   const createVideo = useMutation(api.videos.createFromUpload);
   const markPreviewReady = useMutation(api.videos.setProcessingComplete);
@@ -296,6 +306,39 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
   const [files, setFiles] = useState<FileState[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedAssetClass, setSelectedAssetClass] = useState<AssetClass>("VID");
+  const [selectedFolderId, setSelectedFolderId] = useState<Id<"projectFolders"> | null>(
+    initialFolderId ?? null,
+  );
+  const sortedFolders = useMemo(
+    () => [...folders].sort((a, b) => a.order - b.order || a.title.localeCompare(b.title)),
+    [folders],
+  );
+  const selectedFolder = selectedFolderId
+    ? folders.find((folder) => folder._id === selectedFolderId)
+    : null;
+  const uploadDateKey = localDateKey();
+  const destinationLabel = selectedFolder
+    ? selectedFolder.title
+    : `Today's date folder (${uploadDateKey})`;
+  const destinationOptions = useMemo(
+    () => [
+      {
+        id: DATE_FOLDER_VALUE,
+        label: `Today's date folder (${uploadDateKey})`,
+      },
+      ...sortedFolders.map((folder) => ({
+        id: folder._id,
+        label: folder.title,
+      })),
+    ],
+    [sortedFolders, uploadDateKey],
+  );
+  const selectedDestinationValue = selectedFolderId ?? DATE_FOLDER_VALUE;
+  const selectDestination = (value: string) => {
+    setSelectedFolderId(
+      value === DATE_FOLDER_VALUE ? null : (value as Id<"projectFolders">),
+    );
+  };
 
   const uploadFiles = useCallback(
     async (list: File[]) => {
@@ -327,10 +370,11 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
           );
           const reservation = await reserveUpload({
             projectId,
+            ...(selectedFolderId ? { folderId: selectedFolderId } : {}),
             originalFilename: item.file.name,
             mimeType: normalizedMediaMimeType(item.file.type, item.file.name),
             assetClass: item.assetClass,
-            uploadDateKey: localDateKey(),
+            uploadDateKey,
           });
           const upload = await uploadViaPresignedUrl({
             file: item.file,
@@ -443,11 +487,70 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
         }),
       );
     },
-    [createVideo, markPreviewReady, markProcessingFailed, projectId, reserveUpload, selectedAssetClass],
+    [
+      createVideo,
+      markPreviewReady,
+      markProcessingFailed,
+      projectId,
+      reserveUpload,
+      selectedAssetClass,
+      selectedFolderId,
+      uploadDateKey,
+    ],
   );
 
   return (
     <div className="space-y-3">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3">
+        <div className="flex flex-col gap-2 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
+          <span className="font-medium text-zinc-300">Destination</span>
+          <Popover.Root>
+            <Popover.Trigger asChild>
+              <button
+                type="button"
+                className="inline-flex h-9 w-full items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-left text-xs text-zinc-200 outline-none transition hover:border-zinc-700 hover:bg-zinc-800 focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/25 sm:w-72"
+                aria-label="Choose upload destination"
+              >
+                <span className="truncate">{destinationLabel}</span>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+              </button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content
+                align="end"
+                sideOffset={6}
+                className="z-50 max-h-72 w-[var(--radix-popover-trigger-width)] overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-zinc-200 shadow-2xl shadow-black/45"
+              >
+                {destinationOptions.map((option) => {
+                  const isSelected = selectedDestinationValue === option.id;
+
+                  return (
+                    <Popover.Close asChild key={option.id}>
+                      <button
+                        type="button"
+                        onClick={() => selectDestination(option.id)}
+                        className={cn(
+                          "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-teal-300/80",
+                          isSelected
+                            ? "bg-teal-400 text-zinc-950"
+                            : "text-zinc-400 hover:bg-teal-400/15 hover:text-teal-100",
+                        )}
+                      >
+                        <span className="truncate">{option.label}</span>
+                        {isSelected && <Check className="h-3.5 w-3.5 shrink-0" />}
+                      </button>
+                    </Popover.Close>
+                  );
+                })}
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-zinc-600">
+          New uploads will be placed in {destinationLabel}. You can change this
+          before dropping or choosing files.
+        </p>
+      </div>
       <label
         className={cn(
           "flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed bg-zinc-900/40 px-4 py-9 text-center transition-colors hover:border-zinc-500 sm:px-6 sm:py-10",
@@ -476,7 +579,7 @@ export function UploadDropzone({ projectId }: { projectId: Id<"projects"> }) {
           Drop videos or images, or click to upload
         </span>
         <span className="mt-1 text-xs text-zinc-500">
-          Uploads use today&apos;s flat date folder and a permanent asset code
+          Destination: {destinationLabel}
         </span>
         <div
           className="mt-4 flex flex-wrap items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950/70 p-1"

@@ -16,6 +16,7 @@ import {
   type CommentReactionEmoji,
 } from "@/components/comments/CommentList";
 import { CommentComposer } from "@/components/comments/CommentComposer";
+import { AuthorBadge } from "@/components/comments/AuthorBadge";
 import { cn } from "@/lib/utils";
 import type { VideoStatus } from "@/lib/types";
 
@@ -30,6 +31,12 @@ const STATUS_OPTIONS: Array<{ value: VideoStatus; label: string }> = [
   { value: "final", label: "Final" },
   { value: "omitted", label: "Omit" },
 ];
+
+const UPLOADED_AT_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
 export function VideoDetailsPanel({
   video,
@@ -71,6 +78,10 @@ export function VideoDetailsPanel({
     mode === "client" && token ? { token, videoId: video._id } : "skip",
   );
   const comments = mode === "admin" ? adminComments : clientComments;
+  const uploader = useQuery(
+    api.videos.getUploader,
+    mode === "admin" ? { videoId: video._id } : "skip",
+  );
 
   const markViewedAdmin = useMutation(api.videos.markViewed);
   const markViewedClient = useMutation(api.reviewPublic.clientMarkViewed);
@@ -194,6 +205,29 @@ export function VideoDetailsPanel({
             ) : (
               <p className="text-sm text-zinc-300">{video.title}</p>
             )}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/45 p-3">
+              <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+                Uploaded by
+              </p>
+              {uploader ? (
+                <div className="flex items-center justify-between gap-3">
+                  <AuthorBadge
+                    name={uploader.name}
+                    role={uploader.role}
+                    compact
+                    className="min-w-0"
+                  />
+                  <span className="shrink-0 text-[11px] text-zinc-600">
+                    {UPLOADED_AT_FORMATTER.format(new Date(uploader.uploadedAt))}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-zinc-600">
+                  <span className="h-5 w-5 rounded-full border border-zinc-800 bg-zinc-950" />
+                  Loading uploader...
+                </div>
+              )}
+            </div>
           </div>
         )}
 

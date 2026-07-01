@@ -115,6 +115,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const archiveProject = useMutation(api.projects.archive);
   const updateProject = useMutation(api.projects.update);
   const startPreviewRefresh = useMutation(api.videos.startPreviewRefresh);
+  const markProcessingFailed = useMutation(api.videos.markProcessingFailed);
   const moveToFolder = useMutation(api.videos.moveToFolder);
   const renameFolderMutation = useMutation(api.folders.rename);
   const removeFolderMutation = useMutation(api.folders.remove);
@@ -290,21 +291,27 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           skippedImages++;
           continue;
         }
-        const job = await startPreviewRefresh({ videoId: video._id });
-        const res = await fetch("/api/media/enqueue", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            videoId: video._id,
-            storageKey: job.storageKey,
-            previousThumbnailKey: job.previousThumbnailKey,
-            previousSpriteKey: job.previousSpriteKey,
-          }),
-        });
-        if (res.ok) {
-          ok++;
-        } else {
+        try {
+          const job = await startPreviewRefresh({ videoId: video._id });
+          const res = await fetch("/api/media/enqueue", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              videoId: video._id,
+              storageKey: job.storageKey,
+              previousThumbnailKey: job.previousThumbnailKey,
+              previousSpriteKey: job.previousSpriteKey,
+            }),
+          });
+          if (res.ok) {
+            ok++;
+          } else {
+            failed++;
+            await markProcessingFailed({ videoId: video._id });
+          }
+        } catch {
           failed++;
+          await markProcessingFailed({ videoId: video._id }).catch(() => {});
         }
       }
       if (failed) {
@@ -483,7 +490,11 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           onClearVideos={() => void clearVideos()}
           canClearVideos={canManageAccess && videos.length > 0}
           onArchiveProject={() => void archiveCurrentProject()}
-          uploadHref={`/dashboard/projects/${projectId}/upload`}
+          uploadHref={
+            activeFolderId
+              ? `/dashboard/projects/${projectId}/upload?folder=${activeFolderId}`
+              : `/dashboard/projects/${projectId}/upload`
+          }
           canEditProject={canEditProject}
           canManageAccess={canManageAccess}
         />

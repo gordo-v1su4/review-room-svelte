@@ -231,7 +231,7 @@ Keep status changes tied to *decisions*; let facets carry everything else. On re
 
 Defaults on upload: `status: "awaiting_review"`, `viewed: false`, `rating: 0`, `isSelect: false`, `commentCount: 0`, `feedbackNeedsAttention: false`, `downloadEnabled: project.downloadEnabledByDefault`.
 
-Upload naming: every admin upload first reserves the next project-wide number and writes an immutable `assetCode` using `CLASS_YYYYMMDD_00001`. Date folders stay flat: all assets for a day live directly in the `YYYYMMDD` folder, while `VID` / `IMG` / `CTX` / `STB` drive master collections like Videos, Images, Contact Sheets, and Storyboards.
+Upload naming: every admin upload first reserves the next project-wide number and writes an immutable `assetCode` using `CLASS_YYYYMMDD_00001`. Date folders stay flat: if no destination is chosen, all assets for a day live directly in the `YYYYMMDD` folder. When upload is launched from an open real folder, the upload page preselects that folder and stores new assets there, while still using the current date in the immutable asset code. `VID` / `IMG` / `CTX` / `STB` drive master collections like Videos, Images, Contact Sheets, and Storyboards.
 
 Collections / bundles: folders are not the only way to gather assets. Type collections are automatic from `assetClass`; later custom bundles/playlists can be saved metadata views based on tags, selected assets, reviewer, client cut, or delivery purpose. An asset can appear in many collections without moving out of its original date folder.
 

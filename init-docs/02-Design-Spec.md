@@ -49,7 +49,7 @@ Tab definitions and which ones accept drops are in PRD §4–5.
 ## 5. Right-side viewer / details panel
 
 The second-most-important component after the card. Collapsible, integrated into the dark workspace — **not** a white modal.
-- **Contents:** large player; title; status; tags; rating; shortlist toggle; **Approve / Request Changes**; comments; download (if enabled); admin-only controls when admin.
+- **Contents:** large player; title; status; tags; uploader attribution for admins; rating; shortlist toggle; **Approve / Request Changes**; comments; download (if enabled); admin-only controls when admin.
 - **States:** closed (grid full width) · open (grid left, panel right) · expanded (player dominant) · optional fullscreen playback.
 - Smooth, fast open/close. Prefer this panel and drawers/popovers over blocking modals everywhere.
 
@@ -80,7 +80,7 @@ Simple and fast: a box, an "Add comment" button, and an optional "use current ti
 
 ## 9. Upload
 
-Sleek, no per-asset form. Drag-drop area, multi-file video and image uploads, bounded parallel uploads, per-file progress; states for success / failed / processing-thumbnail / ready. Assets appear in the grid quickly after upload, and admin-side local previews may appear before remote derivatives finish when the browser still has the dropped files.
+Sleek, no per-asset form. Drag-drop area, multi-file video and image uploads, bounded parallel uploads, per-file progress; states for success / failed / processing-thumbnail / ready. The upload page shows the destination folder before files are chosen: opening upload from inside a real folder preselects that folder, while the default remains today's flat date folder. Admins can change the destination before dropping or choosing files through a restrained dark destination menu whose selected and hover states use the teal accent, not the browser/OS default blue. Assets appear in the grid quickly after upload, and admin-side local previews may appear before remote derivatives finish when the browser still has the dropped files.
 
 ## 10. Scenes / Analyze (Phase 2)
 
@@ -92,7 +92,7 @@ Available but visually light — file-type toggles in the main toolbar, a filter
 
 ## 11a. Folders
 
-Folders are lightweight one-level project organization, not a replacement for smart views. Uploads default into a flat `YYYYMMDD` date folder. Do not create nested Videos/Images/Contact Sheets folders inside a date folder; use `VID`, `IMG`, `CTX`, and `STB` asset-class filters instead. The sidebar can show master collections such as Videos, Images, Contact Sheets, and Storyboards as automatic metadata views. These smart folders must look distinct from real folders, auto-count their contents, and not accept drag/drop, rename, delete, or manual placement. Later client bundles/playlists can use the same pattern for saved groupings without moving files. The project root shows folder tiles above loose assets; opening a folder scopes the grid and smart-view counts to that folder. Admins can create and rename root-level date/manual folders, upload/reset a folder cover image from the folder edit control, and drag media cards onto folder tiles or the existing app sidebar folder entries to move assets. Folder covers fall back to the newest image asset inside the folder when no custom cover is set. The sidebar root entry accepts drops to move assets back out of a folder. Clients see folder names/covers but do not get folder edit or drag/drop management controls. Client review links can remain grid-first unless folder navigation is explicitly enabled later.
+Folders are lightweight one-level project organization, not a replacement for smart views. Uploads default into a flat `YYYYMMDD` date folder unless the admin opens upload from inside a real folder or chooses a folder in the upload destination control. Do not create nested Videos/Images/Contact Sheets folders inside a date folder; use `VID`, `IMG`, `CTX`, and `STB` asset-class filters instead. The sidebar can show master collections such as Videos, Images, Contact Sheets, and Storyboards as automatic metadata views. These smart folders must look distinct from real folders, auto-count their contents, and not accept drag/drop, rename, delete, or manual placement. Later client bundles/playlists can use the same pattern for saved groupings without moving files. The project root shows folder tiles above loose assets; opening a folder scopes the grid and smart-view counts to that folder. Admins can create and rename root-level date/manual folders, upload/reset a folder cover image from the folder edit control, and drag media cards onto folder tiles or the existing app sidebar folder entries to move assets. Folder covers fall back to the newest image asset inside the folder when no custom cover is set. The sidebar root entry accepts drops to move assets back out of a folder. Clients see folder names/covers but do not get folder edit or drag/drop management controls. Client review links can remain grid-first unless folder navigation is explicitly enabled later.
 
 ## 12. Visual direction & token system
 
