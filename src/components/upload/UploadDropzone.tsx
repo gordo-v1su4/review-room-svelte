@@ -552,6 +552,7 @@ export function UploadDropzone({
         </p>
       </div>
       <label
+        htmlFor="upload-file-input"
         className={cn(
           "flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed bg-zinc-900/40 px-4 py-9 text-center transition-colors hover:border-zinc-500 sm:px-6 sm:py-10",
           isDragging ? "border-zinc-300 bg-zinc-800/60" : "border-zinc-700",
@@ -603,6 +604,7 @@ export function UploadDropzone({
           ))}
         </div>
         <input
+          id="upload-file-input"
           type="file"
           accept="video/*,image/*"
           multiple
