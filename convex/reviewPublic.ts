@@ -3,6 +3,18 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 
+const annotationStrokeValidator = v.object({
+  id: v.string(),
+  color: v.string(),
+  width: v.number(),
+  points: v.array(
+    v.object({
+      x: v.number(),
+      y: v.number(),
+    }),
+  ),
+});
+
 async function getLink(ctx: QueryCtx, token: string) {
   const link = await ctx.db
     .query("reviewLinks")
@@ -143,6 +155,27 @@ export const clientToggleSelect = mutation({
   },
 });
 
+export const clientSaveAnnotations = mutation({
+  args: {
+    token: v.string(),
+    videoId: v.id("videos"),
+    strokes: v.array(annotationStrokeValidator),
+  },
+  handler: async (ctx, args) => {
+    const link = await getLink(ctx, args.token);
+    const video = await ctx.db.get(args.videoId);
+    if (!video || video.projectId !== link.projectId) {
+      throw new Error("Video not found");
+    }
+    const strokes = normalizeStrokes(args.strokes);
+    await ctx.db.patch(args.videoId, {
+      annotationStrokes: strokes,
+      annotatedAt: strokes.length ? Date.now() : undefined,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 export const clientApprove = mutation({
   args: { token: v.string(), videoId: v.id("videos") },
   handler: async (ctx, args) => {
@@ -159,6 +192,29 @@ export const clientApprove = mutation({
     });
   },
 });
+
+function normalizeStrokes(strokes: Array<{
+  id: string;
+  color: string;
+  width: number;
+  points: Array<{ x: number; y: number }>;
+}>) {
+  return strokes
+    .slice(0, 120)
+    .map((stroke) => ({
+      id: stroke.id.slice(0, 80),
+      color: /^#[0-9a-fA-F]{6}$/.test(stroke.color) ? stroke.color : "#ef4444",
+      width: Math.max(2, Math.min(18, Math.round(stroke.width))),
+      points: stroke.points
+        .slice(0, 1500)
+        .map((point) => ({
+          x: Math.max(0, Math.min(1, point.x)),
+          y: Math.max(0, Math.min(1, point.y)),
+        }))
+        .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
+    }))
+    .filter((stroke) => stroke.points.length > 1);
+}
 
 export const clientRequestChanges = mutation({
   args: { token: v.string(), videoId: v.id("videos") },

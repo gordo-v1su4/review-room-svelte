@@ -65,6 +65,45 @@ input:-webkit-autofill:active {
   scrollbar-width: none;
 }
 
+.annotation-size-slider {
+  height: 14px;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+}
+
+.annotation-size-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 0;
+  background: rgb(45 212 191 / 0.9);
+}
+
+.annotation-size-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 4px;
+  height: 14px;
+  margin-top: -5.5px;
+  border: 1px solid rgb(45 212 191 / 0.95);
+  border-radius: 1px;
+  background: rgb(24 24 27);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55);
+}
+
+.annotation-size-slider::-moz-range-track {
+  height: 3px;
+  border-radius: 0;
+  background: rgb(45 212 191 / 0.9);
+}
+
+.annotation-size-slider::-moz-range-thumb {
+  width: 4px;
+  height: 14px;
+  border: 1px solid rgb(45 212 191 / 0.95);
+  border-radius: 1px;
+  background: rgb(24 24 27);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55);
+}
+
 *::-webkit-scrollbar {
   height: 8px;
   width: 8px;

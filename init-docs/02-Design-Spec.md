@@ -34,6 +34,7 @@ Don't design four heavyweight layouts. The card and the right-side panel carry t
 
 - **Grid (default, MVP)** — responsive cards, small/medium/large sizing, hover scrub affordance, clear selected state, good empty/loading states. Most-used view.
 - **Review / focus (MVP)** — large player with prev/next, metadata, comments, actions; implemented as the *expanded state of the right-side panel*, not a separate screen. Optional filmstrip of nearby videos.
+- **Image fullscreen markup (MVP)** — double-clicking a still image opens a fullscreen review surface with compact drawing controls. Keep it minimal: color swatches, brush size, undo, clear, save, rating, shortlist, and close. Saved strokes render over the image and appear on its grid thumbnail with a red pen indicator.
 - **Grouped (optional, low cost)** — the smart views rendered as stacked sections (each a wrapping row of the *same* cards). Communicates "generated from metadata," not a board. Avoid column-and-drag as the primary metaphor; drag is the optional override from PRD §4.
 - **Table (MVP / operational)** — compact ShotGrid/FTrack-style production view powered by TanStack Table. Shows thumbnail/latest visual, asset code/name, asset class, status, review attention state, rating, note count, latest actionable note, note date, updated date, and duration. At project root, Table is the all-project action board; folder and smart-folder selections narrow it. It should sort like a lightweight Airtable while still reading as a cinematic media review surface, not a raw spreadsheet.
 
@@ -60,6 +61,8 @@ The second-most-important component after the card. Collapsible, integrated into
 **Shows:** thumbnail or scrub frame; optional duration/type label; title; small status pill; tags; rating; comment count; selected/approved/needs-changes indicator; optional download icon.
 
 **Hover scrub:** when a scrub sprite or preview cache exists, horizontal pointer movement over the thumbnail should seek the visible frame immediately. It should feel like FreeCut's media grid: no popover, no heavy player chrome, just quick visual inspection. Still images do not show a scrub cursor. If the preview is still processing, keep the thumbnail/processing state stable.
+
+**Image markup:** still-image cards render saved drawing strokes over the thumbnail and show a small red pen indicator when markup exists. The pen opens the fullscreen markup view; the original image remains unchanged.
 
 **States to design:** default · hover · selected · viewed · commented · approved · needs-changes · uploading · processing-thumbnail · error/missing.
 

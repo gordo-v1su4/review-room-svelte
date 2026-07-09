@@ -1,15 +1,22 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "convex/react";
-import { Bookmark, X } from "lucide-react";
+import { Bookmark, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
 import { Button } from "@/components/ui/button";
 import { VideoRatingControl } from "./VideoRatingControl";
 import { cn } from "@/lib/utils";
+import {
+  ANNOTATION_COLORS,
+  ImageAnnotationCanvas,
+  annotationSignature,
+  type AnnotationStroke,
+} from "./ImageAnnotationLayer";
 
 export function ImageLightbox({
   video,
@@ -30,6 +37,21 @@ export function ImageLightbox({
   const setRatingClient = useMutation(api.reviewPublic.clientSetRating);
   const toggleSelectAdmin = useMutation(api.videos.toggleSelect);
   const toggleSelectClient = useMutation(api.reviewPublic.clientToggleSelect);
+  const saveAnnotationsAdmin = useMutation(api.videos.saveAnnotations);
+  const saveAnnotationsClient = useMutation(api.reviewPublic.clientSaveAnnotations);
+  const [draftStrokes, setDraftStrokes] = useState<AnnotationStroke[]>([]);
+  const [annotationColor, setAnnotationColor] = useState(ANNOTATION_COLORS[0]);
+  const [annotationWidth, setAnnotationWidth] = useState(4);
+  const [savingAnnotations, setSavingAnnotations] = useState(false);
+  const savedAnnotationSignature = useMemo(
+    () => annotationSignature(video?.annotationStrokes as AnnotationStroke[] | undefined),
+    [video?.annotationStrokes],
+  );
+  const draftAnnotationSignature = useMemo(
+    () => annotationSignature(draftStrokes),
+    [draftStrokes],
+  );
+  const annotationsDirty = savedAnnotationSignature !== draftAnnotationSignature;
 
   useEffect(() => {
     if (!video || video.viewed) return;
@@ -41,6 +63,10 @@ export function ImageLightbox({
       void markViewedAdmin({ videoId: video._id });
     }
   }, [markViewedAdmin, markViewedClient, mode, token, video]);
+
+  useEffect(() => {
+    setDraftStrokes((video?.annotationStrokes as AnnotationStroke[] | undefined) ?? []);
+  }, [video?._id, video?.annotationStrokes]);
 
   function setRating(rating: number) {
     if (!video) return;
@@ -60,12 +86,33 @@ export function ImageLightbox({
     void toggleSelectAdmin({ videoId: video._id });
   }
 
+  async function saveAnnotations() {
+    if (!video) return;
+    setSavingAnnotations(true);
+    try {
+      if (mode === "client" && token) {
+        await saveAnnotationsClient({
+          token,
+          videoId: video._id,
+          strokes: draftStrokes,
+        });
+      } else {
+        await saveAnnotationsAdmin({ videoId: video._id, strokes: draftStrokes });
+      }
+      toast.success(draftStrokes.length ? "Markup saved" : "Markup cleared");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save markup");
+    } finally {
+      setSavingAnnotations(false);
+    }
+  }
+
   return (
     <Dialog.Root open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-md" />
         <Dialog.Content className="fixed inset-0 z-[90] grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-zinc-950/35 text-zinc-50 outline-none">
-          <div className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 bg-black/30 px-4 py-3 backdrop-blur sm:px-6">
+          <div className="min-w-0 border-b border-white/10 bg-black/30 px-4 py-3 pr-4 backdrop-blur sm:px-6 lg:pr-[36rem]">
             <div className="min-w-0">
               <Dialog.Title className="truncate text-sm font-medium text-zinc-100">
                 {video?.title ?? "Image preview"}
@@ -76,42 +123,149 @@ export function ImageLightbox({
                 </Dialog.Description>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="fixed right-3 top-3 z-[110] flex max-w-[calc(100vw-1.5rem)] shrink-0 items-center justify-end gap-2 overflow-x-auto rounded-lg bg-black/10 pl-1 no-scrollbar">
               {video && (
                 <>
-                  <VideoRatingControl value={video.rating} onChange={setRating} />
+                  <div
+                    className="inline-flex items-center"
+                    style={{
+                      height: 28,
+                      gap: 6,
+                      border: "1px solid rgb(255 255 255 / 0.1)",
+                      borderRadius: 4,
+                      background: "rgb(255 255 255 / 0.05)",
+                      padding: "0 6px",
+                    }}
+                  >
+                    {ANNOTATION_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        title={`Draw ${color}`}
+                        aria-label={`Draw ${color}`}
+                        className="shrink-0 rounded-full transition"
+                        style={{
+                          width: 14,
+                          height: 14,
+                          backgroundColor: color,
+                          border:
+                            annotationColor === color
+                              ? "1px solid rgb(255 255 255 / 0.95)"
+                              : "1px solid rgb(255 255 255 / 0.25)",
+                          boxShadow:
+                            annotationColor === color
+                              ? "0 0 0 2px rgb(255 255 255 / 0.16), 0 0 0 4px rgb(0 0 0 / 0.35)"
+                              : "none",
+                          filter:
+                            annotationColor === color
+                              ? "none"
+                              : "saturate(0.55) brightness(0.75)",
+                          opacity: annotationColor === color ? 1 : 0.35,
+                          transform:
+                            annotationColor === color ? "scale(1.08)" : "scale(1)",
+                        }}
+                        onClick={() => setAnnotationColor(color)}
+                      />
+                    ))}
+                  </div>
+                  <div
+                    className="inline-flex items-center"
+                    style={{
+                      height: 28,
+                      border: "1px solid rgb(255 255 255 / 0.1)",
+                      borderRadius: 4,
+                      background: "rgb(255 255 255 / 0.05)",
+                      padding: "0 8px",
+                    }}
+                    onPointerDown={(event) => event.stopPropagation()}
+                  >
+                    <input
+                      type="range"
+                      aria-label="Brush size"
+                      min={1}
+                      max={9}
+                      value={annotationWidth}
+                      className="annotation-size-slider w-14"
+                      onChange={(event) => setAnnotationWidth(Number(event.target.value))}
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
-                    className="h-9 gap-1.5 border border-white/10 bg-white/5 px-3 text-xs hover:bg-white/10"
+                    size="icon"
+                    title="Undo markup"
+                    className="h-7 w-7 border border-white/10 bg-white/5 hover:bg-white/10"
+                    disabled={!draftStrokes.length}
+                    onClick={() => setDraftStrokes((strokes) => strokes.slice(0, -1))}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span className="sr-only">Undo markup</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    title="Clear markup"
+                    className="h-7 w-7 border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-red-200"
+                    disabled={!draftStrokes.length}
+                    onClick={() => setDraftStrokes([])}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span className="sr-only">Clear markup</span>
+                  </Button>
+                  <button
+                    type="button"
+                    title="Save markup"
+                    className="inline-flex h-7 min-h-7 items-center justify-center gap-1.5 rounded-md border border-teal-400/30 bg-teal-500 px-2.5 py-0 text-[11px] font-medium leading-none text-zinc-950 transition-colors hover:bg-teal-400 disabled:pointer-events-none disabled:opacity-50"
+                    disabled={!annotationsDirty || savingAnnotations}
+                    onClick={() => void saveAnnotations()}
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    Save
+                  </button>
+                  <VideoRatingControl value={video.rating} onChange={setRating} />
+                  <button
+                    type="button"
+                    className="inline-flex h-7 min-h-7 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-0 text-[11px] font-medium leading-none text-zinc-200 transition-colors hover:bg-white/10"
                     onClick={toggleShortlist}
                   >
                     <Bookmark
                       className={cn(
-                        "h-4 w-4",
+                        "h-3.5 w-3.5",
                         video.isSelect && "fill-sky-400 text-sky-400",
                       )}
                     />
                     Shortlist
-                  </Button>
+                  </button>
                 </>
               )}
-              <Dialog.Close className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white">
-                <X className="h-4 w-4" />
+              <Dialog.Close className="grid h-7 w-7 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white">
+                <X className="h-3.5 w-3.5" />
                 <span className="sr-only">Close image preview</span>
               </Dialog.Close>
             </div>
           </div>
           <div className="grid h-full min-h-0 place-items-center overflow-hidden px-3 py-4 sm:px-8 sm:py-6">
             {imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={imageUrl}
-                alt={video?.title ?? ""}
-                className="block h-auto w-auto max-w-full object-contain shadow-2xl shadow-black/60"
-                style={{ maxHeight: "calc(100dvh - 8rem)" }}
-              />
+              <div
+                className="relative inline-block max-w-full shadow-2xl shadow-black/60"
+                style={{ maxHeight: "calc(100dvh - 8.5rem)" }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageUrl}
+                  alt={video?.title ?? ""}
+                  className="block h-auto w-auto max-w-full object-contain"
+                  style={{ maxHeight: "calc(100dvh - 8.5rem)" }}
+                  draggable={false}
+                />
+                <ImageAnnotationCanvas
+                  strokes={draftStrokes}
+                  color={annotationColor}
+                  width={annotationWidth}
+                  onChange={setDraftStrokes}
+                />
+              </div>
             ) : (
               <div className="text-sm text-zinc-500">Loading image...</div>
             )}

@@ -9,7 +9,15 @@ import {
   useState,
 } from "react";
 import { useMutation } from "convex/react";
-import { MessageSquare, Download, Bookmark, Maximize2, Star, Trash2 } from "lucide-react";
+import {
+  MessageSquare,
+  Download,
+  Bookmark,
+  Maximize2,
+  PenLine,
+  Star,
+  Trash2,
+} from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
 import type { CardAspectRatio, ThumbnailScale } from "@/lib/types";
@@ -18,6 +26,11 @@ import { formatDuration } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { VideoStatusPill } from "./VideoStatusPill";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
+import {
+  ImageAnnotationOverlay,
+  hasImageAnnotations,
+  type AnnotationStroke,
+} from "./ImageAnnotationLayer";
 
 export function VideoCard({
   video,
@@ -51,6 +64,8 @@ export function VideoCard({
   );
   const spriteUrl = useStorageUrl(video.spriteKey, video.updatedAt);
   const canScrub = Boolean(spriteUrl);
+  const annotationStrokes = video.annotationStrokes as AnnotationStroke[] | undefined;
+  const annotated = hasImageAnnotations(annotationStrokes);
   const toggleSelectAdmin = useMutation(api.videos.toggleSelect);
   const toggleSelectClient = useMutation(api.reviewPublic.clientToggleSelect);
   const setRatingAdmin = useMutation(api.videos.setRating);
@@ -88,6 +103,15 @@ export function VideoCard({
       spriteUrl,
       thumbnailScale,
     ],
+  );
+  const annotationSurfaceStyle = useMemo(
+    () =>
+      getMediaSurfaceStyle({
+        containerAspect,
+        mediaAspect: frameAspect,
+        scale: thumbnailScale,
+      }),
+    [containerAspect, frameAspect, thumbnailScale],
   );
   const titleClass =
     size === "lg"
@@ -208,6 +232,14 @@ export function VideoCard({
             style={{ left: `${hoverPct * 100}%` }}
           />
         )}
+        {isImage && annotated && (
+          <div
+            className="pointer-events-none absolute left-1/2 top-1/2 z-[8]"
+            style={annotationSurfaceStyle}
+          >
+            <ImageAnnotationOverlay strokes={annotationStrokes} scaleStroke />
+          </div>
+        )}
         {video.markedForDeletion && actionMode === "admin" && (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-red-950/55 text-red-100 ring-1 ring-inset ring-red-500/30 backdrop-blur-[1px]">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-red-300/25 bg-black/45 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide">
@@ -234,6 +266,21 @@ export function VideoCard({
               onClick={openImagePreview}
             >
               <Maximize2 className="h-3 w-3" />
+            </button>
+          )}
+          {isImage && onOpenImagePreview && (
+            <button
+              type="button"
+              title={annotated ? "Markup saved" : "Markup"}
+              className={cn(
+                "grid h-6 w-6 place-items-center rounded-full text-zinc-300 transition hover:bg-white/10 hover:text-white",
+                annotated && "text-red-300",
+              )}
+              onClick={openImagePreview}
+            >
+              <PenLine
+                className={cn("h-3 w-3", annotated && "fill-red-500/20 text-red-400")}
+              />
             </button>
           )}
           <button
@@ -331,6 +378,7 @@ export function VideoCard({
             {video.isSelect && (
               <Bookmark className="h-3 w-3 fill-sky-400 text-sky-400" />
             )}
+            {annotated && <PenLine className="h-3 w-3 text-red-400" />}
             {video.downloadEnabled && <Download className="h-3 w-3" />}
             {video.assetClass && (
               <span title={assetClassLabel(video.assetClass)}>{video.assetClass}</span>
@@ -402,5 +450,40 @@ function getSpriteSurfaceStyle({
     backgroundSize: `${frameCount * 100}% 100%`,
     backgroundPosition:
       frameCount <= 1 ? "0% center" : `${(frameIndex / (frameCount - 1)) * 100}% center`,
+  };
+}
+
+function getMediaSurfaceStyle({
+  containerAspect,
+  mediaAspect,
+  scale,
+}: {
+  containerAspect: number;
+  mediaAspect: number;
+  scale: ThumbnailScale;
+}): CSSProperties {
+  const mediaRatio = Math.max(mediaAspect, 0.1);
+  const mediaIsWider = mediaRatio > containerAspect;
+  const width =
+    scale === "fit"
+      ? mediaIsWider
+        ? "100%"
+        : `${(mediaRatio / containerAspect) * 100}%`
+      : mediaIsWider
+        ? `${(mediaRatio / containerAspect) * 100}%`
+        : "100%";
+  const height =
+    scale === "fit"
+      ? mediaIsWider
+        ? `${(containerAspect / mediaRatio) * 100}%`
+        : "100%"
+      : mediaIsWider
+        ? "100%"
+        : `${(containerAspect / mediaRatio) * 100}%`;
+
+  return {
+    width,
+    height,
+    transform: "translate(-50%, -50%)",
   };
 }

@@ -26,6 +26,18 @@ const assetClassValidator = v.union(
   v.literal("STB"),
 );
 
+const annotationStrokeValidator = v.object({
+  id: v.string(),
+  color: v.string(),
+  width: v.number(),
+  points: v.array(
+    v.object({
+      x: v.number(),
+      y: v.number(),
+    }),
+  ),
+});
+
 function normalizeDateKey(value: string) {
   if (!/^\d{8}$/.test(value)) throw new Error("Upload date must be YYYYMMDD");
   return value;
@@ -284,6 +296,24 @@ export const toggleSelect = mutation({
   },
 });
 
+export const saveAnnotations = mutation({
+  args: {
+    videoId: v.id("videos"),
+    strokes: v.array(annotationStrokeValidator),
+  },
+  handler: async (ctx, args) => {
+    const video = await ctx.db.get(args.videoId);
+    if (!video) throw new Error("Video not found");
+    await getProjectForAdmin(ctx, video.projectId);
+    const strokes = normalizeStrokes(args.strokes);
+    await ctx.db.patch(args.videoId, {
+      annotationStrokes: strokes,
+      annotatedAt: strokes.length ? Date.now() : undefined,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 export const approve = mutation({
   args: { videoId: v.id("videos") },
   handler: async (ctx, args) => {
@@ -298,6 +328,29 @@ export const approve = mutation({
     });
   },
 });
+
+function normalizeStrokes(strokes: Array<{
+  id: string;
+  color: string;
+  width: number;
+  points: Array<{ x: number; y: number }>;
+}>) {
+  return strokes
+    .slice(0, 120)
+    .map((stroke) => ({
+      id: stroke.id.slice(0, 80),
+      color: /^#[0-9a-fA-F]{6}$/.test(stroke.color) ? stroke.color : "#ef4444",
+      width: Math.max(2, Math.min(18, Math.round(stroke.width))),
+      points: stroke.points
+        .slice(0, 1500)
+        .map((point) => ({
+          x: Math.max(0, Math.min(1, point.x)),
+          y: Math.max(0, Math.min(1, point.y)),
+        }))
+        .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
+    }))
+    .filter((stroke) => stroke.points.length > 1);
+}
 
 export const requestChanges = mutation({
   args: { videoId: v.id("videos") },
