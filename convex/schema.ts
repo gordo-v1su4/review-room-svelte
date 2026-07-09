@@ -38,6 +38,18 @@ const reviewAppearance = v.object({
   showCardInfo: v.boolean(),
 });
 
+const annotationStroke = v.object({
+  id: v.string(),
+  color: v.string(),
+  width: v.number(),
+  points: v.array(
+    v.object({
+      x: v.number(),
+      y: v.number(),
+    }),
+  ),
+});
+
 const applicationTables = {
   appUsers: defineTable({
     authUserId: v.id("users"),
@@ -120,6 +132,8 @@ const applicationTables = {
     commentCount: v.number(),
     tags: v.array(v.string()),
     markedForDeletion: v.optional(v.boolean()),
+    annotationStrokes: v.optional(v.array(annotationStroke)),
+    annotatedAt: v.optional(v.number()),
     feedbackNeedsAttention: v.optional(v.boolean()),
     feedbackAcknowledgedAt: v.optional(v.number()),
     downloadEnabled: v.boolean(),

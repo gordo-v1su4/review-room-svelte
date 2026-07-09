@@ -22,6 +22,7 @@ type UserRole = "admin" | "client";
 - Direct-to-storage upload (presigned), drag/drop batch import for video and image files, bounded parallel uploads, per-file progress, auto thumbnail + video scrub sprite.
 - Video grid with the card system; hover scrub on every ready card; right-side viewer/details panel.
 - Status + tags + 0–5 rating + shortlist (select) + comments (with optional timecode).
+- Still-image drawing markup in fullscreen preview: reviewers/admins can draw colored strokes, undo local strokes, clear, and save the markup back to the asset so it appears on thumbnails.
 - Metadata-driven smart views (§4) exposed as tabs.
 - Client review page via share link (+ optional passcode).
 - Per-asset download via signed URL when enabled.
@@ -29,7 +30,7 @@ type UserRole = "admin" | "client";
 - File-type filtering over review media, starting with video and image assets and leaving room for future document-like types.
 
 **Not in MVP**
-- Threaded comments, drawing annotations, frame-accurate comment sync.
+- Threaded comments, video/frame-accurate drawing annotations, frame-accurate comment sync.
 - Transcoding, proxy generation, batch download.
 - Teams/orgs, enterprise permissions, outbound email notifications. The app can still provide an in-app feedback Inbox/digest.
 - The full freecut editor/timeline/export surface.
@@ -71,6 +72,7 @@ type VideoStatus =
 - `feedbackNeedsAttention: boolean` — `true` ⇒ "Needs Attention" and Inbox follow-up.
 - `rating: 0–5` — `≥ 4` ⇒ "Highly Rated".
 - `isSelect: boolean` — shortlist.
+- `annotationStrokes` / `annotatedAt` — optional still-image review markup, stored as normalized vector strokes so the original image blob is unchanged.
 - `assetClass: "VID" | "IMG" | "CTX" | "STB"` — video, image, contact/context sheet, storyboard.
 - `assetNumber: number` / `assetCode: string` — immutable project-wide upload identifier, e.g. `VID_20260623_00001`. Numbers are never reused, even after delete/archive. The visible asset title defaults to this upload code and should not be editable in the review UI.
 - Media behavior follows `assetClass` plus `mimeType`: `VID` / `video/*` assets use video playback and scrub controls; `IMG`, `CTX`, and `STB` use still-image rendering even when they share the same card/table/panel components.
@@ -158,6 +160,13 @@ export default defineSchema({
     commentCount: v.number(),
     feedbackNeedsAttention: v.optional(v.boolean()),
     feedbackAcknowledgedAt: v.optional(v.number()),
+    annotationStrokes: v.optional(v.array(v.object({
+      id: v.string(),
+      color: v.string(),
+      width: v.number(),
+      points: v.array(v.object({ x: v.number(), y: v.number() })),
+    }))),                                   // still-image review markup, normalized 0..1
+    annotatedAt: v.optional(v.number()),
     // misc
     tags: v.array(v.string()),
     downloadEnabled: v.boolean(),
@@ -225,6 +234,7 @@ Keep status changes tied to *decisions*; let facets carry everything else. On re
 - **Table note display** → the table is an action board, not a raw chat log. Prefer open notes from the other side; collapse extra history behind an "N more notes" affordance when expanded behavior is added.
 - **Rating set** → store `rating` (surfaces in "Highly Rated" at ≥4).
 - **Shortlist toggled** → `isSelect = !isSelect`.
+- **Still-image markup saved** → store normalized vector `annotationStrokes`, set `annotatedAt` when non-empty, and render the saved marks on fullscreen preview plus image thumbnails. This does not alter the original image blob.
 - **Approve** → `status = approved`, `approvedAt = now`.
 - **Request Changes** → `status = needs_changes`.
 - **Admin override** → may set any `status`, or drag a card into a droppable section (§4) to set the mapped field.
