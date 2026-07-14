@@ -26,7 +26,7 @@ A calmer, stripped subset of the workspace. Header with banner, title, a one-lin
 
 ## 2. Admin vs client
 
-Same components, different surface. **Admin** adds: edit status/tags, share link, download settings, folder create/rename/move/cover controls, delete/archive, advanced filters, internal metadata. Uploaded filenames/asset codes are read-only ingest metadata. **Client** sees: watch, rate, shortlist, comment, Approve / Request Changes, upload media into the project (same destination-folder upload flow), table/grid/review views, download-if-allowed. Client UI is quieter and uses human labels, never internal status strings.
+Same components, different surface. **Admin** adds: edit status/tags, share link, download settings, folder create/rename/move/cover controls, delete/archive, advanced filters, internal metadata. Uploaded filenames/asset codes are read-only ingest metadata. **Client** sees: watch, rate, shortlist, comment, Approve / Request Changes, upload media into the project (same destination-folder upload flow), **Mark for delete** (flags media for admin removal; clients cannot permanently delete), table/grid/review views, download-if-allowed. Client UI is quieter and uses human labels, never internal status strings.
 
 ## 3. Views — trimmed for MVP
 

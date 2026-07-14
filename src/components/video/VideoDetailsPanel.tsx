@@ -333,27 +333,25 @@ export function VideoDetailsPanel({
           </div>
         )}
 
-        {mode === "admin" && (canEdit || canDelete) && (
+        {mode === "admin" && (
           <div className="grid gap-2 sm:grid-cols-2">
-            {canEdit && (
-              <Button
-                variant="ghost"
-                className={cn(
-                  "justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-300",
-                  video.markedForDeletion &&
-                    "border-red-900/70 bg-red-950/20 text-red-300",
-                )}
-                onClick={() =>
-                  void setMarkedForDeletion({
-                    videoId: video._id,
-                    marked: !video.markedForDeletion,
-                  })
-                }
-              >
-                <Flag className="h-4 w-4" />
-                {video.markedForDeletion ? "Unmark" : "Mark for delete"}
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              className={cn(
+                "justify-start gap-2 border border-zinc-800 text-zinc-500 hover:border-red-900/60 hover:bg-red-950/20 hover:text-red-300",
+                video.markedForDeletion &&
+                  "border-red-900/70 bg-red-950/20 text-red-300",
+              )}
+              onClick={() =>
+                void setMarkedForDeletion({
+                  videoId: video._id,
+                  marked: !video.markedForDeletion,
+                })
+              }
+            >
+              <Flag className="h-4 w-4" />
+              {video.markedForDeletion ? "Unmark" : "Mark for delete"}
+            </Button>
             {canDelete && (
               <Button
                 variant="ghost"

@@ -468,7 +468,8 @@ export const setMarkedForDeletion = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
-    await getProjectForEditor(ctx, video.projectId);
+    // Any project member (including shared clients) can flag media for admin removal.
+    await getProjectForAdmin(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       markedForDeletion: args.marked,
       updatedAt: Date.now(),
