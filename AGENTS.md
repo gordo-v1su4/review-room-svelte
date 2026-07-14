@@ -24,7 +24,7 @@ Do not duplicate facts across docs; update the doc that owns the topic.
 
 - **Not a video editor** — no timeline, compositing, color tools, or transcoding pipeline in MVP.
 - **Feel** — calm, editorial, cinematic, dark. Video is the hero; UI stays restrained.
-- **Roles** — admin/creator vs client/reviewer (see PRD §1 and §9). Clients may review/comment in the signed-in dashboard when shared, but production controls remain admin-only.
+- **Roles** — admin/creator vs client/reviewer (see PRD §1 and §9). Clients may review/comment/upload in the signed-in dashboard when shared; folder management, archive, and destructive production controls remain admin-only.
 - **MVP focus** — upload, review playback, ratings, shortlist, comments, smart views, table view, feedback Inbox, share links.
 
 ## Commands
@@ -54,7 +54,7 @@ Homelab env: copy from pindeck with `scripts/use-homelab-env.ps1`, then add `S3_
 - Smart views = queries over `status` + facets (see PRD §4–5)
 - Asset class drives media behavior: only `VID` / `video/*` assets get video playback controls; `IMG`, `CTX`, and `STB` render as still-image review assets.
 - Project folders are one-level real folders; date folders stay flat. Videos/Images/Contact Sheets/Storyboards are smart metadata collections, not nested folders.
-- Folder create/rename/move/cover upload, uploads, archive, and destructive production controls are admin-only in UI and Convex mutations.
+- Folder create/rename/move/cover, archive, and destructive production controls are admin-only in UI and Convex mutations. Media upload is available to signed-in project members (admin and client).
 - Brand color on banner/CTA only; status pills use semantic tokens
 - Self-hosted Convex/RustFS per `docs/adr/001-infrastructure.md` (pindeck reference)
 

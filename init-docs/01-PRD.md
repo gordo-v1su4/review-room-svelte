@@ -12,7 +12,7 @@ type UserRole = "admin" | "client";
 ```
 
 - **Admin / creator** — creates projects, chooses project visibility, uploads videos and still images, edits status/tags, sets the banner, toggles downloads, manages folders/folder covers, shares review links, reads and handles feedback. Uploaded asset names/codes are stable ingest metadata, not editable fields.
-- **Client / reviewer** — opens a share link or a shared signed-in workspace, watches/scrubs video or inspects images, rates, shortlists, comments, and approves or requests changes. Downloads only if enabled. Clients do not get production controls such as upload, folder rename/move/cover edit, archive, clear media, or destructive actions.
+- **Client / reviewer** — opens a share link or a shared signed-in workspace, watches/scrubs video or inspects images, rates, shortlists, comments, approves or requests changes, and can upload reference/media into the shared project (same upload flow as admins, including destination folder). Downloads only if enabled. Clients do not get production controls such as folder rename/move/cover edit, archive, clear media, or destructive actions.
 
 ## 2. Scope
 
@@ -294,8 +294,8 @@ Optional but highly desirable: adapt FreeCut's Analyze flow for review search an
 
 Dashboard access is account-gated first: only users allowed to sign in can reach projects. Project visibility then controls which signed-in users can open a dashboard project:
 - **Private** — default. Only the owner can open, edit, upload, share, archive, or delete.
-- **Shared** — owner plus explicit project members or access rules can open it. Rules can target an exact email (`person@example.com`) or a domain (`*@studio.com`). Shared signed-in clients can review, rate, shortlist, and comment in the dashboard-style workspace. Upload, folder management, archive, clear media, and destructive production controls remain admin-role only even if a project is broadly shared.
-- **Workspace** — every signed-in app user can open and review the project. Owners still control access settings, review links, archive, and destructive actions; non-owner viewers do not get upload/edit/delete controls.
+- **Shared** — owner plus explicit project members or access rules can open it. Rules can target an exact email (`person@example.com`) or a domain (`*@studio.com`). Shared signed-in clients can review, rate, shortlist, comment, and upload media (including into a references folder or any existing destination folder) using the same upload flow as admins. Folder create/rename/move/cover, archive, clear media, and destructive production controls remain admin-role only even if a project is broadly shared.
+- **Workspace** — every signed-in app user can open, review, and upload into the project. Owners still control access settings, review links, archive, and destructive actions; non-owner viewers do not get folder management or destructive edit/delete controls.
 
 Clients without dashboard accounts still reach a project through `reviewLinks.token` (optionally passcode-gated, optionally expiring). Capture the reviewer's display name when they first act. Review links are separate from workspace visibility and remain owner-managed.
 

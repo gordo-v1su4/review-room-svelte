@@ -422,6 +422,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   }
 
   const canEditProject = appUser.role === "admin" && project.memberRole !== "viewer";
+  const canUploadMedia = true;
   const canOrganizeFolders = canEditProject;
   const canManageAccess = appUser.role === "admin" && project.isOwner;
 
@@ -469,6 +470,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
               : `/dashboard/projects/${projectId}/upload`
           }
           canEditProject={canEditProject}
+          canUploadMedia={canUploadMedia}
           canManageAccess={canManageAccess}
         />
 
@@ -548,8 +550,14 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                             ? "No media in this folder."
                             : "Upload your first media to start a review."}
                         </p>
-                        {canEditProject && !activeFolder && (
-                          <Link href={`/dashboard/projects/${projectId}/upload`}>
+                        {canUploadMedia && (
+                          <Link
+                            href={
+                              activeFolderId
+                                ? `/dashboard/projects/${projectId}/upload?folder=${activeFolderId}`
+                                : `/dashboard/projects/${projectId}/upload`
+                            }
+                          >
                             <Button className="mt-3">Upload</Button>
                           </Link>
                         )}
@@ -667,6 +675,7 @@ function ProjectHero({
   onArchiveProject,
   uploadHref,
   canEditProject,
+  canUploadMedia,
   canManageAccess,
 }: {
   title: string;
@@ -692,6 +701,7 @@ function ProjectHero({
   onArchiveProject: () => void;
   uploadHref: string;
   canEditProject: boolean;
+  canUploadMedia: boolean;
   canManageAccess: boolean;
 }) {
   const bannerUrl = useStorageUrl(bannerKey, updatedAt);
@@ -1022,7 +1032,7 @@ function ProjectHero({
                 <span className="sm:hidden">Archive</span>
               </Button>
             )}
-            {canEditProject && (
+            {canUploadMedia && (
               <Link href={uploadHref}>
                 <Button size="sm" className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto">
                   <Upload className="h-4 w-4" />

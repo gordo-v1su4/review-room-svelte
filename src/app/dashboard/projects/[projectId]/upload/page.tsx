@@ -37,10 +37,7 @@ export default function UploadPage({
   const returnHref = initialFolderId
     ? `/dashboard/projects/${projectId}?folder=${initialFolderId}`
     : `/dashboard/projects/${projectId}`;
-  const canUpload =
-    appUser?.role === "admin" && project
-      ? project.memberRole !== "viewer"
-      : false;
+  const canUpload = Boolean(appUser && project);
 
   return (
     <AdminGate>
@@ -60,10 +57,9 @@ export default function UploadPage({
         />
       ) : (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6">
-          <p className="font-medium text-zinc-100">View-only access</p>
+          <p className="font-medium text-zinc-100">Project unavailable</p>
           <p className="mt-1 text-sm text-zinc-500">
-            This project is shared with you for review. Ask the owner for edit
-            access to upload media.
+            You need access to this project before you can upload media.
           </p>
         </div>
       )}

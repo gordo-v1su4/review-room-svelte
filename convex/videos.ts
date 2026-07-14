@@ -104,8 +104,7 @@ export const reserveAssetUpload = mutation({
     uploadDateKey: v.string(),
   },
   handler: async (ctx, args) => {
-    const { admin, project } = await getProjectForEditor(ctx, args.projectId);
-    if (admin.role !== "admin") throw new Error("Admin required");
+    const { admin, project } = await getProjectForAdmin(ctx, args.projectId);
     const dateKey = normalizeDateKey(args.uploadDateKey);
     const number = await nextAssetNumber(ctx, project);
     const assetCode = `${args.assetClass}_${dateKey}_${String(number).padStart(5, "0")}`;
@@ -191,8 +190,7 @@ export const createFromUpload = mutation({
     sizeBytes: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const { admin, project } = await getProjectForEditor(ctx, args.projectId);
-    if (admin.role !== "admin") throw new Error("Admin required");
+    const { admin, project } = await getProjectForAdmin(ctx, args.projectId);
     const now = Date.now();
     if (args.folderId) {
       const folder = await ctx.db.get(args.folderId);
@@ -451,7 +449,7 @@ export const setProcessingComplete = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) throw new Error("Video not found");
-    await getProjectForEditor(ctx, video.projectId);
+    await getProjectForAdmin(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       thumbnailKey: args.thumbnailKey,
       spriteKey: args.spriteKey,
@@ -503,7 +501,7 @@ export const markProcessingFailed = mutation({
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
     if (!video) return;
-    await getProjectForEditor(ctx, video.projectId);
+    await getProjectForAdmin(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       processingStatus: "error",
       updatedAt: Date.now(),
