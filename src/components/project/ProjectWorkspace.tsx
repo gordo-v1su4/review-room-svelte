@@ -649,6 +649,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
         <ImageLightbox
           video={previewImage}
           mode="admin"
+          canDownload={Boolean(previewImage?.downloadEnabled)}
           onClose={() => setPreviewImageId(null)}
         />
       </div>

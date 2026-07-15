@@ -333,6 +333,9 @@ export default function ReviewPage({
         video={previewImage}
         mode="client"
         token={token}
+        canDownload={Boolean(
+          data?.link.canDownload && previewImage?.downloadEnabled,
+        )}
         onClose={() => setPreviewImageId(null)}
       />
     </div>

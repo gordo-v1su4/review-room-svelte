@@ -49,10 +49,14 @@ export async function createPresignedUploadUrl(key: string, contentType: string)
   return getSignedUrl(getS3Client(), command, { expiresIn: 3600 });
 }
 
-export async function createPresignedDownloadUrl(key: string) {
+export async function createPresignedDownloadUrl(key: string, filename?: string) {
+  const safeFilename = filename?.replace(/[\r\n"]/g, "").trim();
   const command = new GetObjectCommand({
     Bucket: getBucket(),
     Key: key,
+    ResponseContentDisposition: safeFilename
+      ? `attachment; filename*=UTF-8''${encodeURIComponent(safeFilename)}`
+      : undefined,
   });
   return getSignedUrl(getS3Client(), command, { expiresIn: 3600 });
 }

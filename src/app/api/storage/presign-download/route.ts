@@ -3,11 +3,17 @@ import { createPresignedDownloadUrl } from "@/lib/storage/s3";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { storageKey: string };
+    const body = (await request.json()) as {
+      storageKey: string;
+      filename?: string;
+    };
     if (!body.storageKey) {
       return NextResponse.json({ error: "storageKey required" }, { status: 400 });
     }
-    const downloadUrl = await createPresignedDownloadUrl(body.storageKey);
+    const downloadUrl = await createPresignedDownloadUrl(
+      body.storageKey,
+      body.filename,
+    );
     return NextResponse.json({ downloadUrl });
   } catch (error) {
     console.error(error);

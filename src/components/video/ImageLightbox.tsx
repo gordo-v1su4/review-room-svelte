@@ -3,7 +3,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "convex/react";
-import { Bookmark, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { Bookmark, Download, RotateCcw, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
@@ -22,11 +22,13 @@ export function ImageLightbox({
   video,
   mode,
   token,
+  canDownload = false,
   onClose,
 }: {
   video: VideoDoc | null;
   mode: "admin" | "client";
   token?: string;
+  canDownload?: boolean;
   onClose: () => void;
 }) {
   const imageUrl = useStorageUrl(video?.storageKey, video?.updatedAt);
@@ -43,6 +45,7 @@ export function ImageLightbox({
   const [annotationColor, setAnnotationColor] = useState(ANNOTATION_COLORS[0]);
   const [annotationWidth, setAnnotationWidth] = useState(4);
   const [savingAnnotations, setSavingAnnotations] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const savedAnnotationSignature = useMemo(
     () => annotationSignature(video?.annotationStrokes as AnnotationStroke[] | undefined),
     [video?.annotationStrokes],
@@ -104,6 +107,35 @@ export function ImageLightbox({
       toast.error(error instanceof Error ? error.message : "Could not save markup");
     } finally {
       setSavingAnnotations(false);
+    }
+  }
+
+  async function downloadImage() {
+    if (!video || !canDownload) return;
+    setDownloading(true);
+    try {
+      const response = await fetch("/api/storage/presign-download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storageKey: video.storageKey,
+          filename: video.originalFilename,
+        }),
+      });
+      if (!response.ok) throw new Error("Could not prepare download");
+      const data = (await response.json()) as { downloadUrl?: string };
+      if (!data.downloadUrl) throw new Error("Download URL missing");
+
+      const link = document.createElement("a");
+      link.href = data.downloadUrl;
+      link.download = video.originalFilename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not download image");
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -237,6 +269,18 @@ export function ImageLightbox({
                     />
                     Shortlist
                   </button>
+                  {canDownload && (
+                    <button
+                      type="button"
+                      title={`Download ${video.originalFilename}`}
+                      className="inline-flex h-7 min-h-7 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-0 text-[11px] font-medium leading-none text-zinc-200 transition-colors hover:bg-white/10 disabled:pointer-events-none disabled:opacity-50"
+                      disabled={downloading}
+                      onClick={() => void downloadImage()}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      {downloading ? "Preparing..." : "Download"}
+                    </button>
+                  )}
                 </>
               )}
               <Dialog.Close className="grid h-7 w-7 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white">
