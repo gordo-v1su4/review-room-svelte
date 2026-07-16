@@ -2,6 +2,35 @@
 
 Review Room uses **Next.js** (not Vite). Pindeck uses Vite; the URLs are the same, but the browser env names are different.
 
+## Production deployment contract
+
+Review Room has two independent production deployment surfaces:
+
+| Surface | Production target | Automatic deployment |
+|---------|-------------------|----------------------|
+| Next.js frontend + API routes | Vercel / `https://unfold-flower-gen.app` | Vercel deploys pushes to `main` |
+| Convex schema + functions | Self-hosted / `https://unfold.serving.cloud` | `.github/workflows/deploy-convex.yml` deploys relevant pushes to `main` |
+
+A Vercel deployment never publishes `convex/`. A cross-layer correction is complete only after both deployments succeed and the affected production role completes the final user-visible workflow.
+
+The Convex workflow runs when `convex/**`, `convex.json`, `package.json`, `bun.lock`, or the workflow itself changes. It also supports a manual `workflow_dispatch` run. GitHub repository secrets must contain:
+
+- `CONVEX_SELF_HOSTED_URL` — must equal `https://unfold.serving.cloud`; the workflow refuses any other target.
+- `CONVEX_SELF_HOSTED_ADMIN_KEY` — the Review Room self-hosted deployment admin key.
+
+If the automatic workflow cannot run, deploy manually from a trusted checkout with the same variables in `.env.local`:
+
+```bash
+bun run deploy:convex
+```
+
+After a cross-layer fix:
+
+1. Confirm the Vercel production deployment succeeded.
+2. Confirm the GitHub `Deploy Convex` run succeeded for the same `main` commit.
+3. Exercise the production workflow with the affected role and media/data type.
+4. Confirm the final persisted result, not only the absence of an error toast.
+
 ## NEXT_PUBLIC_* for Review Room
 
 | Pindeck (Vite) | Review Room (Next.js) | Used by |
@@ -122,7 +151,9 @@ OAuth redirect URIs in Google/GitHub consoles must include Convex Auth callback 
 ## Quick checklist
 
 1. `.env.local`: homelab Convex URLs + RustFS `S3_*` or `MEDIA_GATEWAY_*`
-2. `bun run deploy:convex` → functions on homelab
-3. Convex deployment env: `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`
-4. Vercel env: `NEXT_PUBLIC_CONVEX_URL`, `S3_*`, `SITE_URL`
-5. `bun run worker:media` on homelab (or set `MEDIA_WORKER_URL` on Vercel)
+2. GitHub secrets: `CONVEX_SELF_HOSTED_URL` + `CONVEX_SELF_HOSTED_ADMIN_KEY`
+3. Push relevant changes to `main` and confirm the `Deploy Convex` workflow succeeds
+4. Convex deployment env: `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`
+5. Vercel env: `NEXT_PUBLIC_CONVEX_URL`, `S3_*`, `SITE_URL`
+6. `bun run worker:media` on homelab (or set `MEDIA_WORKER_URL` on Vercel)
+7. For cross-layer fixes, verify the affected production flow only after both Vercel and Convex finish

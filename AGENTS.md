@@ -39,6 +39,14 @@ bun run worker:media       # ffmpeg thumbnail/sprite worker
 
 Homelab env: copy from pindeck with `scripts/use-homelab-env.ps1`, then add `S3_*` from `.env.example`.
 
+## Deployment invariant
+
+- Treat Vercel and self-hosted Convex as two separate production deployment surfaces.
+- A Vercel deployment does **not** deploy `convex/` functions. Never report a cross-layer fix complete from a frontend deployment alone.
+- Pushes to `main` that touch `convex/**`, `convex.json`, `package.json`, or `bun.lock` automatically run `.github/workflows/deploy-convex.yml` against `https://unfold.serving.cloud`.
+- Before merging a Convex change, confirm the `CONVEX_SELF_HOSTED_URL` and `CONVEX_SELF_HOSTED_ADMIN_KEY` repository secrets remain configured. If automation is unavailable, run `bun run deploy:convex` with the production self-hosted env.
+- For fixes spanning `src/` and `convex/`, verify both the Vercel deployment and the `Deploy Convex` Actions run, then exercise the final user-visible flow against the production role affected by the change.
+
 ## Architecture
 
 - `src/app/` — Next.js App Router (`/dashboard`, `/review/[token]`, storage API routes)
@@ -62,3 +70,4 @@ Homelab env: copy from pindeck with `scripts/use-homelab-env.ps1`, then add `S3_
 
 - Default branch: `main`
 - Keep commits focused; do not commit secrets (`.env`, credentials, presigned URLs).
+- Do not call a production fix complete until every touched deployment surface is deployed and verified.

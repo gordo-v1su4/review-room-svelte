@@ -32,6 +32,13 @@ Video metadata lives in Convex. Original videos, thumbnails, scrub sprites, and 
 
 The Vercel production URL is public, but dashboard/admin pages still require app sign-in. Client review access is handled by Review Room share links.
 
+Production has two independent deployment surfaces:
+
+- Vercel deploys the Next.js frontend and API routes from `main`.
+- The `Deploy Convex` GitHub Actions workflow deploys self-hosted Convex whenever relevant backend files change on `main`.
+
+For a frontend + Convex change, confirm both deployments succeed before testing the production workflow. A Vercel deployment alone does not publish Convex functions.
+
 ```bash
 bun run build
 bun run deploy:convex
