@@ -28,6 +28,8 @@ Copy `.env.example` to `.env.local` before running locally. The app expects Conv
 
 Video metadata lives in Convex. Original videos, thumbnails, scrub sprites, and project images live in RustFS through S3-compatible APIs.
 
+Browser uploads larger than 50 MiB automatically use S3 multipart upload in 50 MiB parts. This keeps every request below the 100 MB Cloudflare limit on the public RustFS hostname while preserving the original file as one object.
+
 ## Deployment
 
 The Vercel production URL is public, but dashboard/admin pages still require app sign-in. Client review access is handled by Review Room share links.
@@ -51,3 +53,4 @@ Deployment notes live in [`docs/deploy-vercel-and-auth.md`](docs/deploy-vercel-a
 - [`init-docs/00-Creative-Brief.md`](init-docs/00-Creative-Brief.md)
 - [`init-docs/01-PRD.md`](init-docs/01-PRD.md)
 - [`init-docs/02-Design-Spec.md`](init-docs/02-Design-Spec.md)
+- [`documentation/notion-client-guide/README.md`](documentation/notion-client-guide/README.md) — client how-to and annotated screenshots

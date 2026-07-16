@@ -1,0 +1,232 @@
+{
+  "version": 3,
+  "width": 2987,
+  "height": 1928,
+  "defaultFilter": "url(#dropShadow)",
+  "markers": [
+    {
+      "typeName": "CoverMarker",
+      "left": 0,
+      "top": 0,
+      "width": 2987,
+      "height": 220,
+      "rotationAngle": 0,
+      "fillColor": "#000000",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "opacity": 0.6,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    },
+    {
+      "typeName": "CoverMarker",
+      "left": 0,
+      "top": 740,
+      "width": 2987,
+      "height": 1188,
+      "rotationAngle": 0,
+      "fillColor": "#000000",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "opacity": 0.6,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    },
+    {
+      "typeName": "CoverMarker",
+      "left": 0,
+      "top": 220,
+      "width": 320,
+      "height": 520,
+      "rotationAngle": 0,
+      "fillColor": "#000000",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "opacity": 0.6,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    },
+    {
+      "typeName": "CoverMarker",
+      "left": 1300,
+      "top": 220,
+      "width": 1687,
+      "height": 520,
+      "rotationAngle": 0,
+      "fillColor": "#000000",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "opacity": 0.6,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    },
+    {
+      "typeName": "CaptionFrameMarker",
+      "left": 320,
+      "top": 220,
+      "width": 980,
+      "height": 520,
+      "rotationAngle": 0,
+      "text": "Your projects",
+      "color": "#ffffff",
+      "fillColor": "#0d9488",
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": {
+        "value": 32,
+        "units": "px",
+        "step": 1
+      },
+      "padding": 8,
+      "strokeColor": "#2dd4bf",
+      "strokeWidth": 4,
+      "strokeDasharray": "",
+      "opacity": 0.8,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    },
+    {
+      "typeName": "TextMarker",
+      "left": 1336,
+      "top": 236,
+      "width": 663,
+      "height": 38,
+      "rotationAngle": 0,
+      "text": "Only projects shared with you appear here.",
+      "color": "#f4f4f5",
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": {
+        "value": 28,
+        "units": "px",
+        "step": 1
+      },
+      "padding": 0,
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "strokeDasharray": "",
+      "opacity": 1,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    },
+    {
+      "typeName": "TextMarker",
+      "left": 1336,
+      "top": 274,
+      "width": 553,
+      "height": 38,
+      "rotationAngle": 0,
+      "text": "Open a card to enter the workspace.",
+      "color": "#f4f4f5",
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": {
+        "value": 28,
+        "units": "px",
+        "step": 1
+      },
+      "padding": 0,
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "strokeDasharray": "",
+      "opacity": 1,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    }
+  ]
+}

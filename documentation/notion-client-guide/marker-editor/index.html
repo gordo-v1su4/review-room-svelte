@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Review Room — marker.js Annotator</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="/vendor/markerjs3.js"></script>
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <strong>marker.js</strong>
+        <span>Review Room docs · PNG export at full resolution</span>
+      </div>
+      <div class="zoom">
+        <button type="button" class="compact" id="btnZoomOut">−</button>
+        <span id="zoomLabel">100%</span>
+        <button type="button" class="compact" id="btnZoomIn">+</button>
+        <button type="button" class="compact" id="btnZoomFit">Fit</button>
+      </div>
+      <div class="actions">
+        <button type="button" id="btnSave">Save state</button>
+        <button type="button" id="btnExport" class="primary">Export PNG</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="rail">
+        <label class="field">
+          Screenshot
+          <select id="shotSelect"></select>
+        </label>
+        <div class="row2" style="margin-bottom: 12px">
+          <button type="button" class="compact" id="btnPrev" style="text-align:center">← Prev</button>
+          <button type="button" class="compact" id="btnNext" style="text-align:center">Next →</button>
+        </div>
+        <p id="shotMeta" class="hint" style="margin-top:0"></p>
+
+        <p class="hint">
+          Prefer <strong>Caption frame</strong> for regions. Put numbers with
+          <strong>Number badge</strong>. Use <strong>Dim outside frame</strong>
+          after selecting a caption frame. Avoid speech-bubble callouts when a
+          frame or arrow will do.
+        </p>
+
+        <div class="section-title">Add marker</div>
+        <div class="tools" id="tools">
+          <button type="button" data-marker="CaptionFrameMarker">Caption frame</button>
+          <button type="button" data-marker="FrameMarker">Frame</button>
+          <button type="button" data-marker="ArrowMarker">Arrow</button>
+          <button type="button" data-action="number">Number badge</button>
+          <button type="button" data-marker="TextMarker">Text</button>
+          <button type="button" data-marker="HighlightMarker">Highlight</button>
+          <button type="button" data-marker="CoverMarker">Dim cover</button>
+          <button type="button" data-marker="CalloutMarker">Callout (speech)</button>
+        </div>
+
+        <div class="tools secondary">
+          <button type="button" id="btnDimOutside">Dim outside selected frame</button>
+          <button type="button" id="btnUndo">Undo</button>
+          <button type="button" id="btnDelete">Delete selected</button>
+          <button type="button" id="btnClear">Clear all</button>
+        </div>
+
+        <div class="section-title">Style selected</div>
+        <label class="field">Label / number text
+          <input id="styleText" type="text" placeholder="e.g. 1  or  Card size" />
+        </label>
+        <div class="row2">
+          <label class="field">Stroke
+            <input id="styleStroke" type="color" value="#2dd4bf" />
+          </label>
+          <label class="field">Fill / header
+            <input id="styleFill" type="color" value="#0d9488" />
+          </label>
+        </div>
+        <div class="row2">
+          <label class="field">Text color
+            <input id="styleColor" type="color" value="#ffffff" />
+          </label>
+          <label class="field">Stroke width
+            <input id="styleWidth" type="number" min="1" max="12" step="1" value="3" />
+          </label>
+        </div>
+        <label class="field">Opacity <span id="opacityVal">80%</span>
+          <input id="styleOpacity" type="range" min="0.15" max="1" step="0.05" value="0.8" />
+        </label>
+        <label class="field">Font size (px)
+          <input id="styleFont" type="number" min="12" max="72" step="1" value="40" />
+        </label>
+        <button type="button" id="btnApplyStyle" class="primary" style="width:100%;margin-top:6px;text-align:center">
+          Apply to selected
+        </button>
+
+        <p id="status" class="status">Loading…</p>
+        <div class="note">
+          Editing view can be zoomed; <strong>Export PNG</strong> always writes
+          full natural resolution. Use PNG plates for docs; Outline may JPEG once
+          on upload — never re-annotate that JPEG.
+        </div>
+      </aside>
+
+      <main class="stage" id="stage"></main>
+    </div>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

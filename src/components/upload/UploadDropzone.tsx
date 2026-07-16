@@ -22,6 +22,7 @@ type FileState = {
   assetClass: AssetClass;
   progress: number;
   status: "pending" | "uploading" | "done" | "error";
+  errorMessage?: string;
 };
 
 type ClientPreviewResult = {
@@ -34,6 +35,7 @@ type ClientPreviewResult = {
 
 const UPLOAD_ASSET_CLASSES: AssetClass[] = ["VID", "IMG", "CTX", "STB"];
 const DATE_FOLDER_VALUE = "__date__";
+const MULTIPART_PART_BYTES = 50 * 1024 * 1024;
 
 function assetClassForUpload(file: File, selectedAssetClass: AssetClass) {
   if (isVideoFileType(file.type, file.name)) return "VID";
@@ -42,6 +44,12 @@ function assetClassForUpload(file: File, selectedAssetClass: AssetClass) {
 
 function makeUploadId(file: File) {
   return `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`;
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
 function localDateKey(date = new Date()) {
@@ -224,7 +232,121 @@ async function generateClientImagePreview(file: File): Promise<ClientPreviewResu
   }
 }
 
-function uploadViaPresignedUrl({
+function uploadBlobViaPresignedUrl({
+  file,
+  uploadUrl,
+  contentType,
+  onProgress,
+}: {
+  file: Blob;
+  uploadUrl: string;
+  contentType?: string;
+  onProgress: (progress: number) => void;
+}) {
+  return new Promise<string>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl);
+    if (contentType) xhr.setRequestHeader("Content-Type", contentType);
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      onProgress(event.loaded / event.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(xhr.getResponseHeader("ETag") ?? "");
+      } else {
+        reject(
+          new Error(
+            xhr.status === 413
+              ? "This upload exceeded the storage gateway's per-request size limit."
+              : `Upload failed with HTTP ${xhr.status}`,
+          ),
+        );
+      }
+    };
+    xhr.onerror = () => reject(new Error("Direct upload failed"));
+    xhr.send(file);
+  });
+}
+
+async function postMultipartAction<T>(body: Record<string, unknown>) {
+  const response = await fetch("/api/storage/multipart", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const payload = (await response.json().catch(() => ({}))) as T & { error?: string };
+  if (!response.ok) throw new Error(payload.error || "Multipart upload request failed");
+  return payload;
+}
+
+async function uploadViaMultipart({
+  file,
+  projectId,
+  filename,
+  contentType,
+  onProgress,
+}: {
+  file: File;
+  projectId: Id<"projects">;
+  filename: string;
+  contentType: string;
+  onProgress: (progress: number) => void;
+}) {
+  let storageKey: string | undefined;
+  let uploadId: string | undefined;
+
+  try {
+    const created = await postMultipartAction<{ storageKey: string; uploadId: string }>({
+      action: "create",
+      projectId,
+      filename,
+      contentType,
+    });
+    storageKey = created.storageKey;
+    uploadId = created.uploadId;
+
+    const partCount = Math.ceil(file.size / MULTIPART_PART_BYTES);
+    const parts: Array<{ ETag: string; PartNumber: number }> = [];
+
+    for (let partNumber = 1; partNumber <= partCount; partNumber++) {
+      const start = (partNumber - 1) * MULTIPART_PART_BYTES;
+      const end = Math.min(start + MULTIPART_PART_BYTES, file.size);
+      const { uploadUrl } = await postMultipartAction<{ uploadUrl: string }>({
+        action: "part",
+        storageKey,
+        uploadId,
+        partNumber,
+      });
+      const etag = await uploadBlobViaPresignedUrl({
+        file: file.slice(start, end),
+        uploadUrl,
+        onProgress: (partProgress) => {
+          const uploadedBytes = start + (end - start) * partProgress;
+          onProgress(Math.max(10, Math.round((uploadedBytes / file.size) * 85)));
+        },
+      });
+      if (!etag) throw new Error("Storage did not return an ETag for an uploaded part");
+      parts.push({ ETag: etag, PartNumber: partNumber });
+    }
+
+    await postMultipartAction<{ storageKey: string }>({
+      action: "complete",
+      storageKey,
+      uploadId,
+      parts,
+    });
+    onProgress(95);
+    return { storageKey };
+  } catch (error) {
+    if (storageKey && uploadId) {
+      await postMultipartAction({ action: "abort", storageKey, uploadId }).catch(() => {});
+    }
+    throw error;
+  }
+}
+
+async function uploadViaPresignedUrl({
   file,
   projectId,
   filename,
@@ -237,57 +359,46 @@ function uploadViaPresignedUrl({
   contentType?: string;
   onProgress: (progress: number) => void;
 }) {
-  return new Promise<{ storageKey: string }>(async (resolve, reject) => {
-    const uploadContentType =
-      contentType ?? normalizedMediaMimeType(file.type, filename ?? file.name);
-    let storageKey: string | undefined;
-    let uploadUrl: string | undefined;
+  const uploadFilename = filename ?? file.name;
+  const uploadContentType =
+    contentType ?? normalizedMediaMimeType(file.type, uploadFilename);
 
-    try {
-      const response = await fetch("/api/storage/presign-upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId,
-          filename: filename ?? file.name,
-          contentType: uploadContentType,
-        }),
-      });
-      const payload = (await response.json().catch(() => ({}))) as {
-        uploadUrl?: string;
-        storageKey?: string;
-        error?: string;
-      };
+  if (file.size > MULTIPART_PART_BYTES) {
+    return uploadViaMultipart({
+      file,
+      projectId,
+      filename: uploadFilename,
+      contentType: uploadContentType,
+      onProgress,
+    });
+  }
 
-      if (!response.ok || !payload.uploadUrl || !payload.storageKey) {
-        throw new Error(payload.error || "Could not prepare upload");
-      }
-
-      uploadUrl = payload.uploadUrl;
-      storageKey = payload.storageKey;
-    } catch (error) {
-      reject(error instanceof Error ? error : new Error("Could not prepare upload"));
-      return;
-    }
-
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", uploadUrl);
-    xhr.setRequestHeader("Content-Type", uploadContentType);
-    xhr.upload.onprogress = (event) => {
-      if (!event.lengthComputable) return;
-      onProgress(Math.max(10, Math.round((event.loaded / event.total) * 90)));
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300 && storageKey) {
-        onProgress(95);
-        resolve({ storageKey });
-      } else {
-        reject(new Error(`Upload failed with HTTP ${xhr.status}`));
-      }
-    };
-    xhr.onerror = () => reject(new Error("Direct upload failed"));
-    xhr.send(file);
+  const response = await fetch("/api/storage/presign-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      projectId,
+      filename: uploadFilename,
+      contentType: uploadContentType,
+    }),
   });
+  const payload = (await response.json().catch(() => ({}))) as {
+    uploadUrl?: string;
+    storageKey?: string;
+    error?: string;
+  };
+  if (!response.ok || !payload.uploadUrl || !payload.storageKey) {
+    throw new Error(payload.error || "Could not prepare upload");
+  }
+
+  await uploadBlobViaPresignedUrl({
+    file,
+    uploadUrl: payload.uploadUrl,
+    contentType: uploadContentType,
+    onProgress: (progress) => onProgress(Math.max(10, Math.round(progress * 85))),
+  });
+  onProgress(95);
+  return { storageKey: payload.storageKey };
 }
 
 export function UploadDropzone({
@@ -467,10 +578,13 @@ export function UploadDropzone({
             ),
           );
         } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Upload failed");
+          const errorMessage = err instanceof Error ? err.message : "Upload failed";
+          toast.error(`${item.file.name}: ${errorMessage}`);
           setFiles((prev) =>
             prev.map((f) =>
-              f.id === item.id ? { ...f, status: "error", progress: 0 } : f,
+              f.id === item.id
+                ? { ...f, status: "error", progress: 0, errorMessage }
+                : f,
             ),
           );
         }
@@ -621,12 +735,18 @@ export function UploadDropzone({
           {files.map((f) => (
             <li key={f.id} className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-2">
               <div className="flex items-center justify-between gap-3">
-                <span className="truncate text-zinc-300">{f.file.name}</span>
+                <span className="min-w-0 flex-1 truncate text-zinc-300">
+                  {f.file.name}
+                  <span className="ml-2 text-zinc-600">{formatFileSize(f.file.size)}</span>
+                </span>
                 <span className="shrink-0 rounded-full border border-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-500">
                   {f.assetClass}
                 </span>
                 <span className="shrink-0 capitalize">{f.status}</span>
               </div>
+              {f.errorMessage && (
+                <p className="mt-1 text-[11px] text-red-400">{f.errorMessage}</p>
+              )}
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-800">
                 <div
                   className={cn(

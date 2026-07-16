@@ -1,0 +1,310 @@
+{
+  "version": 3,
+  "width": 2987,
+  "height": 1928,
+  "defaultFilter": "url(#dropShadow)",
+  "markers": [
+    {
+      "fillColor": "#000000",
+      "left": 0,
+      "top": 0,
+      "width": 2987,
+      "height": 580,
+      "rotationAngle": 0,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "typeName": "CoverMarker",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "strokeDasharray": "",
+      "opacity": 0.6
+    },
+    {
+      "fillColor": "#000000",
+      "left": 0,
+      "top": 900,
+      "width": 2987,
+      "height": 1028,
+      "rotationAngle": 0,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "typeName": "CoverMarker",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "strokeDasharray": "",
+      "opacity": 0.6
+    },
+    {
+      "fillColor": "#000000",
+      "left": 0,
+      "top": 580,
+      "width": 845,
+      "height": 320,
+      "rotationAngle": 0,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "typeName": "CoverMarker",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "strokeDasharray": "",
+      "opacity": 0.6
+    },
+    {
+      "fillColor": "#000000",
+      "left": 1275,
+      "top": 580,
+      "width": 1712,
+      "height": 320,
+      "rotationAngle": 0,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "typeName": "CoverMarker",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "strokeDasharray": "",
+      "opacity": 0.6
+    },
+    {
+      "fillColor": "#0d9488",
+      "color": "#ffffff",
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": {
+        "value": 32,
+        "units": "px",
+        "step": 1
+      },
+      "text": "Change the appearance",
+      "padding": 8,
+      "left": 842.623743498809,
+      "top": 459.3333435058594,
+      "width": 430,
+      "height": 440.6666564941406,
+      "rotationAngle": 0,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "typeName": "CaptionFrameMarker",
+      "strokeColor": "#2dd4bf",
+      "strokeWidth": 4,
+      "strokeDasharray": "",
+      "opacity": 0.8
+    },
+    {
+      "color": "#f4f4f5",
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": {
+        "value": 40,
+        "units": "px",
+        "step": 1
+      },
+      "text": "Change card size, aspect ratio,",
+      "padding": 0,
+      "left": 1322.3763652792409,
+      "top": 598.8118717494045,
+      "width": 551.3184814453125,
+      "height": 43.9614143371582,
+      "rotationAngle": 0,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "typeName": "TextMarker",
+      "strokeColor": "#2dd4bf",
+      "strokeWidth": 3,
+      "strokeDasharray": "",
+      "opacity": 1
+    },
+    {
+      "color": "#f4f4f5",
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": {
+        "value": 28,
+        "units": "px",
+        "step": 1
+      },
+      "text": "and thumbnail fit or fill.",
+      "padding": 0,
+      "left": 1320,
+      "top": 638,
+      "width": 280.068359375,
+      "height": 30.89180564880371,
+      "rotationAngle": 0,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "typeName": "TextMarker",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "strokeDasharray": "",
+      "opacity": 1
+    },
+    {
+      "color": "#f4f4f5",
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": {
+        "value": 28,
+        "units": "px",
+        "step": 1
+      },
+      "text": "Turn off Show card info to hide",
+      "padding": 0,
+      "left": 1320,
+      "top": 676,
+      "width": 379.68701171875,
+      "height": 30.89180564880371,
+      "rotationAngle": 0,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "typeName": "TextMarker",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "strokeDasharray": "",
+      "opacity": 1
+    },
+    {
+      "color": "#f4f4f5",
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": {
+        "value": 28,
+        "units": "px",
+        "step": 1
+      },
+      "text": "titles for cleaner picture previews.",
+      "padding": 0,
+      "left": 1320,
+      "top": 714,
+      "width": 415.4056701660156,
+      "height": 30.89180564880371,
+      "rotationAngle": 0,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "typeName": "TextMarker",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "strokeDasharray": "",
+      "opacity": 1
+    }
+  ]
+}

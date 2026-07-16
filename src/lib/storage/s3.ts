@@ -1,8 +1,12 @@
 import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
+  UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -47,6 +51,57 @@ export async function createPresignedUploadUrl(key: string, contentType: string)
     ContentType: contentType,
   });
   return getSignedUrl(getS3Client(), command, { expiresIn: 3600 });
+}
+
+export async function createMultipartUpload(key: string, contentType: string) {
+  const result = await getS3Client().send(
+    new CreateMultipartUploadCommand({
+      Bucket: getBucket(),
+      Key: key,
+      ContentType: contentType,
+    }),
+  );
+  if (!result.UploadId) throw new Error("Storage did not return a multipart upload ID");
+  return result.UploadId;
+}
+
+export async function createPresignedPartUploadUrl(
+  key: string,
+  uploadId: string,
+  partNumber: number,
+) {
+  const command = new UploadPartCommand({
+    Bucket: getBucket(),
+    Key: key,
+    UploadId: uploadId,
+    PartNumber: partNumber,
+  });
+  return getSignedUrl(getS3Client(), command, { expiresIn: 3600 });
+}
+
+export async function completeMultipartUpload(
+  key: string,
+  uploadId: string,
+  parts: Array<{ ETag: string; PartNumber: number }>,
+) {
+  await getS3Client().send(
+    new CompleteMultipartUploadCommand({
+      Bucket: getBucket(),
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: { Parts: parts },
+    }),
+  );
+}
+
+export async function abortMultipartUpload(key: string, uploadId: string) {
+  await getS3Client().send(
+    new AbortMultipartUploadCommand({
+      Bucket: getBucket(),
+      Key: key,
+      UploadId: uploadId,
+    }),
+  );
 }
 
 export async function createPresignedDownloadUrl(key: string, filename?: string) {

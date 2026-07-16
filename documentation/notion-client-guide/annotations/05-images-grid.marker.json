@@ -1,0 +1,232 @@
+{
+  "version": 3,
+  "width": 2987,
+  "height": 1928,
+  "defaultFilter": "url(#dropShadow)",
+  "markers": [
+    {
+      "typeName": "CoverMarker",
+      "left": 0,
+      "top": 0,
+      "width": 2987,
+      "height": 330,
+      "rotationAngle": 0,
+      "fillColor": "#000000",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "opacity": 0.6,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    },
+    {
+      "typeName": "CoverMarker",
+      "left": 0,
+      "top": 1230,
+      "width": 2987,
+      "height": 698,
+      "rotationAngle": 0,
+      "fillColor": "#000000",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "opacity": 0.6,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    },
+    {
+      "typeName": "CoverMarker",
+      "left": 0,
+      "top": 330,
+      "width": 270,
+      "height": 900,
+      "rotationAngle": 0,
+      "fillColor": "#000000",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "opacity": 0.6,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    },
+    {
+      "typeName": "CoverMarker",
+      "left": 2270,
+      "top": 330,
+      "width": 717,
+      "height": 900,
+      "rotationAngle": 0,
+      "fillColor": "#000000",
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "opacity": 0.6,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    },
+    {
+      "typeName": "CaptionFrameMarker",
+      "left": 270,
+      "top": 330,
+      "width": 2000,
+      "height": 900,
+      "rotationAngle": 0,
+      "text": "Browse media",
+      "color": "#ffffff",
+      "fillColor": "#0d9488",
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": {
+        "value": 32,
+        "units": "px",
+        "step": 1
+      },
+      "padding": 8,
+      "strokeColor": "#2dd4bf",
+      "strokeWidth": 4,
+      "strokeDasharray": "",
+      "opacity": 0.8,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    },
+    {
+      "typeName": "TextMarker",
+      "left": 40,
+      "top": 360,
+      "width": 459,
+      "height": 38,
+      "rotationAngle": 0,
+      "text": "Open Images or a date folder.",
+      "color": "#f4f4f5",
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": {
+        "value": 28,
+        "units": "px",
+        "step": 1
+      },
+      "padding": 0,
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "strokeDasharray": "",
+      "opacity": 1,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    },
+    {
+      "typeName": "TextMarker",
+      "left": 40,
+      "top": 398,
+      "width": 491,
+      "height": 38,
+      "rotationAngle": 0,
+      "text": "Sort Newest, then click a card.",
+      "color": "#f4f4f5",
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": {
+        "value": 28,
+        "units": "px",
+        "step": 1
+      },
+      "padding": 0,
+      "strokeColor": "transparent",
+      "strokeWidth": 0,
+      "strokeDasharray": "",
+      "opacity": 1,
+      "visualTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "containerTransformMatrix": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      }
+    }
+  ]
+}

@@ -14,7 +14,7 @@ Review Room stores metadata in Convex and media in RustFS. Production Pindeck al
 |-------|--------|
 | **Convex** | **Review Room deployment:** `https://unfold.serving.cloud` (client), `https://unfold-site.serving.cloud` (HTTP/actions). **Pindeck** uses `convex.serving.cloud` / `convex-site.serving.cloud` on the same VPS — separate instances, do not mix env vars. Deploy with `CONVEX_SELF_HOSTED_URL` + `CONVEX_SELF_HOSTED_ADMIN_KEY`. Do **not** set `CONVEX_DEPLOYMENT` from pindeck or local anonymous dev unless intentional. |
 | **Auth** | `@convex-dev/auth` with Password + Google + GitHub (Pindeck pattern). Admin role on `appUsers`. |
-| **Media uploads (browser)** | Next.js presign routes → RustFS S3 API (`S3_*` env, path-style). Fallback documented in `.env.example` for `MEDIA_GATEWAY_*` if presign is blocked by CORS. |
+| **Media uploads (browser)** | Next.js presign routes → RustFS S3 API (`S3_*` env, path-style). Files over 50 MiB use S3 multipart upload with 50 MiB parts so the proxied public endpoint stays below Cloudflare's 100 MB per-request limit. Fallback documented in `.env.example` for `MEDIA_GATEWAY_*` if presign is blocked by CORS. |
 | **Media processing** | Homelab worker (`services/media-worker`) calls ffmpeg for thumbnail + sprite sheet; updates Convex `videos` keys. Can alternatively call `MEDIA_GATEWAY_URL` `/process-image` when `USE_MEDIA_GATEWAY=1`. |
 | **Public object URLs** | Presigned GET from Next.js, or `S3_PUBLIC_BASE_URL` + key when objects are public-read. |
 | **Frontend deploy** | Vercel (or `bun dev` locally); env points at homelab Convex + storage. |
@@ -37,6 +37,7 @@ Review Room stores metadata in Convex and media in RustFS. Production Pindeck al
 ## CORS / TLS
 
 - Browser PUT to presigned URLs requires RustFS CORS allowing the app origin.
+- Multipart uploads also require `POST` and an exposed `ETag` response header in the bucket CORS policy.
 - Validate in Stage 3.8 before upload E2E.
 - Local dev may use Tailscale/hostnames documented in Pindeck README.
 

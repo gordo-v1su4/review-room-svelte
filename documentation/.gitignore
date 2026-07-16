@@ -1,0 +1,8 @@
+.venv/
+notion-client-guide/.outline-upload/
+notion-client-guide/_*.ts
+notion-client-guide/marker-editor/_*.ts
+notion-client-guide/marker-editor/_*.ps1
+notion-client-guide/screenshots/*.png
+notion-client-guide/screenshots/raw/*.WRONG-*
+notion-client-guide/screenshots/annotated/_*

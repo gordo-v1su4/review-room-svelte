@@ -1,0 +1,280 @@
+{
+  "04-project-workspace-root.png": [
+    {
+      "n": 1,
+      "label": "Sidebar \u2014 Projects, Inbox, folders"
+    },
+    {
+      "n": 2,
+      "label": "Smart folders \u2014 Videos / Images / Contact sheets"
+    },
+    {
+      "n": 3,
+      "label": "Date folders \u2014 browse by shoot day"
+    },
+    {
+      "n": 4,
+      "label": "Project title + description"
+    },
+    {
+      "n": 5,
+      "label": "Access \u2014 who can open this project"
+    },
+    {
+      "n": 6,
+      "label": "Status summary \u2014 Awaiting / Feedback / Selected / Approved"
+    },
+    {
+      "n": 7,
+      "label": "Smart views \u2014 filter by review state"
+    },
+    {
+      "n": 8,
+      "label": "Layout + Appearance + type filters + Newest sort"
+    },
+    {
+      "n": 9,
+      "label": "Folder cards \u2014 open a folder to review media"
+    }
+  ],
+  "05-images-grid.png": [
+    {
+      "n": 1,
+      "label": "Images smart folder (active)"
+    },
+    {
+      "n": 2,
+      "label": "Awaiting Review / Selected / Has Feedback tabs"
+    },
+    {
+      "n": 3,
+      "label": "Grid / Group / Table / Review layouts"
+    },
+    {
+      "n": 4,
+      "label": "Appearance \u2014 card size, fit/fill, card info"
+    },
+    {
+      "n": 5,
+      "label": "VID / IMG / CTX / STB type chips"
+    },
+    {
+      "n": 6,
+      "label": "Search"
+    },
+    {
+      "n": 7,
+      "label": "Sort \u2014 Newest / Oldest / Rating / Comments"
+    },
+    {
+      "n": 8,
+      "label": "Media cards \u2014 click to open details"
+    },
+    {
+      "n": 9,
+      "label": "Status badge on each card"
+    }
+  ],
+  "06-appearance-controls.png": [
+    {
+      "n": 1,
+      "label": "Card size S / M / L \u2014 make the grid denser"
+    },
+    {
+      "n": 2,
+      "label": "Aspect ratio \u2014 landscape / square / portrait"
+    },
+    {
+      "n": 3,
+      "label": "Thumbnail scale \u2014 Fit or Fill"
+    },
+    {
+      "n": 4,
+      "label": "Show card info \u2014 titles, ratings, badges"
+    }
+  ],
+  "07-image-selected.png": [
+    {
+      "n": 1,
+      "label": "Selected card (blue outline)"
+    },
+    {
+      "n": 2,
+      "label": "Details panel \u2014 Expand / close"
+    },
+    {
+      "n": 3,
+      "label": "Large preview of the asset"
+    },
+    {
+      "n": 4,
+      "label": "Status + who uploaded it"
+    },
+    {
+      "n": 5,
+      "label": "Star rating"
+    },
+    {
+      "n": 6,
+      "label": "Shortlist (Selected)"
+    },
+    {
+      "n": 7,
+      "label": "Leave a note + Add comment"
+    }
+  ],
+  "08-image-markup-lightbox.png": [
+    {
+      "n": 1,
+      "label": "Asset name / original filename"
+    },
+    {
+      "n": 2,
+      "label": "Draw color \u2014 red / orange / green / blue"
+    },
+    {
+      "n": 3,
+      "label": "Stroke thickness"
+    },
+    {
+      "n": 4,
+      "label": "Undo last stroke"
+    },
+    {
+      "n": 5,
+      "label": "Clear markup"
+    },
+    {
+      "n": 6,
+      "label": "Save markup to the asset"
+    },
+    {
+      "n": 7,
+      "label": "Rate + Shortlist while previewing"
+    },
+    {
+      "n": 8,
+      "label": "Draw directly on the image"
+    }
+  ],
+  "12-video-details-comments.png": [
+    {
+      "n": 1,
+      "label": "Selected video in the grid"
+    },
+    {
+      "n": 2,
+      "label": "Playback + timeline scrub"
+    },
+    {
+      "n": 3,
+      "label": "Show frames \u2014 frame readout toggle"
+    },
+    {
+      "n": 4,
+      "label": "Rate + Shortlist"
+    },
+    {
+      "n": 5,
+      "label": "Comment box + Pin to current time"
+    },
+    {
+      "n": 6,
+      "label": "Existing comments + reactions"
+    }
+  ],
+  "09-selected-view.png": [
+    {
+      "n": 1,
+      "label": "Selected smart view \u2014 shortlisted assets only"
+    },
+    {
+      "n": 2,
+      "label": "CTX chip \u2014 contact sheets in this shortlist"
+    },
+    {
+      "n": 3,
+      "label": "Sort stays on Newest"
+    }
+  ],
+  "10-table-view.png": [
+    {
+      "n": 1,
+      "label": "Table layout"
+    },
+    {
+      "n": 2,
+      "label": "Shot / Asset column"
+    },
+    {
+      "n": 3,
+      "label": "Status"
+    },
+    {
+      "n": 4,
+      "label": "Feedback Open"
+    },
+    {
+      "n": 5,
+      "label": "Rating"
+    },
+    {
+      "n": 6,
+      "label": "Updated date \u2014 find latest activity"
+    }
+  ],
+  "11-has-feedback-view.png": [
+    {
+      "n": 1,
+      "label": "Has Feedback \u2014 only assets with notes"
+    },
+    {
+      "n": 2,
+      "label": "Comment count on cards"
+    },
+    {
+      "n": 3,
+      "label": "New notes badge"
+    }
+  ],
+  "13-inbox-feedback-digest.png": [
+    {
+      "n": 1,
+      "label": "Inbox \u2014 feedback digest"
+    },
+    {
+      "n": 2,
+      "label": "Grouped by project + day"
+    },
+    {
+      "n": 3,
+      "label": "Needs attention badge"
+    },
+    {
+      "n": 4,
+      "label": "Mark handled / Handled"
+    },
+    {
+      "n": 5,
+      "label": "Click a row to jump back to the asset"
+    }
+  ],
+  "03-projects-list.png": [
+    {
+      "n": 1,
+      "label": "Projects"
+    },
+    {
+      "n": 2,
+      "label": "Inbox"
+    },
+    {
+      "n": 3,
+      "label": "Shared project card"
+    },
+    {
+      "n": 4,
+      "label": "Media / Awaiting / Feedback counts"
+    }
+  ]
+}
