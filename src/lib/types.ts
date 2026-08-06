@@ -36,7 +36,12 @@ export type SortKey =
   | "recently_reviewed"
   | "most_comments";
 
-export type FolderSortKey = "manual" | "title" | "newest" | "attention";
+export type FolderSortKey =
+  | "newest"
+  | "oldest"
+  | "title"
+  | "title_desc"
+  | "attention";
 
 export type GridSize = "sm" | "md" | "lg";
 

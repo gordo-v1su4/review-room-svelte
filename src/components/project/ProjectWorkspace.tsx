@@ -132,7 +132,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
-  const [folderSort, setFolderSort] = useState<FolderSortKey>("manual");
+  const [folderSort, setFolderSort] = useState<FolderSortKey>("newest");
   const [filters, setFilters] = useState<FilterState>({
     assetClasses: [],
     statuses: [],
@@ -202,10 +202,12 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const sortedFolders = useMemo(() => {
     const copy = [...folders];
     switch (folderSort) {
+      case "oldest":
+        return copy.sort((a, b) => a.createdAt - b.createdAt);
       case "title":
         return copy.sort((a, b) => a.title.localeCompare(b.title));
-      case "newest":
-        return copy.sort((a, b) => b.createdAt - a.createdAt);
+      case "title_desc":
+        return copy.sort((a, b) => b.title.localeCompare(a.title));
       case "attention": {
         const attention = (folderId: Id<"projectFolders">) =>
           videos.filter(
@@ -213,8 +215,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           ).length;
         return copy.sort((a, b) => attention(b._id) - attention(a._id));
       }
+      case "newest":
       default:
-        return copy;
+        return copy.sort((a, b) => b.createdAt - a.createdAt);
     }
   }, [folderSort, folders, videos]);
 

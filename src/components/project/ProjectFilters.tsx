@@ -42,9 +42,10 @@ const SORT_LABELS = Object.fromEntries(
 ) as Record<SortKey, string>;
 
 const FOLDER_SORTS: { id: FolderSortKey; label: string }[] = [
-  { id: "manual", label: "Manual order" },
+  { id: "newest", label: "Newest" },
+  { id: "oldest", label: "Oldest" },
   { id: "title", label: "Title A–Z" },
-  { id: "newest", label: "Recently created" },
+  { id: "title_desc", label: "Title Z–A" },
   { id: "attention", label: "Needs attention" },
 ];
 
