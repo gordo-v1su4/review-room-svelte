@@ -14,7 +14,6 @@ import {
   ChevronsRight,
   Folder,
   FolderOpen,
-  Image as ImageIcon,
   Inbox,
   LogOut,
   Pencil,
@@ -30,7 +29,6 @@ import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { useAdminAccess } from "@/components/auth/AdminGate";
 import { Button } from "@/components/ui/button";
 import { projectAccent, projectAccentStyle } from "@/lib/projectAccent";
-import type { AssetClass } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_STORAGE_KEY = "review-room.sidebar.collapsed";
@@ -247,13 +245,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 type FolderDoc = Doc<"projectFolders">;
 type VideoDoc = Doc<"videos">;
-const SIDEBAR_ASSET_CLASSES: AssetClass[] = ["VID", "IMG", "CTX", "STB"];
-const COLLECTION_LABELS: Record<AssetClass, string> = {
-  VID: "Videos",
-  IMG: "Images",
-  CTX: "Contact sheets",
-  STB: "Storyboards",
-};
 
 function WorkspaceSidebarFolders({
   projectId,
@@ -270,12 +261,6 @@ function WorkspaceSidebarFolders({
     activeFolderParam && activeFolderParam !== "root"
       ? (activeFolderParam as Id<"projectFolders">)
       : null;
-  const assetClassParam = searchParams.get("assetClass");
-  const activeAssetClass = SIDEBAR_ASSET_CLASSES.includes(
-    assetClassParam as AssetClass,
-  )
-    ? (assetClassParam as AssetClass)
-    : null;
   const router = useRouter();
   const folders = useQuery(api.folders.listByProject, { projectId });
   const videos = useQuery(api.videos.listByProject, { projectId });
@@ -353,7 +338,6 @@ function WorkspaceSidebarFolders({
       folders={folders ?? []}
       videos={videos ?? []}
       activeFolderId={activeFolderId}
-      activeAssetClass={activeAssetClass}
       canEdit={canEdit}
       composerOpen={composerOpen}
       folderDraft={folderDraft}
@@ -385,7 +369,6 @@ function SidebarFolders({
   folders,
   videos,
   activeFolderId,
-  activeAssetClass,
   canEdit,
   composerOpen,
   folderDraft,
@@ -403,7 +386,6 @@ function SidebarFolders({
   folders: FolderDoc[];
   videos: VideoDoc[];
   activeFolderId: Id<"projectFolders"> | null;
-  activeAssetClass: AssetClass | null;
   canEdit: boolean;
   composerOpen: boolean;
   folderDraft: string;
@@ -427,14 +409,9 @@ function SidebarFolders({
   const [removingFolderId, setRemovingFolderId] = useState<Id<"projectFolders"> | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const rootFolders = folders;
-  const rootCount = videos.filter((video) => !video.folderId).length;
+  // Same scope rule as the workspace: counts mean everything under here.
+  const rootCount = videos.length;
   const accent = projectAccent(brandColor);
-  const collectionCounts = Object.fromEntries(
-    SIDEBAR_ASSET_CLASSES.map((assetClass) => [
-      assetClass,
-      videos.filter((video) => sidebarAssetClass(video) === assetClass).length,
-    ]),
-  ) as Record<AssetClass, number>;
 
   function startRename(folder: FolderDoc) {
     setEditingFolderId(folder._id);
@@ -484,21 +461,6 @@ function SidebarFolders({
           depth={0}
           onDrop={canEdit ? (videoId) => onDropVideo(videoId, undefined) : undefined}
         />
-        <div className="border-b border-zinc-800/70 pb-1 pt-1">
-          <p className="px-2 pb-1 text-[9px] font-medium uppercase tracking-wider text-teal-400/55">
-            Smart folders
-          </p>
-          {SIDEBAR_ASSET_CLASSES.map((assetClass) => (
-            <SidebarCollectionLink
-              key={assetClass}
-              href={`/dashboard/projects/${projectId}?assetClass=${assetClass}`}
-              label={COLLECTION_LABELS[assetClass]}
-              assetClass={assetClass}
-              count={collectionCounts[assetClass]}
-              active={activeAssetClass === assetClass}
-            />
-          ))}
-        </div>
         <div className="ml-4 border-l border-zinc-800/90 pl-2">
           {canEdit && composerOpen && (
             <form onSubmit={onCreateFolder} className="mb-1 flex items-center gap-1">
@@ -641,46 +603,6 @@ function SidebarFolders({
       </div>
     </div>
   );
-}
-
-function SidebarCollectionLink({
-  href,
-  label,
-  assetClass,
-  count,
-  active,
-}: {
-  href: string;
-  label: string;
-  assetClass: AssetClass;
-  count: number;
-  active: boolean;
-}) {
-  const Icon =
-    assetClass === "VID" ? Clapperboard : assetClass === "IMG" ? ImageIcon : Folder;
-  return (
-    <Link
-      href={href}
-      title={label}
-      className={cn(
-        "flex items-center gap-2 rounded-sm border px-2 py-1.5 text-[12px] transition",
-        active
-          ? "border-teal-400/30 bg-teal-400/10 text-teal-100"
-          : "border-transparent text-zinc-500 hover:border-teal-400/10 hover:bg-teal-400/[0.045] hover:text-zinc-300",
-      )}
-    >
-      <Icon className={cn("h-3.5 w-3.5 shrink-0", active ? "text-teal-300" : "text-teal-500/45")} />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className={cn("text-[10px] tabular-nums", active ? "text-teal-300/80" : "text-zinc-600")}>
-        {count}
-      </span>
-    </Link>
-  );
-}
-
-function sidebarAssetClass(video: VideoDoc): AssetClass {
-  if (video.assetClass) return video.assetClass;
-  return video.mimeType.startsWith("video/") ? "VID" : "IMG";
 }
 
 function SidebarFolderLink({
