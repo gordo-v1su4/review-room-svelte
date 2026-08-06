@@ -7,9 +7,8 @@ import {
   Check,
   ChevronDown,
   Columns3,
-  Film,
+  Folder,
   Grid3X3,
-  Image,
   List,
   Rows3,
   Search,
@@ -20,8 +19,8 @@ import type { FilterState } from "@/lib/filters";
 import type {
   AssetClass,
   CardAspectRatio,
+  FolderSortKey,
   GridSize,
-  MediaKind,
   SortKey,
   ThumbnailScale,
   WorkspaceLayout,
@@ -42,6 +41,17 @@ const SORT_LABELS = Object.fromEntries(
   SORTS.map((sort) => [sort.id, sort.label]),
 ) as Record<SortKey, string>;
 
+const FOLDER_SORTS: { id: FolderSortKey; label: string }[] = [
+  { id: "manual", label: "Manual order" },
+  { id: "title", label: "Title A–Z" },
+  { id: "newest", label: "Recently created" },
+  { id: "attention", label: "Needs attention" },
+];
+
+const FOLDER_SORT_LABELS = Object.fromEntries(
+  FOLDER_SORTS.map((sort) => [sort.id, sort.label]),
+) as Record<FolderSortKey, string>;
+
 const GRID_SIZES: { id: GridSize; label: string }[] = [
   { id: "sm", label: "S" },
   { id: "md", label: "M" },
@@ -59,18 +69,6 @@ const THUMBNAIL_SCALES: { id: ThumbnailScale; label: string }[] = [
   { id: "fill", label: "Fill" },
 ];
 
-type MediaTypeFilterId = "all" | Extract<MediaKind, "video" | "image">;
-
-const MEDIA_TYPE_OPTIONS: Array<{
-  id: MediaTypeFilterId;
-  label: string;
-  icon?: typeof Film;
-}> = [
-  { id: "all", label: "All" },
-  { id: "video", label: "Videos", icon: Film },
-  { id: "image", label: "Images", icon: Image },
-];
-
 const ASSET_CLASS_OPTIONS: Array<{ id: AssetClass; label: string }> = [
   { id: "VID", label: "VID" },
   { id: "IMG", label: "IMG" },
@@ -85,10 +83,12 @@ export function ProjectFilters({
   thumbnailScale,
   showCardInfo,
   resultCount,
-  mediaTypeCounts,
   assetClassCounts,
   filters,
   sort,
+  folderSort,
+  showFolderSort,
+  onFolderSort,
   onLayout,
   onGridSize,
   onAspectRatio,
@@ -103,10 +103,12 @@ export function ProjectFilters({
   thumbnailScale: ThumbnailScale;
   showCardInfo: boolean;
   resultCount: number;
-  mediaTypeCounts: Record<"all" | "video" | "image", number>;
   assetClassCounts: Record<"all" | AssetClass, number>;
   filters: FilterState;
   sort: SortKey;
+  folderSort?: FolderSortKey;
+  showFolderSort?: boolean;
+  onFolderSort?: (sort: FolderSortKey) => void;
   onLayout: (layout: WorkspaceLayout) => void;
   onGridSize: (size: GridSize) => void;
   onAspectRatio: (ratio: CardAspectRatio) => void;
@@ -156,12 +158,6 @@ export function ProjectFilters({
         onShowCardInfo={onShowCardInfo}
       />
 
-      <MediaTypeFilter
-        filters={filters}
-        counts={mediaTypeCounts}
-        onFilters={onFilters}
-      />
-
       <AssetClassFilter
         filters={filters}
         counts={assetClassCounts}
@@ -179,6 +175,9 @@ export function ProjectFilters({
       </div>
 
       <SortPopover sort={sort} onSort={onSort} />
+      {showFolderSort && folderSort && onFolderSort && (
+        <FolderSortPopover folderSort={folderSort} onFolderSort={onFolderSort} />
+      )}
       <button
         type="button"
         onClick={() =>
@@ -203,60 +202,6 @@ export function ProjectFilters({
   );
 }
 
-function MediaTypeFilter({
-  filters,
-  counts,
-  onFilters,
-}: {
-  filters: FilterState;
-  counts: Record<"all" | "video" | "image", number>;
-  onFilters: (filters: FilterState) => void;
-}) {
-  const current = filters.mediaTypes.length === 1 ? filters.mediaTypes[0] : "all";
-
-  return (
-    <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
-      {MEDIA_TYPE_OPTIONS.map((option) => {
-        const Icon = option.icon;
-        const active = current === option.id;
-
-        return (
-          <button
-            key={option.id}
-            type="button"
-            aria-pressed={active}
-            onClick={() =>
-              onFilters({
-                ...filters,
-                mediaTypes: option.id === "all" ? [] : [option.id],
-              })
-            }
-            className={cn(
-              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium transition",
-              active
-                ? "bg-zinc-800 text-zinc-100"
-                : "text-zinc-500 hover:text-zinc-200",
-            )}
-          >
-            {Icon && <Icon className="h-3.5 w-3.5" />}
-            <span>{option.label}</span>
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0.5 text-[10px] tabular-nums",
-                active
-                  ? "bg-zinc-950 text-zinc-300"
-                  : "bg-zinc-800 text-zinc-600",
-              )}
-            >
-              {counts[option.id === "all" ? "all" : option.id]}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function AssetClassFilter({
   filters,
   counts,
@@ -266,8 +211,31 @@ function AssetClassFilter({
   counts: Record<"all" | AssetClass, number>;
   onFilters: (filters: FilterState) => void;
 }) {
+  const allActive = filters.assetClasses.length === 0;
   return (
     <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
+      <button
+        type="button"
+        aria-pressed={allActive}
+        title="All asset classes"
+        onClick={() => onFilters({ ...filters, assetClasses: [] })}
+        className={cn(
+          "inline-flex h-8 shrink-0 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium transition",
+          allActive
+            ? "bg-zinc-800 text-zinc-100"
+            : "text-zinc-500 hover:text-zinc-200",
+        )}
+      >
+        All
+        <span
+          className={cn(
+            "rounded-full px-1.5 py-0.5 text-[10px] tabular-nums",
+            allActive ? "bg-zinc-950 text-zinc-300" : "bg-zinc-800 text-zinc-600",
+          )}
+        >
+          {counts.all}
+        </span>
+      </button>
       {ASSET_CLASS_OPTIONS.map((option) => {
         const active = filters.assetClasses.includes(option.id);
         return (
@@ -442,10 +410,12 @@ function SortPopover({
       <Popover.Trigger asChild>
         <button
           type="button"
+          title="Sort media"
           className="inline-flex h-8 min-w-32 shrink-0 items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
         >
           <span className="inline-flex items-center gap-1.5">
             <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-500" />
+            <span className="font-normal text-zinc-500">Media</span>
             {SORT_LABELS[sort]}
           </span>
           <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
@@ -471,6 +441,57 @@ function SortPopover({
             >
               {item.label}
               {sort === item.id && <Check className="h-3.5 w-3.5" />}
+            </button>
+          ))}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+function FolderSortPopover({
+  folderSort,
+  onFolderSort,
+}: {
+  folderSort: FolderSortKey;
+  onFolderSort: (sort: FolderSortKey) => void;
+}) {
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          title="Sort groups"
+          className="inline-flex h-8 shrink-0 items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Folder className="h-3.5 w-3.5 text-zinc-500" />
+            <span className="font-normal text-zinc-500">Groups</span>
+            {FOLDER_SORT_LABELS[folderSort]}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={8}
+          className="z-50 w-48 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-zinc-200 shadow-2xl shadow-black/45"
+        >
+          {FOLDER_SORTS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onFolderSort(item.id)}
+              className={cn(
+                "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-teal-300/80",
+                folderSort === item.id
+                  ? "border border-teal-400/35 bg-teal-400/12 text-teal-100"
+                  : "border border-transparent text-zinc-400 hover:bg-teal-400/10 hover:text-teal-100",
+              )}
+            >
+              {item.label}
+              {folderSort === item.id && <Check className="h-3.5 w-3.5" />}
             </button>
           ))}
         </Popover.Content>

@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Download,
   Bookmark,
+  Folder,
   Maximize2,
   PenLine,
   Star,
@@ -41,6 +42,8 @@ export function VideoCard({
   showCardInfo = true,
   actionMode = "admin",
   token,
+  folderLabel,
+  onOpenFolder,
   onDragStart,
   onSelect,
   onOpenImagePreview,
@@ -53,6 +56,8 @@ export function VideoCard({
   showCardInfo?: boolean;
   actionMode?: "admin" | "client";
   token?: string;
+  folderLabel?: string;
+  onOpenFolder?: () => void;
   onDragStart?: (event: DragEvent<HTMLElement>, video: VideoDoc) => void;
   onSelect: () => void;
   onOpenImagePreview?: () => void;
@@ -336,6 +341,20 @@ export function VideoCard({
       </div>
       {showCardInfo && (
         <div className={cn("space-y-1.5", size === "sm" ? "p-2" : "p-2.5")}>
+          {folderLabel && (
+            <button
+              type="button"
+              title={`In ${folderLabel} — open group`}
+              className="flex min-w-0 max-w-full items-center gap-1 rounded-full border border-zinc-800 bg-zinc-950/80 px-1.5 py-0.5 text-[9px] font-medium text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-200"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenFolder?.();
+              }}
+            >
+              <Folder className="h-2.5 w-2.5 shrink-0" />
+              <span className="truncate">{folderLabel}</span>
+            </button>
+          )}
           {video.assetCode && (
             <div className="flex min-w-0 items-center gap-1.5">
               <span className="truncate rounded-full border border-zinc-800 bg-zinc-950/80 px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-zinc-500">

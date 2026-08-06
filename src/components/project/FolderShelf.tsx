@@ -88,7 +88,13 @@ export function FolderTile({
   folder: FolderDoc;
   active: boolean;
   accent: string;
-  counts: { total: number; images: number; videos: number };
+  counts: {
+    total: number;
+    images: number;
+    videos: number;
+    needsAttention: number;
+    selected: number;
+  };
   coverAsset?: VideoDoc | null;
   canEdit: boolean;
   onOpen: () => void;
@@ -367,8 +373,24 @@ export function FolderTile({
             </span>
           </button>
         )}
-        <span className="flex items-center justify-between gap-2 text-[11px] text-zinc-600">
+        <span className="flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-600">
           <span>{folderItemLabel(counts.total)}</span>
+          {counts.needsAttention > 0 && (
+            <span
+              title={`${counts.needsAttention} need${counts.needsAttention === 1 ? "s" : ""} attention`}
+              className="rounded-full bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-amber-300"
+            >
+              {counts.needsAttention} attention
+            </span>
+          )}
+          {counts.selected > 0 && (
+            <span
+              title={`${counts.selected} selected`}
+              className="rounded-full bg-sky-400/10 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-sky-300"
+            >
+              {counts.selected} selected
+            </span>
+          )}
         </span>
       </div>
     </div>
@@ -386,6 +408,10 @@ export function folderCounts(videos: VideoDoc[], folderId: Id<"projectFolders">)
     total: assets.length,
     videos: assets.filter((asset) => mediaKind(asset) === "video").length,
     images: assets.filter((asset) => mediaKind(asset) === "image").length,
+    needsAttention: assets.filter(
+      (asset) => asset.feedbackNeedsAttention === true,
+    ).length,
+    selected: assets.filter((asset) => asset.isSelect).length,
   };
 }
 

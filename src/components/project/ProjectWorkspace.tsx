@@ -46,6 +46,7 @@ import { isImageAsset, mediaKind } from "@/lib/media";
 import type {
   AssetClass,
   CardAspectRatio,
+  FolderSortKey,
   GridSize,
   SmartViewId,
   SortKey,
@@ -131,8 +132,8 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
+  const [folderSort, setFolderSort] = useState<FolderSortKey>("manual");
   const [filters, setFilters] = useState<FilterState>({
-    mediaTypes: [],
     assetClasses: [],
     statuses: [],
     tags: [],
@@ -152,37 +153,78 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     : null;
   const videoParam = searchParams.get("video");
 
-  const folderScopedVideos = useMemo(
+  // Whether the user has expressed any filter intent beyond browsing.
+  const filtersActive =
+    filters.assetClasses.length > 0 ||
+    filters.statuses.length > 0 ||
+    filters.tags.length > 0 ||
+    filters.minRating > 0 ||
+    filters.selectedOnly ||
+    filters.hasComments ||
+    filters.search.trim().length > 0;
+  const isFiltering = view !== "all" || filtersActive;
+
+  // One scope rule: counts always mean everything under the current level.
+  // At project root that is every asset (including those nested in folders);
+  // inside a folder it is that folder's assets.
+  const scopedVideos = useMemo(
     () =>
-      routeAssetClass
-        ? videos
-        : layout === "table" && !activeFolderId
-          ? videos
-        : videos.filter((video) =>
-            activeFolderId ? video.folderId === activeFolderId : !video.folderId,
-          ),
-    [activeFolderId, layout, routeAssetClass, videos],
+      activeFolderId
+        ? videos.filter((video) => video.folderId === activeFolderId)
+        : videos,
+    [activeFolderId, videos],
   );
 
+  // Browsing shows structure; filtering shows content. With no filter at
+  // root the grid holds folder tiles plus loose media. Once any filter is
+  // active the grid flattens to matching media across all folders.
+  const gridSourceVideos = useMemo(() => {
+    if (activeFolderId) return scopedVideos;
+    if (routeAssetClass || layout === "table" || isFiltering) return videos;
+    return videos.filter((video) => !video.folderId);
+  }, [activeFolderId, isFiltering, layout, routeAssetClass, scopedVideos, videos]);
+
   const viewScopedVideos = useMemo(
-    () => folderScopedVideos.filter((v) => matchesSmartView(v, view)),
-    [folderScopedVideos, view],
+    () => scopedVideos.filter((v) => matchesSmartView(v, view)),
+    [scopedVideos, view],
   );
 
   const filtered = useMemo(() => {
-    let list = viewScopedVideos;
+    let list = gridSourceVideos.filter((v) => matchesSmartView(v, view));
     list = applyFilters(list, filters);
     return sortVideos(list, sort);
-  }, [filters, sort, viewScopedVideos]);
+  }, [filters, gridSourceVideos, sort, view]);
 
   const activeFolder = activeFolderId
     ? folders.find((folder) => folder._id === activeFolderId)
     : null;
-  const mediaTypeCounts = {
-    all: viewScopedVideos.length,
-    video: viewScopedVideos.filter((asset) => mediaKind(asset) === "video").length,
-    image: viewScopedVideos.filter((asset) => mediaKind(asset) === "image").length,
-  };
+
+  const sortedFolders = useMemo(() => {
+    const copy = [...folders];
+    switch (folderSort) {
+      case "title":
+        return copy.sort((a, b) => a.title.localeCompare(b.title));
+      case "newest":
+        return copy.sort((a, b) => b.createdAt - a.createdAt);
+      case "attention": {
+        const attention = (folderId: Id<"projectFolders">) =>
+          videos.filter(
+            (v) => v.folderId === folderId && v.feedbackNeedsAttention === true,
+          ).length;
+        return copy.sort((a, b) => attention(b._id) - attention(a._id));
+      }
+      default:
+        return copy;
+    }
+  }, [folderSort, folders, videos]);
+
+  const folderTitleById = useMemo(
+    () => new Map(folders.map((folder) => [folder._id, folder.title])),
+    [folders],
+  );
+  // Badge cards with their folder only when the grid is a flattened
+  // cross-folder list; at level scope the location is already obvious.
+  const showFolderBadges = !activeFolderId && folders.length > 0;
   const assetClassCounts = {
     all: viewScopedVideos.length,
     VID: viewScopedVideos.filter(
@@ -421,6 +463,27 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     }
   }
 
+  function clearAllFilters() {
+    setView("all");
+    setFilters({
+      assetClasses: [],
+      statuses: [],
+      tags: [],
+      minRating: 0,
+      selectedOnly: false,
+      hasComments: false,
+      search: "",
+    });
+    if (routeAssetClass) router.push(`/dashboard/projects/${projectId}`);
+  }
+
+  function filterFromStat(statView: SmartViewId) {
+    if (activeFolderId || routeAssetClass) {
+      router.push(`/dashboard/projects/${projectId}`);
+    }
+    setView((current) => (current === statView ? "all" : statView));
+  }
+
   const canEditProject = appUser.role === "admin" && project.memberRole !== "viewer";
   const canUploadMedia = true;
   const canOrganizeFolders = canEditProject;
@@ -439,6 +502,8 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           projectId={projectId}
           visibility={(project.visibility ?? "private") as ProjectVisibility}
           counts={counts}
+          activeView={view}
+          onStatFilter={filterFromStat}
           onUpdate={(patch) => updateProject({ projectId, ...patch })}
           onShare={() =>
             void createLink({
@@ -474,8 +539,41 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           canManageAccess={canManageAccess}
         />
 
+        {!activeFolderId && folders.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-800/40 px-4 py-1.5 text-[11px] text-zinc-600 sm:px-6 lg:px-8">
+            {isFiltering ? (
+              <>
+                <span>
+                  Showing{" "}
+                  <span className="tabular-nums text-zinc-400">{filtered.length}</span>{" "}
+                  matching {filtered.length === 1 ? "item" : "items"} across all
+                  groups
+                </span>
+                <button
+                  type="button"
+                  className="text-teal-400/90 transition hover:text-teal-300"
+                  onClick={clearAllFilters}
+                >
+                  Clear filters to browse groups
+                </button>
+              </>
+            ) : (
+              <span>
+                Counting{" "}
+                <span className="tabular-nums text-zinc-400">
+                  {scopedVideos.length}
+                </span>{" "}
+                {scopedVideos.length === 1 ? "item" : "items"} across{" "}
+                <span className="tabular-nums text-zinc-400">{folders.length}</span>{" "}
+                {folders.length === 1 ? "group" : "groups"} — filtering shows
+                matches from every group
+              </span>
+            )}
+          </div>
+        )}
+
         <ProjectViewSwitcher
-          videos={folderScopedVideos}
+          videos={scopedVideos}
           active={view}
           onChange={setView}
         />
@@ -487,10 +585,12 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           thumbnailScale={thumbnailScale}
           showCardInfo={showCardInfo}
           resultCount={filtered.length}
-          mediaTypeCounts={mediaTypeCounts}
           assetClassCounts={assetClassCounts}
           filters={filters}
           sort={sort}
+          folderSort={folderSort}
+          showFolderSort={!activeFolderId && folders.length > 0}
+          onFolderSort={setFolderSort}
           onLayout={setLayout}
           onGridSize={setGridSize}
           onAspectRatio={setAspectRatio}
@@ -507,9 +607,23 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                 {layout === "grid" ? (
                   <VideoGrid
                     videos={filtered}
+                    folderLabelFor={
+                      showFolderBadges
+                        ? (video) =>
+                            video.folderId
+                              ? folderTitleById.get(video.folderId)
+                              : undefined
+                        : undefined
+                    }
+                    onOpenVideoFolder={(video) =>
+                      video.folderId &&
+                      router.push(
+                        `/dashboard/projects/${projectId}?folder=${video.folderId}`,
+                      )
+                    }
                     leadingItems={
                       <FolderShelf
-                        folders={routeAssetClass ? [] : folders}
+                        folders={routeAssetClass || isFiltering ? [] : sortedFolders}
                         videos={videos}
                         activeFolderId={activeFolderId}
                         brandColor={project.brandColor}
@@ -548,9 +662,19 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                         <p>
                           {activeFolder
                             ? "No media in this folder."
-                            : "Upload your first media to start a review."}
+                            : isFiltering
+                              ? "Nothing matches the current filters."
+                              : "Upload your first media to start a review."}
                         </p>
-                        {canUploadMedia && (
+                        {!activeFolder && isFiltering ? (
+                          <Button
+                            variant="secondary"
+                            className="mt-3"
+                            onClick={clearAllFilters}
+                          >
+                            Clear filters
+                          </Button>
+                        ) : canUploadMedia && (
                           <Link
                             href={
                               activeFolderId
@@ -566,7 +690,11 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                   />
                 ) : layout === "grouped" ? (
                   <VideoGroupedView
-                    folders={activeFolderId || routeAssetClass ? [] : folders}
+                    folders={
+                      activeFolderId || routeAssetClass || isFiltering
+                        ? []
+                        : sortedFolders
+                    }
                     folderVideos={videos}
                     brandColor={project.brandColor}
                     videos={filtered}
@@ -667,6 +795,8 @@ function ProjectHero({
   projectId,
   visibility,
   counts,
+  activeView,
+  onStatFilter,
   onUpdate,
   onShare,
   onReprocess,
@@ -693,6 +823,8 @@ function ProjectHero({
     selected: number;
     approved: number;
   };
+  activeView: SmartViewId;
+  onStatFilter: (view: SmartViewId) => void;
   onUpdate: (patch: ProjectIdentityPatch) => Promise<unknown>;
   onShare: () => void;
   onReprocess: () => void;
@@ -1044,10 +1176,34 @@ function ProjectHero({
           </div>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <Stat label="Awaiting" value={counts.awaiting} accent="bg-zinc-400" />
-          <Stat label="Feedback" value={counts.feedback} accent="bg-sky-400" />
-          <Stat label="Selected" value={counts.selected} accent="bg-sky-400" />
-          <Stat label="Approved" value={counts.approved} accent="bg-emerald-400" />
+          <Stat
+            label="Awaiting"
+            value={counts.awaiting}
+            accent="bg-zinc-400"
+            active={activeView === "awaiting_review"}
+            onClick={() => onStatFilter("awaiting_review")}
+          />
+          <Stat
+            label="Feedback"
+            value={counts.feedback}
+            accent="bg-sky-400"
+            active={activeView === "has_feedback"}
+            onClick={() => onStatFilter("has_feedback")}
+          />
+          <Stat
+            label="Selected"
+            value={counts.selected}
+            accent="bg-sky-400"
+            active={activeView === "selected"}
+            onClick={() => onStatFilter("selected")}
+          />
+          <Stat
+            label="Approved"
+            value={counts.approved}
+            accent="bg-emerald-400"
+            active={activeView === "approved"}
+            onClick={() => onStatFilter("approved")}
+          />
         </div>
       </div>
     </div>
@@ -1271,23 +1427,53 @@ function Stat({
   label,
   value,
   accent,
+  active,
+  onClick,
 }: {
   label: string;
   value: number;
   accent: string;
+  active: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-lg border border-zinc-800/50 bg-zinc-900/30 px-3.5 py-2.5">
+    <button
+      type="button"
+      aria-pressed={active}
+      title={active ? "Clear this filter" : `Show all ${label.toLowerCase()} items`}
+      onClick={onClick}
+      className={cn(
+        "group/stat flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-left transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-300/70",
+        active
+          ? "border-teal-400/50 bg-teal-400/[0.07]"
+          : "border-zinc-800/50 bg-zinc-900/30 hover:border-zinc-700 hover:bg-zinc-900/60",
+      )}
+    >
       <span className={cn("h-6 w-0.5 rounded-full", accent)} />
-      <div>
-        <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+      <div className="min-w-0 flex-1">
+        <p
+          className={cn(
+            "text-[10px] font-medium uppercase tracking-wider",
+            active ? "text-teal-300/90" : "text-zinc-600",
+          )}
+        >
           {label}
         </p>
         <p className="text-lg font-semibold leading-tight tabular-nums text-zinc-200">
           {value}
         </p>
       </div>
-    </div>
+      <span
+        className={cn(
+          "shrink-0 text-[10px] font-medium transition",
+          active
+            ? "text-teal-300/90"
+            : "text-zinc-700 opacity-0 group-hover/stat:opacity-100",
+        )}
+      >
+        {active ? "Clear ✕" : "Filter"}
+      </span>
+    </button>
   );
 }
 
