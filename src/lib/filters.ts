@@ -1,6 +1,6 @@
 import type { VideoDoc } from "./smartViews";
 import { mediaKind } from "./media";
-import type { AssetClass, MediaKind, SortKey } from "./types";
+import type { AssetClass, SortKey } from "./types";
 
 const STATUS_SORT_ORDER: Record<VideoDoc["status"], number> = {
   not_started: 0,
@@ -14,7 +14,6 @@ const STATUS_SORT_ORDER: Record<VideoDoc["status"], number> = {
 };
 
 export type FilterState = {
-  mediaTypes: MediaKind[];
   assetClasses: AssetClass[];
   statuses: string[];
   tags: string[];
@@ -53,12 +52,6 @@ export function sortVideos(videos: VideoDoc[], sort: SortKey): VideoDoc[] {
 
 export function applyFilters(videos: VideoDoc[], filters: FilterState): VideoDoc[] {
   return videos.filter((v) => {
-    if (
-      filters.mediaTypes.length &&
-      !filters.mediaTypes.includes(mediaKind(v))
-    ) {
-      return false;
-    }
     if (
       filters.assetClasses.length &&
       !filters.assetClasses.includes(v.assetClass ?? (mediaKind(v) === "video" ? "VID" : "IMG"))

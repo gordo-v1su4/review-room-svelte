@@ -19,6 +19,8 @@ export function VideoGrid({
   onDragStart,
   onSelect,
   onOpenImagePreview,
+  folderLabelFor,
+  onOpenVideoFolder,
   empty,
 }: {
   videos: VideoDoc[];
@@ -33,6 +35,8 @@ export function VideoGrid({
   onDragStart?: (event: DragEvent<HTMLElement>, video: VideoDoc) => void;
   onSelect: (id: VideoDoc["_id"]) => void;
   onOpenImagePreview?: (video: VideoDoc) => void;
+  folderLabelFor?: (video: VideoDoc) => string | undefined;
+  onOpenVideoFolder?: (video: VideoDoc) => void;
   empty?: React.ReactNode;
 }) {
   if (!videos.length && !leadingItems) {
@@ -65,6 +69,10 @@ export function VideoGrid({
           token={token}
           onDragStart={onDragStart}
           selected={selectedId === video._id}
+          folderLabel={folderLabelFor?.(video)}
+          onOpenFolder={
+            onOpenVideoFolder ? () => onOpenVideoFolder(video) : undefined
+          }
           onSelect={() => onSelect(video._id)}
           onOpenImagePreview={
             onOpenImagePreview ? () => onOpenImagePreview(video) : undefined
