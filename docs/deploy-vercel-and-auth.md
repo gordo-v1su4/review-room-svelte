@@ -140,6 +140,37 @@ Review Room uses a separate homelab Convex deployment from pindeck. Reuse the sa
 
 OAuth redirect URIs in Google/GitHub consoles must include Convex Auth callback URLs on your **Convex site** host (see [Convex Auth docs](https://labs.convex.dev/auth)). `SITE_URL` should be your Review Room origin (`http://localhost:3000` locally, Vercel URL in prod).
 
+### Password reset email
+
+Review Room uses Convex Auth's two-step password reset flow: the user requests
+an 8-digit email code, then submits that code with a new password. Codes expire
+after 10 minutes, failed attempts are rate-limited by Convex Auth, and a
+successful reset invalidates the account's other sessions.
+
+Password reset delivery uses Resend over HTTPS. Set these on the **Unfold Convex
+deployment**, not Vercel:
+
+| Variable | Purpose |
+|----------|---------|
+| `AUTH_RESEND_KEY` | Resend API key with send access |
+| `AUTH_RESEND_FROM` | Verified sender: `Review Room <no-reply@mail.unfold-flower-gen.app>` |
+
+From the canonical Review Room checkout with the Unfold self-hosted URL and
+admin key in `.env.local`:
+
+```bash
+bunx convex env set AUTH_RESEND_KEY --from-file <one-use-key-file>
+bunx convex env set AUTH_RESEND_FROM "Review Room <no-reply@mail.unfold-flower-gen.app>"
+```
+
+Do not reuse the Pindeck Convex deployment or put the Resend key in tracked
+files. The durable key reference is BWS project `hermes_keys`, secret
+`PROXMOX_HOME_HOSTINGER_UNFOLD_CONVEX_PRIVATE_AUTH_RESEND_KEY`; the sender is
+mirrored as `PROXMOX_HOME_HOSTINGER_UNFOLD_CONVEX_AUTH_RESEND_FROM`. After
+setting the values and deploying `convex/`, confirm that “Forgot
+password?” appears, request a code for a password account, complete the reset,
+and verify that the new password works while the old password fails.
+
 ### After Vercel deploy
 
 1. Deploy to Vercel → note the production URL.
@@ -153,7 +184,7 @@ OAuth redirect URIs in Google/GitHub consoles must include Convex Auth callback 
 1. `.env.local`: homelab Convex URLs + RustFS `S3_*` or `MEDIA_GATEWAY_*`
 2. GitHub secrets: `CONVEX_SELF_HOSTED_URL` + `CONVEX_SELF_HOSTED_ADMIN_KEY`
 3. Push relevant changes to `main` and confirm the `Deploy Convex` workflow succeeds
-4. Convex deployment env: `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`
+4. Convex deployment env: `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`, and `AUTH_RESEND_*` for password reset
 5. Vercel env: `NEXT_PUBLIC_CONVEX_URL`, `S3_*`, `SITE_URL`
 6. `bun run worker:media` on homelab (or set `MEDIA_WORKER_URL` on Vercel)
 7. For cross-layer fixes, verify the affected production flow only after both Vercel and Convex finish

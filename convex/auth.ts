@@ -4,9 +4,19 @@ import Google from "@auth/core/providers/google";
 import GitHub from "@auth/core/providers/github";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import {
+  isPasswordResetEnabled,
+  passwordResetEmail,
+} from "./lib/passwordReset";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
-  providers: [Password, Google, GitHub],
+  providers: [
+    Password(
+      isPasswordResetEnabled() ? { reset: passwordResetEmail } : undefined,
+    ),
+    Google,
+    GitHub,
+  ],
 });
 
 export const oauthProviders = query({
@@ -14,6 +24,7 @@ export const oauthProviders = query({
   handler: async () => ({
     google: Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET),
     github: Boolean(process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET),
+    passwordReset: isPasswordResetEnabled(),
   }),
 });
 
