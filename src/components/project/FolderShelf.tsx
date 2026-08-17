@@ -286,7 +286,7 @@ export function FolderTile({
             <img
               src={coverUrl}
               alt=""
-              className="absolute inset-0 h-full w-full object-cover opacity-80 transition group-hover:opacity-100"
+              className="absolute inset-0 h-full w-full object-cover opacity-70 transition group-hover:opacity-85"
             />
           ) : (
             <span className="absolute inset-2 rounded-md border border-zinc-800 bg-zinc-900/80 shadow-inner transition group-hover:border-zinc-700 group-hover:bg-zinc-900" />
@@ -294,8 +294,10 @@ export function FolderTile({
           <span className="absolute inset-0 bg-gradient-to-t from-zinc-950/75 via-transparent to-zinc-950/10" />
           <Folder
             className={cn(
-              "absolute left-1/2 top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 transition group-hover:text-zinc-100",
-              coverUrl ? "text-white/85 drop-shadow" : "text-zinc-400",
+              "absolute left-1/2 top-1/2 h-10 w-10 -translate-x-1/2 -translate-y-1/2 transition",
+              coverUrl
+                ? "text-white/70 drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] group-hover:text-white/85"
+                : "text-zinc-500 group-hover:text-zinc-300",
             )}
           />
         </span>
@@ -418,7 +420,7 @@ export function folderCounts(videos: VideoDoc[], folderId: Id<"projectFolders">)
 export function folderCoverAsset(videos: VideoDoc[], folder: FolderDoc) {
   const folderAssets = videos
     .filter((video) => video.folderId === folder._id)
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+    .sort((a, b) => b._creationTime - a._creationTime);
 
   return (
     folderAssets.find((asset) => isImageAsset(asset)) ??
