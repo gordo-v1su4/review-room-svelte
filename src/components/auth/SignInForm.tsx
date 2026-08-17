@@ -2,6 +2,7 @@
 
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -9,6 +10,12 @@ import { Eye, EyeOff, Github } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 
 type AuthFlow = "signIn" | "signUp" | "reset" | "resetVerification";
 
@@ -233,34 +240,56 @@ export function SignInForm() {
 
         {verifying ? (
           <form onSubmit={onResetVerification} className="space-y-4">
-            <div className="space-y-2">
-              <label
-                htmlFor="reset-code"
-                className="block text-sm font-medium text-zinc-300"
-              >
-                8-digit reset code
-              </label>
-              <Input
+            <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/45 px-3 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.18)] sm:px-5">
+              <div className="mb-4 flex items-baseline justify-between gap-3">
+                <label
+                  htmlFor="reset-code"
+                  className="text-sm font-medium text-zinc-200"
+                >
+                  Verification code
+                </label>
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-600">
+                  8 digits
+                </span>
+              </div>
+              <InputOTP
                 id="reset-code"
                 name="code"
-                type="text"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                pattern="[0-9]{8}"
+                pattern={REGEXP_ONLY_DIGITS}
                 maxLength={8}
                 value={resetCode}
-                onChange={(event) => {
-                  const next = event.currentTarget.value;
-                  setResetCode(/^\d*$/.test(next) ? next.slice(0, 8) : "");
-                }}
+                onChange={setResetCode}
+                onComplete={() =>
+                  document.querySelector<HTMLInputElement>(
+                    'input[name="newPassword"]',
+                  )?.focus()
+                }
                 aria-describedby="reset-code-hint"
-                placeholder="12345678"
+                aria-label="8-digit reset code"
+                data-1p-ignore
+                data-lpignore="true"
                 required
                 autoFocus
-                className="font-mono tracking-[0.2em] caret-teal-400 text-teal-200/80 focus-visible:ring-teal-500/35"
-              />
-              <p id="reset-code-hint" className="text-xs text-zinc-500">
-                Enter the newest code from your Review Room reset email.
+              >
+                <InputOTPGroup>
+                  {[0, 1, 2, 3].map((index) => (
+                    <InputOTPSlot key={index} index={index} />
+                  ))}
+                </InputOTPGroup>
+                <InputOTPSeparator />
+                <InputOTPGroup>
+                  {[4, 5, 6, 7].map((index) => (
+                    <InputOTPSlot key={index} index={index} />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
+              <p
+                id="reset-code-hint"
+                className="mt-3 text-center text-xs leading-5 text-zinc-500"
+              >
+                Paste the newest code or type it left to right.
               </p>
             </div>
             <div className="relative">
