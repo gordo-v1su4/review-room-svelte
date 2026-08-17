@@ -416,12 +416,14 @@ export function folderCounts(videos: VideoDoc[], folderId: Id<"projectFolders">)
 }
 
 export function folderCoverAsset(videos: VideoDoc[], folder: FolderDoc) {
-  const folderAssets = videos.filter((video) => video.folderId === folder._id);
+  const folderAssets = videos
+    .filter((video) => video.folderId === folder._id)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
 
   return (
-    folderAssets
-      .filter((video) => isImageAsset(video))
-      .sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null
+    folderAssets.find((asset) => isImageAsset(asset)) ??
+    folderAssets.find((asset) => Boolean(asset.thumbnailKey)) ??
+    null
   );
 }
 
