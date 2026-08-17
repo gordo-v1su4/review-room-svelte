@@ -77,6 +77,7 @@ export function SignInForm() {
   const [pendingName, setPendingName] = useState<string | undefined>();
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [resetCode, setResetCode] = useState("");
   const [resetStep, setResetStep] = useState<
     null | "request" | { email: string }
   >(null);
@@ -133,6 +134,7 @@ export function SignInForm() {
     setAuthNotice(null);
     try {
       await signIn("password", formData);
+      setResetCode("");
       setResetStep({ email });
       setAuthNotice("We sent an 8-digit reset code. It expires in 10 minutes.");
     } catch (err) {
@@ -151,6 +153,13 @@ export function SignInForm() {
     const newPassword = String(formData.get("newPassword") ?? "");
     const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
+    if (!/^\d{8}$/.test(resetCode)) {
+      const message = "Enter the 8-digit code from your email.";
+      setAuthNotice(message);
+      toast.error(message);
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       const message = "The new passwords do not match.";
       setAuthNotice(message);
@@ -159,6 +168,7 @@ export function SignInForm() {
     }
 
     formData.delete("confirmPassword");
+    formData.set("code", resetCode);
     formData.set("email", resetStep.email);
     formData.set("flow", "reset-verification");
     setLoading(true);
@@ -199,6 +209,7 @@ export function SignInForm() {
             type="button"
             onClick={() => {
               setResetStep(null);
+              setResetCode("");
               setAuthNotice(null);
               setShowPassword(false);
             }}
@@ -222,18 +233,36 @@ export function SignInForm() {
 
         {verifying ? (
           <form onSubmit={onResetVerification} className="space-y-4">
-            <Input
-              name="code"
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]{8}"
-              maxLength={8}
-              placeholder="8-digit code"
-              required
-              autoFocus
-              className="caret-teal-400 text-teal-200/80 focus-visible:ring-teal-500/35"
-            />
+            <div className="space-y-2">
+              <label
+                htmlFor="reset-code"
+                className="block text-sm font-medium text-zinc-300"
+              >
+                8-digit reset code
+              </label>
+              <Input
+                id="reset-code"
+                name="code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{8}"
+                maxLength={8}
+                value={resetCode}
+                onChange={(event) => {
+                  const next = event.currentTarget.value;
+                  setResetCode(/^\d*$/.test(next) ? next.slice(0, 8) : "");
+                }}
+                aria-describedby="reset-code-hint"
+                placeholder="12345678"
+                required
+                autoFocus
+                className="font-mono tracking-[0.2em] caret-teal-400 text-teal-200/80 focus-visible:ring-teal-500/35"
+              />
+              <p id="reset-code-hint" className="text-xs text-zinc-500">
+                Enter the newest code from your Review Room reset email.
+              </p>
+            </div>
             <div className="relative">
               <Input
                 name="newPassword"
@@ -279,6 +308,7 @@ export function SignInForm() {
               type="button"
               onClick={() => {
                 setResetStep("request");
+                setResetCode("");
                 setAuthNotice(null);
               }}
               className="w-full text-center text-sm text-zinc-400 transition hover:text-teal-300"
