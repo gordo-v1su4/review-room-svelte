@@ -5,7 +5,9 @@ import { useMutation } from "convex/react";
 import { X } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
+import { cn } from "@/lib/utils";
 import { VideoPlayer } from "./VideoPlayer";
+import { VIDEO_PREVIEW_VIEWPORT_CLASS } from "./videoPreviewSizing";
 
 export function VideoLightbox({
   video,
@@ -37,7 +39,12 @@ export function VideoLightbox({
     <Dialog.Root open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md" />
-        <Dialog.Content className="fixed inset-3 z-[90] grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border border-white/10 bg-zinc-950/95 text-zinc-50 shadow-2xl shadow-black/70 outline-none sm:inset-6">
+        <Dialog.Content
+          className={cn(
+            "fixed left-1/2 top-1/2 z-[90] grid -translate-x-1/2 -translate-y-1/2 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border border-white/10 bg-zinc-950/95 text-zinc-50 shadow-2xl shadow-black/70 outline-none",
+            VIDEO_PREVIEW_VIEWPORT_CLASS,
+          )}
+        >
           <div className="flex min-w-0 items-center justify-between gap-4 border-b border-white/10 bg-black/25 px-4 py-3 sm:px-5">
             <div className="min-w-0">
               <Dialog.Title className="truncate text-sm font-medium text-zinc-100">
