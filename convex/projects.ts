@@ -239,6 +239,20 @@ export const archive = mutation({
   },
 });
 
+export const unarchive = mutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const admin = await requireAdmin(ctx);
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+    if (project.createdBy !== admin._id) throw new Error("Project owner required");
+    await ctx.db.patch(project._id, {
+      archived: undefined,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 export const listMembers = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
