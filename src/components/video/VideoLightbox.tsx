@@ -68,6 +68,7 @@ export function VideoLightbox({
                 assetClass={video.assetClass}
                 version={video.updatedAt}
                 fps={video.fps}
+                autoPlay
                 fitAvailable
                 onPlay={handleFirstPlay}
               />
