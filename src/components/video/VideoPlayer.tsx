@@ -16,6 +16,7 @@ export function VideoPlayer({
   fps,
   loop = false,
   autoPlay = false,
+  fitAvailable = false,
   onTimeUpdate,
   onPlay,
   onEnded,
@@ -29,6 +30,7 @@ export function VideoPlayer({
   fps?: number | null;
   loop?: boolean;
   autoPlay?: boolean;
+  fitAvailable?: boolean;
   onTimeUpdate?: (sec: number) => void;
   onPlay?: () => void;
   onEnded?: () => void;
@@ -165,15 +167,29 @@ export function VideoPlayer({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="group relative overflow-hidden rounded-lg bg-black">
+    <div
+      className={cn(
+        fitAvailable
+          ? "flex h-full min-h-0 flex-col gap-3"
+          : "space-y-3",
+      )}
+    >
+      <div
+        className={cn(
+          "group relative overflow-hidden rounded-lg bg-black",
+          fitAvailable && "flex min-h-0 flex-1 items-center justify-center",
+        )}
+      >
         {mediaUrl ? (
           isImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={mediaUrl}
               alt=""
-              className="aspect-video w-full object-contain"
+              className={cn(
+                "w-full object-contain",
+                fitAvailable ? "h-full" : "aspect-video",
+              )}
               onLoad={() => onPlay?.()}
             />
           ) : (
@@ -183,7 +199,10 @@ export function VideoPlayer({
               loop={loop}
               autoPlay={autoPlay}
               playsInline
-              className="aspect-video w-full"
+              className={cn(
+                "w-full object-contain",
+                fitAvailable ? "h-full" : "aspect-video",
+              )}
               onClick={togglePlayback}
               onPlay={() => {
                 setIsPlaying(true);
@@ -211,7 +230,12 @@ export function VideoPlayer({
             />
           )
         ) : (
-          <div className="flex aspect-video items-center justify-center text-sm text-zinc-500">
+          <div
+            className={cn(
+              "flex w-full items-center justify-center text-sm text-zinc-500",
+              fitAvailable ? "h-full" : "aspect-video",
+            )}
+          >
             Loading playback…
           </div>
         )}
@@ -245,7 +269,7 @@ export function VideoPlayer({
         )}
       </div>
       {!isImage && (
-        <div className="space-y-3 px-5 pb-4 pt-1">
+        <div className={cn("space-y-3 px-5 pb-4 pt-1", fitAvailable && "shrink-0")}>
         <div
           ref={timelineRef}
           role="slider"

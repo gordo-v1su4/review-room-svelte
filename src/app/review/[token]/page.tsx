@@ -8,6 +8,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import { VideoGrid } from "@/components/video/VideoGrid";
 import { VideoDetailsPanel } from "@/components/video/VideoDetailsPanel";
 import { ImageLightbox } from "@/components/video/ImageLightbox";
+import { VideoLightbox } from "@/components/video/VideoLightbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type {
@@ -77,6 +78,7 @@ export default function ReviewPage({
   const [initialSelectionDone, setInitialSelectionDone] = useState(false);
   const [selectedId, setSelectedId] = useState<Id<"videos"> | null>(null);
   const [previewImageId, setPreviewImageId] = useState<Id<"videos"> | null>(null);
+  const [previewVideoId, setPreviewVideoId] = useState<Id<"videos"> | null>(null);
   const [showShortlist, setShowShortlist] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [loopPreview, setLoopPreview] = useState(false);
@@ -98,6 +100,10 @@ export default function ReviewPage({
   const previewImage = useMemo(
     () => videos.find((v) => v._id === previewImageId) ?? null,
     [previewImageId, videos],
+  );
+  const previewVideo = useMemo(
+    () => videos.find((v) => v._id === previewVideoId) ?? null,
+    [previewVideoId, videos],
   );
   const shortlisted = useMemo(
     () => videos.filter((video) => video.isSelect),
@@ -308,6 +314,7 @@ export default function ReviewPage({
             token={token}
             onSelect={setSelectedId}
             onOpenImagePreview={(video) => setPreviewImageId(video._id)}
+            onOpenVideoPreview={(video) => setPreviewVideoId(video._id)}
             empty={
               <p className="text-zinc-500">
                 {showShortlist
@@ -337,6 +344,12 @@ export default function ReviewPage({
           data?.link.canDownload && previewImage?.downloadEnabled,
         )}
         onClose={() => setPreviewImageId(null)}
+      />
+      <VideoLightbox
+        video={previewVideo}
+        mode="client"
+        token={token}
+        onClose={() => setPreviewVideoId(null)}
       />
     </div>
   );

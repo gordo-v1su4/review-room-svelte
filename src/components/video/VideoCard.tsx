@@ -47,6 +47,7 @@ export function VideoCard({
   onDragStart,
   onSelect,
   onOpenImagePreview,
+  onOpenVideoPreview,
 }: {
   video: VideoDoc;
   selected?: boolean;
@@ -61,6 +62,7 @@ export function VideoCard({
   onDragStart?: (event: DragEvent<HTMLElement>, video: VideoDoc) => void;
   onSelect: () => void;
   onOpenImagePreview?: () => void;
+  onOpenVideoPreview?: () => void;
 }) {
   const isImage = isImageAsset(video);
   const thumbUrl = useStorageUrl(
@@ -165,12 +167,19 @@ export function VideoCard({
     void setRatingAdmin({ videoId: video._id, rating });
   }
 
-  function openImagePreview(event?: MouseEvent<HTMLElement>) {
+  function openPreview(event?: MouseEvent<HTMLElement>) {
     event?.preventDefault();
     event?.stopPropagation();
-    if (!isImage || !onOpenImagePreview) return;
-    onOpenImagePreview();
+    if (isImage) {
+      onOpenImagePreview?.();
+      return;
+    }
+    onOpenVideoPreview?.();
   }
+
+  const canOpenPreview = isImage
+    ? Boolean(onOpenImagePreview)
+    : Boolean(onOpenVideoPreview);
 
   return (
     <article
@@ -178,7 +187,7 @@ export function VideoCard({
       tabIndex={0}
       draggable={Boolean(onDragStart)}
       onClick={onSelect}
-      onDoubleClick={(event) => openImagePreview(event)}
+      onDoubleClick={(event) => openPreview(event)}
       onDragStart={(event) => onDragStart?.(event, video)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -263,12 +272,12 @@ export function VideoCard({
           onClick={(event) => event.stopPropagation()}
           onDoubleClick={(event) => event.stopPropagation()}
         >
-          {isImage && onOpenImagePreview && (
+          {canOpenPreview && (
             <button
               type="button"
-              title="Preview image"
+              title={isImage ? "Preview image" : "Preview video"}
               className="grid h-6 w-6 place-items-center rounded-full text-zinc-300 transition hover:bg-white/10 hover:text-white"
-              onClick={openImagePreview}
+              onClick={openPreview}
             >
               <Maximize2 className="h-3 w-3" />
             </button>
@@ -281,7 +290,7 @@ export function VideoCard({
                 "grid h-6 w-6 place-items-center rounded-full text-zinc-300 transition hover:bg-white/10 hover:text-white",
                 annotated && "text-red-300",
               )}
-              onClick={openImagePreview}
+              onClick={openPreview}
             >
               <PenLine
                 className={cn("h-3 w-3", annotated && "fill-red-500/20 text-red-400")}

@@ -35,6 +35,7 @@ Don't design four heavyweight layouts. The card and the right-side panel carry t
 - **Grid (default, MVP)** — responsive cards, small/medium/large sizing, hover scrub affordance, clear selected state, good empty/loading states. Most-used view.
 - **Review / focus (MVP)** — large player with prev/next, metadata, comments, actions; implemented as the *expanded state of the right-side panel*, not a separate screen. Optional filmstrip of nearby videos.
 - **Image fullscreen markup (MVP)** — double-clicking a still image opens a fullscreen review surface with compact drawing controls. Keep it minimal: color swatches, brush size, undo, clear, save, rating, shortlist, and close. Saved strokes render over the image and appear on its grid thumbnail with a red pen indicator.
+- **Video quick preview (MVP)** — double-clicking a video opens a large, viewport-bounded playback surface without replacing the selected asset in the right-side panel. The player preserves the source aspect ratio and fits inside the browser window without page scrolling.
 - **Grouped (optional, low cost)** — the smart views rendered as stacked sections (each a wrapping row of the *same* cards). Communicates "generated from metadata," not a board. Avoid column-and-drag as the primary metaphor; drag is the optional override from PRD §4.
 - **Table (MVP / operational)** — compact ShotGrid/FTrack-style production view powered by TanStack Table. Shows thumbnail/latest visual, asset code/name, asset class, status, review attention state, rating, note count, latest actionable note, note date, updated date, and duration. At project root, Table is the all-project action board; folder and smart-folder selections narrow it. It should sort like a lightweight Airtable while still reading as a cinematic media review surface, not a raw spreadsheet.
 
@@ -52,6 +53,7 @@ Tab definitions and which ones accept drops are in PRD §4–5.
 The second-most-important component after the card. Collapsible, integrated into the dark workspace — **not** a white modal.
 - **Contents:** large player; title in the panel header; status; tags; compact one-line uploader attribution for admins; rating; shortlist toggle; **Approve / Request Changes**; comments; download (if enabled); admin-only controls when admin. Do not duplicate the uploaded asset name in a form field. Status changes use the status dropdown/select; do not add a separate "reset status" button.
 - **States:** closed (grid full width) · open (grid left, panel right) · expanded (player dominant) · optional fullscreen playback.
+- **Expanded sizing:** expanding the panel gives it the full workspace width. The complete player, timeline, and playback controls must fit inside the available browser height; preserve the media aspect ratio with letterboxing when necessary instead of making the user scroll to see the top or bottom of the frame.
 - Smooth, fast open/close. Prefer this panel and drawers/popovers over blocking modals everywhere.
 
 ## 6. Video card — the core object
@@ -63,6 +65,8 @@ The second-most-important component after the card. Collapsible, integrated into
 **Hover scrub:** when a scrub sprite or preview cache exists, horizontal pointer movement over the thumbnail should seek the visible frame immediately. It should feel like FreeCut's media grid: no popover, no heavy player chrome, just quick visual inspection. Still images do not show a scrub cursor. If the preview is still processing, keep the thumbnail/processing state stable.
 
 **Image markup:** still-image cards render saved drawing strokes over the thumbnail and show a small red pen indicator when markup exists. The pen opens the fullscreen markup view; the original image remains unchanged.
+
+**Video quick preview:** double-clicking a video card, or using its preview icon, opens the viewport-bounded video preview. Single-click continues to select the asset and open the details panel.
 
 **States to design:** default · hover · selected · viewed · commented · approved · needs-changes · uploading · processing-thumbnail · error/missing.
 
@@ -138,7 +142,7 @@ States to specify across components: hover · selected · focus · disabled · u
 
 ## 15. Responsive intent
 
-Desktop-first, degrade gracefully — don't make mobile impossible. **Tablet:** fewer grid columns; panel becomes an overlay drawer. **Mobile:** cards stack, viewer goes fullscreen, filters collapse to a menu, comments sit below the video.
+Desktop-first, degrade gracefully — don't make mobile impossible. Preview and expanded playback sizes derive from the current browser viewport rather than a fixed video width or height. **Tablet:** fewer grid columns; panel becomes an overlay drawer. **Mobile:** cards stack, viewer goes fullscreen, filters collapse to a menu, comments sit below the video.
 
 > Measurements (card widths, panel width, paddings, header height, grid density) are the designer's to set — pick what serves the density and calm the brief calls for. No fixed pixel values are prescribed here.
 

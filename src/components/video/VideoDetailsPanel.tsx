@@ -144,7 +144,10 @@ export function VideoDetailsPanel({
         </div>
       </div>
       <div className="flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
-        <div onMouseEnter={handleFirstPlay}>
+        <div
+          className={cn(expanded && "lg:h-[calc(100dvh-9rem)]")}
+          onMouseEnter={handleFirstPlay}
+        >
           <VideoPlayer
             storageKey={video.storageKey}
             spriteKey={video.spriteKey}
@@ -154,6 +157,7 @@ export function VideoDetailsPanel({
             fps={video.fps}
             autoPlay={autoPlay}
             loop={loop}
+            fitAvailable={expanded}
             onPlay={handleFirstPlay}
             onTimeUpdate={setPlayhead}
             onEnded={onEnded}
