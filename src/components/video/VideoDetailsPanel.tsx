@@ -28,7 +28,6 @@ import { CommentComposer } from "@/components/comments/CommentComposer";
 import { AuthorBadge } from "@/components/comments/AuthorBadge";
 import { cn } from "@/lib/utils";
 import type { VideoStatus } from "@/lib/types";
-import { VIDEO_PREVIEW_VIEWPORT_CLASS } from "./videoPreviewSizing";
 
 type Mode = "admin" | "client";
 
@@ -45,9 +44,8 @@ const STATUS_OPTIONS: Array<{ value: VideoStatus; label: string }> = [
 export function VideoDetailsPanel({
   video,
   mode,
-  expanded,
   onClose,
-  onToggleExpand,
+  onExpand,
   token,
   autoPlay = false,
   loop = false,
@@ -58,9 +56,8 @@ export function VideoDetailsPanel({
 }: {
   video: VideoDoc;
   mode: Mode;
-  expanded?: boolean;
   onClose: () => void;
-  onToggleExpand?: () => void;
+  onExpand?: () => void;
   token?: string;
   autoPlay?: boolean;
   loop?: boolean;
@@ -121,27 +118,19 @@ export function VideoDetailsPanel({
 
   return (
     <aside
-      className={cn(
-        "review-panel-drawer flex flex-col overflow-hidden border-zinc-800 bg-zinc-950",
-        expanded
-          ? cn(
-              "fixed left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2 rounded-xl border shadow-2xl shadow-black/70",
-              VIDEO_PREVIEW_VIEWPORT_CLASS,
-            )
-          : "fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] w-full rounded-t-xl border-t shadow-2xl shadow-black/60 lg:sticky lg:top-[3.25rem] lg:z-auto lg:h-[calc(100dvh-3.25rem)] lg:max-h-none lg:w-[420px] lg:max-w-md lg:self-start lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none",
-      )}
+      className="review-panel-drawer fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] w-full flex-col rounded-t-xl border-t border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/60 lg:sticky lg:top-[3.25rem] lg:z-auto lg:h-[calc(100dvh-3.25rem)] lg:max-h-none lg:w-[420px] lg:max-w-md lg:self-start lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none"
     >
       <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <h2 className="truncate text-sm font-medium">{video.title}</h2>
         <div className="flex gap-1">
-          {onToggleExpand && (
+          {onExpand && (
             <Button
               variant="ghost"
               size="sm"
               className="hidden lg:inline-flex"
-              onClick={onToggleExpand}
+              onClick={onExpand}
             >
-              {expanded ? "Collapse" : "Expand"}
+              Expand
             </Button>
           )}
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -149,11 +138,8 @@ export function VideoDetailsPanel({
           </Button>
         </div>
       </div>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
-        <div
-          className={cn(expanded && "lg:h-full")}
-          onMouseEnter={handleFirstPlay}
-        >
+      <div className="flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
+        <div onMouseEnter={handleFirstPlay}>
           <VideoPlayer
             storageKey={video.storageKey}
             spriteKey={video.spriteKey}
@@ -163,7 +149,6 @@ export function VideoDetailsPanel({
             fps={video.fps}
             autoPlay={autoPlay}
             loop={loop}
-            fitAvailable={expanded}
             onPlay={handleFirstPlay}
             onTimeUpdate={setPlayhead}
             onEnded={onEnded}

@@ -131,7 +131,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [selectedId, setSelectedId] = useState<Id<"videos"> | null>(null);
   const [previewImageId, setPreviewImageId] = useState<Id<"videos"> | null>(null);
   const [previewVideoId, setPreviewVideoId] = useState<Id<"videos"> | null>(null);
-  const [panelExpanded, setPanelExpanded] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
   const [folderSort, setFolderSort] = useState<FolderSortKey>("newest");
@@ -258,7 +257,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     setSelectedId((current) =>
       current === deepLinkedVideo._id ? current : deepLinkedVideo._id,
     );
-    setPanelExpanded(false);
   }, [videoParam, videos]);
 
   useEffect(() => {
@@ -608,7 +606,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
 
         <div className="min-h-[420px]">
           <div className="min-w-0 flex-1">
-            <div className={cn("flex gap-0", selected && !panelExpanded && "lg:flex-row")}>
+            <div className={cn("flex gap-0", selected && "lg:flex-row")}>
               <div
                 className={cn(
                   "min-w-0 flex-1",
@@ -665,7 +663,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     onDragStart={canOrganizeFolders ? beginVideoDrag : undefined}
                     onSelect={(id) => {
                       setSelectedId(id);
-                      setPanelExpanded(false);
                     }}
                     onOpenImagePreview={(video) => setPreviewImageId(video._id)}
                     onOpenVideoPreview={(video) => setPreviewVideoId(video._id)}
@@ -749,7 +746,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     selectedId={selectedId ?? undefined}
                     onSelect={(id) => {
                       setSelectedId(id);
-                      setPanelExpanded(false);
                     }}
                   />
                 ) : (
@@ -758,7 +754,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     activeId={selectedId ?? undefined}
                     onSelect={(id) => {
                       setSelectedId(id);
-                      setPanelExpanded(false);
                     }}
                     canEdit={canEditProject}
                   />
@@ -772,20 +767,15 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm lg:hidden"
                     onClick={() => setSelectedId(null)}
                   />
-                  {panelExpanded && (
-                    <button
-                      type="button"
-                      aria-label="Collapse expanded video"
-                      className="fixed inset-0 z-[60] hidden bg-black/70 backdrop-blur-sm lg:block"
-                      onClick={() => setPanelExpanded(false)}
-                    />
-                  )}
                   <VideoDetailsPanel
                     video={selected}
                     mode="admin"
-                    expanded={panelExpanded}
                     onClose={() => setSelectedId(null)}
-                    onToggleExpand={() => setPanelExpanded((e) => !e)}
+                    onExpand={() =>
+                      isImageAsset(selected)
+                        ? setPreviewImageId(selected._id)
+                        : setPreviewVideoId(selected._id)
+                    }
                     canEdit={canEditProject}
                     canDelete={project.isOwner}
                     canManageFeedback={canEditProject}
