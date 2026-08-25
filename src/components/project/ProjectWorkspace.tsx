@@ -36,6 +36,7 @@ import { VideoTableView } from "@/components/video/VideoTableView";
 import { VideoReviewMode } from "@/components/video/VideoReviewMode";
 import { VideoDetailsPanel } from "@/components/video/VideoDetailsPanel";
 import { ImageLightbox } from "@/components/video/ImageLightbox";
+import { VideoLightbox } from "@/components/video/VideoLightbox";
 import { ProjectViewSwitcher } from "./ProjectViewSwitcher";
 import { ProjectFilters } from "./ProjectFilters";
 import { VideoGroupedView } from "./VideoGroupedView";
@@ -129,6 +130,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [appearanceReady, setAppearanceReady] = useState(false);
   const [selectedId, setSelectedId] = useState<Id<"videos"> | null>(null);
   const [previewImageId, setPreviewImageId] = useState<Id<"videos"> | null>(null);
+  const [previewVideoId, setPreviewVideoId] = useState<Id<"videos"> | null>(null);
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
@@ -241,6 +243,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   };
   const selected = videos.find((v) => v._id === selectedId) ?? null;
   const previewImage = videos.find((v) => v._id === previewImageId) ?? null;
+  const previewVideo = videos.find((v) => v._id === previewVideoId) ?? null;
   const counts = {
     awaiting: videos.filter((v) => v.status === "awaiting_review" && !v.viewed).length,
     feedback: videos.filter((v) => v.commentCount > 0).length,
@@ -606,7 +609,13 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
         <div className="min-h-[420px]">
           <div className="min-w-0 flex-1">
             <div className={cn("flex gap-0", selected && !panelExpanded && "lg:flex-row")}>
-              <div className={cn("min-w-0 flex-1", selected && "lg:pr-0")}>
+              <div
+                className={cn(
+                  "min-w-0 flex-1",
+                  selected && "lg:pr-0",
+                  panelExpanded && "lg:hidden",
+                )}
+              >
                 {layout === "grid" ? (
                   <VideoGrid
                     videos={filtered}
@@ -660,6 +669,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                       setPanelExpanded(false);
                     }}
                     onOpenImagePreview={(video) => setPreviewImageId(video._id)}
+                    onOpenVideoPreview={(video) => setPreviewVideoId(video._id)}
                     empty={
                       <div className="text-center">
                         <p>
@@ -731,6 +741,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     }
                     onSelect={setSelectedId}
                     onOpenImagePreview={(video) => setPreviewImageId(video._id)}
+                    onOpenVideoPreview={(video) => setPreviewVideoId(video._id)}
                   />
                 ) : layout === "table" ? (
                   <VideoTableView
@@ -782,6 +793,11 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           mode="admin"
           canDownload={Boolean(previewImage?.downloadEnabled)}
           onClose={() => setPreviewImageId(null)}
+        />
+        <VideoLightbox
+          video={previewVideo}
+          mode="admin"
+          onClose={() => setPreviewVideoId(null)}
         />
       </div>
     </AdminGate>
