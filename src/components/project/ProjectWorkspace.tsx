@@ -613,7 +613,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                 className={cn(
                   "min-w-0 flex-1",
                   selected && "lg:pr-0",
-                  panelExpanded && "lg:hidden",
                 )}
               >
                 {layout === "grid" ? (
@@ -773,6 +772,14 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm lg:hidden"
                     onClick={() => setSelectedId(null)}
                   />
+                  {panelExpanded && (
+                    <button
+                      type="button"
+                      aria-label="Collapse expanded video"
+                      className="fixed inset-0 z-[60] hidden bg-black/70 backdrop-blur-sm lg:block"
+                      onClick={() => setPanelExpanded(false)}
+                    />
+                  )}
                   <VideoDetailsPanel
                     video={selected}
                     mode="admin"

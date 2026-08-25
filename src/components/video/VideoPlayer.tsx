@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Pause, Play } from "lucide-react";
+import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
 import { isImageAsset } from "@/lib/media";
 import type { AssetClass } from "@/lib/types";
@@ -50,6 +50,7 @@ export function VideoPlayer({
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [displayMode, setDisplayMode] = useState<"timecode" | "frames">("timecode");
   const [spriteAspect, setSpriteAspect] = useState<number | null>(null);
   const frameRate = Number.isFinite(fps ?? NaN) && (fps ?? 0) > 0 ? fps ?? 24 : 24;
@@ -84,6 +85,11 @@ export function VideoPlayer({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seekTo]);
+
+  useEffect(() => {
+    setIsMuted(true);
+    if (ref.current) ref.current.muted = true;
+  }, [storageKey]);
 
   useEffect(() => {
     return () => {
@@ -166,6 +172,14 @@ export function VideoPlayer({
     }
   }
 
+  function toggleMuted() {
+    setIsMuted((muted) => {
+      const nextMuted = !muted;
+      if (ref.current) ref.current.muted = nextMuted;
+      return nextMuted;
+    });
+  }
+
   return (
     <div
       className={cn(
@@ -198,6 +212,7 @@ export function VideoPlayer({
               src={mediaUrl}
               loop={loop}
               autoPlay={autoPlay}
+              muted={isMuted}
               playsInline
               className={cn(
                 "w-full object-contain",
@@ -365,6 +380,20 @@ export function VideoPlayer({
               <Play className="h-3 w-3 fill-current" />
             )}
             {isPlaying ? "Pause" : "Play"}
+          </button>
+          <button
+            type="button"
+            aria-label={isMuted ? "Unmute video" : "Mute video"}
+            aria-pressed={isMuted}
+            title={isMuted ? "Unmute video" : "Mute video"}
+            onClick={toggleMuted}
+            className="inline-flex h-7 w-9 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900/70 text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-300/70"
+          >
+            {isMuted ? (
+              <VolumeX className="h-3.5 w-3.5" />
+            ) : (
+              <Volume2 className="h-3.5 w-3.5" />
+            )}
           </button>
           <button
             type="button"
