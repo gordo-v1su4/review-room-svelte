@@ -8,12 +8,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-teal-500 text-zinc-950 hover:bg-teal-400",
+        default: "bg-[var(--brand-accent)] text-zinc-950 hover:brightness-110",
         secondary: "bg-zinc-800 text-zinc-100 hover:bg-zinc-700",
         ghost: "hover:bg-zinc-800 text-zinc-200",
         outline: "border border-zinc-700 bg-transparent hover:bg-zinc-900",
-        success: "bg-emerald-600 text-white hover:bg-emerald-500",
-        warning: "bg-amber-600 text-white hover:bg-amber-500",
+        success: "bg-[var(--success)] text-zinc-950 hover:brightness-110",
+        warning: "bg-[var(--warning)] text-zinc-950 hover:brightness-110",
       },
       size: {
         default: "h-9 px-4 py-2",

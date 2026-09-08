@@ -1,6 +1,12 @@
 "use client";
 
-import { type PointerEvent, useState } from "react";
+import { type PointerEvent, useEffect, useMemo, useState } from "react";
+import { useMutation } from "convex/react";
+import { RotateCcw, Save, X } from "lucide-react";
+import { toast } from "sonner";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export type AnnotationPoint = {
@@ -119,6 +125,107 @@ export function ImageAnnotationCanvas({
 
 export function hasImageAnnotations(strokes?: AnnotationStroke[] | null) {
   return Boolean(strokes?.some((stroke) => stroke.points.length > 1));
+}
+
+/** Inline annotation overlay for center viewer (non-fullscreen) */
+export function ImageAnnotationLayer({
+  video,
+  mode,
+  token,
+  className,
+  onClose,
+}: {
+  video: {
+    _id: Id<"videos">;
+    annotationStrokes?: AnnotationStroke[] | null;
+  };
+  mode: "admin" | "client";
+  token?: string;
+  className?: string;
+  onClose?: () => void;
+}) {
+  const saveAnnotationsAdmin = useMutation(api.videos.saveAnnotations);
+  const saveAnnotationsClient = useMutation(api.reviewPublic.clientSaveAnnotations);
+  const [draftStrokes, setDraftStrokes] = useState<AnnotationStroke[]>([]);
+  const [annotationColor, setAnnotationColor] = useState(ANNOTATION_COLORS[0]);
+  const [annotationWidth] = useState(4);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setDraftStrokes((video.annotationStrokes as AnnotationStroke[] | undefined) ?? []);
+  }, [video._id, video.annotationStrokes]);
+
+  const dirty = useMemo(
+    () => annotationSignature(video.annotationStrokes) !== annotationSignature(draftStrokes),
+    [draftStrokes, video.annotationStrokes],
+  );
+
+  async function save() {
+    setSaving(true);
+    try {
+      if (mode === "client" && token) {
+        await saveAnnotationsClient({ token, videoId: video._id, strokes: draftStrokes });
+      } else {
+        await saveAnnotationsAdmin({ videoId: video._id, strokes: draftStrokes });
+      }
+      toast.success(draftStrokes.length ? "Markup saved" : "Markup cleared");
+      onClose?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save markup");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className={cn("pointer-events-auto", className)}>
+      <ImageAnnotationCanvas
+        strokes={draftStrokes}
+        color={annotationColor}
+        width={annotationWidth}
+        onChange={setDraftStrokes}
+      />
+      <div className="absolute bottom-2 left-2 right-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950/90 p-1.5 backdrop-blur">
+        <div className="flex gap-1">
+          {ANNOTATION_COLORS.map((color) => (
+            <button
+              key={color}
+              type="button"
+              className={cn(
+                "h-5 w-5 rounded-full border",
+                annotationColor === color ? "border-zinc-100" : "border-transparent",
+              )}
+              style={{ backgroundColor: color }}
+              onClick={() => setAnnotationColor(color)}
+            />
+          ))}
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2"
+          onClick={() => setDraftStrokes([])}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="h-7 gap-1 px-2"
+          disabled={!dirty || saving}
+          onClick={() => void save()}
+        >
+          <Save className="h-3.5 w-3.5" />
+          Save
+        </Button>
+        {onClose && (
+          <Button size="sm" variant="ghost" className="ml-auto h-7 px-2" onClick={onClose}>
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function annotationSignature(strokes?: AnnotationStroke[] | null) {

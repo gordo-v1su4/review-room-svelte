@@ -9,12 +9,20 @@
   --color-border-subtle: var(--border-subtle);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-muted: var(--brand-accent-muted);
   --color-success: var(--success);
+  --color-success-muted: var(--success-muted);
   --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
   --color-info: var(--info);
+  --color-info-muted: var(--info-muted);
   --color-danger: var(--danger);
+  --color-danger-muted: var(--danger-muted);
   --color-selected: var(--selected);
   --color-approved: var(--approved);
+  --color-rating: var(--rating);
+  --color-annotation: var(--annotation);
   --font-sans: var(--font-geist-sans);
 }
 
@@ -27,12 +35,33 @@
   --border-subtle: rgb(39 39 42 / 0.6);
   --muted: #a1a1aa;
   --muted-foreground: #a1a1aa;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --info: #38bdf8;
-  --danger: #ef4444;
-  --selected: #38bdf8;
-  --approved: #22c55e;
+
+  /* Brand — teal family, CTAs + chrome only */
+  --brand-accent: #6eb5a8;
+  --brand-accent-muted: rgb(110 181 168 / 0.14);
+
+  /* Semantic — muted editorial palette (swap this block to experiment) */
+  --success: #8aa898;
+  --success-muted: rgb(138 168 152 / 0.14);
+  --warning: #b8a882;
+  --warning-muted: rgb(184 168 130 / 0.14);
+  --info: #8aa4b0;
+  --info-muted: rgb(138 164 176 / 0.14);
+  --danger: #b88888;
+  --danger-muted: rgb(184 136 136 / 0.14);
+  --selected: #8eb0c4;
+  --approved: #8aa898;
+  --rating: #c4b488;
+  --annotation: #b88888;
+
+  /* Status-specific */
+  --status-not-started: #8a8a90;
+  --status-in-progress: #9a8eb8;
+  --status-awaiting: #6eb5a8;
+  --status-needs-changes: #b8a882;
+  --status-approved: #8aa898;
+  --status-final: #8aa4b0;
+  --status-omitted: #b87878;
 }
 
 body {
@@ -50,8 +79,8 @@ input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-text-fill-color: rgb(153 246 228 / 0.82);
-  caret-color: rgb(45 212 191);
+  -webkit-text-fill-color: color-mix(in srgb, var(--brand-accent) 82%, white);
+  caret-color: var(--brand-accent);
   box-shadow: 0 0 0 1000px #18181b inset;
   transition: background-color 9999s ease-out;
 }
@@ -75,7 +104,7 @@ input:-webkit-autofill:active {
 .annotation-size-slider::-webkit-slider-runnable-track {
   height: 3px;
   border-radius: 0;
-  background: rgb(45 212 191 / 0.9);
+  background: color-mix(in srgb, var(--brand-accent) 90%, transparent);
 }
 
 .annotation-size-slider::-webkit-slider-thumb {
@@ -83,7 +112,7 @@ input:-webkit-autofill:active {
   width: 4px;
   height: 14px;
   margin-top: -5.5px;
-  border: 1px solid rgb(45 212 191 / 0.95);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 95%, transparent);
   border-radius: 1px;
   background: rgb(24 24 27);
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55);
@@ -92,13 +121,13 @@ input:-webkit-autofill:active {
 .annotation-size-slider::-moz-range-track {
   height: 3px;
   border-radius: 0;
-  background: rgb(45 212 191 / 0.9);
+  background: color-mix(in srgb, var(--brand-accent) 90%, transparent);
 }
 
 .annotation-size-slider::-moz-range-thumb {
   width: 4px;
   height: 14px;
-  border: 1px solid rgb(45 212 191 / 0.95);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 95%, transparent);
   border-radius: 1px;
   background: rgb(24 24 27);
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55);
@@ -133,4 +162,13 @@ input:-webkit-autofill:active {
   .review-grid {
     grid-template-columns: 1fr !important;
   }
+}
+
+[data-separator] {
+  touch-action: none;
+  user-select: none;
+}
+
+[data-separator][data-separator="active"] {
+  background: var(--brand-accent-muted);
 }

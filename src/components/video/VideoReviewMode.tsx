@@ -3,12 +3,10 @@
 import { useEffect, useState } from "react";
 import {
   Bookmark,
-  Check,
   ChevronLeft,
   ChevronRight,
   ListVideo,
   Repeat2,
-  X,
 } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -18,8 +16,9 @@ import { cn, formatDuration } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { VideoPlayer } from "./VideoPlayer";
 import { VideoRatingControl } from "./VideoRatingControl";
-import { VideoStatusPill } from "./VideoStatusPill";
+import { VideoStatusControl } from "./VideoStatusControl";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
+import type { VideoStatus } from "@/lib/types";
 
 export function VideoReviewMode({
   videos,
@@ -35,8 +34,7 @@ export function VideoReviewMode({
   const [playbackMode, setPlaybackMode] = useState<"order" | "loop">("loop");
   const [continuePlayback, setContinuePlayback] = useState(false);
   const toggleSelect = useMutation(api.videos.toggleSelect);
-  const approve = useMutation(api.videos.approve);
-  const requestChanges = useMutation(api.videos.requestChanges);
+  const setStatus = useMutation(api.videos.updateMetadata);
   const setRating = useMutation(api.videos.setRating);
 
   if (!videos.length) {
@@ -131,6 +129,8 @@ export function VideoReviewMode({
             assetClass={active.assetClass}
             version={active.updatedAt}
             fps={active.fps}
+            width={active.width}
+            height={active.height}
             loop={playbackMode === "loop"}
             autoPlay={continuePlayback}
             onEnded={playNextInOrder}
@@ -155,7 +155,16 @@ export function VideoReviewMode({
           )}
         </div>
         <div className="grid gap-3 border-t border-zinc-800/60 px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:gap-4 sm:px-6">
-          <VideoStatusPill status={active.status} />
+          <div className="min-w-[7.5rem] rounded-md border border-zinc-800/80 bg-zinc-950/70 px-2 py-1.5">
+            <VideoStatusControl
+              status={active.status}
+              canEdit={canEdit}
+              includeAdminExtras
+              onChange={(status: VideoStatus) =>
+                void setStatus({ videoId: active._id, status })
+              }
+            />
+          </div>
           <div className="min-w-0 flex-1">
             <h2 className="line-clamp-2 text-base font-medium text-zinc-100 sm:truncate sm:text-lg">
               {active.title}
@@ -185,28 +194,6 @@ export function VideoReviewMode({
               />
               {active.isSelect ? "Selected" : "Select"}
             </Button>
-            {canEdit && (
-              <>
-                <Button
-                  variant="success"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => void approve({ videoId: active._id })}
-                >
-                  <Check className="h-4 w-4" />
-                  Approve
-                </Button>
-                <Button
-                  variant="warning"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => void requestChanges({ videoId: active._id })}
-                >
-                  <X className="h-4 w-4" />
-                  Changes
-                </Button>
-              </>
-            )}
           </div>
         </div>
       </div>

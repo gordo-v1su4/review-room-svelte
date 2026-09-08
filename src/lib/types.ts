@@ -59,3 +59,5 @@ export type WorkspaceAppearance = {
 };
 
 export type WorkspaceLayout = "grid" | "grouped" | "table" | "review";
+
+export type GroupByField = "none" | "status" | "assetClass" | "folder" | "uploader";

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 export function VideoPlayer({
   storageKey,
-  spriteKey,
+  spriteKey: _spriteKey,
   mimeType,
   assetClass,
   version,
@@ -17,6 +17,8 @@ export function VideoPlayer({
   loop = false,
   autoPlay = false,
   fitAvailable = false,
+  width,
+  height,
   onTimeUpdate,
   onPlay,
   onEnded,
@@ -31,13 +33,14 @@ export function VideoPlayer({
   loop?: boolean;
   autoPlay?: boolean;
   fitAvailable?: boolean;
+  width?: number | null;
+  height?: number | null;
   onTimeUpdate?: (sec: number) => void;
   onPlay?: () => void;
   onEnded?: () => void;
   seekTo?: number | null;
 }) {
   const mediaUrl = useStorageUrl(storageKey, version);
-  const spriteUrl = useStorageUrl(spriteKey, version);
   const isImage = isImageAsset({
     mimeType: mimeType ?? "application/octet-stream",
     assetClass,
@@ -45,14 +48,17 @@ export function VideoPlayer({
   const ref = useRef<HTMLVideoElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
-  const [hoverPct, setHoverPct] = useState<number | null>(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [displayMode, setDisplayMode] = useState<"timecode" | "frames">("timecode");
-  const [spriteAspect, setSpriteAspect] = useState<number | null>(null);
+  const [playbackAspect, setPlaybackAspect] = useState<number | null>(
+    width && height && width > 0 && height > 0 ? width / height : null,
+  );
+  const mediaAspect = playbackAspect ?? 1;
+  const mediaAspectStyle = { aspectRatio: `${mediaAspect}` };
   const frameRate = Number.isFinite(fps ?? NaN) && (fps ?? 0) > 0 ? fps ?? 24 : 24;
   const totalFrames = Math.max(0, Math.round(duration * frameRate));
   const currentFrame = Math.min(
@@ -63,20 +69,6 @@ export function VideoPlayer({
     displayMode === "timecode"
       ? `${formatEditorialTimecode(currentTime, frameRate)} / ${formatEditorialTimecode(duration, frameRate)}`
       : `${currentFrame.toLocaleString()} / ${totalFrames.toLocaleString()} fr`;
-  const spriteFrameCount = 10;
-  const hoverFrame =
-    hoverPct == null
-      ? 0
-      : Math.min(
-          spriteFrameCount - 1,
-          Math.max(0, Math.floor(hoverPct * spriteFrameCount)),
-        );
-  const hoverFramePosition =
-    spriteFrameCount <= 1 ? 0 : (hoverFrame / (spriteFrameCount - 1)) * 100;
-  const spritePreviewHeight = 96;
-  const spritePreviewWidth = spriteAspect
-    ? Math.max(44, Math.min(172, spritePreviewHeight * spriteAspect))
-    : 160;
 
   useEffect(() => {
     if (seekTo != null && ref.current) {
@@ -89,26 +81,16 @@ export function VideoPlayer({
   useEffect(() => {
     setIsMuted(true);
     if (ref.current) ref.current.muted = true;
-  }, [storageKey]);
+    if (width && height && width > 0 && height > 0) {
+      setPlaybackAspect(width / height);
+    }
+  }, [height, storageKey, width]);
 
   useEffect(() => {
     return () => {
       if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    if (!spriteUrl) {
-      setSpriteAspect(null);
-      return;
-    }
-    const image = new Image();
-    image.onload = () => {
-      if (!image.naturalWidth || !image.naturalHeight) return;
-      setSpriteAspect(image.naturalWidth / spriteFrameCount / image.naturalHeight);
-    };
-    image.src = spriteUrl;
-  }, [spriteFrameCount, spriteUrl]);
 
   function syncTime(nextTime?: number) {
     const time = nextTime ?? ref.current?.currentTime ?? 0;
@@ -144,7 +126,6 @@ export function VideoPlayer({
     const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
     const nextTime = pct * duration;
     ref.current.currentTime = nextTime;
-    setHoverPct(pct);
     syncTime(nextTime);
   }
 
@@ -201,9 +182,10 @@ export function VideoPlayer({
               src={mediaUrl}
               alt=""
               className={cn(
-                "w-full object-contain",
-                fitAvailable ? "h-full" : "aspect-video",
+                "object-contain",
+                fitAvailable ? "max-h-full max-w-full" : "w-full",
               )}
+              style={mediaAspectStyle}
               onLoad={() => onPlay?.()}
             />
           ) : (
@@ -215,9 +197,10 @@ export function VideoPlayer({
               muted={isMuted}
               playsInline
               className={cn(
-                "w-full object-contain",
-                fitAvailable ? "h-full" : "aspect-video",
+                "object-contain",
+                fitAvailable ? "max-h-full max-w-full" : "w-full",
               )}
+              style={mediaAspectStyle}
               onClick={togglePlayback}
               onPlay={() => {
                 setIsPlaying(true);
@@ -234,6 +217,11 @@ export function VideoPlayer({
               onLoadedMetadata={(e) => {
                 setDuration(e.currentTarget.duration);
                 syncTime(e.currentTarget.currentTime);
+                const nextWidth = e.currentTarget.videoWidth;
+                const nextHeight = e.currentTarget.videoHeight;
+                if (nextWidth > 0 && nextHeight > 0) {
+                  setPlaybackAspect(nextWidth / nextHeight);
+                }
               }}
               onSeeking={(e) => syncTime(e.currentTarget.currentTime)}
               onSeeked={(e) => syncTime(e.currentTarget.currentTime)}
@@ -248,38 +236,11 @@ export function VideoPlayer({
           <div
             className={cn(
               "flex w-full items-center justify-center text-sm text-zinc-500",
-              fitAvailable ? "h-full" : "aspect-video",
+              fitAvailable && "h-full",
             )}
+            style={fitAvailable ? undefined : mediaAspectStyle}
           >
             Loading playback…
-          </div>
-        )}
-        {mediaUrl && !isImage && (
-          <button
-            type="button"
-            aria-label={isPlaying ? "Pause" : "Play"}
-            onClick={togglePlayback}
-            className={cn(
-              "absolute left-4 top-4 grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-black/45 text-white shadow-sm backdrop-blur transition hover:bg-black/70",
-              isPlaying && "opacity-0 group-hover:opacity-100",
-            )}
-          >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
-          </button>
-        )}
-        {!isImage && spriteUrl && hoverPct != null && (
-          <div
-            className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 overflow-hidden rounded border border-zinc-700 bg-zinc-900 shadow-xl"
-            style={{ width: spritePreviewWidth, height: spritePreviewHeight }}
-          >
-            <div
-              className="h-full w-full bg-cover bg-no-repeat"
-              style={{
-                backgroundImage: `url(${spriteUrl})`,
-                backgroundSize: `${spriteFrameCount * 100}% 100%`,
-                backgroundPosition: `${hoverFramePosition}% center`,
-              }}
-            />
           </div>
         )}
       </div>
@@ -294,18 +255,9 @@ export function VideoPlayer({
           aria-valuenow={currentTime}
           tabIndex={0}
           className={cn(
-            "group/timeline relative h-6 cursor-ew-resize touch-none rounded-full py-2.5",
+            "relative h-6 cursor-ew-resize touch-none rounded-full py-2.5",
             isScrubbing && "cursor-grabbing",
           )}
-          onMouseMove={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setHoverPct(
-              Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)),
-            );
-          }}
-          onMouseLeave={() => {
-            if (!isScrubbing) setHoverPct(null);
-          }}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
             setIsScrubbing(true);
@@ -357,16 +309,6 @@ export function VideoPlayer({
               }}
             />
           </div>
-          {hoverPct != null && (
-            <div
-              className="pointer-events-none absolute top-1/2 h-5 w-0.5 -translate-y-1/2 bg-teal-300 shadow-[0_0_10px_rgba(45,212,191,0.85)]"
-              style={{ left: `${hoverPct * 100}%` }}
-            />
-          )}
-          <div
-            className="pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-teal-200 bg-teal-300 opacity-0 shadow-[0_0_14px_rgba(45,212,191,0.75)] transition group-hover/timeline:opacity-100"
-            style={{ left: `${(currentTime / (duration || 1)) * 100}%` }}
-          />
         </div>
         <div className="flex min-w-0 items-center gap-3 text-xs text-zinc-500">
           <button

@@ -9,6 +9,7 @@ import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import type { VideoDoc } from "@/lib/smartViews";
 import { isImageAsset, mediaKind } from "@/lib/media";
 import { projectAccent, projectAccentStyle } from "@/lib/projectAccent";
+import { moveMediaToRootLabel } from "@/lib/projectFolders";
 import { cn } from "@/lib/utils";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
 
@@ -18,6 +19,7 @@ export function FolderShelf({
   folders,
   videos,
   activeFolderId,
+  projectTitle,
   brandColor,
   canEdit,
   onOpen,
@@ -28,6 +30,7 @@ export function FolderShelf({
   folders: FolderDoc[];
   videos: VideoDoc[];
   activeFolderId: Id<"projectFolders"> | null;
+  projectTitle?: string;
   brandColor?: string;
   canEdit: boolean;
   onOpen: (folderId: Id<"projectFolders"> | null) => void;
@@ -67,6 +70,7 @@ export function FolderShelf({
           onDrop={(videoId) => onDropVideo(videoId, folder._id)}
           onRename={onRenameFolder}
           onRemove={onRemoveFolder}
+          projectTitle={projectTitle}
         />
       ))}
     </div>
@@ -84,6 +88,7 @@ export function FolderTile({
   onDrop,
   onRename,
   onRemove,
+  projectTitle,
 }: {
   folder: FolderDoc;
   active: boolean;
@@ -105,6 +110,7 @@ export function FolderTile({
     title: string,
     assetDisposition: "move_to_root" | "archive_assets",
   ) => void;
+  projectTitle?: string;
 }) {
   const [dragActive, setDragActive] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -264,7 +270,7 @@ export function FolderTile({
             }}
           >
             <Folder className="h-3.5 w-3.5 text-zinc-500" />
-            Move media to root
+            {moveMediaToRootLabel(projectTitle)}
           </button>
           <button
             type="button"

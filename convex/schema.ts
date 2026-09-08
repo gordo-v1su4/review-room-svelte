@@ -199,6 +199,28 @@ const applicationTables = {
     displayName: v.string(),
     createdAt: v.number(),
   }).index("by_token", ["token"]),
+
+  workspacePreferences: defineTable({
+    projectId: v.id("projects"),
+    appUserId: v.id("appUsers"),
+    visibleCardFields: v.optional(v.array(v.string())),
+    fieldOrder: v.optional(v.array(v.string())),
+    updatedAt: v.number(),
+  }).index("by_project_user", ["projectId", "appUserId"]),
+
+  collections: defineTable({
+    projectId: v.id("projects"),
+    title: v.string(),
+    kind: v.union(v.literal("system"), v.literal("user")),
+    systemKey: v.optional(v.string()),
+    sourceFolderId: v.optional(v.id("projectFolders")),
+    visibleFields: v.optional(v.array(v.string())),
+    filterRules: v.optional(v.any()),
+    groupBy: v.optional(v.string()),
+    sortKey: v.optional(v.string()),
+    createdBy: v.id("appUsers"),
+    createdAt: v.number(),
+  }).index("by_project", ["projectId"]),
 };
 
 export default defineSchema({

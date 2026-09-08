@@ -14,13 +14,15 @@ const ROLE_META: Record<
 > = {
   admin: {
     label: "Production",
-    bubbleClass: "border-amber-400/30 bg-amber-400/15 text-amber-200",
-    labelClass: "text-amber-300/80",
+    bubbleClass:
+      "border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[var(--warning-muted)] text-[color-mix(in_srgb,var(--warning)_70%,white)]",
+    labelClass: "text-[color-mix(in_srgb,var(--warning)_80%,transparent)]",
   },
   client: {
     label: "Client",
-    bubbleClass: "border-sky-400/30 bg-sky-400/15 text-sky-200",
-    labelClass: "text-sky-300/80",
+    bubbleClass:
+      "border-[color-mix(in_srgb,var(--info)_30%,transparent)] bg-[var(--info-muted)] text-[color-mix(in_srgb,var(--info)_70%,white)]",
+    labelClass: "text-[color-mix(in_srgb,var(--info)_80%,transparent)]",
   },
 };
 
