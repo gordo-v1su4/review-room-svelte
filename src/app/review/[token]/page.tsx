@@ -333,6 +333,11 @@ export default function ReviewPage({
             loop={previewMode && loopPreview && shortlisted.length === 1}
             onEnded={advancePreview}
             onClose={() => setSelectedId(null)}
+            onExpand={() =>
+              isImageAsset(selected)
+                ? setPreviewImageId(selected._id)
+                : setPreviewVideoId(selected._id)
+            }
           />
         )}
       </div>

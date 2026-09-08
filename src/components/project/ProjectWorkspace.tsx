@@ -156,7 +156,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [lastCheckedId, setLastCheckedId] = useState<Id<"videos"> | null>(null);
   const [previewImageId, setPreviewImageId] = useState<Id<"videos"> | null>(null);
   const [previewVideoId, setPreviewVideoId] = useState<Id<"videos"> | null>(null);
-  const [panelExpanded, setPanelExpanded] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(true);
   const [infoOpen, setInfoOpen] = useState(true);
   const [drawMode, setDrawMode] = useState(false);
@@ -287,7 +286,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     setCheckedIds(next);
     setLastCheckedId(id);
     setSelectedId(id);
-    setPanelExpanded(false);
   }
 
   const activeFolder = activeFolderId
@@ -365,7 +363,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     setSelectedId((current) =>
       current === deepLinkedVideo._id ? current : deepLinkedVideo._id,
     );
-    setPanelExpanded(false);
   }, [videoParam, videos]);
 
   useEffect(() => {
@@ -944,7 +941,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
             />
           ) : (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div className={cn("flex min-h-0 min-w-0 flex-1", selected && !panelExpanded && "lg:flex-row")}>
+            <div className={cn("flex min-h-0 min-w-0 flex-1", selected && "lg:flex-row")}>
               <div
                 className={cn(
                   "min-h-0 min-w-0 flex-1 overflow-y-auto",
@@ -1037,20 +1034,15 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm lg:hidden"
                     onClick={() => setSelectedId(null)}
                   />
-                  {panelExpanded && (
-                    <button
-                      type="button"
-                      aria-label="Collapse expanded video"
-                      className="fixed inset-0 z-[60] hidden bg-black/70 backdrop-blur-sm lg:block"
-                      onClick={() => setPanelExpanded(false)}
-                    />
-                  )}
                   <VideoDetailsPanel
                     video={selected}
                     mode="admin"
-                    expanded={panelExpanded}
                     onClose={() => setSelectedId(null)}
-                    onToggleExpand={() => setPanelExpanded((e) => !e)}
+                    onExpand={() =>
+                      isImageAsset(selected)
+                        ? setPreviewImageId(selected._id)
+                        : setPreviewVideoId(selected._id)
+                    }
                     canManageFeedback={canEditProject}
                   />
                 </>
