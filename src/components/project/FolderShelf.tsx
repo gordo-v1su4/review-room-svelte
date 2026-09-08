@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import type { VideoDoc } from "@/lib/smartViews";
+import type { CardAspectRatio, ThumbnailScale } from "@/lib/types";
 import { isImageAsset, mediaKind } from "@/lib/media";
 import { projectAccent, projectAccentStyle } from "@/lib/projectAccent";
 import { moveMediaToRootLabel } from "@/lib/projectFolders";
@@ -15,12 +16,20 @@ import { useStorageUrl } from "@/hooks/useStorageUrl";
 
 type FolderDoc = Doc<"projectFolders">;
 
+const TILE_ASPECT: Record<CardAspectRatio, string> = {
+  video: "aspect-video",
+  square: "aspect-square",
+  portrait: "aspect-[9/16]",
+};
+
 export function FolderShelf({
   folders,
   videos,
   activeFolderId,
   projectTitle,
   brandColor,
+  aspectRatio = "square",
+  thumbnailScale = "fit",
   canEdit,
   onOpen,
   onDropVideo,
@@ -32,6 +41,8 @@ export function FolderShelf({
   activeFolderId: Id<"projectFolders"> | null;
   projectTitle?: string;
   brandColor?: string;
+  aspectRatio?: CardAspectRatio;
+  thumbnailScale?: ThumbnailScale;
   canEdit: boolean;
   onOpen: (folderId: Id<"projectFolders"> | null) => void;
   onDropVideo: (
@@ -65,6 +76,8 @@ export function FolderShelf({
           accent={accent}
           counts={folderCounts(videos, folder._id)}
           coverAsset={folderCoverAsset(videos, folder)}
+          aspectRatio={aspectRatio}
+          thumbnailScale={thumbnailScale}
           canEdit={canEdit}
           onOpen={() => onOpen(folder._id)}
           onDrop={(videoId) => onDropVideo(videoId, folder._id)}
@@ -83,6 +96,8 @@ export function FolderTile({
   accent,
   counts,
   coverAsset,
+  aspectRatio = "square",
+  thumbnailScale = "fit",
   canEdit,
   onOpen,
   onDrop,
@@ -101,6 +116,8 @@ export function FolderTile({
     selected: number;
   };
   coverAsset?: VideoDoc | null;
+  aspectRatio?: CardAspectRatio;
+  thumbnailScale?: ThumbnailScale;
   canEdit: boolean;
   onOpen: () => void;
   onDrop: (videoId: Id<"videos">) => void;
@@ -286,13 +303,21 @@ export function FolderTile({
         </div>
       )}
       <button type="button" onClick={onOpen} className="block w-full text-left">
-        <span className="relative block aspect-square w-full overflow-hidden bg-zinc-950">
+        <span
+          className={cn(
+            "relative block w-full overflow-hidden bg-zinc-950",
+            TILE_ASPECT[aspectRatio],
+          )}
+        >
           {coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={coverUrl}
               alt=""
-              className="absolute inset-0 h-full w-full object-cover opacity-70 transition group-hover:opacity-85"
+              className={cn(
+                "absolute inset-0 h-full w-full opacity-70 transition group-hover:opacity-85",
+                thumbnailScale === "fit" ? "object-contain" : "object-cover",
+              )}
             />
           ) : (
             <span className="absolute inset-2 rounded-md border border-zinc-800 bg-zinc-900/80 shadow-inner transition group-hover:border-zinc-700 group-hover:bg-zinc-900" />

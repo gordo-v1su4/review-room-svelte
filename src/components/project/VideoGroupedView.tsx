@@ -86,6 +86,8 @@ export function VideoGroupedView({
                   accent={accent}
                   counts={folderCounts(folderVideos, folder._id)}
                   coverAsset={folderCoverAsset(folderVideos, folder)}
+                  aspectRatio={aspectRatio}
+                  thumbnailScale={thumbnailScale}
                   canEdit={Boolean(onDropVideo)}
                   onOpen={() => onOpenFolder?.(folder._id)}
                   onDrop={(videoId) => onDropVideo?.(videoId, folder._id)}

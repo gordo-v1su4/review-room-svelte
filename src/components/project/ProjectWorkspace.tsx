@@ -116,7 +116,7 @@ const VISIBILITY_OPTIONS: Array<{
   },
 ];
 
-const WORKSPACE_APPEARANCE_KEY = "review-room.workspace.appearance";
+const WORKSPACE_APPEARANCE_KEY = "review-room.workspace.appearance.shared";
 const GRID_SIZES: GridSize[] = ["sm", "md", "lg"];
 const CARD_ASPECT_RATIOS: CardAspectRatio[] = ["video", "square", "portrait"];
 const THUMBNAIL_SCALES: ThumbnailScale[] = ["fit", "fill"];
@@ -367,9 +367,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
 
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem(
-        `${WORKSPACE_APPEARANCE_KEY}.${projectId}`,
-      );
+      const stored = window.localStorage.getItem(WORKSPACE_APPEARANCE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as {
           gridSize?: GridSize;
@@ -399,22 +397,15 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     } finally {
       setAppearanceReady(true);
     }
-  }, [projectId]);
+  }, []);
 
   useEffect(() => {
     if (!appearanceReady) return;
     window.localStorage.setItem(
-      `${WORKSPACE_APPEARANCE_KEY}.${projectId}`,
+      WORKSPACE_APPEARANCE_KEY,
       JSON.stringify({ gridSize, aspectRatio, thumbnailScale, showCardInfo }),
     );
-  }, [
-    appearanceReady,
-    aspectRatio,
-    gridSize,
-    projectId,
-    showCardInfo,
-    thumbnailScale,
-  ]);
+  }, [appearanceReady, aspectRatio, gridSize, showCardInfo, thumbnailScale]);
 
   useEffect(() => {
     if (layout !== "review" || selectedId || !filtered[0]) return;
@@ -679,6 +670,8 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                   activeFolderId={activeFolderId}
                   projectTitle={projectTitle}
                   brandColor={projectBrandColor}
+                  aspectRatio={aspectRatio}
+                  thumbnailScale={thumbnailScale}
                   canEdit={canOrganizeFolders}
                   onOpen={(folderId) =>
                     router.push(
@@ -1359,14 +1352,12 @@ function ProjectHero({
                 </span>
               )}
             </div>
-            <h1 className="text-xl font-semibold tracking-tight text-zinc-100 sm:text-2xl">
+            <h1 className="truncate text-xl font-semibold tracking-tight text-zinc-100 sm:text-2xl">
               {title}
             </h1>
-            {description && (
-              <p className="mt-1 line-clamp-2 max-w-3xl break-words text-[13px] leading-5 text-zinc-500">
-                {description}
-              </p>
-            )}
+            <p className="mt-1 line-clamp-1 min-h-5 max-w-3xl text-[13px] leading-5 text-zinc-500">
+              {description || "\u00a0"}
+            </p>
             <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-zinc-600">
               <span className="inline-flex items-center gap-1.5">
                 <User className="h-3 w-3" />
