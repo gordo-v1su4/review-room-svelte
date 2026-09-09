@@ -89,7 +89,6 @@ export function VideoPlayer({
       ref.current.currentTime = seekTo;
       syncTime(seekTo);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seekTo]);
 
   useEffect(() => {

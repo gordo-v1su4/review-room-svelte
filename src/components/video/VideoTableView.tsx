@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import {
   flexRender,
@@ -145,27 +145,36 @@ export function VideoTableView({
   const allChecked = videos.length > 0 && videos.every((video) => checkedIds.includes(video._id));
   const someChecked = videos.some((video) => checkedIds.includes(video._id));
 
-  function targetIds(videoId: Id<"videos">) {
-    if (checkedIds.includes(videoId) && checkedIds.length > 1) {
-      return checkedIds as Id<"videos">[];
-    }
-    return [videoId];
-  }
+  const targetIds = useCallback(
+    (videoId: Id<"videos">) => {
+      if (checkedIds.includes(videoId) && checkedIds.length > 1) {
+        return checkedIds as Id<"videos">[];
+      }
+      return [videoId];
+    },
+    [checkedIds],
+  );
 
-  function changeStatus(videoId: Id<"videos">, status: VideoStatus) {
-    void Promise.all(
-      targetIds(videoId).map((id) => updateMetadata({ videoId: id, status })),
-    );
-  }
+  const changeStatus = useCallback(
+    (videoId: Id<"videos">, status: VideoStatus) => {
+      void Promise.all(
+        targetIds(videoId).map((id) => updateMetadata({ videoId: id, status })),
+      );
+    },
+    [targetIds, updateMetadata],
+  );
 
-  function toggleShortlist(videoId: Id<"videos">, currentlySelected: boolean) {
-    const ids = targetIds(videoId);
-    const next =
-      ids.length > 1
-        ? !videos.filter((video) => ids.includes(video._id)).every((video) => video.isSelect)
-        : !currentlySelected;
-    void Promise.all(ids.map((id) => applySmartViewDrop({ videoId: id, isSelect: next })));
-  }
+  const toggleShortlist = useCallback(
+    (videoId: Id<"videos">, currentlySelected: boolean) => {
+      const ids = targetIds(videoId);
+      const next =
+        ids.length > 1
+          ? !videos.filter((video) => ids.includes(video._id)).every((video) => video.isSelect)
+          : !currentlySelected;
+      void Promise.all(ids.map((id) => applySmartViewDrop({ videoId: id, isSelect: next })));
+    },
+    [targetIds, videos, applySmartViewDrop],
+  );
 
   const columns = useMemo<ColumnDef<ReviewTableRow>[]>(
     () => [
@@ -370,7 +379,7 @@ export function VideoTableView({
         size: 200,
       },
     ],
-    [allChecked, checkedIds, onSelect, onToggleAll, someChecked, videos, updateMetadata, applySmartViewDrop],
+    [allChecked, changeStatus, checkedIds, onSelect, onToggleAll, someChecked, toggleShortlist],
   );
 
   const table = useReactTable({
