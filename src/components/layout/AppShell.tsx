@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, type FormEvent } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuthActions } from "@convex-dev/auth/react";
@@ -9,7 +10,6 @@ import { toast } from "sonner";
 import {
   Archive,
   Check,
-  Clapperboard,
   ChevronsLeft,
   ChevronsRight,
   Folder,
@@ -20,7 +20,6 @@ import {
   Pencil,
   Plus,
   Settings,
-  Sparkles,
   Trash2,
   Users,
   X,
@@ -88,16 +87,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href="/dashboard"
             className={cn(
               "flex h-14 items-center border-b border-zinc-800/70",
-              sidebarCollapsed ? "justify-center px-2" : "gap-2.5 px-4",
+              sidebarCollapsed ? "justify-center px-2" : "px-4",
             )}
             title="Review Room"
           >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--brand-accent)] text-zinc-950">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            <span className={cn("leading-tight", sidebarCollapsed && "hidden")}>
-              <span className="block text-sm font-semibold">Review Room</span>
-              <span className="block text-[10px] text-zinc-600">
+            <span
+              className={cn(
+                "grid grid-cols-[auto_auto] items-stretch gap-x-2 gap-y-0.5",
+                sidebarCollapsed && "flex",
+              )}
+            >
+              <span
+                className={cn(
+                  "relative aspect-[809/484]",
+                  sidebarCollapsed ? "h-4 w-auto" : "row-span-2 h-[95%] self-center",
+                )}
+              >
+                <Image
+                  src="/logo-rr-light.png"
+                  alt=""
+                  fill
+                  unoptimized
+                  className="object-contain object-left opacity-80"
+                />
+              </span>
+              <span
+                className={cn(
+                  "self-start text-sm font-semibold leading-none",
+                  sidebarCollapsed && "hidden",
+                )}
+              >
+                Review Room
+              </span>
+              <span
+                className={cn(
+                  "self-end text-[10px] leading-none text-zinc-600",
+                  sidebarCollapsed && "hidden",
+                )}
+              >
                 Review workspace
               </span>
             </span>
@@ -213,8 +240,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur lg:hidden">
           <div className="flex min-h-14 items-center justify-between gap-3 px-3 py-2 sm:px-4">
-            <Link href="/dashboard" className="flex items-center gap-2 text-sm font-semibold">
-              <Clapperboard className="h-4 w-4 text-[var(--brand-accent)]" />
+            <Link href="/dashboard" className="flex items-center gap-2 text-sm font-semibold leading-none">
+              <span className="relative aspect-[809/484] h-[1em] shrink-0">
+                <Image
+                  src="/logo-rr-light.png"
+                  alt=""
+                  fill
+                  unoptimized
+                  className="object-contain object-left opacity-80"
+                />
+              </span>
               Review Room
             </Link>
             {isAuthenticated && appUser && (

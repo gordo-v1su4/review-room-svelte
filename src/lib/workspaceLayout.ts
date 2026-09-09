@@ -16,27 +16,90 @@ const MIN_INSPECTOR = 20;
 const MIN_ASSETS = 18;
 const MIN_VIEWER = 20;
 
-function normalizeLayout(layout: Partial<Layout>): Layout {
-  let assets = layout.assets ?? DEFAULT_LAYOUT.assets;
-  let viewer = layout.viewer ?? DEFAULT_LAYOUT.viewer;
-  let inspector = layout.inspector ?? DEFAULT_LAYOUT.inspector;
+function roundSize(value: number) {
+  return Math.round(value * 10) / 10;
+}
 
-  assets = Math.max(MIN_ASSETS, Math.min(50, assets));
-  viewer = Math.max(MIN_VIEWER, Math.min(55, viewer));
-  inspector = Math.max(MIN_INSPECTOR, Math.min(48, inspector));
+export function normalizeLayout(
+  layout: Partial<Layout>,
+  visible: { viewerOpen?: boolean; infoOpen?: boolean } = {},
+): Layout {
+  const viewerOpen = visible.viewerOpen ?? true;
+  const infoOpen = visible.infoOpen ?? true;
 
-  const total = assets + viewer + inspector;
+  let assets = Number(layout.assets ?? DEFAULT_LAYOUT.assets);
+  let viewer = Number(layout.viewer ?? DEFAULT_LAYOUT.viewer);
+  let inspector = Number(layout.inspector ?? DEFAULT_LAYOUT.inspector);
+
+  const parts: Array<{
+    assign: (value: number) => void;
+    value: number;
+    min: number;
+    max: number;
+  }> = [
+    {
+      assign: (value) => {
+        assets = value;
+      },
+      value: assets,
+      min: MIN_ASSETS,
+      max: viewerOpen || infoOpen ? 80 : 100,
+    },
+  ];
+  if (viewerOpen) {
+    parts.push({
+      assign: (value) => {
+        viewer = value;
+      },
+      value: viewer,
+      min: MIN_VIEWER,
+      max: 55,
+    });
+  }
+  if (infoOpen) {
+    parts.push({
+      assign: (value) => {
+        inspector = value;
+      },
+      value: inspector,
+      min: MIN_INSPECTOR,
+      max: 48,
+    });
+  }
+
+  for (const part of parts) {
+    part.value = Math.max(part.min, Math.min(part.max, part.value));
+  }
+  const total = parts.reduce((sum, part) => sum + part.value, 0);
   if (total <= 0) return DEFAULT_LAYOUT;
-
-  assets = (assets / total) * 100;
-  viewer = (viewer / total) * 100;
-  inspector = (inspector / total) * 100;
+  for (const part of parts) {
+    part.assign(roundSize((part.value / total) * 100));
+  }
 
   return {
-    assets: Math.round(assets * 10) / 10,
-    viewer: Math.round(viewer * 10) / 10,
-    inspector: Math.round(inspector * 10) / 10,
+    assets,
+    viewer,
+    inspector,
   };
+}
+
+export function layoutForVisible(
+  layout: Layout,
+  viewerOpen: boolean,
+  infoOpen: boolean,
+): Layout {
+  const next: Layout = { assets: layout.assets ?? DEFAULT_LAYOUT.assets };
+  if (viewerOpen) next.viewer = layout.viewer ?? DEFAULT_LAYOUT.viewer;
+  if (infoOpen) next.inspector = layout.inspector ?? DEFAULT_LAYOUT.inspector;
+
+  const total = Object.values(next).reduce((sum, value) => sum + Number(value), 0);
+  if (total <= 0) return { assets: 100 };
+
+  const scaled: Layout = {};
+  for (const [key, value] of Object.entries(next)) {
+    scaled[key] = roundSize((Number(value) / total) * 100);
+  }
+  return scaled;
 }
 
 const DEFAULT_STATE: WorkspacePanelState = {
@@ -77,7 +140,10 @@ export function saveWorkspacePanelState(
     storageKey(projectId),
     JSON.stringify({
       ...state,
-      layout: normalizeLayout(state.layout),
+      layout: normalizeLayout(state.layout, {
+        viewerOpen: state.viewerOpen,
+        infoOpen: state.infoOpen,
+      }),
     }),
   );
 }

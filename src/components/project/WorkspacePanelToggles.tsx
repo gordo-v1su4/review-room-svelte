@@ -15,7 +15,7 @@ export function WorkspacePanelToggles({
   onToggleInfo: () => void;
 }) {
   return (
-    <div className="hidden h-8 items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5 lg:inline-flex">
+    <div className="hidden items-center gap-1 lg:inline-flex">
       <ToggleButton
         active={viewerOpen}
         label="Toggle viewer"
@@ -56,10 +56,10 @@ function ToggleButton({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "inline-flex h-7 shrink-0 items-center gap-1 rounded px-2 text-[11px] font-medium transition",
+        "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-medium shadow-sm transition",
         active
-          ? "bg-[var(--brand-accent-muted)] text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]/35"
-          : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200",
+          ? "border-[var(--brand-accent)]/35 bg-[var(--brand-accent-muted)] text-[var(--brand-accent)]"
+          : "border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100",
       )}
     >
       {icon}

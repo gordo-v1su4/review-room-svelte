@@ -34,7 +34,7 @@ import {
   modifiersFromEvent,
   type MediaSelectModifiers,
 } from "@/lib/mediaSelection";
-import { useStorageUrl } from "@/hooks/useStorageUrl";
+import { prefetchStorageUrl, useStorageUrl } from "@/hooks/useStorageUrl";
 import {
   ImageAnnotationOverlay,
   hasImageAnnotations,
@@ -223,6 +223,9 @@ export function VideoCard({
       tabIndex={0}
       draggable={Boolean(onDragStart)}
       onClick={(event) => onSelect(modifiersFromEvent(event))}
+      onPointerEnter={() => {
+        if (!isImage) prefetchStorageUrl(video.storageKey);
+      }}
       onDoubleClick={(event) => openPreview(event)}
       onDragStart={(event) => onDragStart?.(event, video)}
       onKeyDown={(event) => {

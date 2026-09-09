@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { VideoDoc } from "@/lib/smartViews";
 import { isImageAsset } from "@/lib/media";
 import { VideoPlayer } from "./VideoPlayer";
@@ -38,6 +38,10 @@ export function CenterAssetViewer({
   const isImage = isImageAsset(video);
   const [playhead, setPlayhead] = useState(0);
 
+  useEffect(() => {
+    setPlayhead(0);
+  }, [video._id]);
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div
@@ -49,11 +53,12 @@ export function CenterAssetViewer({
       >
         <div className="relative h-full w-full">
           <VideoPlayer
+            key={video._id}
             storageKey={video.storageKey}
             spriteKey={video.spriteKey}
+            posterKey={video.thumbnailKey}
             mimeType={video.mimeType}
             assetClass={video.assetClass}
-            version={video.updatedAt}
             fps={video.fps}
             width={video.width}
             height={video.height}

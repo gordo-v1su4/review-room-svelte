@@ -65,11 +65,12 @@ export function VideoLightbox({
           <div className="min-h-0 p-3 sm:p-5">
             {video ? (
               <VideoPlayer
+                key={video._id}
                 storageKey={video.storageKey}
                 spriteKey={video.spriteKey}
+                posterKey={video.thumbnailKey}
                 mimeType={video.mimeType}
                 assetClass={video.assetClass}
-                version={video.updatedAt}
                 fps={video.fps}
                 width={video.width}
                 height={video.height}

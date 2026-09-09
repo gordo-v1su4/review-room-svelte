@@ -10,9 +10,10 @@ import { cn } from "@/lib/utils";
 export function VideoPlayer({
   storageKey,
   spriteKey: _spriteKey,
+  posterKey,
   mimeType,
   assetClass,
-  version,
+  version: _version,
   fps,
   loop = false,
   autoPlay = false,
@@ -26,6 +27,7 @@ export function VideoPlayer({
 }: {
   storageKey: string;
   spriteKey?: string;
+  posterKey?: string | null;
   mimeType?: string | null;
   assetClass?: AssetClass | null;
   version?: string | number | null;
@@ -40,7 +42,10 @@ export function VideoPlayer({
   onEnded?: () => void;
   seekTo?: number | null;
 }) {
-  const mediaUrl = useStorageUrl(storageKey, version);
+  // Playback URL is keyed only by the object, never by updatedAt/version.
+  // A later re-presign or metadata write must not reload the element.
+  const mediaUrl = useStorageUrl(storageKey);
+  const posterUrl = useStorageUrl(posterKey);
   const isImage = isImageAsset({
     mimeType: mimeType ?? "application/octet-stream",
     assetClass,
@@ -48,6 +53,14 @@ export function VideoPlayer({
   const ref = useRef<HTMLVideoElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
+  const boundKeyRef = useRef<string | null>(null);
+  const boundUrlRef = useRef<string | null>(null);
+  const onPlayRef = useRef(onPlay);
+  const onEndedRef = useRef(onEnded);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  onPlayRef.current = onPlay;
+  onEndedRef.current = onEnded;
+  onTimeUpdateRef.current = onTimeUpdate;
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -57,6 +70,7 @@ export function VideoPlayer({
   const [playbackAspect, setPlaybackAspect] = useState<number | null>(
     width && height && width > 0 && height > 0 ? width / height : null,
   );
+  const [frameReady, setFrameReady] = useState(false);
   const mediaAspect = playbackAspect ?? 1;
   const mediaAspectStyle = { aspectRatio: `${mediaAspect}` };
   const frameRate = Number.isFinite(fps ?? NaN) && (fps ?? 0) > 0 ? fps ?? 24 : 24;
@@ -80,11 +94,37 @@ export function VideoPlayer({
 
   useEffect(() => {
     setIsMuted(true);
-    if (ref.current) ref.current.muted = true;
+    setFrameReady(false);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    boundKeyRef.current = null;
+    boundUrlRef.current = null;
+    const video = ref.current;
+    if (video) {
+      video.muted = true;
+      video.removeAttribute("src");
+      video.load();
+    }
     if (width && height && width > 0 && height > 0) {
       setPlaybackAspect(width / height);
     }
-  }, [height, storageKey, width]);
+    // Only the file identity should reset playback. Width/height updates
+    // and a later signed URL must not rewind the playhead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  useEffect(() => {
+    const video = ref.current;
+    if (!video || !mediaUrl || isImage) return;
+    if (boundKeyRef.current === storageKey && boundUrlRef.current === mediaUrl) {
+      return;
+    }
+    boundKeyRef.current = storageKey;
+    boundUrlRef.current = mediaUrl;
+    video.src = mediaUrl;
+    if (autoPlay) playVideo(video);
+  }, [autoPlay, isImage, mediaUrl, storageKey]);
 
   useEffect(() => {
     return () => {
@@ -95,7 +135,7 @@ export function VideoPlayer({
   function syncTime(nextTime?: number) {
     const time = nextTime ?? ref.current?.currentTime ?? 0;
     setCurrentTime(time);
-    onTimeUpdate?.(time);
+    onTimeUpdateRef.current?.(time);
   }
 
   function startTicker() {
@@ -175,8 +215,8 @@ export function VideoPlayer({
           fitAvailable && "flex min-h-0 flex-1 items-center justify-center",
         )}
       >
-        {mediaUrl ? (
-          isImage ? (
+        {isImage ? (
+          mediaUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={mediaUrl}
@@ -186,16 +226,27 @@ export function VideoPlayer({
                 fitAvailable ? "max-h-full max-w-full" : "w-full",
               )}
               style={mediaAspectStyle}
-              onLoad={() => onPlay?.()}
+              onLoad={() => onPlayRef.current?.()}
             />
           ) : (
+            <div
+              className={cn(
+                "flex w-full items-center justify-center text-sm text-zinc-500",
+                fitAvailable && "h-full",
+              )}
+              style={fitAvailable ? undefined : mediaAspectStyle}
+            >
+              Loading playback…
+            </div>
+          )
+        ) : (
+          <>
             <video
               ref={ref}
-              src={mediaUrl}
               loop={loop}
-              autoPlay={autoPlay}
               muted={isMuted}
               playsInline
+              preload="auto"
               className={cn(
                 "object-contain",
                 fitAvailable ? "max-h-full max-w-full" : "w-full",
@@ -204,9 +255,10 @@ export function VideoPlayer({
               onClick={togglePlayback}
               onPlay={() => {
                 setIsPlaying(true);
-                onPlay?.();
+                onPlayRef.current?.();
                 startTicker();
               }}
+              onPlaying={() => setFrameReady(true)}
               onPause={() => {
                 setIsPlaying(false);
                 stopTicker();
@@ -223,25 +275,35 @@ export function VideoPlayer({
                   setPlaybackAspect(nextWidth / nextHeight);
                 }
               }}
+              onLoadedData={() => {
+                if (!autoPlay) setFrameReady(true);
+              }}
               onSeeking={(e) => syncTime(e.currentTarget.currentTime)}
               onSeeked={(e) => syncTime(e.currentTarget.currentTime)}
               onEnded={() => {
                 setIsPlaying(false);
                 stopTicker();
-                onEnded?.();
+                onEndedRef.current?.();
               }}
             />
-          )
-        ) : (
-          <div
-            className={cn(
-              "flex w-full items-center justify-center text-sm text-zinc-500",
-              fitAvailable && "h-full",
-            )}
-            style={fitAvailable ? undefined : mediaAspectStyle}
-          >
-            Loading playback…
-          </div>
+            {posterUrl && !frameReady ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={posterUrl}
+                alt=""
+                className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+              />
+            ) : null}
+            {!posterUrl && !frameReady ? (
+              <div
+                className={cn(
+                  "pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-zinc-500",
+                )}
+              >
+                Loading playback…
+              </div>
+            ) : null}
+          </>
         )}
       </div>
       {!isImage && (

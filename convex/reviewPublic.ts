@@ -121,7 +121,6 @@ export const clientMarkViewed = mutation({
     if (!video.viewed) {
       await ctx.db.patch(args.videoId, {
         viewed: true,
-        updatedAt: Date.now(),
       });
     }
   },

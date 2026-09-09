@@ -100,9 +100,9 @@ export function VideoDetailsPanel({
           <VideoPlayer
             storageKey={video.storageKey}
             spriteKey={video.spriteKey}
+            posterKey={video.thumbnailKey}
             mimeType={video.mimeType}
             assetClass={video.assetClass}
-            version={video.updatedAt}
             fps={video.fps}
             width={video.width}
             height={video.height}

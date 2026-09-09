@@ -125,9 +125,9 @@ export function VideoReviewMode({
             key={active._id}
             storageKey={active.storageKey}
             spriteKey={active.spriteKey}
+            posterKey={active.thumbnailKey}
             mimeType={active.mimeType}
             assetClass={active.assetClass}
-            version={active.updatedAt}
             fps={active.fps}
             width={active.width}
             height={active.height}

@@ -266,7 +266,6 @@ export const markViewed = mutation({
     await getProjectForAdmin(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       viewed: true,
-      updatedAt: Date.now(),
     });
   },
 });

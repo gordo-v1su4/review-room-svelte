@@ -888,14 +888,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
               projectId={projectId}
               viewerOpen={viewerOpen}
               infoOpen={infoOpen}
-              onViewerOpenChange={(open) => {
-                setViewerOpen(open);
-                persistPanelToggles({ viewerOpen: open });
-              }}
-              onInfoOpenChange={(open) => {
-                setInfoOpen(open);
-                persistPanelToggles({ infoOpen: open });
-              }}
               assetBrowser={
                 <div className="min-h-0 flex-1 overflow-y-auto">
                   {renderGridContent({ selectedId: selectedId ?? undefined })}
@@ -903,6 +895,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
               }
               viewer={
                 <CenterAssetViewer
+                  key={selected._id}
                   video={selected}
                   mode="admin"
                   drawMode={drawMode}
@@ -919,6 +912,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
               }
               inspector={
                 <VideoInspectorPanel
+                  key={selected._id}
                   video={selected}
                   mode="admin"
                   compact
