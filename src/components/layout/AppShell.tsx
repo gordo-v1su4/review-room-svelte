@@ -100,7 +100,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span
                 className={cn(
                   "relative aspect-[809/484]",
-                  sidebarCollapsed ? "h-4 w-auto" : "row-span-2 h-[95%] self-center",
+                  sidebarCollapsed ? "h-[0.95rem] w-auto" : "row-span-2 h-[90%] self-center",
                 )}
               >
                 <Image
@@ -241,7 +241,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur lg:hidden">
           <div className="flex min-h-14 items-center justify-between gap-3 px-3 py-2 sm:px-4">
             <Link href="/dashboard" className="flex items-center gap-2 text-sm font-semibold leading-none">
-              <span className="relative aspect-[809/484] h-[1em] shrink-0">
+              <span className="relative aspect-[809/484] h-[0.95em] shrink-0">
                 <Image
                   src="/logo-rr-light.png"
                   alt=""

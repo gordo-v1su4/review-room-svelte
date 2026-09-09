@@ -8,10 +8,10 @@ export default function SignInPage() {
       <Image
         src="/logo-rr-light.png"
         alt=""
-        width={264}
-        height={160}
+        width={100}
+        height={60}
         priority
-        className="mx-auto h-32 w-auto opacity-80 sm:h-36"
+        className="mx-auto h-12 w-auto opacity-85 sm:h-[3.4rem]"
       />
       <SignInForm />
     </div>
