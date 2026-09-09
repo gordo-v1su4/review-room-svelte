@@ -148,4 +148,4 @@ export function saveWorkspacePanelState(
   );
 }
 
-export { DEFAULT_LAYOUT, normalizeLayout };
+export { DEFAULT_LAYOUT };
