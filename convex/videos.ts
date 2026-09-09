@@ -250,6 +250,7 @@ export const updateMetadata = mutation({
     if (args.status !== undefined) {
       patch.status = args.status;
       if (args.status === "approved") patch.approvedAt = Date.now();
+      patch.markedForDeletion = args.status === "omitted";
     }
     if (args.downloadEnabled !== undefined)
       patch.downloadEnabled = args.downloadEnabled;
@@ -265,7 +266,6 @@ export const markViewed = mutation({
     await getProjectForAdmin(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       viewed: true,
-      updatedAt: Date.now(),
     });
   },
 });
@@ -472,6 +472,11 @@ export const setMarkedForDeletion = mutation({
     await getProjectForAdmin(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       markedForDeletion: args.marked,
+      status: args.marked
+        ? "omitted"
+        : video.status === "omitted"
+          ? "awaiting_review"
+          : video.status,
       updatedAt: Date.now(),
     });
   },
@@ -512,14 +517,44 @@ export const markProcessingFailed = mutation({
 
 export const remove = mutation({
   args: { videoId: v.id("videos") },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const video = await ctx.db.get(args.videoId);
-    if (!video) return;
+    if (!video) return null;
     await getProjectForOwner(ctx, video.projectId);
     await ctx.db.patch(args.videoId, {
       status: "archived",
       updatedAt: Date.now(),
     });
+    return null;
+  },
+});
+
+export const removeMany = mutation({
+  args: { videoIds: v.array(v.id("videos")) },
+  returns: v.object({ archived: v.number() }),
+  handler: async (ctx, args) => {
+    let archived = 0;
+    let projectId: Id<"projects"> | null = null;
+    const now = Date.now();
+
+    for (const videoId of args.videoIds) {
+      const video = await ctx.db.get(videoId);
+      if (!video || video.status === "archived") continue;
+      if (projectId === null) {
+        await getProjectForOwner(ctx, video.projectId);
+        projectId = video.projectId;
+      } else if (video.projectId !== projectId) {
+        throw new Error("Cannot delete media from multiple projects");
+      }
+      await ctx.db.patch(videoId, {
+        status: "archived",
+        updatedAt: now,
+      });
+      archived += 1;
+    }
+
+    return { archived };
   },
 });
 

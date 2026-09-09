@@ -22,11 +22,11 @@ Sidebar Inbox shows a simple in-app digest of review notes grouped by project an
 - **Right-side viewer/details panel** (§5) — opens on card select.
 
 ### C. Client review page (`/review/[token]`)
-A calmer, stripped subset of the workspace. Header with banner, title, a one-line instruction, optional client name / due note. A clean grid showing thumbnail, title, rating control, comment count, and selected/approved state — no admin metadata. Same viewer panel, simplified to: player, comment box, rating, shortlist, **Approve / Request Changes**, download if enabled. The client never sees the workflow machinery — only clear actions.
+A calmer, stripped subset of the workspace. Header with banner, title, a one-line instruction, optional client name / due note. A clean grid showing thumbnail, title, rating control, comment count, and a card status control (Needs review / In progress / Needs changes / Approved) — no admin metadata. Same viewer panel, simplified to: player, comments, and fields. Rating and shortlist live on the card (and in Fields); status lives on the card. The client never sees the workflow extras (Final, Omit) — only the review statuses.
 
 ## 2. Admin vs client
 
-Same components, different surface. **Admin** adds: edit status/tags, share link, download settings, folder create/rename/move/cover controls, delete/archive, advanced filters, internal metadata. Uploaded filenames/asset codes are read-only ingest metadata. **Client** sees: watch, rate, shortlist, comment, Approve / Request Changes, upload media into the project (same destination-folder upload flow), **Mark for delete** (flags media for admin removal; clients cannot permanently delete), table/grid/review views, download-if-allowed. Client UI is quieter and uses human labels, never internal status strings.
+Same components, different surface. **Admin** adds: edit status/tags (status on the card, including admin extras), share link, download settings, folder create/rename/move/cover controls, delete/archive, advanced filters, internal metadata. Uploaded filenames/asset codes are read-only ingest metadata. **Client** sees: watch, rate, shortlist, comment, set card status (Needs review / In progress / Needs changes / Approved), upload media into the project (same destination-folder upload flow), table/grid/review views, download-if-allowed. Clients cannot permanently delete and do not see Omit. Client UI is quieter and uses human labels, never internal status strings.
 
 ## 3. Views — trimmed for MVP
 
@@ -37,7 +37,7 @@ Don't design four heavyweight layouts. The card and the right-side panel carry t
 - **Image fullscreen markup (MVP)** — double-clicking a still image opens a fullscreen review surface with compact drawing controls. Keep it minimal: color swatches, brush size, undo, clear, save, rating, shortlist, and close. Saved strokes render over the image and appear on its grid thumbnail with a red pen indicator.
 - **Video quick preview (MVP)** — double-clicking a video opens a centered playback surface sized to 75% of the current browser viewport without replacing the selected asset in the right-side panel. Playback starts automatically and muted, with a visible mute/unmute control. The player preserves the source aspect ratio and fits inside that surface without page scrolling.
 - **Grouped (optional, low cost)** — the smart views rendered as stacked sections (each a wrapping row of the *same* cards). Communicates "generated from metadata," not a board. Avoid column-and-drag as the primary metaphor; drag is the optional override from PRD §4.
-- **Table (MVP / operational)** — compact ShotGrid/FTrack-style production view powered by TanStack Table. Shows thumbnail/latest visual, asset code/name, asset class, status, review attention state, rating, note count, latest actionable note, note date, updated date, and duration. At project root, Table is the all-project action board; folder and smart-folder selections narrow it. It should sort like a lightweight Airtable while still reading as a cinematic media review surface, not a raw spreadsheet.
+- **Table (MVP / operational)** — compact ShotGrid/FTrack-style production view powered by TanStack Table. Shows thumbnail/latest visual, asset code/name, asset class, a status dropdown (same card statuses, including admin extras), shortlist bookmark, review attention state (read-only), rating, note count, and latest note. Changing status or the bookmark on a multi-selected row applies to every selected item. Feedback is not edited here. At project root, Table is the all-project action board; folder and smart-folder selections narrow it. Prefer fitting the working columns in the available width over a wide spreadsheet scroll.
 
 ## 4. Smart-view tabs
 
@@ -51,7 +51,7 @@ Tab definitions and which ones accept drops are in PRD §4–5.
 ## 5. Right-side viewer / details panel
 
 The second-most-important component after the card. Collapsible, integrated into the dark workspace — **not** a white modal.
-- **Contents:** large player with a compact mute/unmute control (videos start muted); title in the panel header; status; tags; compact one-line uploader attribution for admins; rating; shortlist toggle; **Approve / Request Changes**; comments; download (if enabled); admin-only controls when admin. Do not duplicate the uploaded asset name in a form field. Status changes use the status dropdown/select; do not add a separate "reset status" button.
+- **Contents:** Comments and Fields only. The player lives in the center viewer. Comments is the thread and composer. Fields holds metadata, rating, and shortlist. Status, stars, and bookmark stay on the card (and rating/shortlist also appear in Fields). Do not put Approve / Request Changes, Mark for delete, or Delete video in this panel. Omit is a status (red). Permanent delete is **Actions → Delete selected** after multi-select, distinct from Clear media (wipe all). Do not duplicate the uploaded asset name in a form field.
 - **States:** closed (grid full width) · open (grid left, panel right) · expanded (player dominant) · optional fullscreen playback.
 - **Expanded sizing:** expanding the panel uses the same centered 75%-of-viewport footprint as the video quick preview. The complete player, timeline, and playback controls must fit inside the visible panel before metadata scrolling begins; preserve the media aspect ratio with letterboxing when necessary instead of making the user scroll to see the top or bottom of the frame.
 - Smooth, fast open/close. Prefer this panel and drawers/popovers over blocking modals everywhere.
@@ -60,7 +60,7 @@ The second-most-important component after the card. Collapsible, integrated into
 
 **Priority hierarchy:** thumbnail → title → status/review state → rating/select/approved → tags/comments → secondary metadata. Small cards show less; large cards show more. Never overcrowd.
 
-**Shows:** thumbnail or scrub frame; optional duration/type label; title; small status pill; tags; rating; comment count; selected/approved/needs-changes indicator; optional download icon.
+**Shows:** thumbnail or scrub frame; optional duration/type label; title; a Status footer with the current review state as a colored badge (Needs review / In progress / Needs changes / Approved); tags; rating; comment count; selected indicator; optional download icon. Clicking Status on the card changes the decision in place. Approved is a status, not a second control.
 
 **Hover scrub:** when a scrub sprite or preview cache exists, horizontal pointer movement over the thumbnail should seek the visible frame immediately. It should feel like FreeCut's media grid: no popover, no heavy player chrome, just quick visual inspection. Still images do not show a scrub cursor. If the preview is still processing, keep the thumbnail/processing state stable.
 
@@ -77,7 +77,7 @@ The second-most-important component after the card. Collapsible, integrated into
 Four signals exist, but they are **not** peers. Show the hierarchy in the UI so the client always knows which action "counts":
 - **Rating (0–5)** — a quiet preference signal. Minimal: clean stars, dots, or a small segmented control. Not playful hearts.
 - **Shortlist / Select** — a quiet "this is a pick" toggle.
-- **Approve / Request Changes** — *the* decision. This binary pair is the one prominent control in the client panel.
+- **Status on the card** — *the* decision. Needs review, In progress, Needs changes, and Approved share one dropdown on the card. Admin extras (Not started, Final, Omit) sit under More. Omit is red and replaces mark-for-delete. The inspector is comments and fields.
 
 A heart/favorite may exist as an internal admin marker, but client-facing language stays professional.
 

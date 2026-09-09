@@ -231,12 +231,14 @@ Keep status changes tied to *decisions*; let facets carry everything else. On re
 - **First play / open** → `viewed = true`. No status change.
 - **Comment added** → insert comment, `commentCount++`, set `feedbackNeedsAttention = true`. No forced workflow status change; comments surface in "Needs Attention", "Has Feedback", and the in-app Inbox.
 - **Comment completed** → admin can mark individual comments complete, Frame.io-style. When all comments on an asset are complete, set `feedbackNeedsAttention = false`; reactions remain a small fixed emoji set for quick acknowledgement.
-- **Table note display** → the table is an action board, not a raw chat log. Prefer open notes from the other side; collapse extra history behind an "N more notes" affordance when expanded behavior is added.
+- **Table note display** → the table is an action board, not a raw chat log. Prefer open notes from the other side; collapse extra history behind an "N more notes" affordance when expanded behavior is added. Status and shortlist are editable in the table; a change on a multi-selected row applies to every selected item. Feedback remains read-only here.
 - **Rating set** → store `rating` (surfaces in "Highly Rated" at ≥4).
 - **Shortlist toggled** → `isSelect = !isSelect`.
 - **Still-image markup saved** → store normalized vector `annotationStrokes`, set `annotatedAt` when non-empty, and render the saved marks on fullscreen preview plus image thumbnails. This does not alter the original image blob.
-- **Approve** → `status = approved`, `approvedAt = now`.
-- **Request Changes** → `status = needs_changes`.
+- **Approve** → `status = approved`, `approvedAt = now`. Set from the card status control.
+- **Request Changes** → `status = needs_changes`. Set from the card status control.
+- **Omit** → `status = omitted`, `markedForDeletion = true`. Admin extra; replaces a separate mark-for-delete control. Leaving Omit clears the flag.
+- **Delete selected** → owner archives checked assets from Actions. Distinct from Clear media (archive all project media).
 - **Admin override** → may set any `status`, or drag a card into a droppable section (§4) to set the mapped field.
 
 Defaults on upload: `status: "awaiting_review"`, `viewed: false`, `rating: 0`, `isSelect: false`, `commentCount: 0`, `feedbackNeedsAttention: false`, `downloadEnabled: project.downloadEnabledByDefault`.
@@ -318,9 +320,9 @@ Clients without dashboard accounts still reach a project through `reviewLinks.to
 3. **Convex data model** (§5) + CRUD + the transitions in §6.
 4. **Storage** — abstraction + presign routes; test against local RustFS.
 5. **Admin workspace** — project header/banner, drag/drop upload dropzone, video grid + hover-scrub card, filters, right-side panel shell.
-6. **Player + details panel** — playback, scrub previews, status/tags/rating/select controls, download.
+6. **Player + details panel** — center viewer for playback; inspector is comments + fields. Rating, shortlist, and status live on the card.
 7. **Comments** — composer + list + optional timecode capture.
-8. **Client review page** — `/review/[token]`, simplified panel, Approve / Request Changes.
+8. **Client review page** — `/review/[token]`, simplified panel, card status (Needs review / In progress / Needs changes / Approved).
 9. **Smart views** — tab bar with counts (§5 table); optional grouped (stacked) display reusing the card; optional drag-to-set on droppable sections.
 10. **Polish** — responsive, loading/empty/error states, upload progress, panel transitions.
 11. **Phase B/C ports when ready** — FreeCut preview engine first, then browser-local Analyze scenes/search.
@@ -334,7 +336,7 @@ MVP is done when:
 2. Admin can drag/drop a batch of media files; each file shows progress and appears in the workspace as soon as its metadata is ready.
 3. Uploaded assets appear as polished cards in a grid; images show thumbnails and videos show thumbnail + hover scrub preview.
 4. Selecting a card opens the right-side viewer; playback and scrubbing feel instant (Phase A).
-5. Client (link only, no account) can rate, shortlist, comment (with optional timecode), and Approve / Request Changes.
+5. Client (link only, no account) can rate, shortlist, comment (with optional timecode), and set card status (Needs review / In progress / Needs changes / Approved).
 6. `status` and facets update per §6; smart-view tabs reflect the changes live across sessions.
 7. Filtering/sorting over status, facets, tags, and dates works and matches the grid.
 8. Download works when enabled (signed URL).

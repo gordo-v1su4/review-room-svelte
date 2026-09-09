@@ -65,7 +65,7 @@ function annotatedPathFor(shot: string) {
 }
 
 function mime(path: string) {
-  if (path.endsWith(".js")) return "text/javascript; charset=utf-8";
+  if (path.endsWith(".js") || path.endsWith(".ts")) return "text/javascript; charset=utf-8";
   if (path.endsWith(".css")) return "text/css; charset=utf-8";
   if (path.endsWith(".html")) return "text/html; charset=utf-8";
   if (path.endsWith(".png")) return "image/png";
@@ -134,11 +134,23 @@ const server = Bun.serve({
       });
     }
 
-    // Static editor files
-    let file = url.pathname === "/" ? "/index.html" : url.pathname;
+    // Static editor files. Browser TS is compiled on the fly.
+    const file = url.pathname === "/" ? "/index.html" : url.pathname;
     const path = join(EDITOR, file.replace(/^\//, ""));
     if (!path.startsWith(EDITOR) || !existsSync(path)) {
       return new Response("not found", { status: 404 });
+    }
+    if (path.endsWith(".ts")) {
+      const built = await Bun.build({
+        entrypoints: [path],
+        target: "browser",
+      });
+      if (!built.success || !built.outputs[0]) {
+        return new Response(built.logs.join("\n"), { status: 500 });
+      }
+      return new Response(await built.outputs[0].text(), {
+        headers: { "Content-Type": "text/javascript; charset=utf-8" },
+      });
     }
     return new Response(readFileSync(path), { headers: { "Content-Type": mime(path) } });
   },

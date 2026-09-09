@@ -3,11 +3,10 @@
 import * as Popover from "@radix-ui/react-popover";
 import type { ReactNode } from "react";
 import {
-  Bookmark,
+  ArrowUpDown,
   Check,
   ChevronDown,
   Columns3,
-  Folder,
   Grid3X3,
   List,
   Rows3,
@@ -16,15 +15,20 @@ import {
   SquarePlay,
 } from "lucide-react";
 import type { FilterState } from "@/lib/filters";
+import { assetClassLabel } from "@/lib/media";
 import type {
   AssetClass,
   CardAspectRatio,
   FolderSortKey,
   GridSize,
+  GroupByField,
   SortKey,
   ThumbnailScale,
+  VideoStatus,
   WorkspaceLayout,
 } from "@/lib/types";
+import type { CardFieldId } from "@/lib/cardFields";
+import { FieldsVisibilityPopover } from "./FieldsVisibilityPopover";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -49,10 +53,6 @@ const FOLDER_SORTS: { id: FolderSortKey; label: string }[] = [
   { id: "attention", label: "Needs attention" },
 ];
 
-const FOLDER_SORT_LABELS = Object.fromEntries(
-  FOLDER_SORTS.map((sort) => [sort.id, sort.label]),
-) as Record<FolderSortKey, string>;
-
 const GRID_SIZES: { id: GridSize; label: string }[] = [
   { id: "sm", label: "S" },
   { id: "md", label: "M" },
@@ -71,11 +71,26 @@ const THUMBNAIL_SCALES: { id: ThumbnailScale; label: string }[] = [
 ];
 
 const ASSET_CLASS_OPTIONS: Array<{ id: AssetClass; label: string }> = [
-  { id: "VID", label: "VID" },
-  { id: "IMG", label: "IMG" },
-  { id: "CTX", label: "CTX" },
-  { id: "STB", label: "STB" },
+  { id: "VID", label: assetClassLabel("VID") },
+  { id: "IMG", label: assetClassLabel("IMG") },
+  { id: "CTX", label: assetClassLabel("CTX") },
+  { id: "STB", label: assetClassLabel("STB") },
 ];
+
+const toolbarShellClass =
+  "inline-flex h-8 shrink-0 items-center rounded-md border border-zinc-800 bg-zinc-900 p-0.5";
+const toolbarActionClass =
+  "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100";
+
+function toolbarSegmentClass(active: boolean, iconOnly?: boolean) {
+  return cn(
+    "inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded px-2 text-[11px] font-medium transition",
+    iconOnly ? "w-7 px-0" : "min-w-[3.25rem]",
+    active
+      ? "bg-[var(--brand-accent-muted)] text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]/35"
+      : "text-zinc-500 hover:bg-zinc-800/70 hover:text-zinc-200",
+  );
+}
 
 export function ProjectFilters({
   layout,
@@ -83,12 +98,15 @@ export function ProjectFilters({
   aspectRatio,
   thumbnailScale,
   showCardInfo,
-  resultCount,
   assetClassCounts,
   filters,
   sort,
   folderSort,
   showFolderSort,
+  groupBy = "none",
+  visibleFields,
+  fieldOrder,
+  panelToggles,
   onFolderSort,
   onLayout,
   onGridSize,
@@ -97,18 +115,23 @@ export function ProjectFilters({
   onShowCardInfo,
   onFilters,
   onSort,
+  onGroupBy,
+  onVisibleFieldsChange,
 }: {
   layout: WorkspaceLayout;
   gridSize: GridSize;
   aspectRatio: CardAspectRatio;
   thumbnailScale: ThumbnailScale;
   showCardInfo: boolean;
-  resultCount: number;
   assetClassCounts: Record<"all" | AssetClass, number>;
   filters: FilterState;
   sort: SortKey;
   folderSort?: FolderSortKey;
   showFolderSort?: boolean;
+  groupBy?: GroupByField;
+  visibleFields?: CardFieldId[];
+  fieldOrder?: CardFieldId[];
+  panelToggles?: React.ReactNode;
   onFolderSort?: (sort: FolderSortKey) => void;
   onLayout: (layout: WorkspaceLayout) => void;
   onGridSize: (size: GridSize) => void;
@@ -117,163 +140,88 @@ export function ProjectFilters({
   onShowCardInfo: (show: boolean) => void;
   onFilters: (f: FilterState) => void;
   onSort: (s: SortKey) => void;
+  onGroupBy?: (group: GroupByField) => void;
+  onVisibleFieldsChange?: (visible: CardFieldId[], order: CardFieldId[]) => void;
 }) {
+  const chromePadding = "px-4 sm:px-6 lg:px-8";
+
   return (
-    <div className="no-scrollbar sticky top-14 z-20 flex h-[3.25rem] flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-zinc-800 bg-zinc-950 px-4 py-2.5 sm:px-6 lg:top-0 lg:px-8">
-      <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
-        {[
-          { id: "grid", label: "Grid", icon: Grid3X3 },
-          { id: "grouped", label: "Group", icon: Columns3 },
-          { id: "table", label: "Table", icon: List },
-          { id: "review", label: "Review", icon: SquarePlay },
-        ].map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              title={item.label}
-              onClick={() => onLayout(item.id as WorkspaceLayout)}
-              className={cn(
-                "inline-flex h-8 w-[4.6rem] shrink-0 items-center justify-center gap-1.5 rounded px-2 text-[11px] font-medium transition",
-                layout === item.id
-                  ? "bg-zinc-800 text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-200",
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <AppearancePopover
-        gridSize={gridSize}
-        aspectRatio={aspectRatio}
-        thumbnailScale={thumbnailScale}
-        showCardInfo={showCardInfo}
-        onGridSize={onGridSize}
-        onAspectRatio={onAspectRatio}
-        onThumbnailScale={onThumbnailScale}
-        onShowCardInfo={onShowCardInfo}
-      />
-
-      <AssetClassFilter
-        filters={filters}
-        counts={assetClassCounts}
-        onFilters={onFilters}
-      />
-
-      <div className="relative w-[15rem] shrink-0">
-        <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
-        <Input
-          placeholder="Search..."
-          value={filters.search}
-          onChange={(e) => onFilters({ ...filters, search: e.target.value })}
-          className="h-8 border-zinc-800 bg-zinc-900 pl-7 text-xs"
-        />
-      </div>
-
-      <SortPopover sort={sort} onSort={onSort} />
-      {showFolderSort && folderSort && onFolderSort && (
-        <FolderSortPopover folderSort={folderSort} onFolderSort={onFolderSort} />
-      )}
-      <button
-        type="button"
-        onClick={() =>
-          onFilters({ ...filters, selectedOnly: !filters.selectedOnly })
-        }
+    <div className="sticky top-14 z-20 w-full min-w-0 border-b border-zinc-800 bg-zinc-950 lg:top-0">
+      <div
         className={cn(
-          "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[11px] font-medium transition",
-          filters.selectedOnly
-            ? "border-zinc-700 bg-zinc-800 text-sky-200"
-            : "border-zinc-800 bg-zinc-900 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200",
+          "flex h-11 w-full min-w-0 flex-nowrap items-center gap-1 overflow-hidden py-1.5",
+          chromePadding,
         )}
       >
-        <Bookmark
-          className={cn("h-3.5 w-3.5", filters.selectedOnly && "fill-current")}
-        />
-        Selected
-      </button>
-      <span className="shrink-0 px-1 text-[11px] tabular-nums text-zinc-600">
-        {resultCount}
-      </span>
-    </div>
-  );
-}
+        <div className={toolbarShellClass}>
+          {[
+            { id: "grid", label: "Grid", icon: Grid3X3 },
+            { id: "grouped", label: "Group", icon: Columns3 },
+            { id: "table", label: "Table", icon: List },
+            { id: "review", label: "Review", icon: SquarePlay },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                title={item.label}
+                aria-label={item.label}
+                onClick={() => onLayout(item.id as WorkspaceLayout)}
+                className={cn(
+                  toolbarSegmentClass(layout === item.id, true),
+                  "xl:w-auto xl:min-w-0 xl:px-2",
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
-function AssetClassFilter({
-  filters,
-  counts,
-  onFilters,
-}: {
-  filters: FilterState;
-  counts: Record<"all" | AssetClass, number>;
-  onFilters: (filters: FilterState) => void;
-}) {
-  const allActive = filters.assetClasses.length === 0;
-  return (
-    <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
-      <button
-        type="button"
-        aria-pressed={allActive}
-        title="All asset classes"
-        onClick={() => onFilters({ ...filters, assetClasses: [] })}
-        className={cn(
-          "inline-flex h-8 shrink-0 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium transition",
-          allActive
-            ? "bg-zinc-800 text-zinc-100"
-            : "text-zinc-500 hover:text-zinc-200",
+        <AppearancePopover
+          gridSize={gridSize}
+          aspectRatio={aspectRatio}
+          thumbnailScale={thumbnailScale}
+          showCardInfo={showCardInfo}
+          iconOnly
+          onGridSize={onGridSize}
+          onAspectRatio={onAspectRatio}
+          onThumbnailScale={onThumbnailScale}
+          onShowCardInfo={onShowCardInfo}
+        />
+
+        {visibleFields && fieldOrder && onVisibleFieldsChange && (
+          <FieldsVisibilityPopover
+            visibleFields={visibleFields}
+            fieldOrder={fieldOrder}
+            iconOnly
+            onChange={onVisibleFieldsChange}
+          />
         )}
-      >
-        All
-        <span
-          className={cn(
-            "rounded-full px-1.5 py-0.5 text-[10px] tabular-nums",
-            allActive ? "bg-zinc-950 text-zinc-300" : "bg-zinc-800 text-zinc-600",
-          )}
-        >
-          {counts.all}
-        </span>
-      </button>
-      {ASSET_CLASS_OPTIONS.map((option) => {
-        const active = filters.assetClasses.includes(option.id);
-        return (
-          <button
-            key={option.id}
-            type="button"
-            aria-pressed={active}
-            title={option.label}
-            onClick={() =>
-              onFilters({
-                ...filters,
-                assetClasses: active
-                  ? filters.assetClasses.filter((item) => item !== option.id)
-                  : [...filters.assetClasses, option.id],
-              })
-            }
-            className={cn(
-              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium transition",
-              active
-                ? "bg-teal-400 text-zinc-950"
-                : "text-zinc-500 hover:text-zinc-200",
-            )}
-          >
-            {option.label}
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0.5 text-[10px] tabular-nums",
-                active
-                  ? "bg-zinc-950/15 text-zinc-950"
-                  : "bg-zinc-800 text-zinc-600",
-              )}
-            >
-              {counts[option.id]}
-            </span>
-          </button>
-        );
-      })}
+
+        <FilterPopover
+          filters={filters}
+          assetClassCounts={assetClassCounts}
+          groupBy={groupBy}
+          onFilters={onFilters}
+          onGroupBy={onGroupBy}
+        />
+
+        <div className="min-w-2 flex-1" aria-hidden />
+
+        <SearchIconPopover filters={filters} onFilters={onFilters} />
+        <SortPopover
+          sort={sort}
+          folderSort={folderSort}
+          showFolderSort={showFolderSort}
+          iconOnly
+          onSort={onSort}
+          onFolderSort={onFolderSort}
+        />
+        {panelToggles}
+      </div>
     </div>
   );
 }
@@ -283,6 +231,7 @@ function AppearancePopover({
   aspectRatio,
   thumbnailScale,
   showCardInfo,
+  iconOnly,
   onGridSize,
   onAspectRatio,
   onThumbnailScale,
@@ -292,6 +241,7 @@ function AppearancePopover({
   aspectRatio: CardAspectRatio;
   thumbnailScale: ThumbnailScale;
   showCardInfo: boolean;
+  iconOnly?: boolean;
   onGridSize: (size: GridSize) => void;
   onAspectRatio: (ratio: CardAspectRatio) => void;
   onThumbnailScale: (scale: ThumbnailScale) => void;
@@ -302,11 +252,16 @@ function AppearancePopover({
       <Popover.Trigger asChild>
         <button
           type="button"
-          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
+          title="Appearance"
+          className={cn(toolbarActionClass, iconOnly && "w-8 justify-center px-0")}
         >
           <Rows3 className="h-3.5 w-3.5" />
-          Appearance
-          <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+          {!iconOnly && (
+            <>
+              Appearance
+              <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+            </>
+          )}
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -401,30 +356,42 @@ function AppearancePopover({
 
 function SortPopover({
   sort,
+  folderSort,
+  showFolderSort,
+  iconOnly,
   onSort,
+  onFolderSort,
 }: {
   sort: SortKey;
+  folderSort?: FolderSortKey;
+  showFolderSort?: boolean;
+  iconOnly?: boolean;
   onSort: (sort: SortKey) => void;
+  onFolderSort?: (sort: FolderSortKey) => void;
 }) {
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
         <button
           type="button"
-          title="Sort media"
-          className="inline-flex h-8 min-w-32 shrink-0 items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
+          title={`Sorted by: ${SORT_LABELS[sort]}`}
+          className={cn(toolbarActionClass, "min-w-8 justify-between", iconOnly && "w-8 justify-center px-0")}
         >
           <span className="inline-flex items-center gap-1.5">
-            <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-500" />
-            <span className="font-normal text-zinc-500">Media</span>
-            {SORT_LABELS[sort]}
+            <ArrowUpDown className="h-3.5 w-3.5 text-zinc-500" />
+            {!iconOnly && (
+              <>
+                <span className="font-normal text-zinc-500">Sorted by</span>
+                {SORT_LABELS[sort]}
+              </>
+            )}
           </span>
-          <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+          {!iconOnly && <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />}
         </button>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
-          align="start"
+          align="end"
           sideOffset={8}
           className="z-50 w-48 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-zinc-200 shadow-2xl shadow-black/45"
         >
@@ -444,57 +411,29 @@ function SortPopover({
               {sort === item.id && <Check className="h-3.5 w-3.5" />}
             </button>
           ))}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
-  );
-}
-
-function FolderSortPopover({
-  folderSort,
-  onFolderSort,
-}: {
-  folderSort: FolderSortKey;
-  onFolderSort: (sort: FolderSortKey) => void;
-}) {
-  return (
-    <Popover.Root>
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          title="Sort groups"
-          className="inline-flex h-8 shrink-0 items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
-        >
-          <span className="inline-flex items-center gap-1.5">
-            <Folder className="h-3.5 w-3.5 text-zinc-500" />
-            <span className="font-normal text-zinc-500">Groups</span>
-            {FOLDER_SORT_LABELS[folderSort]}
-          </span>
-          <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          align="start"
-          sideOffset={8}
-          className="z-50 w-48 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-zinc-200 shadow-2xl shadow-black/45"
-        >
-          {FOLDER_SORTS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onFolderSort(item.id)}
-              className={cn(
-                "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-teal-300/80",
-                folderSort === item.id
-                  ? "border border-teal-400/35 bg-teal-400/12 text-teal-100"
-                  : "border border-transparent text-zinc-400 hover:bg-teal-400/10 hover:text-teal-100",
-              )}
-            >
-              {item.label}
-              {folderSort === item.id && <Check className="h-3.5 w-3.5" />}
-            </button>
-          ))}
+          {showFolderSort && folderSort && onFolderSort && (
+            <>
+              <p className="mt-1.5 px-2.5 pt-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+                Groups
+              </p>
+              {FOLDER_SORTS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onFolderSort(item.id)}
+                  className={cn(
+                    "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-teal-300/80",
+                    folderSort === item.id
+                      ? "border border-teal-400/35 bg-teal-400/12 text-teal-100"
+                      : "border border-transparent text-zinc-400 hover:bg-teal-400/10 hover:text-teal-100",
+                  )}
+                >
+                  {item.label}
+                  {folderSort === item.id && <Check className="h-3.5 w-3.5" />}
+                </button>
+              ))}
+            </>
+          )}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
@@ -574,3 +513,191 @@ const ratioIconClass: Record<CardAspectRatio, string> = {
   square: "h-3 w-3",
   portrait: "h-4 w-2.5",
 };
+
+const GROUP_OPTIONS: Array<{ id: GroupByField; label: string }> = [
+  { id: "none", label: "None" },
+  { id: "status", label: "Status" },
+  { id: "assetClass", label: "Asset class" },
+  { id: "folder", label: "Folder" },
+];
+
+const STATUS_FILTER_OPTIONS: Array<{ id: VideoStatus; label: string }> = [
+  { id: "awaiting_review", label: "Needs review" },
+  { id: "in_progress", label: "In progress" },
+  { id: "needs_changes", label: "Needs changes" },
+  { id: "approved", label: "Approved" },
+];
+
+function FilterPopover({
+  filters,
+  assetClassCounts,
+  groupBy,
+  onFilters,
+  onGroupBy,
+}: {
+  filters: FilterState;
+  assetClassCounts: Record<"all" | AssetClass, number>;
+  groupBy: GroupByField;
+  onFilters: (filters: FilterState) => void;
+  onGroupBy?: (group: GroupByField) => void;
+}) {
+  const activeCount =
+    filters.statuses.length +
+    filters.assetClasses.length +
+    (filters.hasComments ? 1 : 0) +
+    (filters.selectedOnly ? 1 : 0) +
+    (groupBy !== "none" ? 1 : 0);
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          title={activeCount ? `Filter (${activeCount} active)` : "Filter"}
+          className={cn(toolbarActionClass, "relative w-8 justify-center px-0")}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          {activeCount > 0 && (
+            <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-[var(--brand-accent)]" />
+          )}
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={8}
+          className="z-50 w-52 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl"
+        >
+          {STATUS_FILTER_OPTIONS.map((option) => {
+            const active = filters.statuses.includes(option.id);
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() =>
+                  onFilters({
+                    ...filters,
+                    statuses: active
+                      ? filters.statuses.filter((s) => s !== option.id)
+                      : [...filters.statuses, option.id],
+                  })
+                }
+                className={cn(
+                  "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs",
+                  active ? "bg-[var(--brand-accent-muted)] text-zinc-100" : "text-zinc-500",
+                )}
+              >
+                {option.label}
+                {active && <Check className="h-3.5 w-3.5" />}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() =>
+              onFilters({ ...filters, selectedOnly: !filters.selectedOnly })
+            }
+            className={cn(
+              "mt-1 flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs",
+              filters.selectedOnly
+                ? "bg-[var(--brand-accent-muted)] text-zinc-100"
+                : "text-zinc-500",
+            )}
+          >
+            Selected only
+            {filters.selectedOnly && <Check className="h-3.5 w-3.5" />}
+          </button>
+          <p className="mt-1.5 px-2 pt-1 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+            Media
+          </p>
+          {ASSET_CLASS_OPTIONS.map((option) => {
+            const active = filters.assetClasses.includes(option.id);
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() =>
+                  onFilters({
+                    ...filters,
+                    assetClasses: active
+                      ? filters.assetClasses.filter((id) => id !== option.id)
+                      : [...filters.assetClasses, option.id],
+                  })
+                }
+                className={cn(
+                  "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs",
+                  active ? "bg-[var(--brand-accent-muted)] text-zinc-100" : "text-zinc-500",
+                )}
+              >
+                {option.label}
+                <span className="tabular-nums text-zinc-600">
+                  {assetClassCounts[option.id]}
+                </span>
+              </button>
+            );
+          })}
+          {onGroupBy && (
+            <>
+              <p className="mt-1.5 px-2 pt-1 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+                Group by
+              </p>
+              {GROUP_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => onGroupBy(option.id)}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs",
+                    groupBy === option.id
+                      ? "bg-[var(--brand-accent-muted)] text-zinc-100"
+                      : "text-zinc-500 hover:bg-zinc-900",
+                  )}
+                >
+                  {option.label}
+                  {groupBy === option.id && <Check className="h-3.5 w-3.5" />}
+                </button>
+              ))}
+            </>
+          )}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+function SearchIconPopover({
+  filters,
+  onFilters,
+}: {
+  filters: FilterState;
+  onFilters: (filters: FilterState) => void;
+}) {
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          title="Search"
+          className={cn(toolbarActionClass, "w-8 justify-center px-0")}
+        >
+          <Search className="h-3.5 w-3.5" />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={8}
+          className="z-50 w-56 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl"
+        >
+          <Input
+            autoFocus
+            placeholder="Search..."
+            value={filters.search}
+            onChange={(e) => onFilters({ ...filters, search: e.target.value })}
+            className="h-8 border-zinc-800 bg-zinc-900 text-xs"
+          />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}

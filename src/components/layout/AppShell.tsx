@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, type FormEvent } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuthActions } from "@convex-dev/auth/react";
@@ -9,17 +10,16 @@ import { toast } from "sonner";
 import {
   Archive,
   Check,
-  Clapperboard,
   ChevronsLeft,
   ChevronsRight,
   Folder,
   FolderOpen,
   Inbox,
+  Layers,
   LogOut,
   Pencil,
   Plus,
   Settings,
-  Sparkles,
   Trash2,
   Users,
   X,
@@ -27,7 +27,9 @@ import {
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { useAdminAccess } from "@/components/auth/AdminGate";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Button } from "@/components/ui/button";
+import { projectRootLabel, moveMediaToRootLabel } from "@/lib/projectFolders";
 import { projectAccent, projectAccentStyle } from "@/lib/projectAccent";
 import { cn } from "@/lib/utils";
 
@@ -77,7 +79,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {isAuthenticated && appUser && (
         <aside
           className={cn(
-            "hidden shrink-0 flex-col border-r border-zinc-800/70 bg-zinc-950 transition-[width] duration-200 lg:flex",
+            "hidden shrink-0 flex-col overflow-visible border-r border-zinc-800/70 bg-zinc-950 transition-[width] duration-200 lg:flex",
             sidebarCollapsed ? "w-14" : "w-60",
           )}
         >
@@ -85,22 +87,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href="/dashboard"
             className={cn(
               "flex h-14 items-center border-b border-zinc-800/70",
-              sidebarCollapsed ? "justify-center px-2" : "gap-2.5 px-4",
+              sidebarCollapsed ? "justify-center px-2" : "px-4",
             )}
             title="Review Room"
           >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal-500 text-zinc-950">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            <span className={cn("leading-tight", sidebarCollapsed && "hidden")}>
-              <span className="block text-sm font-semibold">Review Room</span>
-              <span className="block text-[10px] text-zinc-600">
+            <span
+              className={cn(
+                "grid grid-cols-[auto_auto] items-stretch gap-x-2 gap-y-0.5",
+                sidebarCollapsed && "flex",
+              )}
+            >
+              <span
+                className={cn(
+                  "relative aspect-[809/484]",
+                  sidebarCollapsed ? "h-[0.95rem] w-auto" : "row-span-2 h-[90%] self-center",
+                )}
+              >
+                <Image
+                  src="/logo-rr-light.png"
+                  alt=""
+                  fill
+                  unoptimized
+                  className="object-contain object-left opacity-80"
+                />
+              </span>
+              <span
+                className={cn(
+                  "self-start text-sm font-semibold leading-none",
+                  sidebarCollapsed && "hidden",
+                )}
+              >
+                Review Room
+              </span>
+              <span
+                className={cn(
+                  "self-end text-[10px] leading-none text-zinc-600",
+                  sidebarCollapsed && "hidden",
+                )}
+              >
                 Review workspace
               </span>
             </span>
           </Link>
 
-          <nav className={cn("space-y-1 py-4", sidebarCollapsed ? "px-2" : "px-3")}>
+          <nav className={cn("space-y-1 overflow-visible py-4", sidebarCollapsed ? "px-2" : "px-3")}>
             <SideLink
               href="/dashboard"
               active={pathname === "/dashboard"}
@@ -116,6 +146,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               label="Inbox"
               collapsed={sidebarCollapsed}
             />
+            <NotificationBell collapsed={sidebarCollapsed} />
             <SideLink
               href="/dashboard"
               icon={<Users className="h-4 w-4" />}
@@ -151,7 +182,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Suspense fallback={null}>
               <WorkspaceSidebarFolders
                 projectId={workspaceProjectId}
+                projectTitle={workspaceProject?.title}
                 brandColor={workspaceProject?.brandColor}
+                canEdit={isAdmin}
+              />
+              <WorkspaceSidebarCollections
+                projectId={workspaceProjectId}
                 canEdit={isAdmin}
               />
             </Suspense>
@@ -204,8 +240,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur lg:hidden">
           <div className="flex min-h-14 items-center justify-between gap-3 px-3 py-2 sm:px-4">
-            <Link href="/dashboard" className="flex items-center gap-2 text-sm font-semibold">
-              <Clapperboard className="h-4 w-4 text-teal-400" />
+            <Link href="/dashboard" className="flex items-center gap-2 text-sm font-semibold leading-none">
+              <span className="relative aspect-[809/484] h-[0.95em] shrink-0">
+                <Image
+                  src="/logo-rr-light.png"
+                  alt=""
+                  fill
+                  unoptimized
+                  className="object-contain object-left opacity-80"
+                />
+              </span>
               Review Room
             </Link>
             {isAuthenticated && appUser && (
@@ -232,8 +276,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <main
           className={cn(
-            "min-w-0 flex-1 overflow-y-auto",
-            isWorkspace ? "" : "mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8",
+            "min-w-0 flex-1",
+            isWorkspace
+              ? "flex min-h-0 flex-col overflow-hidden"
+              : "overflow-y-auto mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8",
           )}
         >
           {children}
@@ -246,12 +292,168 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 type FolderDoc = Doc<"projectFolders">;
 type VideoDoc = Doc<"videos">;
 
+function WorkspaceSidebarCollections({
+  projectId,
+  canEdit,
+}: {
+  projectId: Id<"projects">;
+  canEdit: boolean;
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeCollectionParam = searchParams.get("collection");
+  const collections = useQuery(api.collections.listByProject, { projectId });
+  const ensureCollections = useMutation(api.collections.ensureSystemCollections);
+  const createCollection = useMutation(api.collections.create);
+  const renameCollection = useMutation(api.collections.rename);
+  const removeCollection = useMutation(api.collections.remove);
+  const [editingId, setEditingId] = useState<Id<"collections"> | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    void ensureCollections({ projectId }).catch(() => {
+      // Non-blocking if homelab deploy lags.
+    });
+  }, [ensureCollections, projectId]);
+
+  async function handleCreate() {
+    setCreating(true);
+    try {
+      const collectionId = await createCollection({ projectId });
+      router.push(`/dashboard/projects/${projectId}?collection=${collectionId}`);
+      toast.success("Collection created");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create collection");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleRename(collectionId: Id<"collections">) {
+    const title = renameDraft.trim();
+    if (!title) return;
+    try {
+      await renameCollection({ collectionId, title });
+      setEditingId(null);
+      toast.success("Collection renamed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not rename collection");
+    }
+  }
+
+  async function handleRemove(collectionId: Id<"collections">, title: string) {
+    if (!window.confirm(`Delete collection "${title}"?`)) return;
+    try {
+      await removeCollection({ collectionId });
+      if (activeCollectionParam === collectionId) {
+        router.push(`/dashboard/projects/${projectId}`);
+      }
+      toast.success("Collection deleted");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not delete collection");
+    }
+  }
+
+  return (
+    <div className="mt-5 px-3">
+      <div className="flex items-center justify-between px-2 pb-2">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+          Collections
+        </p>
+        {canEdit && (
+          <button
+            type="button"
+            className="grid h-5 w-5 place-items-center rounded border border-zinc-800 bg-zinc-900 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-100"
+            title="New collection"
+            disabled={creating}
+            onClick={() => void handleCreate()}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="space-y-1">
+        {(collections ?? []).map((collection) => {
+          const active = activeCollectionParam === collection._id;
+          const href = `/dashboard/projects/${projectId}?collection=${collection._id}`;
+
+          if (editingId === collection._id && collection.kind === "user") {
+            return (
+              <form
+                key={collection._id}
+                className="flex items-center gap-1 px-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void handleRename(collection._id);
+                }}
+              >
+                <input
+                  autoFocus
+                  value={renameDraft}
+                  onChange={(event) => setRenameDraft(event.target.value)}
+                  className="h-7 min-w-0 flex-1 rounded border border-zinc-800 bg-zinc-900 px-2 text-[11px] text-zinc-200"
+                />
+                <button type="submit" className="text-[10px] text-[var(--brand-accent)]">
+                  Save
+                </button>
+              </form>
+            );
+          }
+
+          return (
+            <div key={collection._id} className="group relative flex items-center">
+              <Link
+                href={href}
+                className={cn(
+                  "flex min-w-0 flex-1 items-center gap-2 rounded-sm py-1.5 pl-2 pr-1 text-[12px] transition",
+                  active
+                    ? "bg-[var(--brand-accent-muted)] text-zinc-200"
+                    : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300",
+                )}
+              >
+                <Layers className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{collection.title}</span>
+              </Link>
+              {canEdit && collection.kind === "user" && (
+                <div className="flex shrink-0 items-center opacity-0 transition group-hover:opacity-100">
+                  <button
+                    type="button"
+                    title="Rename"
+                    className="grid h-6 w-6 place-items-center rounded text-zinc-600 hover:bg-zinc-900 hover:text-zinc-200"
+                    onClick={() => {
+                      setEditingId(collection._id);
+                      setRenameDraft(collection.title);
+                    }}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Delete"
+                    className="grid h-6 w-6 place-items-center rounded text-zinc-600 hover:bg-zinc-900 hover:text-red-300"
+                    onClick={() => void handleRemove(collection._id, collection.title)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function WorkspaceSidebarFolders({
   projectId,
+  projectTitle,
   brandColor,
   canEdit,
 }: {
   projectId: Id<"projects">;
+  projectTitle?: string;
   brandColor?: string;
   canEdit: boolean;
 }) {
@@ -309,10 +511,11 @@ function WorkspaceSidebarFolders({
     assetDisposition: "move_to_root" | "archive_assets",
   ) {
     const count = (videos ?? []).filter((video) => video.folderId === folderId).length;
+    const rootName = projectRootLabel(projectTitle);
     const action =
       assetDisposition === "archive_assets"
         ? `Archive ${count} media ${count === 1 ? "asset" : "assets"} and delete "${title}"?`
-        : `Delete "${title}" and move ${count} media ${count === 1 ? "asset" : "assets"} to Project root?`;
+        : `Delete "${title}" and move ${count} media ${count === 1 ? "asset" : "assets"} to ${rootName}?`;
     if (count > 0 && !window.confirm(action)) return;
     if (count === 0 && !window.confirm(`Delete folder "${title}"?`)) return;
 
@@ -323,7 +526,7 @@ function WorkspaceSidebarFolders({
         result.archived
           ? `Archived ${result.archived} and removed folder`
           : result.moved
-            ? `Moved ${result.moved} to Project root`
+            ? `Moved ${result.moved} to ${rootName}`
             : "Folder removed",
       );
     } catch (error) {
@@ -334,6 +537,7 @@ function WorkspaceSidebarFolders({
   return (
     <SidebarFolders
       projectId={projectId}
+      projectTitle={projectTitle}
       brandColor={brandColor}
       folders={folders ?? []}
       videos={videos ?? []}
@@ -365,6 +569,7 @@ function WorkspaceSidebarFolders({
 
 function SidebarFolders({
   projectId,
+  projectTitle,
   brandColor,
   folders,
   videos,
@@ -382,6 +587,7 @@ function SidebarFolders({
   onRemoveFolder,
 }: {
   projectId: Id<"projects">;
+  projectTitle?: string;
   brandColor?: string;
   folders: FolderDoc[];
   videos: VideoDoc[];
@@ -409,6 +615,7 @@ function SidebarFolders({
   const [removingFolderId, setRemovingFolderId] = useState<Id<"projectFolders"> | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const rootFolders = folders;
+  const rootLabel = projectRootLabel(projectTitle);
   // Same scope rule as the workspace: counts mean everything under here.
   const rootCount = videos.length;
   const accent = projectAccent(brandColor);
@@ -453,7 +660,7 @@ function SidebarFolders({
       <div className="space-y-1">
         <SidebarFolderLink
           href={`/dashboard/projects/${projectId}`}
-          label="Project root"
+          label={rootLabel}
           count={rootCount}
           active={!activeFolderId}
           accent={accent}
@@ -578,7 +785,7 @@ function SidebarFolders({
                             }}
                           >
                             <FolderOpen className="h-3.5 w-3.5 text-zinc-500" />
-                            Move media to root
+                            {moveMediaToRootLabel(projectTitle)}
                           </button>
                           <button
                             type="button"

@@ -121,7 +121,6 @@ export const clientMarkViewed = mutation({
     if (!video.viewed) {
       await ctx.db.patch(args.videoId, {
         viewed: true,
-        updatedAt: Date.now(),
       });
     }
   },
@@ -173,6 +172,36 @@ export const clientSaveAnnotations = mutation({
       annotatedAt: strokes.length ? Date.now() : undefined,
       updatedAt: Date.now(),
     });
+  },
+});
+
+const clientStatusValidator = v.union(
+  v.literal("awaiting_review"),
+  v.literal("in_progress"),
+  v.literal("needs_changes"),
+  v.literal("approved"),
+);
+
+export const clientSetStatus = mutation({
+  args: {
+    token: v.string(),
+    videoId: v.id("videos"),
+    status: clientStatusValidator,
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const link = await getLink(ctx, args.token);
+    const video = await ctx.db.get(args.videoId);
+    if (!video || video.projectId !== link.projectId) {
+      throw new Error("Video not found");
+    }
+    const now = Date.now();
+    await ctx.db.patch(args.videoId, {
+      status: args.status,
+      approvedAt: args.status === "approved" ? now : video.approvedAt,
+      updatedAt: now,
+    });
+    return null;
   },
 });
 

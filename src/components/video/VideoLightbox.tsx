@@ -5,9 +5,11 @@ import { useMutation } from "convex/react";
 import { X } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
-import { cn } from "@/lib/utils";
 import { VideoPlayer } from "./VideoPlayer";
-import { VIDEO_PREVIEW_VIEWPORT_CLASS } from "./videoPreviewSizing";
+import {
+  nativeMediaAspect,
+  videoLightboxStyle,
+} from "./videoPreviewSizing";
 
 export function VideoLightbox({
   video,
@@ -21,6 +23,9 @@ export function VideoLightbox({
   onClose: () => void;
 }) {
   const open = Boolean(video);
+  const previewStyle = videoLightboxStyle(
+    nativeMediaAspect(video?.width, video?.height),
+  );
   const markViewedAdmin = useMutation(api.videos.markViewed);
   const markViewedClient = useMutation(api.reviewPublic.clientMarkViewed);
 
@@ -40,10 +45,8 @@ export function VideoLightbox({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md" />
         <Dialog.Content
-          className={cn(
-            "fixed left-1/2 top-1/2 z-[90] grid -translate-x-1/2 -translate-y-1/2 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border border-white/10 bg-zinc-950/95 text-zinc-50 shadow-2xl shadow-black/70 outline-none",
-            VIDEO_PREVIEW_VIEWPORT_CLASS,
-          )}
+          className="fixed left-1/2 top-1/2 z-[90] grid -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-white/10 bg-zinc-950/95 text-zinc-50 shadow-2xl shadow-black/70 outline-none"
+          style={previewStyle}
         >
           <div className="flex min-w-0 items-center justify-between gap-4 border-b border-white/10 bg-black/25 px-4 py-3 sm:px-5">
             <div className="min-w-0">
@@ -62,14 +65,16 @@ export function VideoLightbox({
           <div className="min-h-0 p-3 sm:p-5">
             {video ? (
               <VideoPlayer
+                key={video._id}
                 storageKey={video.storageKey}
                 spriteKey={video.spriteKey}
+                posterKey={video.thumbnailKey}
                 mimeType={video.mimeType}
                 assetClass={video.assetClass}
-                version={video.updatedAt}
                 fps={video.fps}
+                width={video.width}
+                height={video.height}
                 autoPlay
-                fitAvailable
                 onPlay={handleFirstPlay}
               />
             ) : null}

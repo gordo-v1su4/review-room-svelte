@@ -2,18 +2,24 @@
 
 import type { DragEvent } from "react";
 import type { VideoDoc } from "@/lib/smartViews";
+import type { CardFieldId } from "@/lib/cardFields";
 import type { CardAspectRatio, GridSize, ThumbnailScale } from "@/lib/types";
+import { assetGridClass, assetGridStyle } from "@/lib/gridLayout";
 import { cn } from "@/lib/utils";
+import type { MediaSelectModifiers } from "@/lib/mediaSelection";
 import { VideoCard } from "./VideoCard";
 
 export function VideoGrid({
   videos,
   leadingItems,
   selectedId,
+  checkedIds,
   size,
   aspectRatio = "video",
   thumbnailScale = "fill",
   showCardInfo = true,
+  visibleFields,
+  fieldOrder,
   actionMode = "admin",
   token,
   onDragStart,
@@ -27,14 +33,17 @@ export function VideoGrid({
   videos: VideoDoc[];
   leadingItems?: React.ReactNode;
   selectedId?: string;
+  checkedIds?: string[];
   size: GridSize;
   aspectRatio?: CardAspectRatio;
   thumbnailScale?: ThumbnailScale;
   showCardInfo?: boolean;
+  visibleFields?: CardFieldId[];
+  fieldOrder?: CardFieldId[];
   actionMode?: "admin" | "client";
   token?: string;
   onDragStart?: (event: DragEvent<HTMLElement>, video: VideoDoc) => void;
-  onSelect: (id: VideoDoc["_id"]) => void;
+  onSelect: (id: VideoDoc["_id"], modifiers?: MediaSelectModifiers) => void;
   onOpenImagePreview?: (video: VideoDoc) => void;
   onOpenVideoPreview?: (video: VideoDoc) => void;
   folderLabelFor?: (video: VideoDoc) => string | undefined;
@@ -49,15 +58,11 @@ export function VideoGrid({
     );
   }
 
-  const gridClass =
-    size === "sm"
-      ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
-      : size === "lg"
-        ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-        : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
-
   return (
-    <div className={cn("grid gap-3 p-4 sm:p-6 lg:p-8", gridClass)}>
+    <div
+      className={cn(assetGridClass(), "p-4 sm:p-6 lg:p-8")}
+      style={assetGridStyle(size)}
+    >
       {leadingItems}
       {videos.map((video) => (
         <VideoCard
@@ -67,15 +72,18 @@ export function VideoGrid({
           aspectRatio={aspectRatio}
           thumbnailScale={thumbnailScale}
           showCardInfo={showCardInfo}
+          visibleFields={visibleFields}
+          fieldOrder={fieldOrder}
           actionMode={actionMode}
           token={token}
           onDragStart={onDragStart}
           selected={selectedId === video._id}
+          checked={checkedIds ? checkedIds.includes(video._id) : undefined}
           folderLabel={folderLabelFor?.(video)}
           onOpenFolder={
             onOpenVideoFolder ? () => onOpenVideoFolder(video) : undefined
           }
-          onSelect={() => onSelect(video._id)}
+          onSelect={(modifiers) => onSelect(video._id, modifiers)}
           onOpenImagePreview={
             onOpenImagePreview ? () => onOpenImagePreview(video) : undefined
           }

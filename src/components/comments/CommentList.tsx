@@ -46,7 +46,7 @@ export function CommentList({
   return (
     <div className="space-y-2">
       {openCount > 0 && (
-        <div className="rounded-md bg-sky-500 px-3 py-1.5 text-center text-xs font-medium text-white">
+        <div className="rounded-md bg-[var(--info)] px-3 py-1.5 text-center text-xs font-medium text-white">
           {openCount} open {openCount === 1 ? "comment" : "comments"}
         </div>
       )}
@@ -56,7 +56,7 @@ export function CommentList({
             key={c._id}
             className={cn(
               "rounded-lg border bg-zinc-900/50 p-3",
-              c.completedAt ? "border-emerald-400/15" : "border-zinc-800",
+              c.completedAt ? "border-[color-mix(in_srgb,var(--success)_15%,transparent)]" : "border-zinc-800",
             )}
           >
             <div className="flex items-start justify-between gap-2 text-xs text-zinc-500">

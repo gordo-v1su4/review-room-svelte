@@ -19,6 +19,7 @@ import {
   Clock,
   ImagePlus,
   Link2,
+  MoreHorizontal,
   Palette,
   RefreshCw,
   Trash2,
@@ -35,13 +36,18 @@ import { VideoGrid } from "@/components/video/VideoGrid";
 import { VideoTableView } from "@/components/video/VideoTableView";
 import { VideoReviewMode } from "@/components/video/VideoReviewMode";
 import { VideoDetailsPanel } from "@/components/video/VideoDetailsPanel";
+import { CenterAssetViewer } from "@/components/video/CenterAssetViewer";
+import { VideoInspectorPanel } from "@/components/video/VideoInspectorPanel";
+import { ReviewWorkspaceShell } from "./ReviewWorkspaceShell";
+import { WorkspacePanelToggles } from "./WorkspacePanelToggles";
+import { AssetBrowserToolbar } from "./AssetBrowserToolbar";
 import { ImageLightbox } from "@/components/video/ImageLightbox";
 import { VideoLightbox } from "@/components/video/VideoLightbox";
-import { ProjectViewSwitcher } from "./ProjectViewSwitcher";
-import { ProjectFilters } from "./ProjectFilters";
 import { VideoGroupedView } from "./VideoGroupedView";
+import { VideoFieldGroupedView } from "./VideoFieldGroupedView";
 import { FolderShelf } from "./FolderShelf";
 import { matchesSmartView } from "@/lib/smartViews";
+import { projectRootLabel } from "@/lib/projectFolders";
 import { applyFilters, sortVideos, type FilterState } from "@/lib/filters";
 import { isImageAsset, mediaKind } from "@/lib/media";
 import type {
@@ -49,15 +55,30 @@ import type {
   CardAspectRatio,
   FolderSortKey,
   GridSize,
+  GroupByField,
   SmartViewId,
   SortKey,
   ThumbnailScale,
   WorkspaceLayout,
 } from "@/lib/types";
+import type { CardFieldId } from "@/lib/cardFields";
+import {
+  DEFAULT_VISIBLE_CARD_FIELDS,
+  normalizeVisibleFields,
+} from "@/lib/cardFields";
+import {
+  loadWorkspacePanelState,
+  saveWorkspacePanelState,
+} from "@/lib/workspaceLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  emptySelectModifiers,
+  nextCheckedIds,
+  type MediaSelectModifiers,
+} from "@/lib/mediaSelection";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
 import { DEFAULT_PROJECT_ACCENT, hexToRgba, projectAccent } from "@/lib/projectAccent";
 
@@ -95,7 +116,7 @@ const VISIBILITY_OPTIONS: Array<{
   },
 ];
 
-const WORKSPACE_APPEARANCE_KEY = "review-room.workspace.appearance";
+const WORKSPACE_APPEARANCE_KEY = "review-room.workspace.appearance.shared";
 const GRID_SIZES: GridSize[] = ["sm", "md", "lg"];
 const CARD_ASPECT_RATIOS: CardAspectRatio[] = ["video", "square", "portrait"];
 const THUMBNAIL_SCALES: ThumbnailScale[] = ["fit", "fill"];
@@ -113,11 +134,13 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const folders = useMemo(() => queriedFolders ?? [], [queriedFolders]);
   const createLink = useMutation(api.reviewLinks.create);
   const archiveVideos = useMutation(api.videos.archiveByProject);
+  const removeMany = useMutation(api.videos.removeMany);
   const archiveProject = useMutation(api.projects.archive);
   const updateProject = useMutation(api.projects.update);
   const startPreviewRefresh = useMutation(api.videos.startPreviewRefresh);
   const markProcessingFailed = useMutation(api.videos.markProcessingFailed);
   const moveToFolder = useMutation(api.videos.moveToFolder);
+  const markViewedAdmin = useMutation(api.videos.markViewed);
   const renameFolderMutation = useMutation(api.folders.rename);
   const removeFolderMutation = useMutation(api.folders.remove);
 
@@ -129,8 +152,22 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [showCardInfo, setShowCardInfo] = useState(true);
   const [appearanceReady, setAppearanceReady] = useState(false);
   const [selectedId, setSelectedId] = useState<Id<"videos"> | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Id<"videos">[]>([]);
+  const [lastCheckedId, setLastCheckedId] = useState<Id<"videos"> | null>(null);
   const [previewImageId, setPreviewImageId] = useState<Id<"videos"> | null>(null);
   const [previewVideoId, setPreviewVideoId] = useState<Id<"videos"> | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(true);
+  const [infoOpen, setInfoOpen] = useState(true);
+  const [drawMode, setDrawMode] = useState(false);
+  const [playhead, setPlayhead] = useState(0);
+  const [seekTo, setSeekTo] = useState<number | null>(null);
+  const [groupBy, setGroupBy] = useState<GroupByField>("none");
+  const [visibleCardFields, setVisibleCardFields] = useState<CardFieldId[]>(
+    DEFAULT_VISIBLE_CARD_FIELDS,
+  );
+  const [cardFieldOrder, setCardFieldOrder] = useState<CardFieldId[]>(
+    DEFAULT_VISIBLE_CARD_FIELDS,
+  );
   const [reprocessing, setReprocessing] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
   const [folderSort, setFolderSort] = useState<FolderSortKey>("newest");
@@ -153,6 +190,21 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     ? (assetClassParam as AssetClass)
     : null;
   const videoParam = searchParams.get("video");
+  const collectionParam = searchParams.get("collection");
+  const activeCollectionId = collectionParam
+    ? (collectionParam as Id<"collections">)
+    : null;
+  const workspacePrefs = useQuery(
+    api.workspacePreferences.getForProject,
+    appUser ? { projectId } : "skip",
+  );
+  const saveCardFields = useMutation(api.workspacePreferences.saveCardFields);
+  const ensureCollections = useMutation(api.collections.ensureSystemCollections);
+  const setCollectionSourceFolder = useMutation(api.collections.setSourceFolder);
+  const activeCollection = useQuery(
+    api.collections.getById,
+    activeCollectionId ? { collectionId: activeCollectionId } : "skip",
+  );
 
   // Whether the user has expressed any filter intent beyond browsing.
   const filtersActive =
@@ -192,9 +244,49 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
 
   const filtered = useMemo(() => {
     let list = gridSourceVideos.filter((v) => matchesSmartView(v, view));
+    if (activeCollection?.sourceFolderId) {
+      list = list.filter((video) => video.folderId === activeCollection.sourceFolderId);
+    } else if (activeCollection?.kind === "system" && activeCollection.filterRules) {
+      const rules = activeCollection.filterRules as {
+        assetClass?: AssetClass;
+        status?: string;
+      };
+      if (rules.assetClass) {
+        list = list.filter((video) => video.assetClass === rules.assetClass);
+      }
+      if (rules.status) {
+        list = list.filter((video) => video.status === rules.status);
+      }
+    }
     list = applyFilters(list, filters);
     return sortVideos(list, sort);
-  }, [filters, gridSourceVideos, sort, view]);
+  }, [activeCollection, filters, gridSourceVideos, sort, view]);
+
+  const filteredIdsKey = filtered.map((video) => video._id).join(",");
+
+  useEffect(() => {
+    const visible = new Set(filteredIdsKey.split(",").filter(Boolean));
+    setCheckedIds((current) => {
+      const next = current.filter((id) => visible.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [filteredIdsKey]);
+
+  function handleMediaSelect(
+    id: Id<"videos">,
+    modifiers: MediaSelectModifiers = emptySelectModifiers(),
+  ) {
+    const next = nextCheckedIds(
+      filtered.map((video) => video._id),
+      checkedIds,
+      id,
+      lastCheckedId,
+      modifiers,
+    );
+    setCheckedIds(next);
+    setLastCheckedId(id);
+    setSelectedId(id);
+  }
 
   const activeFolder = activeFolderId
     ? folders.find((folder) => folder._id === activeFolderId)
@@ -243,12 +335,26 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const selected = videos.find((v) => v._id === selectedId) ?? null;
   const previewImage = videos.find((v) => v._id === previewImageId) ?? null;
   const previewVideo = videos.find((v) => v._id === previewVideoId) ?? null;
-  const counts = {
-    awaiting: videos.filter((v) => v.status === "awaiting_review" && !v.viewed).length,
-    feedback: videos.filter((v) => v.commentCount > 0).length,
-    selected: videos.filter((v) => v.isSelect).length,
-    approved: videos.filter((v) => v.status === "approved").length,
-  };
+
+  useEffect(() => {
+    const stored = loadWorkspacePanelState(projectId);
+    setViewerOpen(stored.viewerOpen);
+    setInfoOpen(stored.infoOpen);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!workspacePrefs) return;
+    setVisibleCardFields(normalizeVisibleFields(workspacePrefs.visibleCardFields));
+    setCardFieldOrder(
+      normalizeVisibleFields(workspacePrefs.fieldOrder ?? workspacePrefs.visibleCardFields),
+    );
+  }, [workspacePrefs]);
+
+  useEffect(() => {
+    void ensureCollections({ projectId }).catch(() => {
+      // Homelab may lag deploy; collections seed is non-blocking.
+    });
+  }, [ensureCollections, projectId]);
 
   useEffect(() => {
     if (!videoParam || !videos.length) return;
@@ -261,9 +367,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
 
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem(
-        `${WORKSPACE_APPEARANCE_KEY}.${projectId}`,
-      );
+      const stored = window.localStorage.getItem(WORKSPACE_APPEARANCE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as {
           gridSize?: GridSize;
@@ -293,22 +397,20 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     } finally {
       setAppearanceReady(true);
     }
-  }, [projectId]);
+  }, []);
 
   useEffect(() => {
     if (!appearanceReady) return;
     window.localStorage.setItem(
-      `${WORKSPACE_APPEARANCE_KEY}.${projectId}`,
+      WORKSPACE_APPEARANCE_KEY,
       JSON.stringify({ gridSize, aspectRatio, thumbnailScale, showCardInfo }),
     );
-  }, [
-    appearanceReady,
-    aspectRatio,
-    gridSize,
-    projectId,
-    showCardInfo,
-    thumbnailScale,
-  ]);
+  }, [appearanceReady, aspectRatio, gridSize, showCardInfo, thumbnailScale]);
+
+  useEffect(() => {
+    if (layout !== "review" || selectedId || !filtered[0]) return;
+    setSelectedId(filtered[0]._id);
+  }, [filtered, layout, selectedId]);
 
   useEffect(() => {
     setFilters((current) => {
@@ -380,7 +482,28 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     if (!window.confirm(`Archive ${videos.length} assets from this project?`)) return;
     const result = await archiveVideos({ projectId });
     setSelectedId(null);
+    setCheckedIds([]);
+    setLastCheckedId(null);
     toast.success(`Archived ${result.archived} assets`);
+  }
+
+  async function deleteSelected() {
+    if (!checkedIds.length) return;
+    const count = checkedIds.length;
+    if (
+      !window.confirm(
+        `Delete ${count} selected item${count === 1 ? "" : "s"}?`,
+      )
+    ) {
+      return;
+    }
+    const result = await removeMany({ videoIds: checkedIds });
+    if (selectedId && checkedIds.includes(selectedId)) {
+      setSelectedId(null);
+    }
+    setCheckedIds([]);
+    setLastCheckedId(null);
+    toast.success(`Deleted ${result.archived} item${result.archived === 1 ? "" : "s"}`);
   }
 
   async function archiveCurrentProject() {
@@ -407,6 +530,8 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     );
   }
 
+  const projectTitle = project.title;
+
   function beginVideoDrag(event: DragEvent<HTMLElement>, video: (typeof videos)[number]) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("application/review-room-video-id", video._id);
@@ -424,7 +549,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
       const folder = folderId
         ? folders.find((item) => item._id === folderId)
         : null;
-      toast.success(folder ? `Moved to ${folder.title}` : "Moved to project root");
+      toast.success(
+        folder ? `Moved to ${folder.title}` : `Moved to ${projectRootLabel(projectTitle)}`,
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not move media");
     }
@@ -445,10 +572,11 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     assetDisposition: "move_to_root" | "archive_assets",
   ) {
     const count = videos.filter((video) => video.folderId === folderId).length;
+    const rootName = projectRootLabel(projectTitle);
     const action =
       assetDisposition === "archive_assets"
         ? `Archive ${count} media ${count === 1 ? "asset" : "assets"} and delete "${title}"?`
-        : `Delete "${title}" and move ${count} media ${count === 1 ? "asset" : "assets"} to Project root?`;
+        : `Delete "${title}" and move ${count} media ${count === 1 ? "asset" : "assets"} to ${rootName}?`;
     if (count > 0 && !window.confirm(action)) return;
     if (count === 0 && !window.confirm(`Delete folder "${title}"?`)) return;
 
@@ -459,7 +587,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
         result.archived
           ? `Archived ${result.archived} and removed folder`
           : result.moved
-            ? `Moved ${result.moved} to Project root`
+            ? `Moved ${result.moved} to ${rootName}`
             : "Folder removed",
       );
     } catch (error) {
@@ -481,21 +609,201 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     if (routeAssetClass) router.push(`/dashboard/projects/${projectId}`);
   }
 
-  function filterFromStat(statView: SmartViewId) {
-    if (activeFolderId || routeAssetClass) {
-      router.push(`/dashboard/projects/${projectId}`);
-    }
-    setView((current) => (current === statView ? "all" : statView));
-  }
-
   const canEditProject = appUser.role === "admin" && project.memberRole !== "viewer";
   const canUploadMedia = true;
   const canOrganizeFolders = canEditProject;
   const canManageAccess = appUser.role === "admin" && project.isOwner;
+  const projectBrandColor = project.brandColor;
+  const useReviewShell = layout === "review";
+
+  function renderGridContent(options: {
+    selectedId?: Id<"videos">;
+    includeLeadingItems?: boolean;
+    onDragStart?: (event: DragEvent<HTMLElement>, video: (typeof videos)[number]) => void;
+    showFolderBadges?: boolean;
+    onSelect?: (id: Id<"videos">, modifiers?: MediaSelectModifiers) => void;
+  }) {
+    const handleSelect = options.onSelect ?? handleMediaSelect;
+    const commonProps = {
+      videos: filtered,
+      selectedId: options.selectedId,
+      checkedIds,
+      size: gridSize,
+      aspectRatio,
+      thumbnailScale,
+      showCardInfo,
+      visibleFields: visibleCardFields,
+      fieldOrder: cardFieldOrder,
+      onSelect: handleSelect,
+      onOpenImagePreview: (video: (typeof videos)[number]) => setPreviewImageId(video._id),
+      onOpenVideoPreview: (video: (typeof videos)[number]) => setPreviewVideoId(video._id),
+      folderLabelFor: options.showFolderBadges
+        ? (video: (typeof videos)[number]) =>
+            video.folderId ? folderTitleById.get(video.folderId) : undefined
+        : undefined,
+      onOpenVideoFolder: (video: (typeof videos)[number]) =>
+        video.folderId &&
+        router.push(`/dashboard/projects/${projectId}?folder=${video.folderId}`),
+      onDragStart: options.onDragStart,
+    };
+
+    if (groupBy !== "none") {
+      return (
+        <VideoFieldGroupedView
+          {...commonProps}
+          groupBy={groupBy}
+          folderTitleById={folderTitleById}
+          projectTitle={projectTitle}
+        />
+      );
+    }
+
+    return (
+      <VideoGrid
+        {...commonProps}
+        leadingItems={
+          options.includeLeadingItems
+            ? (
+                <FolderShelf
+                  folders={routeAssetClass || isFiltering ? [] : sortedFolders}
+                  videos={videos}
+                  activeFolderId={activeFolderId}
+                  projectTitle={projectTitle}
+                  brandColor={projectBrandColor}
+                  aspectRatio={aspectRatio}
+                  thumbnailScale={thumbnailScale}
+                  canEdit={canOrganizeFolders}
+                  onOpen={(folderId) =>
+                    router.push(
+                      folderId
+                        ? `/dashboard/projects/${projectId}?folder=${folderId}`
+                        : `/dashboard/projects/${projectId}`,
+                    )
+                  }
+                  onDropVideo={(videoId, folderId) =>
+                    void moveVideoToFolder(videoId, folderId)
+                  }
+                  onRenameFolder={
+                    canOrganizeFolders
+                      ? (folderId, title) => void renameFolder(folderId, title)
+                      : undefined
+                  }
+                  onRemoveFolder={
+                    canOrganizeFolders
+                      ? (folderId, title, assetDisposition) =>
+                          void removeFolder(folderId, title, assetDisposition)
+                      : undefined
+                  }
+                />
+              )
+            : undefined
+        }
+        empty={
+          <div className="col-span-full py-16 text-center">
+            <p className="text-sm text-zinc-500">
+              {activeFolder
+                ? "No media in this folder."
+                : isFiltering
+                  ? "Nothing matches the current filters."
+                  : "Upload your first media to start a review."}
+            </p>
+            {!activeFolder && isFiltering ? (
+              <Button variant="secondary" className="mt-3" onClick={clearAllFilters}>
+                Clear filters
+              </Button>
+            ) : (
+              canUploadMedia && (
+                <Link
+                  href={
+                    activeFolderId
+                      ? `/dashboard/projects/${projectId}/upload?folder=${activeFolderId}`
+                      : `/dashboard/projects/${projectId}/upload`
+                  }
+                >
+                  <Button className="mt-3">Upload</Button>
+                </Link>
+              )
+            )}
+          </div>
+        }
+      />
+    );
+  }
+
+  function persistPanelToggles(next: { viewerOpen?: boolean; infoOpen?: boolean }) {
+    const current = loadWorkspacePanelState(projectId);
+    saveWorkspacePanelState(projectId, {
+      ...current,
+      viewerOpen: next.viewerOpen ?? viewerOpen,
+      infoOpen: next.infoOpen ?? infoOpen,
+    });
+  }
+
+  function handleVisibleFieldsChange(visible: CardFieldId[], order: CardFieldId[]) {
+    setVisibleCardFields(visible);
+    setCardFieldOrder(order);
+    void saveCardFields({
+      projectId,
+      visibleCardFields: visible,
+      fieldOrder: order,
+    });
+  }
+
+  const assetBrowserToolbar = (
+    <AssetBrowserToolbar
+      layout={layout}
+      gridSize={gridSize}
+      aspectRatio={aspectRatio}
+      thumbnailScale={thumbnailScale}
+      showCardInfo={showCardInfo}
+      assetClassCounts={assetClassCounts}
+      filters={filters}
+      sort={sort}
+      folderSort={folderSort}
+      showFolderSort={!activeFolderId && folders.length > 0}
+      groupBy={groupBy}
+      visibleFields={visibleCardFields}
+      fieldOrder={cardFieldOrder}
+      panelToggles={
+        <WorkspacePanelToggles
+          viewerOpen={layout === "review" && viewerOpen}
+          infoOpen={infoOpen}
+          onToggleViewer={() => {
+            if (layout !== "review") {
+              setLayout("review");
+              setViewerOpen(true);
+              persistPanelToggles({ viewerOpen: true });
+              return;
+            }
+            const next = !viewerOpen;
+            setViewerOpen(next);
+            persistPanelToggles({ viewerOpen: next });
+          }}
+          onToggleInfo={() => {
+            const next = !infoOpen;
+            setInfoOpen(next);
+            persistPanelToggles({ infoOpen: next });
+          }}
+        />
+      }
+      onFolderSort={setFolderSort}
+      onLayout={setLayout}
+      onGridSize={setGridSize}
+      onAspectRatio={setAspectRatio}
+      onThumbnailScale={setThumbnailScale}
+      onShowCardInfo={setShowCardInfo}
+      onFilters={setFilters}
+      onSort={setSort}
+      onGroupBy={setGroupBy}
+      onVisibleFieldsChange={handleVisibleFieldsChange}
+    />
+  );
 
   return (
     <AdminGate>
-      <div className="min-h-dvh bg-zinc-950">
+      <div
+        className="flex h-full min-h-0 flex-col overflow-hidden bg-zinc-950"
+      >
         <ProjectHero
           title={project.title}
           clientName={project.clientName}
@@ -505,9 +813,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           updatedAt={project.updatedAt}
           projectId={projectId}
           visibility={(project.visibility ?? "private") as ProjectVisibility}
-          counts={counts}
-          activeView={view}
-          onStatFilter={filterFromStat}
           onUpdate={(patch) => updateProject({ projectId, ...patch })}
           onShare={() =>
             void createLink({
@@ -532,6 +837,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           reprocessing={reprocessing}
           onClearVideos={() => void clearVideos()}
           canClearVideos={canManageAccess && videos.length > 0}
+          onDeleteSelected={() => void deleteSelected()}
+          canDeleteSelected={project.isOwner && checkedIds.length > 0}
+          selectedCount={checkedIds.length}
           onArchiveProject={() => void archiveCurrentProject()}
           uploadHref={
             activeFolderId
@@ -543,160 +851,98 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           canManageAccess={canManageAccess}
         />
 
-        {!activeFolderId && folders.length > 0 && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-800/40 px-4 py-1.5 text-[11px] text-zinc-600 sm:px-6 lg:px-8">
-            {isFiltering ? (
-              <>
-                <span>
-                  Showing{" "}
-                  <span className="tabular-nums text-zinc-400">{filtered.length}</span>{" "}
-                  matching {filtered.length === 1 ? "item" : "items"} across all
-                  groups
-                </span>
-                <button
-                  type="button"
-                  className="text-teal-400/90 transition hover:text-teal-300"
-                  onClick={clearAllFilters}
-                >
-                  Clear filters to browse groups
-                </button>
-              </>
-            ) : (
-              <span>
-                Counting{" "}
-                <span className="tabular-nums text-zinc-400">
-                  {scopedVideos.length}
-                </span>{" "}
-                {scopedVideos.length === 1 ? "item" : "items"} across{" "}
-                <span className="tabular-nums text-zinc-400">{folders.length}</span>{" "}
-                {folders.length === 1 ? "group" : "groups"} — filtering shows
-                matches from every group
-              </span>
+        {assetBrowserToolbar}
+
+        {activeCollection && activeCollection.kind === "user" && !activeCollection.sourceFolderId && (
+          <div className="border-b border-zinc-800/60 px-4 py-8 text-center sm:px-6 lg:px-8">
+            <p className="text-sm text-zinc-300">Add assets to this collection</p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Choose a source folder to pull assets into this view.
+            </p>
+            {folders.length > 0 && canEditProject && (
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                {folders.map((folder) => (
+                  <Button
+                    key={folder._id}
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() =>
+                      void setCollectionSourceFolder({
+                        collectionId: activeCollection._id,
+                        sourceFolderId: folder._id,
+                      }).then(() => toast.success(`Source folder set to ${folder.title}`))
+                    }
+                  >
+                    {folder.title}
+                  </Button>
+                ))}
+              </div>
             )}
           </div>
         )}
 
-        <ProjectViewSwitcher
-          videos={scopedVideos}
-          active={view}
-          onChange={setView}
-        />
-
-        <ProjectFilters
-          layout={layout}
-          gridSize={gridSize}
-          aspectRatio={aspectRatio}
-          thumbnailScale={thumbnailScale}
-          showCardInfo={showCardInfo}
-          resultCount={filtered.length}
-          assetClassCounts={assetClassCounts}
-          filters={filters}
-          sort={sort}
-          folderSort={folderSort}
-          showFolderSort={!activeFolderId && folders.length > 0}
-          onFolderSort={setFolderSort}
-          onLayout={setLayout}
-          onGridSize={setGridSize}
-          onAspectRatio={setAspectRatio}
-          onThumbnailScale={setThumbnailScale}
-          onShowCardInfo={setShowCardInfo}
-          onFilters={setFilters}
-          onSort={setSort}
-        />
-
-        <div className="min-h-[420px]">
-          <div className="min-w-0 flex-1">
-            <div className={cn("flex gap-0", selected && "lg:flex-row")}>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {useReviewShell && selected ? (
+            <ReviewWorkspaceShell
+              projectId={projectId}
+              viewerOpen={viewerOpen}
+              infoOpen={infoOpen}
+              assetBrowser={
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  {renderGridContent({ selectedId: selectedId ?? undefined })}
+                </div>
+              }
+              viewer={
+                <CenterAssetViewer
+                  key={selected._id}
+                  video={selected}
+                  mode="admin"
+                  drawMode={drawMode}
+                  canAnnotate={canEditProject}
+                  onDrawModeChange={setDrawMode}
+                  seekTo={seekTo}
+                  onTimeUpdate={setPlayhead}
+                  onFirstPlay={() => {
+                    if (!selected.viewed) {
+                      void markViewedAdmin({ videoId: selected._id });
+                    }
+                  }}
+                />
+              }
+              inspector={
+                <VideoInspectorPanel
+                  key={selected._id}
+                  video={selected}
+                  mode="admin"
+                  compact
+                  playhead={playhead}
+                  drawMode={drawMode}
+                  onDrawModeChange={setDrawMode}
+                  onSeek={(sec) => setSeekTo(sec)}
+                  onClose={() => setSelectedId(null)}
+                  canEdit={canEditProject}
+                  canManageFeedback={canEditProject}
+                />
+              }
+            />
+          ) : (
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div className={cn("flex min-h-0 min-w-0 flex-1", selected && "lg:flex-row")}>
               <div
                 className={cn(
-                  "min-w-0 flex-1",
+                  "min-h-0 min-w-0 flex-1 overflow-y-auto",
                   selected && "lg:pr-0",
                 )}
               >
                 {layout === "grid" ? (
-                  <VideoGrid
-                    videos={filtered}
-                    folderLabelFor={
-                      showFolderBadges
-                        ? (video) =>
-                            video.folderId
-                              ? folderTitleById.get(video.folderId)
-                              : undefined
-                        : undefined
-                    }
-                    onOpenVideoFolder={(video) =>
-                      video.folderId &&
-                      router.push(
-                        `/dashboard/projects/${projectId}?folder=${video.folderId}`,
-                      )
-                    }
-                    leadingItems={
-                      <FolderShelf
-                        folders={routeAssetClass || isFiltering ? [] : sortedFolders}
-                        videos={videos}
-                        activeFolderId={activeFolderId}
-                        brandColor={project.brandColor}
-                        canEdit={canOrganizeFolders}
-                        onOpen={(folderId) =>
-                          router.push(
-                            folderId
-                              ? `/dashboard/projects/${projectId}?folder=${folderId}`
-                              : `/dashboard/projects/${projectId}`,
-                          )
-                        }
-                        onDropVideo={(videoId, folderId) =>
-                          void moveVideoToFolder(videoId, folderId)
-                        }
-                        onRenameFolder={(folderId, title) =>
-                          void renameFolder(folderId, title)
-                        }
-                        onRemoveFolder={(folderId, title, assetDisposition) =>
-                          void removeFolder(folderId, title, assetDisposition)
-                        }
-                      />
-                    }
-                    selectedId={selectedId ?? undefined}
-                    size={gridSize}
-                    aspectRatio={aspectRatio}
-                    thumbnailScale={thumbnailScale}
-                    showCardInfo={showCardInfo}
-                    onDragStart={canOrganizeFolders ? beginVideoDrag : undefined}
-                    onSelect={(id) => {
-                      setSelectedId(id);
-                    }}
-                    onOpenImagePreview={(video) => setPreviewImageId(video._id)}
-                    onOpenVideoPreview={(video) => setPreviewVideoId(video._id)}
-                    empty={
-                      <div className="text-center">
-                        <p>
-                          {activeFolder
-                            ? "No media in this folder."
-                            : isFiltering
-                              ? "Nothing matches the current filters."
-                              : "Upload your first media to start a review."}
-                        </p>
-                        {!activeFolder && isFiltering ? (
-                          <Button
-                            variant="secondary"
-                            className="mt-3"
-                            onClick={clearAllFilters}
-                          >
-                            Clear filters
-                          </Button>
-                        ) : canUploadMedia && (
-                          <Link
-                            href={
-                              activeFolderId
-                                ? `/dashboard/projects/${projectId}/upload?folder=${activeFolderId}`
-                                : `/dashboard/projects/${projectId}/upload`
-                            }
-                          >
-                            <Button className="mt-3">Upload</Button>
-                          </Link>
-                        )}
-                      </div>
-                    }
-                  />
+                  renderGridContent({
+                    selectedId: selectedId ?? undefined,
+                    includeLeadingItems: true,
+                    showFolderBadges,
+                    onDragStart: canOrganizeFolders ? beginVideoDrag : undefined,
+                    onSelect: handleMediaSelect,
+                  })
                 ) : layout === "grouped" ? (
                   <VideoGroupedView
                     folders={
@@ -705,13 +951,17 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                         : sortedFolders
                     }
                     folderVideos={videos}
-                    brandColor={project.brandColor}
+                    projectTitle={projectTitle}
+                    brandColor={projectBrandColor}
                     videos={filtered}
                     size={gridSize}
                     aspectRatio={aspectRatio}
                     thumbnailScale={thumbnailScale}
                     showCardInfo={showCardInfo}
+                    visibleFields={visibleCardFields}
+                    fieldOrder={cardFieldOrder}
                     selectedId={selectedId ?? undefined}
+                    checkedIds={checkedIds}
                     onDragStart={canOrganizeFolders ? beginVideoDrag : undefined}
                     onOpenFolder={(folderId) =>
                       router.push(
@@ -735,7 +985,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                             void removeFolder(folderId, title, assetDisposition)
                         : undefined
                     }
-                    onSelect={setSelectedId}
+                    onSelect={handleMediaSelect}
                     onOpenImagePreview={(video) => setPreviewImageId(video._id)}
                     onOpenVideoPreview={(video) => setPreviewVideoId(video._id)}
                   />
@@ -744,8 +994,12 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     projectId={projectId}
                     videos={filtered}
                     selectedId={selectedId ?? undefined}
-                    onSelect={(id) => {
-                      setSelectedId(id);
+                    checkedIds={checkedIds}
+                    onSelect={handleMediaSelect}
+                    onToggleAll={(checked) => {
+                      const ids = filtered.map((video) => video._id);
+                      setCheckedIds(checked ? ids : []);
+                      setLastCheckedId(checked ? (ids[ids.length - 1] ?? null) : null);
                     }}
                   />
                 ) : (
@@ -753,13 +1007,13 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     videos={filtered}
                     activeId={selectedId ?? undefined}
                     onSelect={(id) => {
-                      setSelectedId(id);
+                      handleMediaSelect(id);
                     }}
                     canEdit={canEditProject}
                   />
                 )}
               </div>
-              {selected && layout !== "review" && (
+              {selected && layout !== "review" && infoOpen && (
                 <>
                   <button
                     type="button"
@@ -776,14 +1030,13 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                         ? setPreviewImageId(selected._id)
                         : setPreviewVideoId(selected._id)
                     }
-                    canEdit={canEditProject}
-                    canDelete={project.isOwner}
                     canManageFeedback={canEditProject}
                   />
                 </>
               )}
             </div>
           </div>
+          )}
         </div>
         <ImageLightbox
           video={previewImage}
@@ -802,6 +1055,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
 }
 
 function ProjectHero({
+  compact = false,
   title,
   clientName,
   description,
@@ -810,21 +1064,22 @@ function ProjectHero({
   updatedAt,
   projectId,
   visibility,
-  counts,
-  activeView,
-  onStatFilter,
   onUpdate,
   onShare,
   onReprocess,
   reprocessing,
   onClearVideos,
   canClearVideos,
+  onDeleteSelected,
+  canDeleteSelected,
+  selectedCount,
   onArchiveProject,
   uploadHref,
   canEditProject,
   canUploadMedia,
   canManageAccess,
 }: {
+  compact?: boolean;
   title: string;
   clientName?: string;
   description?: string;
@@ -833,20 +1088,15 @@ function ProjectHero({
   updatedAt: number;
   projectId: Id<"projects">;
   visibility: ProjectVisibility;
-  counts: {
-    awaiting: number;
-    feedback: number;
-    selected: number;
-    approved: number;
-  };
-  activeView: SmartViewId;
-  onStatFilter: (view: SmartViewId) => void;
   onUpdate: (patch: ProjectIdentityPatch) => Promise<unknown>;
   onShare: () => void;
   onReprocess: () => void;
   reprocessing: boolean;
   onClearVideos: () => void;
   canClearVideos: boolean;
+  onDeleteSelected: () => void;
+  canDeleteSelected: boolean;
+  selectedCount: number;
   onArchiveProject: () => void;
   uploadHref: string;
   canEditProject: boolean;
@@ -965,9 +1215,14 @@ function ProjectHero({
 
   return (
     <div className="relative border-b border-zinc-800/60">
-      <div className="h-32 sm:h-40" style={heroStyle} />
-      <div className="relative -mt-14 px-4 pb-5 sm:-mt-16 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:gap-5">
+      <div className={cn("h-32 sm:h-40", compact && "h-20 sm:h-24")} style={heroStyle} />
+      <div
+        className={cn(
+          "relative -mt-14 px-4 pb-5 sm:-mt-16 sm:px-6 lg:px-8",
+          compact && "-mt-10 pb-3 sm:-mt-12",
+        )}
+      >
+        <div className="flex flex-nowrap items-end gap-3 sm:gap-5">
           <div className="relative shrink-0">
             <button
               type="button"
@@ -1091,14 +1346,12 @@ function ProjectHero({
                 </span>
               )}
             </div>
-            <h1 className="text-xl font-semibold tracking-tight text-zinc-100 sm:text-2xl">
+            <h1 className="truncate text-xl font-semibold tracking-tight text-zinc-100 sm:text-2xl">
               {title}
             </h1>
-            {description && (
-              <p className="mt-1 line-clamp-2 max-w-3xl break-words text-[13px] leading-5 text-zinc-500">
-                {description}
-              </p>
-            )}
+            <p className="mt-1 line-clamp-1 min-h-5 max-w-3xl text-[13px] leading-5 text-zinc-500">
+              {description || "\u00a0"}
+            </p>
             <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-zinc-600">
               <span className="inline-flex items-center gap-1.5">
                 <User className="h-3 w-3" />
@@ -1119,71 +1372,34 @@ function ProjectHero({
                 <Clock className="h-3 w-3" />
                 Live workspace
               </span>
-              <span className="inline-flex items-center gap-1.5 text-emerald-400/80">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span className="inline-flex items-center gap-1.5 text-[var(--success)]/80">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
                 Review link ready
               </span>
             </div>
           </div>
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-start xl:justify-end">
+          <div className="flex shrink-0 flex-nowrap items-center justify-end gap-2">
             <ProjectAccessPopover
               projectId={projectId}
               visibility={visibility}
               canManage={canManageAccess}
             />
-            {canManageAccess && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto"
-                onClick={onShare}
-              >
-                <Link2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Share review link</span>
-                <span className="sm:hidden">Share</span>
-              </Button>
-            )}
-            {canEditProject && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto"
-                disabled={reprocessing}
-                onClick={onReprocess}
-              >
-                <RefreshCw className={cn("h-4 w-4", reprocessing && "animate-spin")} />
-                <span className="hidden sm:inline">Refresh previews</span>
-                <span className="sm:hidden">Refresh</span>
-              </Button>
-            )}
-            {canEditProject && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-300 sm:w-auto"
-                disabled={!canClearVideos}
-                onClick={onClearVideos}
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Clear media</span>
-                <span className="sm:hidden">Clear</span>
-              </Button>
-            )}
-            {canManageAccess && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-full gap-1.5 px-2.5 text-xs text-zinc-500 sm:w-auto"
-                onClick={onArchiveProject}
-              >
-                <Archive className="h-4 w-4" />
-                <span className="hidden sm:inline">Archive project</span>
-                <span className="sm:hidden">Archive</span>
-              </Button>
-            )}
+            <ProjectActionsMenu
+              canManageAccess={canManageAccess}
+              canEditProject={canEditProject}
+              canClearVideos={canClearVideos}
+              canDeleteSelected={canDeleteSelected}
+              selectedCount={selectedCount}
+              reprocessing={reprocessing}
+              onShare={onShare}
+              onReprocess={onReprocess}
+              onClearVideos={onClearVideos}
+              onDeleteSelected={onDeleteSelected}
+              onArchiveProject={onArchiveProject}
+            />
             {canUploadMedia && (
               <Link href={uploadHref}>
-                <Button size="sm" className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto">
+                <Button size="sm" className="h-8 gap-1.5 px-2.5 text-xs">
                   <Upload className="h-4 w-4" />
                   Upload
                 </Button>
@@ -1191,38 +1407,117 @@ function ProjectHero({
             )}
           </div>
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <Stat
-            label="Awaiting"
-            value={counts.awaiting}
-            accent="bg-zinc-400"
-            active={activeView === "awaiting_review"}
-            onClick={() => onStatFilter("awaiting_review")}
-          />
-          <Stat
-            label="Feedback"
-            value={counts.feedback}
-            accent="bg-sky-400"
-            active={activeView === "has_feedback"}
-            onClick={() => onStatFilter("has_feedback")}
-          />
-          <Stat
-            label="Selected"
-            value={counts.selected}
-            accent="bg-sky-400"
-            active={activeView === "selected"}
-            onClick={() => onStatFilter("selected")}
-          />
-          <Stat
-            label="Approved"
-            value={counts.approved}
-            accent="bg-emerald-400"
-            active={activeView === "approved"}
-            onClick={() => onStatFilter("approved")}
-          />
-        </div>
       </div>
     </div>
+  );
+}
+
+function ProjectActionsMenu({
+  canManageAccess,
+  canEditProject,
+  canClearVideos,
+  canDeleteSelected,
+  selectedCount,
+  reprocessing,
+  onShare,
+  onReprocess,
+  onClearVideos,
+  onDeleteSelected,
+  onArchiveProject,
+}: {
+  canManageAccess: boolean;
+  canEditProject: boolean;
+  canClearVideos: boolean;
+  canDeleteSelected: boolean;
+  selectedCount: number;
+  reprocessing: boolean;
+  onShare: () => void;
+  onReprocess: () => void;
+  onClearVideos: () => void;
+  onDeleteSelected: () => void;
+  onArchiveProject: () => void;
+}) {
+  const hasActions =
+    canManageAccess || canEditProject;
+
+  if (!hasActions) return null;
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-8 gap-1.5 px-2.5 text-xs"
+          title="Project actions"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+          <span className="hidden sm:inline">Actions</span>
+        </Button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={8}
+          className="z-50 w-52 rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 shadow-2xl"
+        >
+          {canManageAccess && (
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 transition hover:bg-zinc-900"
+              onClick={onShare}
+            >
+              <Link2 className="h-3.5 w-3.5 text-zinc-500" />
+              Share review link
+            </button>
+          )}
+          {canEditProject && (
+            <button
+              type="button"
+              disabled={reprocessing}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 transition hover:bg-zinc-900 disabled:opacity-50"
+              onClick={onReprocess}
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5 text-zinc-500", reprocessing && "animate-spin")} />
+              Refresh previews
+            </button>
+          )}
+          {canEditProject && (
+            <button
+              type="button"
+              disabled={!canDeleteSelected}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 transition hover:bg-zinc-900 disabled:opacity-50"
+              onClick={onDeleteSelected}
+            >
+              <Trash2 className="h-3.5 w-3.5 text-[var(--danger)]" />
+              Delete selected
+              {selectedCount > 0 ? ` (${selectedCount})` : ""}
+            </button>
+          )}
+          {canEditProject && (
+            <button
+              type="button"
+              disabled={!canClearVideos}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 transition hover:bg-zinc-900 disabled:opacity-50"
+              onClick={onClearVideos}
+            >
+              <Trash2 className="h-3.5 w-3.5 text-zinc-500" />
+              Clear media
+            </button>
+          )}
+          {canManageAccess && (
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-red-300 transition hover:bg-red-950/30"
+              onClick={onArchiveProject}
+            >
+              <Archive className="h-3.5 w-3.5" />
+              Archive project
+            </button>
+          )}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -1293,10 +1588,25 @@ function ProjectAccessPopover({
           type="button"
           variant="secondary"
           size="sm"
-          className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto"
+          className="h-8 gap-2 px-2.5 text-xs sm:w-auto"
         >
-          <Users className="h-4 w-4" />
-          Access
+          <div className="flex -space-x-1.5">
+            {(members ?? []).slice(0, 3).map((member) => (
+              <span
+                key={member.entryKey}
+                className="grid h-5 w-5 place-items-center rounded-full border border-zinc-950 bg-zinc-700 text-[9px] font-medium text-zinc-200"
+                title={member.name}
+              >
+                {member.name.slice(0, 1).toUpperCase()}
+              </span>
+            ))}
+          </div>
+          <span className="tabular-nums text-zinc-300">
+            {members ? members.length : "…"}
+          </span>
+          <span className="hidden text-zinc-500 sm:inline">
+            {members?.length === 1 ? "person" : "people"}
+          </span>
         </Button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -1327,7 +1637,7 @@ function ProjectAccessPopover({
                     className={cn(
                       "rounded-md border px-2 py-1.5 text-left text-[11px] font-medium transition",
                       visibility === option.id
-                        ? "border-teal-400 bg-teal-950 text-teal-100"
+                        ? "border-[var(--brand-accent)] bg-[color-mix(in_srgb,var(--brand-accent)_12%,#09090b)] text-[color-mix(in_srgb,var(--brand-accent)_70%,white)]"
                         : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200",
                     )}
                   >
@@ -1352,7 +1662,7 @@ function ProjectAccessPopover({
               Direct access
             </p>
             {visibility === "workspace" && (
-              <span className="rounded-full bg-sky-400/10 px-2 py-0.5 text-[10px] font-medium text-sky-300">
+              <span className="rounded-full bg-[var(--info-muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--info)]">
                 Optional
               </span>
             )}
@@ -1375,7 +1685,7 @@ function ProjectAccessPopover({
                     </p>
                   </div>
                   {member.isOwner ? (
-                    <span className="rounded-full bg-teal-400/10 px-2 py-0.5 text-[10px] font-medium text-teal-300">
+                    <span className="rounded-full bg-[var(--brand-accent-muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--brand-accent)]">
                       Owner
                     </span>
                   ) : canManage && member.membershipId ? (
@@ -1436,60 +1746,6 @@ function ProjectAccessPopover({
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  accent,
-  active,
-  onClick,
-}: {
-  label: string;
-  value: number;
-  accent: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      title={active ? "Clear this filter" : `Show all ${label.toLowerCase()} items`}
-      onClick={onClick}
-      className={cn(
-        "group/stat flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-left transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-300/70",
-        active
-          ? "border-teal-400/50 bg-teal-400/[0.07]"
-          : "border-zinc-800/50 bg-zinc-900/30 hover:border-zinc-700 hover:bg-zinc-900/60",
-      )}
-    >
-      <span className={cn("h-6 w-0.5 rounded-full", accent)} />
-      <div className="min-w-0 flex-1">
-        <p
-          className={cn(
-            "text-[10px] font-medium uppercase tracking-wider",
-            active ? "text-teal-300/90" : "text-zinc-600",
-          )}
-        >
-          {label}
-        </p>
-        <p className="text-lg font-semibold leading-tight tabular-nums text-zinc-200">
-          {value}
-        </p>
-      </div>
-      <span
-        className={cn(
-          "shrink-0 text-[10px] font-medium transition",
-          active
-            ? "text-teal-300/90"
-            : "text-zinc-700 opacity-0 group-hover/stat:opacity-100",
-        )}
-      >
-        {active ? "Clear ✕" : "Filter"}
-      </span>
-    </button>
   );
 }
 
