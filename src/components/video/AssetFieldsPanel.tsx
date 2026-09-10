@@ -80,7 +80,7 @@ export function AssetFieldsPanel({
             className="flex items-start justify-between gap-3 rounded-md border border-zinc-800/60 bg-zinc-900/30 px-2.5 py-2"
           >
             <span className="text-[11px] text-zinc-500">{row.label}</span>
-            <div className="min-w-0 text-right text-xs text-zinc-200">
+            <div className="min-w-0 break-words text-right text-xs text-zinc-200 [overflow-wrap:anywhere]">
               {row.id === "status" ? (
                 <VideoStatusPill status={video.status} />
               ) : row.id === "rating" && canEdit && onRatingChange ? (

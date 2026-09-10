@@ -80,6 +80,7 @@ import {
   type MediaSelectModifiers,
 } from "@/lib/mediaSelection";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { DEFAULT_PROJECT_ACCENT, hexToRgba, projectAccent } from "@/lib/projectAccent";
 
 type ProjectIdentityPatch = {
@@ -123,6 +124,7 @@ const THUMBNAIL_SCALES: ThumbnailScale[] = ["fit", "fill"];
 const ASSET_CLASSES: AssetClass[] = ["VID", "IMG", "CTX", "STB"];
 
 export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
+  const desktopWorkspace = useMediaQuery("(min-width: 1024px)");
   const router = useRouter();
   const searchParams = useSearchParams();
   const { appUser, isAuthenticated, isChecking } = useAdminAccess();
@@ -614,7 +616,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const canOrganizeFolders = canEditProject;
   const canManageAccess = appUser.role === "admin" && project.isOwner;
   const projectBrandColor = project.brandColor;
-  const useReviewShell = layout === "review";
+  const useReviewShell = layout === "review" && desktopWorkspace;
 
   function renderGridContent(options: {
     selectedId?: Id<"videos">;
@@ -802,7 +804,8 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   return (
     <AdminGate>
       <div
-        className="flex h-full min-h-0 flex-col overflow-hidden bg-zinc-950"
+        className="project-workspace flex h-full min-h-0 flex-col overflow-hidden lg:bg-zinc-950"
+        data-layout={layout}
       >
         <ProjectHero
           title={project.title}
@@ -882,7 +885,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           </div>
         )}
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="workspace-content flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950">
           {useReviewShell && selected ? (
             <ReviewWorkspaceShell
               projectId={projectId}
@@ -1013,15 +1016,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                   />
                 )}
               </div>
-              {selected && layout !== "review" && infoOpen && (
-                <>
-                  <button
-                    type="button"
-                    aria-label="Close video details"
-                    className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm lg:hidden"
-                    onClick={() => setSelectedId(null)}
-                  />
+              {selected && !previewImage && !previewVideo && layout !== "review" && (infoOpen || !desktopWorkspace) && (
                   <VideoDetailsPanel
+                    key={selected._id}
                     video={selected}
                     mode="admin"
                     onClose={() => setSelectedId(null)}
@@ -1032,7 +1029,6 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     }
                     canManageFeedback={canEditProject}
                   />
-                </>
               )}
             </div>
           </div>
@@ -1214,20 +1210,20 @@ function ProjectHero({
   }
 
   return (
-    <div className="relative border-b border-zinc-800/60">
-      <div className={cn("h-32 sm:h-40", compact && "h-20 sm:h-24")} style={heroStyle} />
+    <div className="project-hero relative shrink-0 lg:border-b lg:border-zinc-800/60">
+      <div className={cn("hidden h-40 lg:block", compact && "h-24")} style={heroStyle} />
       <div
         className={cn(
-          "relative -mt-14 px-4 pb-5 sm:-mt-16 sm:px-6 lg:px-8",
+          "relative px-4 pb-3 pt-2 lg:-mt-16 lg:px-8 lg:pb-5 lg:pt-0",
           compact && "-mt-10 pb-3 sm:-mt-12",
         )}
       >
-        <div className="flex flex-nowrap items-end gap-3 sm:gap-5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 lg:items-end lg:gap-5">
           <div className="relative shrink-0">
             <button
               type="button"
               disabled={!canEditProject}
-              className="group grid h-16 w-16 place-items-center rounded-xl text-lg font-semibold text-zinc-950 ring-4 ring-zinc-950 transition hover:brightness-110 sm:h-20 sm:w-20"
+              className="group grid h-11 w-11 place-items-center rounded-xl text-base font-semibold text-zinc-950 ring-2 ring-black/20 transition hover:brightness-110 lg:h-20 lg:w-20 lg:text-lg lg:ring-4 lg:ring-zinc-950"
               style={{ backgroundColor: accent }}
               onClick={openIdentityEditor}
               title={canEditProject ? "Edit project identity" : "View-only project"}
@@ -1327,8 +1323,8 @@ function ProjectHero({
               </div>
             )}
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-center gap-2 text-[11px] text-zinc-500">
+          <div className="min-w-0 flex-1 basis-[calc(100%-4rem)] lg:basis-0">
+            <div className="mb-1 hidden items-center gap-2 text-[11px] text-zinc-500 lg:flex">
               <span>Projects</span>
               <span className="text-zinc-700">/</span>
               {canEditProject ? (
@@ -1346,13 +1342,13 @@ function ProjectHero({
                 </span>
               )}
             </div>
-            <h1 className="truncate text-xl font-semibold tracking-tight text-zinc-100 sm:text-2xl">
+            <h1 className="truncate text-lg font-semibold tracking-tight text-zinc-100 lg:text-2xl">
               {title}
             </h1>
-            <p className="mt-1 line-clamp-1 min-h-5 max-w-3xl text-[13px] leading-5 text-zinc-500">
-              {description || "\u00a0"}
+            <p className="mt-0.5 line-clamp-1 max-w-3xl text-xs leading-4 text-zinc-400 lg:mt-1 lg:min-h-5 lg:text-[13px] lg:leading-5 lg:text-zinc-500">
+              {description || clientName || "\u00a0"}
             </p>
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-zinc-600">
+            <div className="mt-2.5 hidden flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-zinc-600 lg:flex">
               <span className="inline-flex items-center gap-1.5">
                 <User className="h-3 w-3" />
                 {canEditProject ? (
@@ -1372,13 +1368,13 @@ function ProjectHero({
                 <Clock className="h-3 w-3" />
                 Live workspace
               </span>
-              <span className="inline-flex items-center gap-1.5 text-[var(--success)]/80">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
+              <span className="inline-flex items-center gap-1.5 text-zinc-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                 Review link ready
               </span>
             </div>
           </div>
-          <div className="flex shrink-0 flex-nowrap items-center justify-end gap-2">
+          <div className="project-hero-actions flex w-full shrink-0 flex-wrap items-center justify-end gap-2 lg:w-auto">
             <ProjectAccessPopover
               projectId={projectId}
               visibility={visibility}
@@ -1590,14 +1586,15 @@ function ProjectAccessPopover({
           size="sm"
           className="h-8 gap-2 px-2.5 text-xs sm:w-auto"
         >
-          <div className="flex -space-x-1.5">
-            {(members ?? []).slice(0, 3).map((member) => (
+          <div className="isolate flex shrink-0 -space-x-1">
+            {(members ?? []).slice(0, 3).map((member, index) => (
               <span
                 key={member.entryKey}
-                className="grid h-5 w-5 place-items-center rounded-full border border-zinc-950 bg-zinc-700 text-[9px] font-medium text-zinc-200"
+                className="relative grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 border-zinc-800 bg-zinc-900 text-[9px] font-medium text-zinc-200"
+                style={{ zIndex: 3 - index }}
                 title={member.name}
               >
-                {member.name.slice(0, 1).toUpperCase()}
+                {member.name.startsWith("*") ? <Users className="h-3 w-3" /> : member.name.slice(0, 1).toUpperCase()}
               </span>
             ))}
           </div>

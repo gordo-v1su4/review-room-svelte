@@ -220,7 +220,7 @@ export function SignInForm() {
               setAuthNotice(null);
               setShowPassword(false);
             }}
-            className="text-sm text-zinc-400 transition hover:text-teal-300"
+            className="text-sm text-zinc-400 transition hover:text-[var(--brand-accent)]"
           >
             ← Back to sign in
           </button>
@@ -300,7 +300,7 @@ export function SignInForm() {
                 minLength={8}
                 placeholder="New password"
                 required
-                className="pr-10 caret-teal-400 text-teal-200/80 focus-visible:ring-teal-500/35"
+                className="pr-10 rounded-[4px] border-[#202023] text-zinc-100 caret-[var(--brand-accent)] focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]/50"
               />
               <button
                 type="button"
@@ -308,7 +308,7 @@ export function SignInForm() {
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 aria-pressed={showPassword}
                 onClick={() => setShowPassword((visible) => !visible)}
-                className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md text-zinc-500 transition hover:bg-zinc-800 hover:text-teal-300/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-400/50"
+                className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md text-zinc-500 transition hover:bg-zinc-800 hover:text-[var(--brand-accent)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]/50"
               >
                 {showPassword ? (
                   <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -324,7 +324,7 @@ export function SignInForm() {
               minLength={8}
               placeholder="Confirm new password"
               required
-              className="caret-teal-400 text-teal-200/80 focus-visible:ring-teal-500/35"
+              className="rounded-[4px] border-[#202023] text-zinc-100 caret-[var(--brand-accent)] focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]/50"
             />
             <Button
               type="submit"
@@ -340,7 +340,7 @@ export function SignInForm() {
                 setResetCode("");
                 setAuthNotice(null);
               }}
-              className="w-full text-center text-sm text-zinc-400 transition hover:text-teal-300"
+              className="w-full text-center text-sm text-zinc-400 transition hover:text-[var(--brand-accent)]"
             >
               Send a new code
             </button>
@@ -354,7 +354,7 @@ export function SignInForm() {
               placeholder="Email"
               required
               autoFocus
-              className="caret-teal-400 text-teal-200/80 focus-visible:ring-teal-500/35"
+              className="rounded-[4px] border-[#202023] text-zinc-100 caret-[var(--brand-accent)] focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]/50"
             />
             <Button
               type="submit"
@@ -399,7 +399,7 @@ export function SignInForm() {
           <Input
             name="name"
             placeholder="Your name"
-            className="caret-teal-400 text-teal-200/80 focus-visible:ring-teal-500/35"
+            className="rounded-[4px] border-[#202023] text-zinc-100 caret-[var(--brand-accent)] focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]/50"
           />
         )}
         <Input
@@ -408,7 +408,7 @@ export function SignInForm() {
           autoComplete="email"
           placeholder="Email"
           required
-          className="caret-teal-400 text-teal-200/80 focus-visible:ring-teal-500/35"
+          className="rounded-[4px] border-[#202023] text-zinc-100 caret-[var(--brand-accent)] focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]/50"
         />
         <div className="relative">
           <Input
@@ -418,7 +418,7 @@ export function SignInForm() {
             minLength={8}
             placeholder="Password"
             required
-            className="pr-10 caret-teal-400 text-teal-200/80 focus-visible:ring-teal-500/35"
+            className="pr-10 rounded-[4px] border-[#202023] text-zinc-100 caret-[var(--brand-accent)] focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]/50"
           />
           <button
             type="button"
@@ -426,7 +426,7 @@ export function SignInForm() {
             aria-label={showPassword ? "Hide password" : "Show password"}
             aria-pressed={showPassword}
             onClick={() => setShowPassword((visible) => !visible)}
-            className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md text-zinc-500 transition hover:bg-zinc-800 hover:text-teal-300/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-400/50"
+            className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md text-zinc-500 transition hover:bg-zinc-800 hover:text-[var(--brand-accent)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]/50"
           >
             {showPassword ? (
               <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -444,7 +444,7 @@ export function SignInForm() {
                 setAuthNotice(null);
                 setShowPassword(false);
               }}
-              className="text-sm text-zinc-400 transition hover:text-teal-300"
+              className="text-sm text-zinc-400 transition hover:text-[var(--brand-accent)]"
             >
               Forgot password?
             </button>

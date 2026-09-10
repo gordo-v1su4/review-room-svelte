@@ -124,7 +124,7 @@ export function VideoListView({
                     className={cn(
                       "h-3 w-3",
                       index < video.rating
-                        ? "fill-yellow-400 text-yellow-400"
+                        ? "fill-[var(--rating)] text-[var(--rating)]"
                         : "text-zinc-800",
                     )}
                   />

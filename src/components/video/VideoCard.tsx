@@ -15,6 +15,7 @@ import {
   Check,
   Folder,
   PenLine,
+  Maximize2,
   Star,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -229,6 +230,7 @@ export function VideoCard({
       onDoubleClick={(event) => openPreview(event)}
       onDragStart={(event) => onDragStart?.(event, video)}
       onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onSelect(emptySelectModifiers());
@@ -309,6 +311,11 @@ export function VideoCard({
           onClick={(event) => event.stopPropagation()}
           onDoubleClick={(event) => event.stopPropagation()}
         >
+          {!isImage && onOpenVideoPreview && (
+            <button type="button" title="Preview video" aria-label="Preview video" className="grid h-8 w-8 place-items-center rounded-full bg-black/30 text-zinc-300 transition hover:bg-white/10 hover:text-white sm:h-6 sm:w-6" onClick={openPreview}>
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+          )}
           {isImage && onOpenImagePreview && (
             <button
               type="button"
@@ -380,13 +387,6 @@ export function VideoCard({
               </span>
             </button>
           )}
-          <VideoRatingControl
-            value={video.rating}
-            onChange={rateVideo}
-            className="gap-0"
-            starClassName="h-3 w-3"
-            buttonClassName="h-5 w-4 text-zinc-400 hover:text-[var(--rating)]"
-          />
         </div>
         <div
           className={cn(
@@ -405,6 +405,15 @@ export function VideoCard({
             </span>
           )}
         </div>
+      </div>
+      <div className="flex min-w-0 items-center border-t border-zinc-800/60 px-2 py-1" onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
+        <VideoRatingControl
+          value={video.rating}
+          onChange={rateVideo}
+          className="gap-0"
+          starClassName="h-3.5 w-3.5"
+          buttonClassName="h-8 w-7 min-w-7 text-zinc-400 hover:text-[var(--rating)] sm:h-6 sm:w-6 sm:min-w-6"
+        />
       </div>
       {showCardInfo && (
         <div className={cn("space-y-1.5", size === "sm" ? "p-2" : "p-2.5")}>

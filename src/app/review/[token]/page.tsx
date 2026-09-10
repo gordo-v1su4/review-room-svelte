@@ -232,9 +232,9 @@ export default function ReviewPage({
 
   return (
     <div className="min-h-dvh bg-zinc-950 text-zinc-50">
-      <header className="border-b border-zinc-800 px-6 py-8">
+      <header className="border-b border-zinc-800 px-4 py-6 sm:px-6 sm:py-8">
         <p className="text-xs uppercase tracking-widest text-zinc-500">Review</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+        <h1 className="mt-2 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
           {project.title}
         </h1>
         {project.description && (
@@ -302,7 +302,7 @@ export default function ReviewPage({
         </div>
       </div>
       <div className="flex">
-        <div className="min-w-0 flex-1 p-6">
+        <div className="min-w-0 flex-1 p-4 sm:p-6">
           <VideoGrid
             videos={visibleVideos}
             selectedId={selectedId ?? undefined}
@@ -324,8 +324,9 @@ export default function ReviewPage({
             }
           />
         </div>
-        {selected && (
+        {selected && !previewImage && !previewVideo && (
           <VideoDetailsPanel
+            key={selected._id}
             video={selected}
             mode="client"
             token={token}

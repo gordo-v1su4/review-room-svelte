@@ -371,7 +371,7 @@ export function VideoPlayer({
             />
           </div>
         </div>
-        <div className="flex min-w-0 items-center gap-3 text-xs text-zinc-500">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-zinc-500 sm:gap-3">
           <button
             type="button"
             onClick={togglePlayback}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
+import styles from "./SignInLogo.module.css";
 
 const quickHoverGlitch = {
   playMode: "hover" as const,
@@ -10,10 +11,9 @@ const quickHoverGlitch = {
   slice: {
     count: 6,
     velocity: 15,
-    minHeight: 0.02,
-    maxHeight: 0.15,
+    minHeight: 0.03,
+    maxHeight: 0.2,
     hueRotate: false,
-    cssFilters: "drop-shadow(2px 0 0 #6eb5a8) drop-shadow(-2px 0 0 #6eb5a8)",
   },
 };
 
@@ -50,11 +50,11 @@ export function SignInLogo() {
   );
 
   return (
-    <div className="flex justify-center">
+    <div className={`${styles.logo} flex justify-center opacity-85`}>
       <div
         ref={onLogoRef}
         aria-hidden
-        className="h-12 w-[calc(3rem*809/484)] opacity-85 sm:h-[3.4rem] sm:w-[calc(3.4rem*809/484)]"
+        className="h-12 w-[calc(3rem*809/484)] sm:h-[3.4rem] sm:w-[calc(3.4rem*809/484)]"
         style={logoMaskStyle}
       />
     </div>

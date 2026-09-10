@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { VideoPlayer } from "./VideoPlayer";
 import { VideoRatingControl } from "./VideoRatingControl";
 import { VideoStatusControl } from "./VideoStatusControl";
+import { VideoInspectorPanel } from "./VideoInspectorPanel";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
 import type { VideoStatus } from "@/lib/types";
 
@@ -33,6 +34,8 @@ export function VideoReviewMode({
 }) {
   const [playbackMode, setPlaybackMode] = useState<"order" | "loop">("loop");
   const [continuePlayback, setContinuePlayback] = useState(false);
+  const [playhead, setPlayhead] = useState(0);
+  const [seekTo, setSeekTo] = useState<number | null>(null);
   const toggleSelect = useMutation(api.videos.toggleSelect);
   const setStatus = useMutation(api.videos.updateMetadata);
   const setRating = useMutation(api.videos.setRating);
@@ -52,11 +55,15 @@ export function VideoReviewMode({
   function navigate(delta: number) {
     const next = videos[(activeIndex + delta + videos.length) % videos.length];
     setContinuePlayback(false);
+    setSeekTo(null);
+    setPlayhead(0);
     onSelect(next._id);
   }
 
   function selectVideo(id: VideoDoc["_id"]) {
     setContinuePlayback(false);
+    setSeekTo(null);
+    setPlayhead(0);
     onSelect(id);
   }
 
@@ -64,14 +71,16 @@ export function VideoReviewMode({
     if (playbackMode !== "order" || videos.length < 2) return;
     const next = videos[(activeIndex + 1) % videos.length];
     setContinuePlayback(true);
+    setSeekTo(null);
+    setPlayhead(0);
     onSelect(next._id);
   }
 
   return (
-    <div className="space-y-5 p-4 sm:p-6 lg:p-8">
-      <div className="overflow-hidden rounded-lg border border-zinc-800/60 bg-zinc-900/30">
-        <div className="flex flex-col gap-3 border-b border-zinc-800/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+    <div className="h-full space-y-3 overflow-y-auto p-2.5 lg:h-auto lg:space-y-5 lg:overflow-visible lg:p-8">
+      <div className="mobile-review-player flex h-[calc(100%-1rem)] min-h-[16rem] flex-col overflow-hidden rounded-lg border border-zinc-800/60 bg-zinc-900/30 lg:block lg:h-auto">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-800/60 px-2 py-1 lg:px-4 lg:py-3">
+          <div className="hidden lg:block">
             <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">
               Playback
             </p>
@@ -83,7 +92,7 @@ export function VideoReviewMode({
                 : "Advancing through the strip below"}
             </p>
           </div>
-          <div className="grid grid-cols-2 rounded-lg border border-zinc-800 bg-zinc-950/70 p-1 sm:flex">
+          <div className="grid w-full grid-cols-2 rounded-lg bg-zinc-950/70 p-0.5 lg:flex lg:w-auto lg:border lg:border-zinc-800 lg:p-1">
             <button
               type="button"
               aria-pressed={playbackMode === "order"}
@@ -120,8 +129,9 @@ export function VideoReviewMode({
             </button>
           </div>
         </div>
-        <div className="relative bg-black">
+        <div className="relative min-h-0 flex-1 bg-black lg:h-[min(50dvh,36rem)]">
           <VideoPlayer
+            fitAvailable
             key={active._id}
             storageKey={active.storageKey}
             spriteKey={active.spriteKey}
@@ -134,11 +144,14 @@ export function VideoReviewMode({
             loop={playbackMode === "loop"}
             autoPlay={continuePlayback}
             onEnded={playNextInOrder}
+            onTimeUpdate={setPlayhead}
+            seekTo={seekTo}
           />
           {videos.length > 1 && (
             <>
               <button
                 type="button"
+                aria-label="Previous asset"
                 onClick={() => navigate(-1)}
                 className="absolute left-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-zinc-200 backdrop-blur transition hover:bg-black/70"
               >
@@ -146,6 +159,7 @@ export function VideoReviewMode({
               </button>
               <button
                 type="button"
+                aria-label="Next asset"
                 onClick={() => navigate(1)}
                 className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-zinc-200 backdrop-blur transition hover:bg-black/70"
               >
@@ -154,28 +168,29 @@ export function VideoReviewMode({
             </>
           )}
         </div>
-        <div className="grid gap-3 border-t border-zinc-800/60 px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:gap-4 sm:px-6">
-          <div className="min-w-[7.5rem] rounded-md border border-zinc-800/80 bg-zinc-950/70 px-2 py-1.5">
+        <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 border-t border-zinc-800/60 px-2.5 py-2 lg:flex lg:flex-wrap lg:gap-4 lg:px-6 lg:py-4">
+          <div className="min-w-[6rem] rounded-md border border-zinc-800/80 bg-zinc-950/70 px-2 py-1 lg:min-w-[7.5rem]">
             <VideoStatusControl
               status={active.status}
-              canEdit={canEdit}
-              includeAdminExtras
+              canEdit
+              includeAdminExtras={canEdit}
+              hideLabel
               onChange={(status: VideoStatus) =>
                 void setStatus({ videoId: active._id, status })
               }
             />
           </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="line-clamp-2 text-base font-medium text-zinc-100 sm:truncate sm:text-lg">
+          <div className="order-first min-w-0 flex-1 lg:order-none">
+            <h2 className="truncate text-xs font-medium text-zinc-100 lg:text-lg">
               {active.title}
             </h2>
-            <p className="text-[11px] text-zinc-600">
+            <p className="hidden break-words text-[11px] text-zinc-600 [overflow-wrap:anywhere] lg:block">
               {activeIndex + 1} / {videos.length} /{" "}
               {activeIsImage ? mediaKindLabel(active) : formatDuration(active.durationSec)} /{" "}
               {active.originalFilename}
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+          <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 lg:justify-start lg:gap-3">
             <VideoRatingControl
               value={active.rating}
               onChange={(rating) => void setRating({ videoId: active._id, rating })}
@@ -196,6 +211,10 @@ export function VideoReviewMode({
             </Button>
           </div>
         </div>
+      </div>
+
+      <div className="h-[28rem] overflow-hidden rounded-lg border border-zinc-800">
+        <VideoInspectorPanel key={active._id} video={active} mode="admin" canEdit canManageFeedback={canEdit} playhead={playhead} onSeek={setSeekTo} />
       </div>
 
       <div>

@@ -51,7 +51,7 @@
   --danger-muted: rgb(184 136 136 / 0.14);
   --selected: #8eb0c4;
   --approved: #8aa898;
-  --rating: #c4b488;
+  --rating: #d4ba70;
   --annotation: #b88888;
 
   /* Status-specific */
@@ -79,7 +79,7 @@ input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-text-fill-color: color-mix(in srgb, var(--brand-accent) 82%, white);
+  -webkit-text-fill-color: var(--foreground);
   caret-color: var(--brand-accent);
   box-shadow: 0 0 0 1000px #18181b inset;
   transition: background-color 9999s ease-out;
@@ -149,19 +149,141 @@ input:-webkit-autofill:active {
   border-radius: 999px;
 }
 
-@media (max-width: 1024px) {
-  .review-panel-drawer {
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    max-width: none;
-  }
-}
-
-@media (max-width: 640px) {
+@media (width < 640px) {
   .review-grid {
     grid-template-columns: 1fr !important;
   }
+
+  /* Keep the compact desktop chrome, with separate touch targets on phones. */
+  .asset-toolbar button:not(.view-switcher button) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+@media (width < 1024px) {
+  .mobile-project-shell {
+    background-image: radial-gradient(ellipse 34rem 16rem at 0 0,
+      color-mix(in srgb, var(--project-accent) 70%, white) 0%,
+      color-mix(in srgb, var(--project-accent) 65%, transparent) 24%,
+      transparent 75%);
+  }
+}
+
+/* In landscape, scroll past the header instead of squeezing the viewer to zero. */
+@media (height < 600px) and (width < 1024px) {
+  .project-workspace {
+    height: auto;
+    min-height: 100%;
+    flex-shrink: 0;
+    overflow: visible;
+  }
+  .workspace-content {
+    flex: none;
+    height: max(24rem, 80dvh);
+  }
+}
+
+[data-radix-popper-content-wrapper] > [data-side] {
+  max-height: var(--radix-popover-content-available-height);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (pointer: coarse) {
+  button, [role="button"], summary {
+    touch-action: manipulation;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  textarea {
+    font-size: 16px;
+  }
+
+  /* Hover-only actions also need to be discoverable on tablets. */
+  .group .opacity-0, .group .sm\:opacity-0 {
+    opacity: 1;
+  }
+}
+
+.mobile-navigation a, .mobile-navigation button {
+  min-height: 44px;
+}
+
+.mobile-navigation .opacity-0 {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+.menu-surface,
+[data-radix-popper-content-wrapper] > [data-side] {
+  background: rgb(9 9 11 / 0.8) !important;
+  backdrop-filter: blur(20px);
+  border-color: #202023 !important;
+  border-radius: 4px !important;
+  padding: 8px !important;
+}
+.menu-surface > button,
+.menu-surface > div > button {
+  border: 0;
+  border-radius: 4px;
+  min-height: 32px;
+  padding: 6px 10px;
+  margin-top: 2px;
+  margin-bottom: 0;
+}
+.menu-surface > p {
+  margin-top: 12px;
+  margin-bottom: 4px;
+  color: #a1a1aa;
+}
+.menu-surface .text-zinc-500 {
+  color: #a1a1aa;
+}
+.view-switcher button {
+  border: 0;
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+@keyframes mobile-nav-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes mobile-nav-out {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+@keyframes mobile-nav-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes mobile-nav-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.mobile-navigation[data-state="open"] {
+  animation: mobile-nav-in 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.mobile-navigation :is(.text-zinc-500, .text-zinc-600) {
+  color: #d4d4d8;
+}
+.mobile-navigation[data-state="closed"] {
+  animation: mobile-nav-out 200ms ease-in;
+}
+.mobile-navigation-overlay[data-state="open"] {
+  animation: mobile-nav-fade-in 280ms ease-out;
+}
+.mobile-navigation-overlay[data-state="closed"] {
+  animation: mobile-nav-fade-out 200ms ease-in;
 }
 
 [data-separator] {

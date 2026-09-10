@@ -50,7 +50,7 @@ export function FieldsVisibilityPopover({
           type="button"
           title={`Fields: ${visibleFields.length} visible`}
           className={cn(
-            "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-800",
+            "inline-flex h-8 min-h-11 min-w-11 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-800 sm:min-h-0 sm:min-w-0",
             iconOnly && "w-8 justify-center px-0",
           )}
         >
@@ -62,7 +62,7 @@ export function FieldsVisibilityPopover({
         <Popover.Content
           align="start"
           sideOffset={8}
-          className="z-50 w-64 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl"
+          className="menu-surface z-50 w-64 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl"
         >
           <div className="relative mb-2">
             <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />

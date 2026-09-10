@@ -84,9 +84,9 @@ export function VideoStatusControl({
         <Popover.Content
           align="start"
           side="bottom"
-          sideOffset={6}
+          sideOffset={8}
           collisionPadding={12}
-          className="z-50 w-48 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 shadow-2xl shadow-black/50"
+          className="menu-surface z-50 w-48 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 shadow-2xl shadow-black/50"
           onClick={(event) => event.stopPropagation()}
           onCloseAutoFocus={(event) => event.preventDefault()}
         >
@@ -150,17 +150,11 @@ function StatusMenuButton({
       onClick={() => onSelect(option)}
       className={cn(
         "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs",
-        active
-          ? "bg-zinc-800/90 text-zinc-100"
-          : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100",
+        STATUS_BADGE_CLASS[option],
+        !active && "!bg-transparent hover:opacity-80",
       )}
     >
-      <span
-        className={cn(
-          "inline-flex max-w-full truncate rounded-md px-1.5 py-0.5 text-[10px] font-medium",
-          STATUS_BADGE_CLASS[option],
-        )}
-      >
+      <span className="min-w-0 truncate">
         {videoStatusLabel(option)}
       </span>
       {active && <Check className="h-3.5 w-3.5 shrink-0 text-zinc-300" />}

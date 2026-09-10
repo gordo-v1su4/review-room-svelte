@@ -1,7 +1,7 @@
 "use client";
 
 import * as Popover from "@radix-ui/react-popover";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ArrowUpDown,
   Check,
@@ -31,6 +31,7 @@ import type { CardFieldId } from "@/lib/cardFields";
 import { FieldsVisibilityPopover } from "./FieldsVisibilityPopover";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { STATUS_BADGE_CLASS } from "@/lib/videoStatus";
 
 const SORTS: { id: SortKey; label: string }[] = [
   { id: "newest", label: "Newest" },
@@ -78,16 +79,16 @@ const ASSET_CLASS_OPTIONS: Array<{ id: AssetClass; label: string }> = [
 ];
 
 const toolbarShellClass =
-  "inline-flex h-8 shrink-0 items-center rounded-md border border-zinc-800 bg-zinc-900 p-0.5";
+  "inline-flex h-8 shrink-0 items-center rounded-sm bg-zinc-900 p-0.5";
 const toolbarActionClass =
-  "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100";
+  "inline-flex h-8 min-h-11 min-w-11 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100 sm:min-h-0 sm:min-w-0";
 
 function toolbarSegmentClass(active: boolean, iconOnly?: boolean) {
   return cn(
     "inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded px-2 text-[11px] font-medium transition",
     iconOnly ? "w-7 px-0" : "min-w-[3.25rem]",
     active
-      ? "bg-[var(--brand-accent-muted)] text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]/35"
+      ? "bg-[var(--brand-accent-muted)] text-zinc-100"
       : "text-zinc-500 hover:bg-zinc-800/70 hover:text-zinc-200",
   );
 }
@@ -143,17 +144,18 @@ export function ProjectFilters({
   onGroupBy?: (group: GroupByField) => void;
   onVisibleFieldsChange?: (visible: CardFieldId[], order: CardFieldId[]) => void;
 }) {
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const chromePadding = "px-4 sm:px-6 lg:px-8";
 
   return (
-    <div className="sticky top-14 z-20 w-full min-w-0 border-b border-zinc-800 bg-zinc-950 lg:top-0">
+    <div className="asset-toolbar relative z-20 w-full min-w-0 shrink-0 border-b border-zinc-800 bg-zinc-950">
       <div
         className={cn(
-          "flex h-11 w-full min-w-0 flex-nowrap items-center gap-1 overflow-hidden py-1.5",
+          "flex w-full min-w-0 flex-wrap items-center gap-2 py-2 sm:gap-1 sm:py-1.5",
           chromePadding,
         )}
       >
-        <div className={toolbarShellClass}>
+        <div className={cn(toolbarShellClass, "view-switcher !h-11 !w-full sm:!h-8 sm:!w-auto", layout === "review" && "!w-[calc(100%-3.25rem)]")}>
           {[
             { id: "grid", label: "Grid", icon: Grid3X3 },
             { id: "grouped", label: "Group", icon: Columns3 },
@@ -167,19 +169,26 @@ export function ProjectFilters({
                 type="button"
                 title={item.label}
                 aria-label={item.label}
+                aria-pressed={layout === item.id}
                 onClick={() => onLayout(item.id as WorkspaceLayout)}
                 className={cn(
                   toolbarSegmentClass(layout === item.id, true),
-                  "xl:w-auto xl:min-w-0 xl:px-2",
+                  "!h-10 flex-1 !w-auto sm:!h-7 sm:flex-none sm:!w-7 xl:!w-auto xl:min-w-0 xl:px-2",
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">{item.label}</span>
+                <span className="sm:hidden xl:inline">{item.label}</span>
               </button>
             );
           })}
         </div>
+        {layout === "review" && (
+          <button type="button" aria-label="Review tools" aria-expanded={mobileToolsOpen} onClick={() => setMobileToolsOpen((open) => !open)} className="grid h-11 w-11 place-items-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-400 sm:hidden">
+            <SlidersHorizontal className="h-4 w-4" />
+          </button>
+        )}
 
+        <div className={cn("flex w-full items-center gap-2 sm:contents", layout === "review" && !mobileToolsOpen && "hidden")}>
         <AppearancePopover
           gridSize={gridSize}
           aspectRatio={aspectRatio}
@@ -221,6 +230,7 @@ export function ProjectFilters({
           onFolderSort={onFolderSort}
         />
         {panelToggles}
+        </div>
       </div>
     </div>
   );
@@ -268,7 +278,7 @@ function AppearancePopover({
         <Popover.Content
           align="start"
           sideOffset={8}
-          className="z-50 w-[15.25rem] max-w-[calc(100vw-1rem)] rounded-lg border border-zinc-800 bg-zinc-950 p-2 text-zinc-200 shadow-2xl shadow-black/45"
+          className="menu-surface z-50 w-[15.25rem] max-w-[calc(100vw-1rem)] rounded-lg border border-zinc-800 bg-zinc-950 p-2 text-zinc-200 shadow-2xl shadow-black/45"
         >
           <div className="mb-1.5 border-b border-white/10 pb-1.5">
             <p className="text-[10px] font-medium leading-none text-zinc-400">
@@ -333,8 +343,8 @@ function AppearancePopover({
                 aria-checked={showCardInfo}
                 onClick={() => onShowCardInfo(!showCardInfo)}
                 className={cn(
-                  "ml-auto flex h-4 w-7 items-center rounded-full p-0.5 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-200/80",
-                  showCardInfo ? "bg-teal-400" : "bg-zinc-700/70",
+                  "ml-auto flex h-4 w-7 items-center rounded-full p-0.5 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]",
+                  showCardInfo ? "bg-[var(--brand-accent)]" : "bg-zinc-700/70",
                 )}
               >
                 <span
@@ -393,7 +403,7 @@ function SortPopover({
         <Popover.Content
           align="end"
           sideOffset={8}
-          className="z-50 w-48 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-zinc-200 shadow-2xl shadow-black/45"
+          className="menu-surface z-50 w-48 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-zinc-200 shadow-2xl shadow-black/45"
         >
           {SORTS.map((item) => (
             <button
@@ -401,10 +411,10 @@ function SortPopover({
               type="button"
               onClick={() => onSort(item.id)}
               className={cn(
-                "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-teal-300/80",
+                "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]",
                 sort === item.id
-                  ? "border border-teal-400/35 bg-teal-400/12 text-teal-100"
-                  : "border border-transparent text-zinc-400 hover:bg-teal-400/10 hover:text-teal-100",
+                  ? "bg-[var(--brand-accent-muted)] text-zinc-100"
+                  : "text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-100",
               )}
             >
               {item.label}
@@ -422,10 +432,10 @@ function SortPopover({
                   type="button"
                   onClick={() => onFolderSort(item.id)}
                   className={cn(
-                    "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-teal-300/80",
+                    "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]",
                     folderSort === item.id
-                      ? "border border-teal-400/35 bg-teal-400/12 text-teal-100"
-                      : "border border-transparent text-zinc-400 hover:bg-teal-400/10 hover:text-teal-100",
+                      ? "bg-[var(--brand-accent-muted)] text-zinc-100"
+                      : "text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-100",
                   )}
                 >
                   {item.label}
@@ -467,7 +477,7 @@ function SegmentGroup({
   return (
     <div
       className={cn(
-        "grid w-[5.35rem] justify-self-end gap-px rounded-md border border-zinc-800 bg-zinc-900 p-0.5",
+        "grid w-[5.35rem] justify-self-end gap-px rounded-sm bg-zinc-900 p-0.5",
         columns === 2 ? "grid-cols-2" : "grid-cols-3",
       )}
     >
@@ -497,9 +507,9 @@ function SegmentButton({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "inline-flex h-[18px] min-w-0 items-center justify-center gap-0.5 rounded-[4px] px-0.5 text-[9px] font-semibold leading-none text-zinc-300 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-200/80",
+        "inline-flex h-[18px] min-w-0 items-center justify-center gap-0.5 rounded-[4px] px-0.5 text-[9px] font-semibold leading-none text-zinc-300 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]",
         active
-          ? "bg-teal-400 text-zinc-950 shadow-sm ring-1 ring-teal-200/70"
+          ? "bg-[var(--brand-accent)] text-zinc-950"
           : "hover:bg-zinc-800 hover:text-zinc-100",
       )}
     >
@@ -566,7 +576,7 @@ function FilterPopover({
         <Popover.Content
           align="start"
           sideOffset={8}
-          className="z-50 w-52 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl"
+          className="menu-surface z-50 w-52 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl"
         >
           {STATUS_FILTER_OPTIONS.map((option) => {
             const active = filters.statuses.includes(option.id);
@@ -584,7 +594,8 @@ function FilterPopover({
                 }
                 className={cn(
                   "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs",
-                  active ? "bg-[var(--brand-accent-muted)] text-zinc-100" : "text-zinc-500",
+                  STATUS_BADGE_CLASS[option.id],
+                  !active && "!bg-transparent hover:brightness-125",
                 )}
               >
                 {option.label}
@@ -598,7 +609,7 @@ function FilterPopover({
               onFilters({ ...filters, selectedOnly: !filters.selectedOnly })
             }
             className={cn(
-              "mt-1 flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs",
+              "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs",
               filters.selectedOnly
                 ? "bg-[var(--brand-accent-muted)] text-zinc-100"
                 : "text-zinc-500",
@@ -687,7 +698,7 @@ function SearchIconPopover({
         <Popover.Content
           align="start"
           sideOffset={8}
-          className="z-50 w-56 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl"
+          className="menu-surface z-50 w-56 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl"
         >
           <Input
             autoFocus

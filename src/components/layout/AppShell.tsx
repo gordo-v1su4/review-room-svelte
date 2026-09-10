@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, type FormEvent } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -17,6 +18,7 @@ import {
   Inbox,
   Layers,
   LogOut,
+  Menu,
   Pencil,
   Plus,
   Settings,
@@ -32,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { projectRootLabel, moveMediaToRootLabel } from "@/lib/projectFolders";
 import { projectAccent, projectAccentStyle } from "@/lib/projectAccent";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const SIDEBAR_STORAGE_KEY = "review-room.sidebar.collapsed";
 
@@ -50,6 +53,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     : undefined;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarReady, setSidebarReady] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const desktop = useMediaQuery("(min-width: 1024px)");
+  useEffect(() => { setMobileNavOpen(false); }, [desktop, pathname]);
   const projects = useQuery(
     api.projects.listForAdmin,
     isAuthenticated && appUser && !isReview ? {} : "skip",
@@ -75,19 +81,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-dvh bg-[var(--background)] text-zinc-50">
+    <div className="flex h-dvh min-w-0 overflow-hidden bg-[var(--background)] text-zinc-50">
       {isAuthenticated && appUser && (
         <aside
           className={cn(
-            "hidden shrink-0 flex-col overflow-visible border-r border-zinc-800/70 bg-zinc-950 transition-[width] duration-200 lg:flex",
+            "hidden min-h-0 shrink-0 flex-col overflow-y-auto border-r border-zinc-800/70 bg-zinc-950 transition-[width] duration-200 lg:flex",
             sidebarCollapsed ? "w-14" : "w-60",
           )}
         >
+          <div className={cn("flex shrink-0 items-center border-b border-zinc-800/70", sidebarCollapsed ? "flex-col py-2" : "h-14 pr-2")}>
           <Link
             href="/dashboard"
             className={cn(
-              "flex h-14 items-center border-b border-zinc-800/70",
-              sidebarCollapsed ? "justify-center px-2" : "px-4",
+              "flex min-w-0 items-center",
+              sidebarCollapsed ? "h-8 justify-center px-2" : "flex-1 pl-4",
             )}
             title="Review Room"
           >
@@ -129,6 +136,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             </span>
           </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 text-zinc-500 hover:text-zinc-200"
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!sidebarCollapsed}
+            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+          >
+            {sidebarCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+          </Button>
+          </div>
 
           <nav className={cn("space-y-1 overflow-visible py-4", sidebarCollapsed ? "px-2" : "px-3")}>
             <SideLink
@@ -193,20 +212,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Suspense>
           )}
 
-          <div className={cn("mt-auto space-y-3 p-3", sidebarCollapsed && "px-2")}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-full text-zinc-500 hover:text-zinc-200"
-              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
-            >
-              {sidebarCollapsed ? (
-                <ChevronsRight className="h-4 w-4" />
-              ) : (
-                <ChevronsLeft className="h-4 w-4" />
-              )}
-            </Button>
+          <div className={cn("mt-auto flex shrink-0 flex-col gap-3 px-3 pt-5 pb-7", sidebarCollapsed && "px-2")}>
             {isAdmin && (
               <Link href="/dashboard/projects/new">
                 <Button
@@ -237,39 +243,51 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur lg:hidden">
-          <div className="flex min-h-14 items-center justify-between gap-3 px-3 py-2 sm:px-4">
-            <Link href="/dashboard" className="flex items-center gap-2 text-sm font-semibold leading-none">
-              <span className="relative aspect-[809/484] h-[0.95em] shrink-0">
-                <Image
-                  src="/logo-rr-light.png"
-                  alt=""
-                  fill
-                  unoptimized
-                  className="object-contain object-left opacity-80"
-                />
-              </span>
-              Review Room
-            </Link>
+      <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", workspaceProject && "mobile-project-shell")} style={workspaceProject ? projectAccentStyle(projectAccent(workspaceProject.brandColor)) : undefined}>
+        <header className={cn("relative z-40 shrink-0 lg:hidden", workspaceProject ? "text-zinc-950" : "bg-zinc-950/90")}>
+          <div className="flex h-12 items-center gap-2 px-2 sm:px-4">
             {isAuthenticated && appUser && (
-              <div className="flex min-w-0 items-center gap-1.5">
-                {isAdmin && (
-                  <Button size="sm" className="h-8 gap-1.5 px-2.5" asChild>
-                    <Link href="/dashboard/projects/new">
-                      <Plus className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">New</span>
-                    </Link>
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2.5 text-zinc-500"
-                  onClick={() => void signOut()}
-                >
-                  Sign out
-                </Button>
+              <div className="order-first flex shrink-0 items-center">
+                <Dialog.Root open={mobileNavOpen && !desktop} onOpenChange={setMobileNavOpen}>
+                  <Dialog.Trigger asChild>
+                    <Button variant="ghost" size="icon" aria-label="Open navigation" className={cn("h-11 w-11", workspaceProject && "text-zinc-950 hover:bg-black/10")}>
+                      <Menu className="h-5 w-5" />
+                    </Button>
+                  </Dialog.Trigger>
+                  <Dialog.Portal>
+                    <Dialog.Overlay className="mobile-navigation-overlay fixed inset-0 z-50 bg-black/25" />
+                    <Dialog.Content aria-describedby={undefined} className="mobile-navigation fixed inset-y-0 left-0 z-[60] flex w-[min(22rem,90vw)] flex-col border-r border-zinc-800/40 bg-zinc-950/80 backdrop-blur-xl text-zinc-50 shadow-2xl outline-none">
+                      <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 p-3">
+                        <Dialog.Title className="sr-only">Review Room navigation</Dialog.Title>
+                        <Link href="/dashboard" aria-label="Review Room home" onClick={() => setMobileNavOpen(false)} className="flex h-11 items-center px-2">
+                          <Image src="/logo-rr-light.png" alt="" width={40} height={24} unoptimized className="h-6 w-auto opacity-85" />
+                        </Link>
+                        <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close navigation" className="h-11 w-11"><X className="h-5 w-5" /></Button></Dialog.Close>
+                      </div>
+                      <div className="min-h-0 flex-1 overflow-y-auto pb-6" onClick={(event) => {
+                        if ((event.target as HTMLElement).closest("a")) setMobileNavOpen(false);
+                      }}>
+                        <nav aria-label="Main navigation" className="space-y-1 p-3">
+                          <SideLink href="/dashboard" label="Projects" icon={<Folder className="h-4 w-4" />} active={pathname === "/dashboard"} count={projects?.length} />
+                          <SideLink href="/dashboard/inbox" label="Inbox" icon={<Inbox className="h-4 w-4" />} active={pathname === "/dashboard/inbox"} />
+                          <NotificationBell />
+                        </nav>
+                        <div className="space-y-1 px-3">
+                          <p className="px-2 py-2 text-xs text-zinc-500">Projects</p>
+                          {(projects ?? []).map((project) => <RecentProjectLink key={project._id} href={`/dashboard/projects/${project._id}`} title={project.title} brandColor={project.brandColor} active={workspaceProjectId === project._id} />)}
+                        </div>
+                        {workspaceProjectId && <Suspense fallback={null}>
+                          <WorkspaceSidebarFolders projectId={workspaceProjectId} projectTitle={workspaceProject?.title} brandColor={workspaceProject?.brandColor} canEdit={isAdmin} />
+                          <WorkspaceSidebarCollections projectId={workspaceProjectId} canEdit={isAdmin} />
+                        </Suspense>}
+                      </div>
+                      <div className="flex shrink-0 flex-col gap-3 border-t border-zinc-800 px-4 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+                        {isAdmin && <Button asChild variant="secondary" className="h-11 w-full" onClick={() => setMobileNavOpen(false)}><Link href="/dashboard/projects/new"><Plus className="mr-2 h-4 w-4" />New project</Link></Button>}
+                        <Button variant="ghost" className="h-11 w-full" onClick={() => void signOut()}><LogOut className="mr-2 h-4 w-4" />Sign out</Button>
+                      </div>
+                    </Dialog.Content>
+                  </Dialog.Portal>
+                </Dialog.Root>
               </div>
             )}
           </div>
@@ -278,7 +296,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           className={cn(
             "min-w-0 flex-1",
             isWorkspace
-              ? "flex min-h-0 flex-col overflow-hidden"
+              ? "flex min-h-0 flex-col overflow-y-auto lg:overflow-hidden"
               : "overflow-y-auto mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8",
           )}
         >

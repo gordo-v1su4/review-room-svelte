@@ -58,7 +58,7 @@ function ToggleButton({
       className={cn(
         "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-medium shadow-sm transition",
         active
-          ? "border-[var(--brand-accent)]/35 bg-[var(--brand-accent-muted)] text-[var(--brand-accent)]"
+          ? "border-transparent bg-[var(--brand-accent-muted)] text-zinc-100"
           : "border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100",
       )}
     >

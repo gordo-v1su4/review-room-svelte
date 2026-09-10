@@ -27,10 +27,11 @@ export function VideoRatingControl({
           disabled={disabled}
           onClick={() => onChange(n === value ? 0 : n)}
           className={cn(
-            "rounded p-0.5 text-zinc-500 hover:text-zinc-200 disabled:opacity-40",
+            "grid min-h-8 min-w-8 place-items-center rounded p-0.5 text-zinc-500 hover:text-zinc-200 disabled:opacity-40 sm:min-h-0 sm:min-w-0",
             buttonClassName,
           )}
           aria-label={`Rate ${n}`}
+          aria-pressed={n === value}
         >
           <Star
             className={cn(

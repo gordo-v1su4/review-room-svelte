@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
 import { VideoPlayer } from "./VideoPlayer";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   nativeMediaAspect,
   videoLightboxStyle,
@@ -22,6 +23,7 @@ export function VideoLightbox({
   token?: string;
   onClose: () => void;
 }) {
+  const desktop = useMediaQuery("(min-width: 1024px)");
   const open = Boolean(video);
   const previewStyle = videoLightboxStyle(
     nativeMediaAspect(video?.width, video?.height),
@@ -45,8 +47,8 @@ export function VideoLightbox({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-[90] grid -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-white/10 bg-zinc-950/95 text-zinc-50 shadow-2xl shadow-black/70 outline-none"
-          style={previewStyle}
+          className="fixed left-1/2 top-1/2 z-[90] grid h-dvh w-screen grid-rows-[auto_minmax(0,1fr)] -translate-x-1/2 -translate-y-1/2 overflow-hidden border border-white/10 bg-zinc-950 text-zinc-50 shadow-2xl shadow-black/70 outline-none lg:h-[75dvh] lg:rounded-xl"
+          style={desktop ? { ...previewStyle, minWidth: "min(22rem,75vw)" } : undefined}
         >
           <div className="flex min-w-0 items-center justify-between gap-4 border-b border-white/10 bg-black/25 px-4 py-3 sm:px-5">
             <div className="min-w-0">
@@ -65,6 +67,7 @@ export function VideoLightbox({
           <div className="min-h-0 p-3 sm:p-5">
             {video ? (
               <VideoPlayer
+                fitAvailable
                 key={video._id}
                 storageKey={video.storageKey}
                 spriteKey={video.spriteKey}

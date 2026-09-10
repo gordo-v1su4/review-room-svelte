@@ -142,7 +142,20 @@ States to specify across components: hover · selected · focus · disabled · u
 
 ## 15. Responsive intent
 
-Desktop-first, degrade gracefully — don't make mobile impossible. Preview and expanded playback sizes derive from the current browser viewport rather than a fixed video width or height. **Tablet:** fewer grid columns; panel becomes an overlay drawer. **Mobile:** cards stack, viewer goes fullscreen, filters collapse to a menu, comments sit below the video.
+Use the same routes and functionality on desktop, tablet, and phone; no separate mobile site. Preserve the calm desktop visual system while changing the arrangement to fit the available space.
+
+Workspace menus share a dark 80% opaque blurred surface, a subtle outer border, and small corner radii. Options use flat fills without individual outlines, consistent row heights and gaps, and white text over muted brand teal for selected non-status options. Status choices use the same semantic colors as media status badges. Appearance switches use the Upload CTA's brand teal; the layout switcher is a single segmented surface without outlined segments. Review-link readiness uses a distinct green indicator.
+
+The mobile project gradient continues behind the menu button, without a separate brand label or bottom header divider. The navigation drawer slides in from the left with an 80% opaque blurred background and an RR-only logo at its top left. Desktop collapse controls sit beside the branding; account actions have bottom breathing room on both layouts. Sign-in forms stay narrow on desktop and phone; the white RR logo uses varied grayscale glitch slices on hover.
+
+On phones, Review mode tucks secondary tools behind a toggle and sizes the player and primary controls to the remaining viewport. Comments and nearby media follow below. Card ratings occupy their own row to avoid overlapping thumbnail actions.
+
+- **Navigation:** below 1024px, a labelled menu opens a focus-managed drawer with Projects, Inbox, notifications, project folders, collections, and account actions. Folder management and new-project controls retain their existing role restrictions. Selecting a destination closes the drawer.
+- **Project header and toolbar:** the project title keeps its own space; actions move to a separate row on phones. Below 640px, Grid / Group / Table / Review form a full-width switcher, with appearance, fields, filters, search, and sort on a second row. Controls wrap instead of clipping. Popovers scroll within the available viewport height.
+- **Media browsing:** grid tracks respond to the available pane width, including when a desktop inspector is open. Small screens use larger rating targets and expose thumbnail actions without hover. Table columns retain readable widths inside a labelled horizontal scroll region rather than squeezing into unreadable columns.
+- **Review:** desktop retains resizable panes. Below 1024px, Review mode uses a stacked player, review controls, comments/fields, and nearby-media strip. Selecting a card opens a fullscreen phone dialog or tablet side drawer, with comments below a viewport-bounded player. The dialog supports Escape, focus containment, and an explicit close button; desktop panel visibility preferences never suppress mobile review access.
+- **Previews:** video previews fill the phone/tablet viewport with aspect-preserving media and visible playback controls; desktop retains the centered viewport-bounded preview. Image markup controls wrap below the title on smaller screens, and the image fits the space remaining below them.
+- **Short landscape screens:** the workspace can scroll past its header, keeping a usable media area instead of collapsing the content height. Safe-area padding protects the bottom of mobile drawers. Reduced-motion settings suppress nonessential transitions; touch-device text inputs use a readable size without focus zoom.
 
 > Measurements (card widths, panel width, paddings, header height, grid density) are the designer's to set — pick what serves the density and calm the brief calls for. No fixed pixel values are prescribed here.
 

@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { AssetFieldsPanel } from "./AssetFieldsPanel";
 import { useMutation, useQuery } from "convex/react";
 import { X, CheckCircle2, MessageSquare } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -38,6 +41,8 @@ export function VideoDetailsPanel({
   onEnded?: () => void;
   canManageFeedback?: boolean;
 }) {
+  const desktop = useMediaQuery("(min-width: 1024px)");
+  const returnFocus = useRef<HTMLElement | null>(null);
   const [seekTo, setSeekTo] = useState<number | null>(null);
   const [playhead, setPlayhead] = useState(0);
   const isImage = isImageAsset(video);
@@ -62,6 +67,10 @@ export function VideoDetailsPanel({
   const toggleReaction = useMutation(api.comments.toggleReaction);
   const toggleCommentComplete = useMutation(api.comments.toggleComplete);
   const acknowledgeFeedback = useMutation(api.videos.acknowledgeFeedback);
+  const setRatingAdmin = useMutation(api.videos.setRating);
+  const setRatingClient = useMutation(api.reviewPublic.clientSetRating);
+  const toggleSelectAdmin = useMutation(api.videos.toggleSelect);
+  const toggleSelectClient = useMutation(api.reviewPublic.clientToggleSelect);
 
   const handleFirstPlay = () => {
     if (!video.viewed) {
@@ -73,31 +82,33 @@ export function VideoDetailsPanel({
     }
   };
 
-  return (
+  const panel = (
     <aside
-      className="review-panel-drawer fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] w-full flex-col rounded-t-xl border-t border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/60 lg:sticky lg:top-[3.25rem] lg:z-auto lg:h-[calc(100dvh-3.25rem)] lg:max-h-none lg:w-[420px] lg:max-w-md lg:self-start lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none"
+      className="flex h-full min-h-0 w-full shrink-0 flex-col bg-zinc-950 lg:w-[min(420px,40vw)] lg:border-l lg:border-zinc-800"
+      style={desktop && mode === "client" ? { position: "sticky", top: 0, height: "100dvh" } : undefined}
     >
       <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-        <h2 className="truncate text-sm font-medium">{video.title}</h2>
-        <div className="flex gap-1">
+        <h2 className="min-w-0 truncate text-sm font-medium">{video.title}</h2>
+        <div className="flex shrink-0 gap-1">
           {onExpand && (
             <Button
               variant="ghost"
               size="sm"
-              className="hidden lg:inline-flex"
+              className="inline-flex"
               onClick={onExpand}
             >
               Expand
             </Button>
           )}
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" aria-label="Close video details" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
       </div>
-      <div className="flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
-        <div onMouseEnter={handleFirstPlay}>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-4">
+        <div className="h-[min(45dvh,28rem)]" onMouseEnter={handleFirstPlay}>
           <VideoPlayer
+            fitAvailable
             storageKey={video.storageKey}
             spriteKey={video.spriteKey}
             posterKey={video.thumbnailKey}
@@ -205,7 +216,36 @@ export function VideoDetailsPanel({
             void toggleCommentComplete({ commentId })
           }
         />
+        <details className="rounded-lg border border-zinc-800">
+          <summary className="cursor-pointer px-3 py-3 text-sm text-zinc-300">Fields, rating & shortlist</summary>
+          <div className="h-80">
+            <AssetFieldsPanel video={video} canEdit onRatingChange={(rating) => {
+              if (mode === "client" && token) void setRatingClient({ token, videoId: video._id, rating });
+              else void setRatingAdmin({ videoId: video._id, rating });
+            }} onShortlistChange={() => {
+              if (mode === "client" && token) void toggleSelectClient({ token, videoId: video._id });
+              else void toggleSelectAdmin({ videoId: video._id });
+            }} />
+          </div>
+        </details>
       </div>
     </aside>
+  );
+  if (desktop) return panel;
+  return (
+    <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/65" />
+        <Dialog.Content aria-describedby={undefined} onOpenAutoFocus={() => {
+          returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        }} onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          returnFocus.current?.focus({ preventScroll: true });
+        }} className="fixed inset-0 z-50 h-dvh overflow-hidden bg-zinc-950 outline-none sm:inset-x-auto sm:right-0 sm:w-[min(32rem,100vw)]">
+          <Dialog.Title className="sr-only">Review {video.title}</Dialog.Title>
+          {panel}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
