@@ -3,11 +3,12 @@ import { SignInLogo } from "@/components/auth/SignInLogo";
 
 export default function SignInPage() {
   return (
-    <div className="rr-blueprint relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-4 py-10 sm:px-6">
+    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[var(--background)] px-4 py-10 sm:px-6">
+      <div aria-hidden className="rr-blueprint pointer-events-none absolute inset-0 z-0" />
       {/* Ambient glow */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-0 z-0"
         style={{
           background:
             "radial-gradient(46rem 26rem at 50% -10rem, rgb(94 196 180 / 0.07), transparent 65%)",
@@ -28,7 +29,7 @@ export default function SignInPage() {
         v0.1.0
       </div>
 
-      <div className="relative mx-auto flex w-full max-w-xl flex-col gap-9">
+      <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col gap-9">
         <h1 className="sr-only">Review Room</h1>
         <div className="flex flex-col items-center gap-4">
           <SignInLogo />
