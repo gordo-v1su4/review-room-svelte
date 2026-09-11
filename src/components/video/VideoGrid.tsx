@@ -64,9 +64,13 @@ export function VideoGrid({
       style={assetGridStyle(size)}
     >
       {leadingItems}
-      {videos.map((video) => (
-        <VideoCard
+      {videos.map((video, index) => (
+        <div
           key={video._id}
+          className="rr-grid"
+          style={{ animationDelay: `${Math.min(index, 11) * 28}ms` }}
+        >
+        <VideoCard
           video={video}
           size={size}
           aspectRatio={aspectRatio}
@@ -91,6 +95,7 @@ export function VideoGrid({
             onOpenVideoPreview ? () => onOpenVideoPreview(video) : undefined
           }
         />
+        </div>
       ))}
     </div>
   );

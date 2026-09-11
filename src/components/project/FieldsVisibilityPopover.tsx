@@ -13,11 +13,12 @@ import { cn } from "@/lib/utils";
 export function FieldsVisibilityPopover({
   visibleFields,
   fieldOrder,
-  iconOnly = false,
+  iconOnly,
   onChange,
 }: {
   visibleFields: CardFieldId[];
   fieldOrder: CardFieldId[];
+  /** Force icon-only layout; omit for responsive labels at lg+. */
   iconOnly?: boolean;
   onChange: (visible: CardFieldId[], order: CardFieldId[]) => void;
 }) {
@@ -49,20 +50,27 @@ export function FieldsVisibilityPopover({
         <button
           type="button"
           title={`Fields: ${visibleFields.length} visible`}
+          aria-label={`Fields: ${visibleFields.length} visible`}
           className={cn(
-            "inline-flex h-8 min-h-11 min-w-11 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-800 sm:min-h-0 sm:min-w-0",
-            iconOnly && "w-8 justify-center px-0",
+            "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-800",
+            iconOnly
+              ? "w-8 justify-center px-0"
+              : "max-lg:w-8 max-lg:justify-center max-lg:px-0",
           )}
         >
           <ListTree className="h-3.5 w-3.5" />
-          {!iconOnly && `Fields: ${visibleFields.length}`}
+          {!iconOnly && (
+            <span className="hidden lg:inline">
+              Fields: {visibleFields.length}
+            </span>
+          )}
         </button>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
           align="start"
           sideOffset={8}
-          className="menu-surface z-50 w-64 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl"
+          className="rr-popover z-50 w-64 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d0d0f] p-2"
         >
           <div className="relative mb-2">
             <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />

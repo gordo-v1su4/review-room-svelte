@@ -39,10 +39,8 @@ export function AssetBrowserToolbar(props: {
   onGroupBy: (group: GroupByField) => void;
   onVisibleFieldsChange: (visible: CardFieldId[], order: CardFieldId[]) => void;
   panelToggles?: React.ReactNode;
+  canUploadMedia?: boolean;
+  uploadHref?: string;
 }) {
-  return (
-    <div className="w-full min-w-0">
-      <ProjectFilters {...props} />
-    </div>
-  );
+  return <ProjectFilters {...props} />;
 }

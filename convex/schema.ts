@@ -38,10 +38,20 @@ const reviewAppearance = v.object({
   showCardInfo: v.boolean(),
 });
 
+const annotationTool = v.optional(
+  v.union(
+    v.literal("pen"),
+    v.literal("arrow"),
+    v.literal("rect"),
+    v.literal("circle"),
+  ),
+);
+
 const annotationStroke = v.object({
   id: v.string(),
   color: v.string(),
   width: v.number(),
+  tool: annotationTool,
   points: v.array(
     v.object({
       x: v.number(),

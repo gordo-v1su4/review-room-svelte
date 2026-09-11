@@ -364,14 +364,14 @@ export function VideoPlayer({
             className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-zinc-800"
           >
             <div
-              className="h-full rounded-full bg-teal-400 shadow-[0_0_14px_rgba(45,212,191,0.35)]"
+              className="h-full rounded-full bg-teal-400 shadow-[0_0_14px_rgba(110,181,168,0.4)]"
               style={{
                 width: `${(currentTime / (duration || 1)) * 100}%`,
               }}
             />
           </div>
         </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-zinc-500 sm:gap-3">
+        <div className="flex min-w-0 items-center gap-3 text-xs text-zinc-500">
           <button
             type="button"
             onClick={togglePlayback}

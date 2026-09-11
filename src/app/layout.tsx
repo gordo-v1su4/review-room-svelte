@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { ConvexClientProvider } from "@/components/providers/ConvexClientProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import "./globals.css";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
+const jbMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jbmono",
+});
 
 export const metadata: Metadata = {
   title: "Review Room",
@@ -17,7 +24,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${geist.variable} antialiased`}>
+      <body
+        className={`${inter.variable} ${jbMono.variable} font-sans tracking-[-0.011em] antialiased`}
+      >
         <ConvexClientProvider>
           <AppShell>{children}</AppShell>
           <Toaster theme="dark" position="bottom-right" />

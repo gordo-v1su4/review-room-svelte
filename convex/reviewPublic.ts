@@ -3,10 +3,20 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 
+const annotationToolValidator = v.optional(
+  v.union(
+    v.literal("pen"),
+    v.literal("arrow"),
+    v.literal("rect"),
+    v.literal("circle"),
+  ),
+);
+
 const annotationStrokeValidator = v.object({
   id: v.string(),
   color: v.string(),
   width: v.number(),
+  tool: annotationToolValidator,
   points: v.array(
     v.object({
       x: v.number(),
@@ -222,26 +232,35 @@ export const clientApprove = mutation({
   },
 });
 
+const ANNOTATION_TOOLS = new Set(["pen", "arrow", "rect", "circle"]);
+
 function normalizeStrokes(strokes: Array<{
   id: string;
   color: string;
   width: number;
+  tool?: string;
   points: Array<{ x: number; y: number }>;
 }>) {
   return strokes
     .slice(0, 120)
-    .map((stroke) => ({
-      id: stroke.id.slice(0, 80),
-      color: /^#[0-9a-fA-F]{6}$/.test(stroke.color) ? stroke.color : "#ef4444",
-      width: Math.max(2, Math.min(18, Math.round(stroke.width))),
-      points: stroke.points
+    .map((stroke) => {
+      const tool =
+        stroke.tool && ANNOTATION_TOOLS.has(stroke.tool) ? stroke.tool : "pen";
+      const points = stroke.points
         .slice(0, 1500)
         .map((point) => ({
           x: Math.max(0, Math.min(1, point.x)),
           y: Math.max(0, Math.min(1, point.y)),
         }))
-        .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
-    }))
+        .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+      return {
+        id: stroke.id.slice(0, 80),
+        color: /^#[0-9a-fA-F]{6}$/.test(stroke.color) ? stroke.color : "#ef4444",
+        width: Math.max(2, Math.min(18, Math.round(stroke.width))),
+        tool: tool as "pen" | "arrow" | "rect" | "circle",
+        points,
+      };
+    })
     .filter((stroke) => stroke.points.length > 1);
 }
 

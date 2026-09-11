@@ -234,7 +234,7 @@ export function FolderTile({
         onDrop(videoId);
       }}
       className={cn(
-        "group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border bg-zinc-900/80 text-left transition-all",
+        "group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border bg-zinc-900/80 text-left transition-[border-color,background-color,box-shadow]",
         dragActive
           ? "border-[var(--project-accent)] ring-1 ring-[var(--project-accent-ring)]"
           : active
@@ -275,7 +275,7 @@ export function FolderTile({
       )}
       {removing && onRemove && (
         <div
-          className="absolute right-2 top-11 z-20 w-44 rounded-md border border-zinc-800 bg-zinc-950 p-1 shadow-2xl shadow-black/50"
+          className="rr-popover absolute right-2 top-11 z-20 w-44 rounded-xl border border-white/[0.08] bg-[#0d0d0f] p-1"
           onClick={(event) => event.stopPropagation()}
         >
           <button

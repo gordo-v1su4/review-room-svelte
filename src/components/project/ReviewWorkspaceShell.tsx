@@ -24,6 +24,7 @@ export function ReviewWorkspaceShell({
   inspector,
   viewerOpen,
   infoOpen,
+  preferredLayout,
   className,
 }: {
   projectId: Id<"projects">;
@@ -32,11 +33,14 @@ export function ReviewWorkspaceShell({
   inspector: ReactNode;
   viewerOpen: boolean;
   infoOpen: boolean;
+  preferredLayout: Layout;
   className?: string;
 }) {
-  const [layout, setLayout] = useState<Layout>(
-    () => loadWorkspacePanelState(projectId).layout,
+  const [layout, setLayout] = useState<Layout>(() =>
+    layoutForVisible(preferredLayout, viewerOpen, infoOpen),
   );
+  const visibleLayout = layoutForVisible(preferredLayout, viewerOpen, infoOpen);
+  const layoutKey = JSON.stringify(visibleLayout);
 
   function persist(next: Partial<WorkspacePanelState>) {
     const current = loadWorkspacePanelState(projectId);
@@ -51,10 +55,11 @@ export function ReviewWorkspaceShell({
 
   return (
     <Group
+      key={layoutKey}
       id={`workspace-${projectId}`}
       orientation="horizontal"
       className={cn("hidden min-h-0 flex-1 lg:flex", className)}
-      defaultLayout={layoutForVisible(layout, viewerOpen, infoOpen)}
+      defaultLayout={visibleLayout}
       onLayoutChanged={(nextLayout, meta) => {
         const merged: Layout = {
           ...layout,
@@ -80,7 +85,7 @@ export function ReviewWorkspaceShell({
       {viewerOpen && (
         <>
           <WorkspaceResizeHandle />
-          <Panel id="viewer" minSize={`${MIN_VIEWER}%`} maxSize="58%">
+          <Panel id="viewer" minSize={`${MIN_VIEWER}%`} maxSize="68%">
             <div className="flex h-full min-w-0 flex-col overflow-hidden border-x border-zinc-800/60 bg-zinc-950">
               {viewer}
             </div>

@@ -18,6 +18,7 @@ import type {
   WorkspaceAppearance,
 } from "@/lib/types";
 import { isImageAsset } from "@/lib/media";
+import { isEditableTarget, stepInList } from "@/lib/mediaNavigation";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_APPEARANCE: WorkspaceAppearance = {
@@ -114,6 +115,57 @@ export default function ReviewPage({
     ? shortlisted.findIndex((video) => video._id === selected._id)
     : -1;
 
+  // ←/→ cycles media: the open lightbox first, otherwise the grid selection.
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isEditableTarget(event.target)) return;
+      const direction = event.key === "ArrowRight" ? 1 : -1;
+      const ids = visibleVideos.map((video) => video._id);
+      if (!ids.length) return;
+      if (previewVideoId) {
+        const next = stepInList(ids, previewVideoId, direction);
+        if (next && next !== previewVideoId) {
+          event.preventDefault();
+          setPreviewVideoId(next);
+        }
+        return;
+      }
+      if (previewImageId) {
+        const next = stepInList(ids, previewImageId, direction);
+        if (next && next !== previewImageId) {
+          event.preventDefault();
+          setPreviewImageId(next);
+        }
+        return;
+      }
+      const next = stepInList(ids, selectedId, direction);
+      if (next && next !== selectedId) {
+        event.preventDefault();
+        setSelectedId(next);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [previewImageId, previewVideoId, selectedId, visibleVideos]);
+
+  const previewIds = visibleVideos.map((video) => video._id);
+  const activePreviewId = previewVideoId ?? previewImageId;
+  const activePreviewIndex = activePreviewId
+    ? previewIds.indexOf(activePreviewId)
+    : -1;
+  const hasPrevPreview = activePreviewIndex > 0;
+  const hasNextPreview =
+    activePreviewIndex !== -1 && activePreviewIndex < previewIds.length - 1;
+
+  function stepPreview(direction: 1 | -1) {
+    const next = stepInList(previewIds, activePreviewId, direction);
+    if (!next || next === activePreviewId) return;
+    if (previewVideoId) setPreviewVideoId(next);
+    else if (previewImageId) setPreviewImageId(next);
+  }
+
   useEffect(() => {
     if (!showShortlist) return;
     if (!shortlisted.length) {
@@ -178,7 +230,7 @@ export default function ReviewPage({
   if (!unlocked && data.link.passcodeHash) {
     return (
       <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 px-6">
-        <h1 className="text-xl font-semibold">{project.title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{project.title}</h1>
         <p className="text-sm text-zinc-400">Enter the passcode to continue.</p>
         <Input
           type="password"
@@ -210,7 +262,7 @@ export default function ReviewPage({
   if (!savedName && !nameSubmitted) {
     return (
       <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 px-6">
-        <h1 className="text-xl font-semibold">{project.title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{project.title}</h1>
         <p className="text-sm text-zinc-400">Your name appears on comments.</p>
         <Input
           value={name}
@@ -232,16 +284,35 @@ export default function ReviewPage({
 
   return (
     <div className="min-h-dvh bg-zinc-950 text-zinc-50">
-      <header className="border-b border-zinc-800 px-4 py-6 sm:px-6 sm:py-8">
-        <p className="text-xs uppercase tracking-widest text-zinc-500">Review</p>
-        <h1 className="mt-2 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
-          {project.title}
-        </h1>
-        {project.description && (
-          <p className="mt-3 max-w-2xl text-sm text-zinc-400">
-            {project.description}
-          </p>
-        )}
+      <header className="relative overflow-hidden border-b border-zinc-800">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(44rem 18rem at 10% -8rem, rgb(110 181 168 / 0.07), transparent 65%)",
+          }}
+        />
+        <div className="rr-blueprint pointer-events-none absolute inset-0" aria-hidden />
+        <div className="rr-ruler relative" aria-hidden />
+        <div className="rr-frame relative px-6 pt-5 pb-8">
+          <div className="flex items-center justify-between gap-3">
+            <p className="rr-eyebrow" style={{ color: "var(--brand-accent)" }}>
+              Review room — Client portal
+            </p>
+            <p className="rr-readout text-[10px] tracking-[0.14em] text-zinc-600 uppercase">
+              {String(videos.length).padStart(2, "0")} clips
+            </p>
+          </div>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+            {project.title}
+          </h1>
+          {project.description && (
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
+              {project.description}
+            </p>
+          )}
+        </div>
       </header>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-900 px-4 py-3 sm:px-6">
         <div className="flex flex-wrap items-center gap-2">
@@ -249,33 +320,34 @@ export default function ReviewPage({
             type="button"
             onClick={() => setShowShortlist(false)}
             className={cn(
-              "h-8 rounded-md border px-3 text-xs font-medium transition",
+              "h-8 rounded-md border px-3 font-mono text-[10px] font-medium tracking-[0.12em] uppercase transition",
               !showShortlist
                 ? "border-teal-400/50 bg-teal-400/15 text-teal-200"
                 : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-zinc-200",
             )}
           >
-            All {videos.length}
+            All {String(videos.length).padStart(2, "0")}
           </button>
           <button
             type="button"
             onClick={() => setShowShortlist(true)}
             disabled={!shortlisted.length}
             className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-45",
+              "inline-flex h-8 items-center gap-1.5 rounded-md border px-3 font-mono text-[10px] font-medium tracking-[0.12em] uppercase transition disabled:cursor-not-allowed disabled:opacity-45",
               showShortlist
                 ? "border-sky-300/50 bg-sky-400/15 text-sky-200"
                 : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-zinc-200",
             )}
           >
             <Bookmark className="h-3.5 w-3.5" />
-            Shortlist {shortlisted.length}
+            Shortlist {String(shortlisted.length).padStart(2, "0")}
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {previewMode && selected && previewIndex >= 0 && (
-            <span className="text-xs text-zinc-500">
-              Previewing {previewIndex + 1}/{shortlisted.length}
+            <span className="rr-readout text-[11px] tracking-[0.1em] text-zinc-500 uppercase">
+              Preview {String(previewIndex + 1).padStart(2, "0")}/
+              {String(shortlisted.length).padStart(2, "0")}
             </span>
           )}
           <Button
@@ -302,7 +374,7 @@ export default function ReviewPage({
         </div>
       </div>
       <div className="flex">
-        <div className="min-w-0 flex-1 p-4 sm:p-6">
+        <div className="min-w-0 flex-1 p-6">
           <VideoGrid
             videos={visibleVideos}
             selectedId={selectedId ?? undefined}
@@ -324,9 +396,8 @@ export default function ReviewPage({
             }
           />
         </div>
-        {selected && !previewImage && !previewVideo && (
+        {selected && (
           <VideoDetailsPanel
-            key={selected._id}
             video={selected}
             mode="client"
             token={token}
@@ -349,12 +420,20 @@ export default function ReviewPage({
         canDownload={Boolean(
           data?.link.canDownload && previewImage?.downloadEnabled,
         )}
+        hasPrev={hasPrevPreview}
+        hasNext={hasNextPreview}
+        onPrev={() => stepPreview(-1)}
+        onNext={() => stepPreview(1)}
         onClose={() => setPreviewImageId(null)}
       />
       <VideoLightbox
         video={previewVideo}
         mode="client"
         token={token}
+        hasPrev={hasPrevPreview}
+        hasNext={hasNextPreview}
+        onPrev={() => stepPreview(-1)}
+        onNext={() => stepPreview(1)}
         onClose={() => setPreviewVideoId(null)}
       />
     </div>
