@@ -19,6 +19,9 @@ import {
 
 type AuthFlow = "signIn" | "signUp" | "reset" | "resetVerification";
 
+const signInFormShellClass =
+  "mx-auto w-full max-w-[18rem] space-y-6 sm:max-w-[21rem]";
+
 function authErrorMessage(err: unknown, flow: AuthFlow) {
   const message = err instanceof Error ? err.message : "";
   if (message.includes("Password reset email is not configured")) {
@@ -210,7 +213,7 @@ export function SignInForm() {
   if (resetStep) {
     const verifying = resetStep !== "request";
     return (
-      <div className="mx-auto w-full max-w-md space-y-6">
+      <div className={signInFormShellClass}>
         <div className="space-y-2">
           <button
             type="button"
@@ -370,7 +373,7 @@ export function SignInForm() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-6">
+    <div className={signInFormShellClass}>
       <div className="flex gap-2 rounded-lg bg-zinc-900 p-1">
         {(["signIn", "signUp"] as const).map((id) => (
           <button
