@@ -101,7 +101,7 @@ function RatingCell({ rating }: { rating: number }) {
           key={index}
           className={cn(
             "h-3 w-3",
-            index < rating ? "fill-[var(--rating)] text-[var(--rating)]" : "text-zinc-800",
+            index < rating ? "fill-yellow-400 text-yellow-400" : "text-zinc-800",
           )}
         />
       ))}
@@ -402,8 +402,8 @@ export function VideoTableView({
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="overflow-hidden rounded-lg border border-zinc-800/70 bg-zinc-950">
-        <div className="overflow-x-auto" role="region" aria-label="Media table, scroll horizontally for more columns" tabIndex={0}>
-          <table className="w-full min-w-[760px] table-fixed border-collapse">
+        <div className="overflow-x-auto">
+          <table className="w-full table-fixed border-collapse">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id} className="border-b border-zinc-800/70">

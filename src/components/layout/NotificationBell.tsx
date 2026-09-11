@@ -48,7 +48,7 @@ export function NotificationBell({ collapsed }: { collapsed?: boolean }) {
           align={collapsed ? "start" : "start"}
           side={collapsed ? "right" : "bottom"}
           sideOffset={8}
-          className="z-[70] w-80 max-w-[calc(100vw-1rem)] rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl shadow-black/45"
+          className="rr-popover z-50 w-80 max-w-[calc(100vw-1rem)] rounded-xl border border-white/[0.08] bg-[#0d0d0f] p-2"
         >
           <div className="mb-2 flex items-center justify-between border-b border-zinc-800 px-2 pb-2">
             <p className="text-xs font-medium text-zinc-200">Notifications</p>

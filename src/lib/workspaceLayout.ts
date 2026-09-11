@@ -1,20 +1,48 @@
 import type { Layout } from "react-resizable-panels";
 
+/** Shared horizontal inset for project workspace chrome (hero, toolbar, grids, review). */
+export const WORKSPACE_CHROME_PADDING = "px-3 sm:px-6 lg:px-8";
+export const WORKSPACE_CHROME_MARGIN = "mx-3 sm:mx-6 lg:mx-8";
+export const WORKSPACE_CHROME_INSET = "p-3 sm:p-6 lg:p-8";
+
 export type WorkspacePanelState = {
   viewerOpen: boolean;
   infoOpen: boolean;
   layout: Layout;
 };
 
-const DEFAULT_LAYOUT: Layout = {
-  assets: 28,
-  viewer: 40,
-  inspector: 32,
+/** Viewer + grid, opened via toolbar toggle — 50/50. */
+export const VIEWER_HALF_LAYOUT: Layout = {
+  assets: 50,
+  viewer: 50,
 };
+
+/** Viewer + grid, opened via double-click — wider viewer. */
+export const VIEWER_EXPANDED_LAYOUT: Layout = {
+  assets: 36,
+  viewer: 64,
+};
+
+/** Grid + viewer + info — balanced thirds. */
+export const ALL_HALF_LAYOUT: Layout = {
+  assets: 34,
+  viewer: 33,
+  inspector: 33,
+};
+
+/** Grid + viewer + info — wider viewer for focus playback. */
+export const ALL_EXPANDED_LAYOUT: Layout = {
+  assets: 26,
+  viewer: 44,
+  inspector: 30,
+};
+
+const DEFAULT_LAYOUT: Layout = VIEWER_HALF_LAYOUT;
 
 const MIN_INSPECTOR = 20;
 const MIN_ASSETS = 18;
 const MIN_VIEWER = 20;
+const MAX_VIEWER = 68;
 
 function roundSize(value: number) {
   return Math.round(value * 10) / 10;
@@ -53,7 +81,7 @@ export function normalizeLayout(
       },
       value: viewer,
       min: MIN_VIEWER,
-      max: 55,
+      max: MAX_VIEWER,
     });
   }
   if (infoOpen) {
@@ -83,6 +111,22 @@ export function normalizeLayout(
   };
 }
 
+export function layoutPreset(options: {
+  viewerOpen: boolean;
+  infoOpen: boolean;
+  expanded?: boolean;
+}): Layout {
+  const { viewerOpen, infoOpen, expanded = false } = options;
+  if (!viewerOpen && !infoOpen) return { assets: 100 };
+  if (viewerOpen && infoOpen) {
+    return expanded ? ALL_EXPANDED_LAYOUT : ALL_HALF_LAYOUT;
+  }
+  if (viewerOpen) {
+    return expanded ? VIEWER_EXPANDED_LAYOUT : VIEWER_HALF_LAYOUT;
+  }
+  return { assets: 50, inspector: 50 };
+}
+
 export function layoutForVisible(
   layout: Layout,
   viewerOpen: boolean,
@@ -103,8 +147,8 @@ export function layoutForVisible(
 }
 
 const DEFAULT_STATE: WorkspacePanelState = {
-  viewerOpen: true,
-  infoOpen: true,
+  viewerOpen: false,
+  infoOpen: false,
   layout: DEFAULT_LAYOUT,
 };
 

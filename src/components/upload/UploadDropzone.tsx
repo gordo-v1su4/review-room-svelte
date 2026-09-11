@@ -615,14 +615,14 @@ export function UploadDropzone({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md border border-zinc-800 bg-zinc-950/50 p-3">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3">
         <div className="flex flex-col gap-2 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
           <span className="font-medium text-zinc-300">Destination</span>
           <Popover.Root>
             <Popover.Trigger asChild>
               <button
                 type="button"
-                className="inline-flex h-9 w-full items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-left text-xs text-zinc-200 outline-none transition hover:border-zinc-700 hover:bg-zinc-800 focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)]/25 sm:w-72"
+                className="inline-flex h-9 w-full items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-left text-xs text-zinc-200 outline-none transition hover:border-zinc-700 hover:bg-zinc-800 focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/25 sm:w-72"
                 aria-label="Choose upload destination"
               >
                 <span className="truncate">{destinationLabel}</span>
@@ -633,7 +633,7 @@ export function UploadDropzone({
               <Popover.Content
                 align="end"
                 sideOffset={6}
-                className="menu-surface z-50 max-h-72 w-[var(--radix-popover-trigger-width)] overflow-y-auto rounded-md border border-zinc-800 bg-zinc-950 p-1.5 text-zinc-200 shadow-2xl shadow-black/45"
+                className="rr-popover z-50 max-h-72 w-[var(--radix-popover-trigger-width)] overflow-y-auto rounded-xl border border-white/[0.08] bg-[#0d0d0f] p-1.5 text-zinc-200"
               >
                 {destinationOptions.map((option) => {
                   const isSelected = selectedDestinationValue === option.id;
@@ -644,10 +644,10 @@ export function UploadDropzone({
                         type="button"
                         onClick={() => selectDestination(option.id)}
                         className={cn(
-                          "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]",
+                          "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-teal-300/80",
                           isSelected
-                            ? "bg-[var(--brand-accent-muted)] text-zinc-100"
-                            : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100",
+                            ? "border border-teal-400/35 bg-teal-400/12 text-teal-100"
+                            : "border border-transparent text-zinc-400 hover:bg-teal-400/10 hover:text-teal-100",
                         )}
                       >
                         <span className="truncate">{option.label}</span>
@@ -668,7 +668,7 @@ export function UploadDropzone({
       <label
         htmlFor="upload-file-input"
         className={cn(
-          "flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed bg-zinc-900/40 px-4 py-9 text-center transition-colors hover:border-zinc-500 sm:px-6 sm:py-10",
+          "flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed bg-zinc-900/40 px-4 py-9 text-center transition-colors hover:border-zinc-500 sm:px-6 sm:py-10",
           isDragging ? "border-zinc-300 bg-zinc-800/60" : "border-zinc-700",
         )}
         onDragEnter={(e) => {
@@ -697,7 +697,7 @@ export function UploadDropzone({
           Destination: {destinationLabel}
         </span>
         <div
-          className="mt-4 flex flex-wrap items-center justify-center gap-1.5 rounded-md bg-zinc-950/70 p-1"
+          className="mt-4 flex flex-wrap items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950/70 p-1"
           onClick={(event) => event.preventDefault()}
         >
           {UPLOAD_ASSET_CLASSES.map((assetClass) => (
@@ -708,7 +708,7 @@ export function UploadDropzone({
               className={cn(
                 "h-7 rounded-md px-2.5 text-[11px] font-medium transition",
                 selectedAssetClass === assetClass
-                  ? "bg-[var(--brand-accent)] text-zinc-950"
+                  ? "bg-teal-400 text-zinc-950"
                   : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200",
               )}
               onClick={() => setSelectedAssetClass(assetClass)}
@@ -733,7 +733,7 @@ export function UploadDropzone({
       {files.length > 0 && (
         <ul className="space-y-2 text-xs text-zinc-500">
           {files.map((f) => (
-            <li key={f.id} className="rounded-md border border-zinc-800 bg-zinc-950/40 p-2">
+            <li key={f.id} className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-2">
               <div className="flex items-center justify-between gap-3">
                 <span className="min-w-0 flex-1 truncate text-zinc-300">
                   {f.file.name}
@@ -751,7 +751,7 @@ export function UploadDropzone({
                 <div
                   className={cn(
                     "h-full rounded-full transition-all",
-                    f.status === "error" ? "bg-red-500" : "bg-[var(--brand-accent)]",
+                    f.status === "error" ? "bg-red-500" : "bg-teal-400",
                   )}
                   style={{ width: `${f.progress}%` }}
                 />

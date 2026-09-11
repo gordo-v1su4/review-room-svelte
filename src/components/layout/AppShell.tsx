@@ -55,7 +55,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarReady, setSidebarReady] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const desktop = useMediaQuery("(min-width: 1024px)");
-  useEffect(() => { setMobileNavOpen(false); }, [desktop, pathname]);
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [desktop, pathname]);
   const projects = useQuery(
     api.projects.listForAdmin,
     isAuthenticated && appUser && !isReview ? {} : "skip",
@@ -81,72 +83,74 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-dvh min-w-0 overflow-hidden bg-[var(--background)] text-zinc-50">
+    <div className="flex h-dvh bg-[var(--background)] text-zinc-50">
       {isAuthenticated && appUser && (
         <aside
           className={cn(
-            "hidden min-h-0 shrink-0 flex-col overflow-y-auto border-r border-zinc-800/70 bg-zinc-950 transition-[width] duration-200 lg:flex",
+            "relative hidden shrink-0 flex-col overflow-visible border-r border-zinc-800/70 bg-zinc-950 lg:flex",
             sidebarCollapsed ? "w-14" : "w-60",
           )}
         >
-          <div className={cn("flex shrink-0 items-center border-b border-zinc-800/70", sidebarCollapsed ? "flex-col py-2" : "h-14 pr-2")}>
-          <Link
-            href="/dashboard"
-            className={cn(
-              "flex min-w-0 items-center",
-              sidebarCollapsed ? "h-8 justify-center px-2" : "flex-1 pl-4",
-            )}
-            title="Review Room"
-          >
-            <span
-              className={cn(
-                "grid grid-cols-[auto_auto] items-stretch gap-x-2 gap-y-0.5",
-                sidebarCollapsed && "flex",
-              )}
+          {sidebarCollapsed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute -right-2.5 top-[18px] z-20 h-5 w-5 rounded-full border border-zinc-800/80 bg-zinc-950 text-zinc-500 shadow-sm hover:bg-zinc-900 hover:text-zinc-200"
+              title="Expand sidebar"
+              onClick={() => setSidebarCollapsed(false)}
             >
-              <span
-                className={cn(
-                  "relative aspect-[809/484]",
-                  sidebarCollapsed ? "h-[0.95rem] w-auto" : "row-span-2 h-[90%] self-center",
-                )}
-              >
+              <ChevronsRight className="h-3 w-3" />
+            </Button>
+          )}
+          <div
+            className={cn(
+              "flex h-14 shrink-0 items-center border-b border-zinc-800/70",
+              sidebarCollapsed ? "justify-center px-2" : "gap-1 pl-4 pr-1",
+            )}
+          >
+            <Link
+              href="/dashboard"
+              className={cn(
+                "flex min-w-0 items-center gap-2",
+                sidebarCollapsed ? "justify-center" : "min-h-0 flex-1",
+              )}
+              title="Review Room"
+            >
+              <span className="relative block h-6 w-[2.35rem] shrink-0">
                 <Image
                   src="/logo-rr-light.png"
                   alt=""
                   fill
                   unoptimized
-                  className="object-contain object-left opacity-80"
+                  priority
+                  className={cn(
+                    "object-contain opacity-80",
+                    sidebarCollapsed ? "object-center" : "object-left",
+                  )}
                 />
               </span>
-              <span
-                className={cn(
-                  "self-start text-sm font-semibold leading-none",
-                  sidebarCollapsed && "hidden",
-                )}
+              {!sidebarCollapsed && (
+                <span className="grid min-w-0 grid-cols-1 gap-0.5">
+                  <span className="truncate text-sm font-semibold leading-none">
+                    Review Room
+                  </span>
+                  <span className="truncate text-[10px] leading-none text-zinc-600">
+                    Review workspace
+                  </span>
+                </span>
+              )}
+            </Link>
+            {!sidebarCollapsed && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-zinc-500 hover:text-zinc-200"
+                title="Collapse sidebar"
+                onClick={() => setSidebarCollapsed(true)}
               >
-                Review Room
-              </span>
-              <span
-                className={cn(
-                  "self-end text-[10px] leading-none text-zinc-600",
-                  sidebarCollapsed && "hidden",
-                )}
-              >
-                Review workspace
-              </span>
-            </span>
-          </Link>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0 text-zinc-500 hover:text-zinc-200"
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-expanded={!sidebarCollapsed}
-            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
-          >
-            {sidebarCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
-          </Button>
+                <ChevronsLeft className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
 
           <nav className={cn("space-y-1 overflow-visible py-4", sidebarCollapsed ? "px-2" : "px-3")}>
@@ -212,7 +216,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Suspense>
           )}
 
-          <div className={cn("mt-auto flex shrink-0 flex-col gap-3 px-3 pt-5 pb-7", sidebarCollapsed && "px-2")}>
+          <div className={cn("mt-auto space-y-3 p-3", sidebarCollapsed && "px-2")}>
             {isAdmin && (
               <Link href="/dashboard/projects/new">
                 <Button
@@ -243,47 +247,151 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
       )}
 
-      <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", workspaceProject && "mobile-project-shell")} style={workspaceProject ? projectAccentStyle(projectAccent(workspaceProject.brandColor)) : undefined}>
-        <header className={cn("relative z-40 shrink-0 lg:hidden", workspaceProject ? "text-zinc-950" : "bg-zinc-950/90")}>
-          <div className="flex h-12 items-center gap-2 px-2 sm:px-4">
+      <div
+        className="flex min-h-0 min-w-0 flex-1 flex-col bg-zinc-950"
+        style={
+          workspaceProject
+            ? projectAccentStyle(projectAccent(workspaceProject.brandColor))
+            : undefined
+        }
+      >
+        <header
+          className={cn(
+            "relative z-50 shrink-0 bg-transparent lg:hidden",
+            workspaceProject
+              ? "text-zinc-100"
+              : "border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur",
+          )}
+        >
+          <div className="flex h-12 items-center gap-2 px-3 sm:px-6 lg:px-8">
             {isAuthenticated && appUser && (
               <div className="order-first flex shrink-0 items-center">
-                <Dialog.Root open={mobileNavOpen && !desktop} onOpenChange={setMobileNavOpen}>
+                <Dialog.Root
+                  open={mobileNavOpen && !desktop}
+                  onOpenChange={setMobileNavOpen}
+                >
                   <Dialog.Trigger asChild>
-                    <Button variant="ghost" size="icon" aria-label="Open navigation" className={cn("h-11 w-11", workspaceProject && "text-zinc-950 hover:bg-black/10")}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Open navigation"
+                      className={cn(
+                        "h-11 w-11",
+                        workspaceProject && "text-zinc-100 hover:bg-white/10",
+                      )}
+                    >
                       <Menu className="h-5 w-5" />
                     </Button>
                   </Dialog.Trigger>
                   <Dialog.Portal>
                     <Dialog.Overlay className="mobile-navigation-overlay fixed inset-0 z-50 bg-black/25" />
-                    <Dialog.Content aria-describedby={undefined} className="mobile-navigation fixed inset-y-0 left-0 z-[60] flex w-[min(22rem,90vw)] flex-col border-r border-zinc-800/40 bg-zinc-950/80 backdrop-blur-xl text-zinc-50 shadow-2xl outline-none">
+                    <Dialog.Content
+                      aria-describedby={undefined}
+                      className="mobile-navigation fixed inset-y-0 left-0 z-[60] flex w-[min(22rem,90vw)] flex-col border-r border-zinc-800/40 bg-zinc-950/80 text-zinc-50 shadow-2xl outline-none backdrop-blur-xl"
+                    >
                       <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 p-3">
-                        <Dialog.Title className="sr-only">Review Room navigation</Dialog.Title>
-                        <Link href="/dashboard" aria-label="Review Room home" onClick={() => setMobileNavOpen(false)} className="flex h-11 items-center px-2">
-                          <Image src="/logo-rr-light.png" alt="" width={40} height={24} unoptimized className="h-6 w-auto opacity-85" />
+                        <Dialog.Title className="sr-only">
+                          Review Room navigation
+                        </Dialog.Title>
+                        <Link
+                          href="/dashboard"
+                          aria-label="Review Room home"
+                          onClick={() => setMobileNavOpen(false)}
+                          className="flex h-11 items-center px-2"
+                        >
+                          <Image
+                            src="/logo-rr-light.png"
+                            alt=""
+                            width={40}
+                            height={24}
+                            unoptimized
+                            className="h-6 w-auto opacity-85"
+                          />
                         </Link>
-                        <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close navigation" className="h-11 w-11"><X className="h-5 w-5" /></Button></Dialog.Close>
+                        <Dialog.Close asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Close navigation"
+                            className="h-11 w-11"
+                          >
+                            <X className="h-5 w-5" />
+                          </Button>
+                        </Dialog.Close>
                       </div>
-                      <div className="min-h-0 flex-1 overflow-y-auto pb-6" onClick={(event) => {
-                        if ((event.target as HTMLElement).closest("a")) setMobileNavOpen(false);
-                      }}>
+                      <div
+                        className="min-h-0 flex-1 overflow-y-auto pb-6"
+                        onClick={(event) => {
+                          if ((event.target as HTMLElement).closest("a")) {
+                            setMobileNavOpen(false);
+                          }
+                        }}
+                      >
                         <nav aria-label="Main navigation" className="space-y-1 p-3">
-                          <SideLink href="/dashboard" label="Projects" icon={<Folder className="h-4 w-4" />} active={pathname === "/dashboard"} count={projects?.length} />
-                          <SideLink href="/dashboard/inbox" label="Inbox" icon={<Inbox className="h-4 w-4" />} active={pathname === "/dashboard/inbox"} />
+                          <SideLink
+                            href="/dashboard"
+                            label="Projects"
+                            icon={<Folder className="h-4 w-4" />}
+                            active={pathname === "/dashboard"}
+                            count={projects?.length}
+                          />
+                          <SideLink
+                            href="/dashboard/inbox"
+                            label="Inbox"
+                            icon={<Inbox className="h-4 w-4" />}
+                            active={pathname === "/dashboard/inbox"}
+                          />
                           <NotificationBell />
                         </nav>
                         <div className="space-y-1 px-3">
                           <p className="px-2 py-2 text-xs text-zinc-500">Projects</p>
-                          {(projects ?? []).map((project) => <RecentProjectLink key={project._id} href={`/dashboard/projects/${project._id}`} title={project.title} brandColor={project.brandColor} active={workspaceProjectId === project._id} />)}
+                          {(projects ?? []).map((project) => (
+                            <RecentProjectLink
+                              key={project._id}
+                              href={`/dashboard/projects/${project._id}`}
+                              title={project.title}
+                              brandColor={project.brandColor}
+                              active={workspaceProjectId === project._id}
+                            />
+                          ))}
                         </div>
-                        {workspaceProjectId && <Suspense fallback={null}>
-                          <WorkspaceSidebarFolders projectId={workspaceProjectId} projectTitle={workspaceProject?.title} brandColor={workspaceProject?.brandColor} canEdit={isAdmin} />
-                          <WorkspaceSidebarCollections projectId={workspaceProjectId} canEdit={isAdmin} />
-                        </Suspense>}
+                        {workspaceProjectId && (
+                          <Suspense fallback={null}>
+                            <WorkspaceSidebarFolders
+                              projectId={workspaceProjectId}
+                              projectTitle={workspaceProject?.title}
+                              brandColor={workspaceProject?.brandColor}
+                              canEdit={isAdmin}
+                            />
+                            <WorkspaceSidebarCollections
+                              projectId={workspaceProjectId}
+                              canEdit={isAdmin}
+                            />
+                          </Suspense>
+                        )}
                       </div>
                       <div className="flex shrink-0 flex-col gap-3 border-t border-zinc-800 px-4 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-                        {isAdmin && <Button asChild variant="secondary" className="h-11 w-full" onClick={() => setMobileNavOpen(false)}><Link href="/dashboard/projects/new"><Plus className="mr-2 h-4 w-4" />New project</Link></Button>}
-                        <Button variant="ghost" className="h-11 w-full" onClick={() => void signOut()}><LogOut className="mr-2 h-4 w-4" />Sign out</Button>
+                        {isAdmin && (
+                          <Button
+                            asChild
+                            variant="secondary"
+                            className="h-11 w-full"
+                            onClick={() => setMobileNavOpen(false)}
+                          >
+                            <Link href="/dashboard/projects/new">
+                              <Plus className="mr-2 h-4 w-4" />
+                              New project
+                            </Link>
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          className="h-11 w-full"
+                          onClick={() => void signOut()}
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Sign out
+                        </Button>
                       </div>
                     </Dialog.Content>
                   </Dialog.Portal>
@@ -296,8 +404,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           className={cn(
             "min-w-0 flex-1",
             isWorkspace
-              ? "flex min-h-0 flex-col overflow-y-auto lg:overflow-hidden"
-              : "overflow-y-auto mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8",
+              ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+              : "mx-auto w-full max-w-[1600px] overflow-y-auto px-4 py-6 sm:px-6 sm:py-8",
           )}
         >
           {children}
@@ -793,7 +901,7 @@ function SidebarFolders({
                         <Trash2 className="h-3 w-3" />
                       </button>
                       {removingFolderId === folder._id && (
-                        <div className="absolute right-0 top-7 z-50 w-44 rounded-md border border-zinc-800 bg-zinc-950 p-1 shadow-2xl shadow-black/50">
+                        <div className="rr-popover absolute right-0 top-7 z-50 w-44 rounded-xl border border-white/[0.08] bg-[#0d0d0f] p-1">
                           <button
                             type="button"
                             className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] text-zinc-300 transition hover:bg-zinc-900 hover:text-zinc-100"
@@ -931,10 +1039,10 @@ function RecentProjectLink({
       href={href}
       style={projectAccentStyle(accent)}
       className={cn(
-        "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[12px] transition",
+        "flex items-center gap-2.5 rounded-[9px] px-2 py-1.5 text-[12px] transition",
         active
-          ? "bg-zinc-900 text-zinc-100"
-          : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300",
+          ? "bg-white/[0.06] text-zinc-100"
+          : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300",
       )}
     >
       <span
@@ -966,14 +1074,14 @@ function SideLink({
       href={href}
       title={label}
       className={cn(
-        "flex items-center rounded-md py-1.5 text-[12.5px] transition",
+        "flex items-center rounded-[9px] py-1.5 text-[12.5px] transition",
         collapsed ? "justify-center px-0" : "gap-2.5 px-2",
         active
-          ? "bg-zinc-800/60 text-zinc-100"
-          : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300",
+          ? "bg-white/[0.06] text-zinc-50"
+          : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300",
       )}
     >
-      <span className={cn(active ? "text-zinc-200" : "text-zinc-600")}>
+      <span className={cn(active ? "text-[var(--brand-accent)]" : "text-zinc-600")}>
         {icon}
       </span>
       <span className={cn("flex-1", collapsed && "hidden")}>{label}</span>

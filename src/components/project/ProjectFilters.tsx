@@ -1,7 +1,8 @@
 "use client";
 
 import * as Popover from "@radix-ui/react-popover";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import Link from "next/link";
 import {
   ArrowUpDown,
   Check,
@@ -13,9 +14,12 @@ import {
   Search,
   SlidersHorizontal,
   SquarePlay,
+  Upload,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { FilterState } from "@/lib/filters";
 import { assetClassLabel } from "@/lib/media";
+import { WORKSPACE_CHROME_PADDING } from "@/lib/workspaceLayout";
 import type {
   AssetClass,
   CardAspectRatio,
@@ -31,7 +35,6 @@ import type { CardFieldId } from "@/lib/cardFields";
 import { FieldsVisibilityPopover } from "./FieldsVisibilityPopover";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { STATUS_BADGE_CLASS } from "@/lib/videoStatus";
 
 const SORTS: { id: SortKey; label: string }[] = [
   { id: "newest", label: "Newest" },
@@ -79,17 +82,73 @@ const ASSET_CLASS_OPTIONS: Array<{ id: AssetClass; label: string }> = [
 ];
 
 const toolbarShellClass =
-  "inline-flex h-8 shrink-0 items-center rounded-sm bg-zinc-900 p-0.5";
+  "inline-flex h-8 shrink-0 items-center rounded-md bg-zinc-900 p-0.5";
 const toolbarActionClass =
-  "inline-flex h-8 min-h-11 min-w-11 shrink-0 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 shadow-sm transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100 sm:min-h-0 sm:min-w-0";
+  "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100";
 
-function toolbarSegmentClass(active: boolean, iconOnly?: boolean) {
+const toolbarIconOnlyClass = "max-lg:w-7 max-lg:px-0 lg:min-w-[3.25rem]";
+const toolbarActionIconOnlyClass =
+  "max-lg:w-8 max-lg:justify-center max-lg:px-0";
+
+function toolbarSegmentClass(active: boolean) {
   return cn(
     "inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded px-2 text-[11px] font-medium transition",
-    iconOnly ? "w-7 px-0" : "min-w-[3.25rem]",
+    toolbarIconOnlyClass,
     active
-      ? "bg-[var(--brand-accent-muted)] text-zinc-100"
+      ? "bg-[var(--brand-accent-muted)] text-[var(--brand-accent)]"
       : "text-zinc-500 hover:bg-zinc-800/70 hover:text-zinc-200",
+  );
+}
+
+const LAYOUT_ITEMS = [
+  { id: "grid", label: "Grid", icon: Grid3X3 },
+  { id: "grouped", label: "Group", icon: Columns3 },
+  { id: "table", label: "Table", icon: List },
+  { id: "review", label: "Review", icon: SquarePlay },
+] as const;
+
+export function WorkspaceLayoutSwitcher({
+  layout,
+  onLayout,
+  className,
+}: {
+  layout: WorkspaceLayout;
+  onLayout: (layout: WorkspaceLayout) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "grid grid-cols-4 gap-0.5 rounded-lg bg-zinc-900/80 p-0.5",
+        className,
+      )}
+      role="tablist"
+      aria-label="Workspace layout"
+    >
+      {LAYOUT_ITEMS.map((item) => {
+        const Icon = item.icon;
+        const active = layout === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            title={item.label}
+            onClick={() => onLayout(item.id)}
+            className={cn(
+              "inline-flex h-8 items-center justify-center gap-1.5 rounded-md text-[11px] font-medium transition",
+              active
+                ? "bg-zinc-800 text-zinc-100"
+                : "text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300",
+            )}
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden min-[480px]:inline">{item.label}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -108,6 +167,8 @@ export function ProjectFilters({
   visibleFields,
   fieldOrder,
   panelToggles,
+  canUploadMedia,
+  uploadHref,
   onFolderSort,
   onLayout,
   onGridSize,
@@ -133,6 +194,8 @@ export function ProjectFilters({
   visibleFields?: CardFieldId[];
   fieldOrder?: CardFieldId[];
   panelToggles?: React.ReactNode;
+  canUploadMedia?: boolean;
+  uploadHref?: string;
   onFolderSort?: (sort: FolderSortKey) => void;
   onLayout: (layout: WorkspaceLayout) => void;
   onGridSize: (size: GridSize) => void;
@@ -144,24 +207,40 @@ export function ProjectFilters({
   onGroupBy?: (group: GroupByField) => void;
   onVisibleFieldsChange?: (visible: CardFieldId[], order: CardFieldId[]) => void;
 }) {
-  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
-  const chromePadding = "px-4 sm:px-6 lg:px-8";
-
   return (
-    <div className="asset-toolbar relative z-20 w-full min-w-0 shrink-0 border-b border-zinc-800 bg-zinc-950">
+    <div className="z-20 w-full shrink-0 min-w-0 bg-zinc-950 lg:border-b lg:border-zinc-800">
       <div
         className={cn(
-          "flex w-full min-w-0 flex-wrap items-center gap-2 py-2 sm:gap-1 sm:py-1.5",
-          chromePadding,
+          "flex items-center gap-2 pb-1.5 pt-1 lg:hidden",
+          WORKSPACE_CHROME_PADDING,
         )}
       >
-        <div className={cn(toolbarShellClass, "view-switcher !h-11 !w-full sm:!h-8 sm:!w-auto", layout === "review" && "!w-[calc(100%-3.25rem)]")}>
-          {[
-            { id: "grid", label: "Grid", icon: Grid3X3 },
-            { id: "grouped", label: "Group", icon: Columns3 },
-            { id: "table", label: "Table", icon: List },
-            { id: "review", label: "Review", icon: SquarePlay },
-          ].map((item) => {
+        <WorkspaceLayoutSwitcher
+          layout={layout}
+          onLayout={onLayout}
+          className="min-w-0 flex-1"
+        />
+        {canUploadMedia && uploadHref && (
+          <Link href={uploadHref} className="shrink-0">
+            <Button
+              size="sm"
+              aria-label="Upload"
+              className="h-8 gap-1.5 px-2.5 text-xs"
+            >
+              <Upload className="h-4 w-4" />
+              <span className="hidden min-[480px]:inline">Upload</span>
+            </Button>
+          </Link>
+        )}
+      </div>
+      <div
+        className={cn(
+          "no-scrollbar flex w-full min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden max-lg:h-9 max-lg:pb-1 max-lg:pt-0 lg:h-11 lg:overflow-hidden lg:py-1.5",
+          WORKSPACE_CHROME_PADDING,
+        )}
+      >
+        <div className={cn(toolbarShellClass, "hidden lg:inline-flex")}>
+          {LAYOUT_ITEMS.map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -169,32 +248,21 @@ export function ProjectFilters({
                 type="button"
                 title={item.label}
                 aria-label={item.label}
-                aria-pressed={layout === item.id}
-                onClick={() => onLayout(item.id as WorkspaceLayout)}
-                className={cn(
-                  toolbarSegmentClass(layout === item.id, true),
-                  "!h-10 flex-1 !w-auto sm:!h-7 sm:flex-none sm:!w-7 xl:!w-auto xl:min-w-0 xl:px-2",
-                )}
+                onClick={() => onLayout(item.id)}
+                className={toolbarSegmentClass(layout === item.id)}
               >
                 <Icon className="h-3.5 w-3.5" />
-                <span className="sm:hidden xl:inline">{item.label}</span>
+                <span className="hidden lg:inline">{item.label}</span>
               </button>
             );
           })}
         </div>
-        {layout === "review" && (
-          <button type="button" aria-label="Review tools" aria-expanded={mobileToolsOpen} onClick={() => setMobileToolsOpen((open) => !open)} className="grid h-11 w-11 place-items-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-400 sm:hidden">
-            <SlidersHorizontal className="h-4 w-4" />
-          </button>
-        )}
 
-        <div className={cn("flex w-full items-center gap-2 sm:contents", layout === "review" && !mobileToolsOpen && "hidden")}>
         <AppearancePopover
           gridSize={gridSize}
           aspectRatio={aspectRatio}
           thumbnailScale={thumbnailScale}
           showCardInfo={showCardInfo}
-          iconOnly
           onGridSize={onGridSize}
           onAspectRatio={onAspectRatio}
           onThumbnailScale={onThumbnailScale}
@@ -205,7 +273,6 @@ export function ProjectFilters({
           <FieldsVisibilityPopover
             visibleFields={visibleFields}
             fieldOrder={fieldOrder}
-            iconOnly
             onChange={onVisibleFieldsChange}
           />
         )}
@@ -225,12 +292,22 @@ export function ProjectFilters({
           sort={sort}
           folderSort={folderSort}
           showFolderSort={showFolderSort}
-          iconOnly
           onSort={onSort}
           onFolderSort={onFolderSort}
         />
+        <span
+          className="hidden h-8 shrink-0 items-center gap-1.5 border-l border-zinc-800/80 pl-2 text-[10px] text-zinc-600 lg:inline-flex"
+          title="Arrow keys: previous / next asset"
+        >
+          <kbd className="rounded border border-zinc-800 bg-zinc-900 px-1 py-px font-sans text-[9px] leading-none text-zinc-500">
+            ←
+          </kbd>
+          <kbd className="rounded border border-zinc-800 bg-zinc-900 px-1 py-px font-sans text-[9px] leading-none text-zinc-500">
+            →
+          </kbd>
+          <span className="hidden xl:inline">Prev / next</span>
+        </span>
         {panelToggles}
-        </div>
       </div>
     </div>
   );
@@ -241,7 +318,6 @@ function AppearancePopover({
   aspectRatio,
   thumbnailScale,
   showCardInfo,
-  iconOnly,
   onGridSize,
   onAspectRatio,
   onThumbnailScale,
@@ -251,7 +327,6 @@ function AppearancePopover({
   aspectRatio: CardAspectRatio;
   thumbnailScale: ThumbnailScale;
   showCardInfo: boolean;
-  iconOnly?: boolean;
   onGridSize: (size: GridSize) => void;
   onAspectRatio: (ratio: CardAspectRatio) => void;
   onThumbnailScale: (scale: ThumbnailScale) => void;
@@ -263,22 +338,19 @@ function AppearancePopover({
         <button
           type="button"
           title="Appearance"
-          className={cn(toolbarActionClass, iconOnly && "w-8 justify-center px-0")}
+          aria-label="Appearance"
+          className={cn(toolbarActionClass, toolbarActionIconOnlyClass)}
         >
           <Rows3 className="h-3.5 w-3.5" />
-          {!iconOnly && (
-            <>
-              Appearance
-              <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
-            </>
-          )}
+          <span className="hidden lg:inline">Appearance</span>
+          <ChevronDown className="hidden h-3.5 w-3.5 text-zinc-500 lg:inline" />
         </button>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
           align="start"
           sideOffset={8}
-          className="menu-surface z-50 w-[15.25rem] max-w-[calc(100vw-1rem)] rounded-lg border border-zinc-800 bg-zinc-950 p-2 text-zinc-200 shadow-2xl shadow-black/45"
+          className="rr-popover z-50 w-[15.25rem] max-w-[calc(100vw-1rem)] rounded-xl border border-white/[0.08] bg-[#0d0d0f] p-2 text-zinc-200"
         >
           <div className="mb-1.5 border-b border-white/10 pb-1.5">
             <p className="text-[10px] font-medium leading-none text-zinc-400">
@@ -343,8 +415,8 @@ function AppearancePopover({
                 aria-checked={showCardInfo}
                 onClick={() => onShowCardInfo(!showCardInfo)}
                 className={cn(
-                  "ml-auto flex h-4 w-7 items-center rounded-full p-0.5 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]",
-                  showCardInfo ? "bg-[var(--brand-accent)]" : "bg-zinc-700/70",
+                  "ml-auto flex h-4 w-7 items-center rounded-full p-0.5 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-200/80",
+                  showCardInfo ? "bg-teal-400" : "bg-zinc-700/70",
                 )}
               >
                 <span
@@ -368,14 +440,12 @@ function SortPopover({
   sort,
   folderSort,
   showFolderSort,
-  iconOnly,
   onSort,
   onFolderSort,
 }: {
   sort: SortKey;
   folderSort?: FolderSortKey;
   showFolderSort?: boolean;
-  iconOnly?: boolean;
   onSort: (sort: SortKey) => void;
   onFolderSort?: (sort: FolderSortKey) => void;
 }) {
@@ -384,26 +454,29 @@ function SortPopover({
       <Popover.Trigger asChild>
         <button
           type="button"
-          title={`Sorted by: ${SORT_LABELS[sort]}`}
-          className={cn(toolbarActionClass, "min-w-8 justify-between", iconOnly && "w-8 justify-center px-0")}
+          title={`Sort: ${SORT_LABELS[sort]}`}
+          aria-label={`Sort: ${SORT_LABELS[sort]}`}
+          className={cn(
+            toolbarActionClass,
+            "min-w-8 justify-between",
+            toolbarActionIconOnlyClass,
+          )}
         >
           <span className="inline-flex items-center gap-1.5">
             <ArrowUpDown className="h-3.5 w-3.5 text-zinc-500" />
-            {!iconOnly && (
-              <>
-                <span className="font-normal text-zinc-500">Sorted by</span>
-                {SORT_LABELS[sort]}
-              </>
-            )}
+            <span className="hidden font-normal text-zinc-500 lg:inline">
+              Sort
+            </span>
+            <span className="hidden lg:inline">{SORT_LABELS[sort]}</span>
           </span>
-          {!iconOnly && <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />}
+          <ChevronDown className="hidden h-3.5 w-3.5 text-zinc-500 lg:inline" />
         </button>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
           align="end"
           sideOffset={8}
-          className="menu-surface z-50 w-48 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-zinc-200 shadow-2xl shadow-black/45"
+          className="rr-popover z-50 w-48 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d0d0f] p-1.5 text-zinc-200"
         >
           {SORTS.map((item) => (
             <button
@@ -411,10 +484,10 @@ function SortPopover({
               type="button"
               onClick={() => onSort(item.id)}
               className={cn(
-                "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]",
+                "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-teal-300/80",
                 sort === item.id
-                  ? "bg-[var(--brand-accent-muted)] text-zinc-100"
-                  : "text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-100",
+                  ? "border border-teal-400/35 bg-teal-400/12 text-teal-100"
+                  : "border border-transparent text-zinc-400 hover:bg-teal-400/10 hover:text-teal-100",
               )}
             >
               {item.label}
@@ -432,10 +505,10 @@ function SortPopover({
                   type="button"
                   onClick={() => onFolderSort(item.id)}
                   className={cn(
-                    "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]",
+                    "flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs outline-none transition focus-visible:ring-1 focus-visible:ring-teal-300/80",
                     folderSort === item.id
-                      ? "bg-[var(--brand-accent-muted)] text-zinc-100"
-                      : "text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-100",
+                      ? "border border-teal-400/35 bg-teal-400/12 text-teal-100"
+                      : "border border-transparent text-zinc-400 hover:bg-teal-400/10 hover:text-teal-100",
                   )}
                 >
                   {item.label}
@@ -477,7 +550,7 @@ function SegmentGroup({
   return (
     <div
       className={cn(
-        "grid w-[5.35rem] justify-self-end gap-px rounded-sm bg-zinc-900 p-0.5",
+        "grid w-[5.35rem] justify-self-end gap-px rounded-md border border-zinc-800 bg-zinc-900 p-0.5",
         columns === 2 ? "grid-cols-2" : "grid-cols-3",
       )}
     >
@@ -507,9 +580,9 @@ function SegmentButton({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "inline-flex h-[18px] min-w-0 items-center justify-center gap-0.5 rounded-[4px] px-0.5 text-[9px] font-semibold leading-none text-zinc-300 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--brand-accent)]",
+        "inline-flex h-[18px] min-w-0 items-center justify-center gap-0.5 rounded-[4px] px-0.5 text-[9px] font-semibold leading-none text-zinc-300 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-200/80",
         active
-          ? "bg-[var(--brand-accent)] text-zinc-950"
+          ? "bg-teal-400 text-zinc-950 shadow-sm ring-1 ring-teal-200/70"
           : "hover:bg-zinc-800 hover:text-zinc-100",
       )}
     >
@@ -564,9 +637,15 @@ function FilterPopover({
         <button
           type="button"
           title={activeCount ? `Filter (${activeCount} active)` : "Filter"}
-          className={cn(toolbarActionClass, "relative w-8 justify-center px-0")}
+          aria-label={activeCount ? `Filter (${activeCount} active)` : "Filter"}
+          className={cn(
+            toolbarActionClass,
+            "relative",
+            toolbarActionIconOnlyClass,
+          )}
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
+          <span className="hidden lg:inline">Filter</span>
           {activeCount > 0 && (
             <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-[var(--brand-accent)]" />
           )}
@@ -576,7 +655,7 @@ function FilterPopover({
         <Popover.Content
           align="start"
           sideOffset={8}
-          className="menu-surface z-50 w-52 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl"
+          className="rr-popover z-50 w-52 rounded-xl border border-white/[0.08] bg-[#0d0d0f] p-2"
         >
           {STATUS_FILTER_OPTIONS.map((option) => {
             const active = filters.statuses.includes(option.id);
@@ -594,8 +673,7 @@ function FilterPopover({
                 }
                 className={cn(
                   "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs",
-                  STATUS_BADGE_CLASS[option.id],
-                  !active && "!bg-transparent hover:brightness-125",
+                  active ? "bg-[var(--brand-accent-muted)] text-zinc-100" : "text-zinc-500",
                 )}
               >
                 {option.label}
@@ -609,7 +687,7 @@ function FilterPopover({
               onFilters({ ...filters, selectedOnly: !filters.selectedOnly })
             }
             className={cn(
-              "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs",
+              "mt-1 flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs",
               filters.selectedOnly
                 ? "bg-[var(--brand-accent-muted)] text-zinc-100"
                 : "text-zinc-500",
@@ -689,16 +767,18 @@ function SearchIconPopover({
         <button
           type="button"
           title="Search"
-          className={cn(toolbarActionClass, "w-8 justify-center px-0")}
+          aria-label="Search"
+          className={cn(toolbarActionClass, toolbarActionIconOnlyClass)}
         >
           <Search className="h-3.5 w-3.5" />
+          <span className="hidden lg:inline">Search</span>
         </button>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
           align="start"
           sideOffset={8}
-          className="menu-surface z-50 w-56 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl"
+          className="rr-popover z-50 w-56 rounded-xl border border-white/[0.08] bg-[#0d0d0f] p-2"
         >
           <Input
             autoFocus

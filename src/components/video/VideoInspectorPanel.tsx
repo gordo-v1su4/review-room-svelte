@@ -33,7 +33,7 @@ export function VideoInspectorPanel({
 }: {
   video: VideoDoc;
   mode: Mode;
-  onClose?: () => void;
+  onClose: () => void;
   token?: string;
   canEdit?: boolean;
   canManageFeedback?: boolean;
@@ -78,9 +78,9 @@ export function VideoInspectorPanel({
             </div>
           )}
         </div>
-        {onClose && <Button variant="ghost" size="icon" aria-label="Close inspector" className="h-8 w-8 shrink-0" onClick={onClose}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose}>
           <X className="h-4 w-4" />
-        </Button>}
+        </Button>
       </div>
 
       <div className="flex border-b border-zinc-800/60">
@@ -90,9 +90,9 @@ export function VideoInspectorPanel({
             type="button"
             onClick={() => setTab(item)}
             className={cn(
-              "flex-1 px-3 py-2 text-xs font-medium capitalize transition",
+              "flex-1 px-3 py-2 font-mono text-[10px] font-medium tracking-[0.14em] uppercase transition",
               tab === item
-                ? "border-b-2 border-[var(--brand-accent)] text-zinc-100"
+                ? "border-b border-[var(--brand-accent)] text-zinc-100"
                 : "text-zinc-500 hover:text-zinc-300",
             )}
           >
@@ -144,7 +144,7 @@ export function VideoInspectorPanel({
 
           <CommentComposer
             currentTime={playhead}
-            drawEnabled={isImage && Boolean(onDrawModeChange)}
+            drawEnabled={isImage}
             drawActive={drawMode}
             onDrawToggle={() => onDrawModeChange?.(!drawMode)}
             onSubmit={(body, timecodeSec) => {

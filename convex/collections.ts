@@ -45,20 +45,38 @@ export const listByProject = query({
   },
 });
 
+const collectionFilterRulesValidator = v.object({
+  assetClass: v.optional(v.string()),
+  status: v.optional(v.string()),
+  smartView: v.optional(v.string()),
+  assetClasses: v.optional(v.array(v.string())),
+  statuses: v.optional(v.array(v.string())),
+  tags: v.optional(v.array(v.string())),
+  minRating: v.optional(v.number()),
+  selectedOnly: v.optional(v.boolean()),
+  hasComments: v.optional(v.boolean()),
+  search: v.optional(v.string()),
+});
+
 export const ensureSystemCollections = mutation({
   args: { projectId: v.id("projects") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { admin } = await getProjectForEditor(ctx, args.projectId);
+    const { admin } = await getProjectForAdmin(ctx, args.projectId);
     const existing = await ctx.db
       .query("collections")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
 
-    if (existing.some((item) => item.kind === "system")) return null;
+    const existingSystemKeys = new Set(
+      existing
+        .filter((item) => item.kind === "system" && item.systemKey)
+        .map((item) => item.systemKey as string),
+    );
 
     const now = Date.now();
     for (const [index, item] of SYSTEM_COLLECTIONS.entries()) {
+      if (existingSystemKeys.has(item.systemKey)) continue;
       await ctx.db.insert("collections", {
         projectId: args.projectId,
         title: item.title,
@@ -105,6 +123,26 @@ export const rename = mutation({
     if (collection.kind === "system") throw new Error("System collections cannot be renamed");
     await ctx.db.patch("collections", args.collectionId, {
       title: args.title.trim() || "Untitled Collection",
+    });
+    return null;
+  },
+});
+
+export const updateFilterRules = mutation({
+  args: {
+    collectionId: v.id("collections"),
+    filterRules: collectionFilterRulesValidator,
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const collection = await ctx.db.get("collections", args.collectionId);
+    if (!collection) throw new Error("Collection not found");
+    await getProjectForEditor(ctx, collection.projectId);
+    if (collection.kind === "system") {
+      throw new Error("System collections cannot be edited");
+    }
+    await ctx.db.patch("collections", args.collectionId, {
+      filterRules: args.filterRules,
     });
     return null;
   },

@@ -4,16 +4,22 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 rounded-[10px] text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)]/55 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.985]",
   {
     variants: {
       variant: {
-        default: "bg-[var(--brand-accent)] text-zinc-950 hover:brightness-110",
-        secondary: "bg-zinc-800 text-zinc-100 hover:bg-zinc-700",
-        ghost: "hover:bg-zinc-800 text-zinc-200",
-        outline: "border border-zinc-700 bg-transparent hover:bg-zinc-900",
-        success: "bg-[var(--success)] text-zinc-950 hover:brightness-110",
-        warning: "bg-[var(--warning)] text-zinc-950 hover:brightness-110",
+        default:
+          "bg-[linear-gradient(180deg,var(--brand-accent-strong)_0%,var(--brand-accent)_45%,var(--brand-accent-deep)_130%)] text-[#06231e] hover:brightness-[1.08]",
+        secondary:
+          "border border-white/[0.07] bg-[linear-gradient(180deg,rgb(255_255_255/0.075)_0%,rgb(255_255_255/0.03)_100%)] text-zinc-100 hover:border-white/[0.12] hover:bg-[linear-gradient(180deg,rgb(255_255_255/0.1)_0%,rgb(255_255_255/0.045)_100%)]",
+        ghost:
+          "text-zinc-300 hover:bg-white/[0.055] hover:text-zinc-50",
+        outline:
+          "border border-white/[0.09] bg-transparent hover:border-white/[0.16] hover:bg-white/[0.035]",
+        success:
+          "bg-[linear-gradient(180deg,color-mix(in_srgb,var(--success)_88%,white)_0%,var(--success)_55%)] text-[#0d1a10] hover:brightness-[1.08]",
+        warning:
+          "bg-[linear-gradient(180deg,color-mix(in_srgb,var(--warning)_88%,white)_0%,var(--warning)_55%)] text-[#1d1608] hover:brightness-[1.08]",
       },
       size: {
         default: "h-9 px-4 py-2",

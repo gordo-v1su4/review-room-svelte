@@ -15,7 +15,6 @@ import {
   Check,
   Folder,
   PenLine,
-  Maximize2,
   Star,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -230,20 +229,19 @@ export function VideoCard({
       onDoubleClick={(event) => openPreview(event)}
       onDragStart={(event) => onDragStart?.(event, video)}
       onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onSelect(emptySelectModifiers());
         }
       }}
       className={cn(
-        "group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border bg-zinc-900/80 text-left transition-all",
+        "group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-white/[0.06] bg-[linear-gradient(180deg,rgb(255_255_255/0.035)_0%,rgb(255_255_255/0.012)_100%)] text-left transition-[border-color,background-color,box-shadow] duration-200 hover:border-white/[0.12] hover:bg-[linear-gradient(180deg,rgb(255_255_255/0.05)_0%,rgb(255_255_255/0.02)_100%)]",
         onDragStart && "cursor-grab active:cursor-grabbing",
         selected
-          ? "border-[var(--selected)] ring-1 ring-[color-mix(in_srgb,var(--selected)_50%,transparent)]"
+          ? "border-[var(--selected)]/70 ring-2 ring-[color-mix(in_srgb,var(--selected)_38%,transparent)]"
           : checked
             ? "border-[var(--brand-accent)]/40 ring-1 ring-[color-mix(in_srgb,var(--brand-accent)_22%,transparent)]"
-            : "border-zinc-800/80 hover:border-zinc-600",
+            : "",
       )}
     >
       <div
@@ -271,7 +269,7 @@ export function VideoCard({
             alt=""
             onError={() => setThumbnailFailed(true)}
             className={cn(
-              "h-full w-full",
+              "h-full w-full transition-transform duration-300 ease-out group-hover:scale-[1.03]",
               thumbnailScale === "fit" ? "object-contain" : "object-cover",
             )}
           />
@@ -311,11 +309,6 @@ export function VideoCard({
           onClick={(event) => event.stopPropagation()}
           onDoubleClick={(event) => event.stopPropagation()}
         >
-          {!isImage && onOpenVideoPreview && (
-            <button type="button" title="Preview video" aria-label="Preview video" className="grid h-8 w-8 place-items-center rounded-full bg-black/30 text-zinc-300 transition hover:bg-white/10 hover:text-white sm:h-6 sm:w-6" onClick={openPreview}>
-              <Maximize2 className="h-3.5 w-3.5" />
-            </button>
-          )}
           {isImage && onOpenImagePreview && (
             <button
               type="button"
@@ -387,6 +380,13 @@ export function VideoCard({
               </span>
             </button>
           )}
+          <VideoRatingControl
+            value={video.rating}
+            onChange={rateVideo}
+            className="gap-0"
+            starClassName="h-3 w-3"
+            buttonClassName="h-5 w-4 text-zinc-400 hover:text-[var(--rating)]"
+          />
         </div>
         <div
           className={cn(
@@ -405,15 +405,6 @@ export function VideoCard({
             </span>
           )}
         </div>
-      </div>
-      <div className="flex min-w-0 items-center border-t border-zinc-800/60 px-2 py-1" onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
-        <VideoRatingControl
-          value={video.rating}
-          onChange={rateVideo}
-          className="gap-0"
-          starClassName="h-3.5 w-3.5"
-          buttonClassName="h-8 w-7 min-w-7 text-zinc-400 hover:text-[var(--rating)] sm:h-6 sm:w-6 sm:min-w-6"
-        />
       </div>
       {showCardInfo && (
         <div className={cn("space-y-1.5", size === "sm" ? "p-2" : "p-2.5")}>

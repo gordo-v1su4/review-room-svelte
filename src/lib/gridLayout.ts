@@ -19,5 +19,5 @@ export function assetGridStyle(size: GridSize): CSSProperties {
 }
 
 export function assetGridClass(): string {
-  return "review-grid grid w-full min-w-0 gap-4";
+  return "grid w-full min-w-0 gap-4";
 }

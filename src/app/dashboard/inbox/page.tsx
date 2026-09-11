@@ -155,7 +155,7 @@ export default function InboxPage() {
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 break-words text-sm leading-5 text-zinc-300 [overflow-wrap:anywhere]">
+                      <p className="mt-1 text-sm leading-5 text-zinc-300">
                         {comment.body}
                       </p>
                     </div>

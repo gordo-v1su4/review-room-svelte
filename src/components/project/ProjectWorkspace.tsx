@@ -35,20 +35,26 @@ import { AdminGate, useAdminAccess } from "@/components/auth/AdminGate";
 import { VideoGrid } from "@/components/video/VideoGrid";
 import { VideoTableView } from "@/components/video/VideoTableView";
 import { VideoReviewMode } from "@/components/video/VideoReviewMode";
-import { VideoDetailsPanel } from "@/components/video/VideoDetailsPanel";
 import { CenterAssetViewer } from "@/components/video/CenterAssetViewer";
 import { VideoInspectorPanel } from "@/components/video/VideoInspectorPanel";
 import { ReviewWorkspaceShell } from "./ReviewWorkspaceShell";
 import { WorkspacePanelToggles } from "./WorkspacePanelToggles";
 import { AssetBrowserToolbar } from "./AssetBrowserToolbar";
 import { ImageLightbox } from "@/components/video/ImageLightbox";
-import { VideoLightbox } from "@/components/video/VideoLightbox";
 import { VideoGroupedView } from "./VideoGroupedView";
 import { VideoFieldGroupedView } from "./VideoFieldGroupedView";
 import { FolderShelf } from "./FolderShelf";
 import { matchesSmartView } from "@/lib/smartViews";
 import { projectRootLabel } from "@/lib/projectFolders";
 import { applyFilters, sortVideos, type FilterState } from "@/lib/filters";
+import {
+  applyCollectionFilterRules,
+  collectionIsConfigured,
+  collectionRulesActive,
+  collectionRulesToFilterState,
+  filterStateToCollectionRules,
+  type CollectionFilterRules,
+} from "@/lib/collectionFilters";
 import { isImageAsset, mediaKind } from "@/lib/media";
 import type {
   AssetClass,
@@ -67,20 +73,23 @@ import {
   normalizeVisibleFields,
 } from "@/lib/cardFields";
 import {
+  layoutPreset,
   loadWorkspacePanelState,
   saveWorkspacePanelState,
+  WORKSPACE_CHROME_PADDING,
 } from "@/lib/workspaceLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   emptySelectModifiers,
   nextCheckedIds,
   type MediaSelectModifiers,
 } from "@/lib/mediaSelection";
+import { isEditableTarget, stepInList } from "@/lib/mediaNavigation";
 import { useStorageUrl } from "@/hooks/useStorageUrl";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { DEFAULT_PROJECT_ACCENT, hexToRgba, projectAccent } from "@/lib/projectAccent";
 
 type ProjectIdentityPatch = {
@@ -124,7 +133,6 @@ const THUMBNAIL_SCALES: ThumbnailScale[] = ["fit", "fill"];
 const ASSET_CLASSES: AssetClass[] = ["VID", "IMG", "CTX", "STB"];
 
 export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
-  const desktopWorkspace = useMediaQuery("(min-width: 1024px)");
   const router = useRouter();
   const searchParams = useSearchParams();
   const { appUser, isAuthenticated, isChecking } = useAdminAccess();
@@ -157,9 +165,14 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const [checkedIds, setCheckedIds] = useState<Id<"videos">[]>([]);
   const [lastCheckedId, setLastCheckedId] = useState<Id<"videos"> | null>(null);
   const [previewImageId, setPreviewImageId] = useState<Id<"videos"> | null>(null);
-  const [previewVideoId, setPreviewVideoId] = useState<Id<"videos"> | null>(null);
-  const [viewerOpen, setViewerOpen] = useState(true);
-  const [infoOpen, setInfoOpen] = useState(true);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [viewerAutoPlay, setViewerAutoPlay] = useState(false);
+  const [viewerExpanded, setViewerExpanded] = useState(false);
+  const [panelLayout, setPanelLayout] = useState(() =>
+    loadWorkspacePanelState(projectId).layout,
+  );
+  const desktopWorkspace = useMediaQuery("(min-width: 1024px)");
   const [drawMode, setDrawMode] = useState(false);
   const [playhead, setPlayhead] = useState(0);
   const [seekTo, setSeekTo] = useState<number | null>(null);
@@ -203,6 +216,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   const saveCardFields = useMutation(api.workspacePreferences.saveCardFields);
   const ensureCollections = useMutation(api.collections.ensureSystemCollections);
   const setCollectionSourceFolder = useMutation(api.collections.setSourceFolder);
+  const updateCollectionFilterRules = useMutation(api.collections.updateFilterRules);
   const activeCollection = useQuery(
     api.collections.getById,
     activeCollectionId ? { collectionId: activeCollectionId } : "skip",
@@ -218,6 +232,10 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     filters.hasComments ||
     filters.search.trim().length > 0;
   const isFiltering = view !== "all" || filtersActive;
+  const collectionConfigured = activeCollection
+    ? collectionIsConfigured(activeCollection)
+    : false;
+  const collectionBrowsing = Boolean(activeCollectionId && collectionConfigured);
 
   // One scope rule: counts always mean everything under the current level.
   // At project root that is every asset (including those nested in folders);
@@ -234,10 +252,24 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   // root the grid holds folder tiles plus loose media. Once any filter is
   // active the grid flattens to matching media across all folders.
   const gridSourceVideos = useMemo(() => {
+    if (activeCollection?.sourceFolderId) {
+      return videos.filter((video) => video.folderId === activeCollection.sourceFolderId);
+    }
     if (activeFolderId) return scopedVideos;
-    if (routeAssetClass || layout === "table" || isFiltering) return videos;
+    if (routeAssetClass || layout === "table" || isFiltering || activeCollectionId) {
+      return videos;
+    }
     return videos.filter((video) => !video.folderId);
-  }, [activeFolderId, isFiltering, layout, routeAssetClass, scopedVideos, videos]);
+  }, [
+    activeCollection?.sourceFolderId,
+    activeCollectionId,
+    activeFolderId,
+    isFiltering,
+    layout,
+    routeAssetClass,
+    scopedVideos,
+    videos,
+  ]);
 
   const viewScopedVideos = useMemo(
     () => scopedVideos.filter((v) => matchesSmartView(v, view)),
@@ -246,22 +278,15 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
 
   const filtered = useMemo(() => {
     let list = gridSourceVideos.filter((v) => matchesSmartView(v, view));
-    if (activeCollection?.sourceFolderId) {
-      list = list.filter((video) => video.folderId === activeCollection.sourceFolderId);
-    } else if (activeCollection?.kind === "system" && activeCollection.filterRules) {
-      const rules = activeCollection.filterRules as {
-        assetClass?: AssetClass;
-        status?: string;
-      };
-      if (rules.assetClass) {
-        list = list.filter((video) => video.assetClass === rules.assetClass);
-      }
-      if (rules.status) {
-        list = list.filter((video) => video.status === rules.status);
-      }
+    if (activeCollection?.filterRules) {
+      list = applyCollectionFilterRules(
+        list,
+        activeCollection.filterRules as CollectionFilterRules,
+      );
     }
     list = applyFilters(list, filters);
-    return sortVideos(list, sort);
+    const collectionSort = activeCollection?.sortKey as SortKey | undefined;
+    return sortVideos(list, collectionSort ?? sort);
   }, [activeCollection, filters, gridSourceVideos, sort, view]);
 
   const filteredIdsKey = filtered.map((video) => video._id).join(",");
@@ -288,6 +313,38 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     setCheckedIds(next);
     setLastCheckedId(id);
     setSelectedId(id);
+    setViewerAutoPlay(false);
+  }
+
+  function applyPanelLayout(
+    expanded: boolean,
+    overrides?: { viewerOpen?: boolean; infoOpen?: boolean },
+  ) {
+    const nextViewerOpen = overrides?.viewerOpen ?? viewerOpen;
+    const nextInfoOpen = overrides?.infoOpen ?? infoOpen;
+    const nextLayout = layoutPreset({
+      viewerOpen: nextViewerOpen,
+      infoOpen: nextInfoOpen,
+      expanded,
+    });
+    setPanelLayout(nextLayout);
+    saveWorkspacePanelState(projectId, {
+      viewerOpen: nextViewerOpen,
+      infoOpen: nextInfoOpen,
+      layout: nextLayout,
+    });
+  }
+
+  function openVideoInWorkspace(videoId: Id<"videos">) {
+    setSelectedId(videoId);
+    setCheckedIds((current) =>
+      current.includes(videoId) ? current : [...current, videoId],
+    );
+    setLastCheckedId(videoId);
+    setViewerExpanded(true);
+    setViewerOpen(true);
+    setViewerAutoPlay(true);
+    applyPanelLayout(true, { viewerOpen: true });
   }
 
   const activeFolder = activeFolderId
@@ -336,12 +393,55 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
   };
   const selected = videos.find((v) => v._id === selectedId) ?? null;
   const previewImage = videos.find((v) => v._id === previewImageId) ?? null;
-  const previewVideo = videos.find((v) => v._id === previewVideoId) ?? null;
+
+  // ←/→ cycles the open image lightbox first, otherwise the grid selection.
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isEditableTarget(event.target)) return;
+      const direction = event.key === "ArrowRight" ? 1 : -1;
+      const ids = filtered.map((video) => video._id);
+      if (!ids.length) return;
+      if (previewImageId) {
+        const next = stepInList(ids, previewImageId, direction);
+        if (next && next !== previewImageId) {
+          event.preventDefault();
+          setPreviewImageId(next);
+        }
+        return;
+      }
+      const next = stepInList(ids, selectedId, direction);
+      if (next && next !== selectedId) {
+        event.preventDefault();
+        setSelectedId(next);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [filtered, previewImageId, selectedId]);
+
+  const previewIds = filtered.map((video) => video._id);
+  const activePreviewId = previewImageId;
+  const activePreviewIndex = activePreviewId
+    ? previewIds.indexOf(activePreviewId)
+    : -1;
+  const hasPrevPreview = activePreviewIndex > 0;
+  const hasNextPreview =
+    activePreviewIndex !== -1 && activePreviewIndex < previewIds.length - 1;
+
+  function stepPreview(direction: 1 | -1) {
+    const next = stepInList(previewIds, activePreviewId, direction);
+    if (!next || next === activePreviewId) return;
+    if (previewImageId) setPreviewImageId(next);
+  }
 
   useEffect(() => {
     const stored = loadWorkspacePanelState(projectId);
-    setViewerOpen(stored.viewerOpen);
-    setInfoOpen(stored.infoOpen);
+    setPanelLayout(stored.layout);
+    setViewerOpen(false);
+    setInfoOpen(false);
+    setViewerExpanded(false);
   }, [projectId]);
 
   useEffect(() => {
@@ -357,6 +457,24 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
       // Homelab may lag deploy; collections seed is non-blocking.
     });
   }, [ensureCollections, projectId]);
+
+  const loadedCollectionFiltersRef = useRef<string | null>(null);
+  useEffect(() => {
+    loadedCollectionFiltersRef.current = null;
+  }, [activeCollectionId]);
+
+  useEffect(() => {
+    if (!activeCollection || activeCollection.kind !== "user") return;
+    if (!activeCollection.filterRules) return;
+    const key = activeCollection._id;
+    if (loadedCollectionFiltersRef.current === key) return;
+    loadedCollectionFiltersRef.current = key;
+    const parsed = collectionRulesToFilterState(
+      activeCollection.filterRules as CollectionFilterRules,
+    );
+    setView(parsed.smartView);
+    setFilters(parsed.filters);
+  }, [activeCollection]);
 
   useEffect(() => {
     if (!videoParam || !videos.length) return;
@@ -483,7 +601,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     if (!videos.length) return;
     if (!window.confirm(`Archive ${videos.length} assets from this project?`)) return;
     const result = await archiveVideos({ projectId });
-    setSelectedId(null);
+    closeSelectedAsset();
     setCheckedIds([]);
     setLastCheckedId(null);
     toast.success(`Archived ${result.archived} assets`);
@@ -501,7 +619,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     }
     const result = await removeMany({ videoIds: checkedIds });
     if (selectedId && checkedIds.includes(selectedId)) {
-      setSelectedId(null);
+      closeSelectedAsset();
     }
     setCheckedIds([]);
     setLastCheckedId(null);
@@ -611,12 +729,56 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
     if (routeAssetClass) router.push(`/dashboard/projects/${projectId}`);
   }
 
+  async function saveCollectionFilters() {
+    if (!activeCollection || activeCollection.kind !== "user") return;
+    const rules = filterStateToCollectionRules(filters, view);
+    if (!collectionRulesActive(rules)) {
+      toast.error("Set at least one filter in the toolbar first");
+      return;
+    }
+    try {
+      await updateCollectionFilterRules({
+        collectionId: activeCollection._id,
+        filterRules: rules,
+      });
+      toast.success("Collection filters saved");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not save collection filters",
+      );
+    }
+  }
+
   const canEditProject = appUser.role === "admin" && project.memberRole !== "viewer";
   const canUploadMedia = true;
   const canOrganizeFolders = canEditProject;
   const canManageAccess = appUser.role === "admin" && project.isOwner;
   const projectBrandColor = project.brandColor;
-  const useReviewShell = layout === "review" && desktopWorkspace;
+  const viewerPanelVisible =
+    Boolean(selected) && desktopWorkspace && viewerOpen;
+  const infoPanelVisible = Boolean(selected) && desktopWorkspace && infoOpen;
+  const useWorkspacePanels =
+    layout !== "review" && (viewerPanelVisible || infoPanelVisible);
+
+  function handleLayoutChange(next: WorkspaceLayout) {
+    if (next === "review") {
+      setViewerOpen(false);
+      setInfoOpen(false);
+      setViewerAutoPlay(false);
+      setViewerExpanded(false);
+      persistPanelToggles({ viewerOpen: false, infoOpen: false });
+    }
+    setLayout(next);
+  }
+
+  function closeSelectedAsset() {
+    setSelectedId(null);
+    setViewerOpen(false);
+    setInfoOpen(false);
+    setViewerAutoPlay(false);
+    setViewerExpanded(false);
+    persistPanelToggles({ viewerOpen: false, infoOpen: false });
+  }
 
   function renderGridContent(options: {
     selectedId?: Id<"videos">;
@@ -638,7 +800,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
       fieldOrder: cardFieldOrder,
       onSelect: handleSelect,
       onOpenImagePreview: (video: (typeof videos)[number]) => setPreviewImageId(video._id),
-      onOpenVideoPreview: (video: (typeof videos)[number]) => setPreviewVideoId(video._id),
+      onOpenVideoPreview: (video: (typeof videos)[number]) => openVideoInWorkspace(video._id),
       folderLabelFor: options.showFolderBadges
         ? (video: (typeof videos)[number]) =>
             video.folderId ? folderTitleById.get(video.folderId) : undefined
@@ -667,7 +829,9 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           options.includeLeadingItems
             ? (
                 <FolderShelf
-                  folders={routeAssetClass || isFiltering ? [] : sortedFolders}
+                  folders={
+                    routeAssetClass || isFiltering || collectionBrowsing ? [] : sortedFolders
+                  }
                   videos={videos}
                   activeFolderId={activeFolderId}
                   projectTitle={projectTitle}
@@ -705,9 +869,11 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
             <p className="text-sm text-zinc-500">
               {activeFolder
                 ? "No media in this folder."
-                : isFiltering
-                  ? "Nothing matches the current filters."
-                  : "Upload your first media to start a review."}
+                : collectionBrowsing
+                  ? "Nothing matches this collection."
+                  : isFiltering
+                    ? "Nothing matches the current filters."
+                    : "Upload your first media to start a review."}
             </p>
             {!activeFolder && isFiltering ? (
               <Button variant="secondary" className="mt-3" onClick={clearAllFilters}>
@@ -767,29 +933,40 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
       visibleFields={visibleCardFields}
       fieldOrder={cardFieldOrder}
       panelToggles={
+        layout === "review" ? null : (
         <WorkspacePanelToggles
-          viewerOpen={layout === "review" && viewerOpen}
-          infoOpen={infoOpen}
+          viewerActive={viewerPanelVisible}
+          infoActive={infoPanelVisible}
           onToggleViewer={() => {
-            if (layout !== "review") {
-              setLayout("review");
-              setViewerOpen(true);
-              persistPanelToggles({ viewerOpen: true });
+            if (viewerPanelVisible) {
+              setViewerOpen(false);
+              setViewerExpanded(false);
+              setViewerAutoPlay(false);
+              persistPanelToggles({ viewerOpen: false });
               return;
             }
-            const next = !viewerOpen;
-            setViewerOpen(next);
-            persistPanelToggles({ viewerOpen: next });
+            if (!selected) return;
+            setViewerOpen(true);
+            setViewerExpanded(false);
+            applyPanelLayout(false, { viewerOpen: true });
+            persistPanelToggles({ viewerOpen: true });
           }}
           onToggleInfo={() => {
-            const next = !infoOpen;
-            setInfoOpen(next);
-            persistPanelToggles({ infoOpen: next });
+            if (infoPanelVisible) {
+              setInfoOpen(false);
+              persistPanelToggles({ infoOpen: false });
+              return;
+            }
+            if (!selected) return;
+            setInfoOpen(true);
+            applyPanelLayout(viewerExpanded, { infoOpen: true });
+            persistPanelToggles({ infoOpen: true });
           }}
         />
+        )
       }
       onFolderSort={setFolderSort}
-      onLayout={setLayout}
+      onLayout={handleLayoutChange}
       onGridSize={setGridSize}
       onAspectRatio={setAspectRatio}
       onThumbnailScale={setThumbnailScale}
@@ -798,16 +975,29 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
       onSort={setSort}
       onGroupBy={setGroupBy}
       onVisibleFieldsChange={handleVisibleFieldsChange}
+      canUploadMedia={canUploadMedia}
+      uploadHref={
+        activeFolderId
+          ? `/dashboard/projects/${projectId}/upload?folder=${activeFolderId}`
+          : `/dashboard/projects/${projectId}/upload`
+      }
     />
   );
 
   return (
     <AdminGate>
       <div
-        className="project-workspace flex h-full min-h-0 flex-col overflow-hidden lg:bg-zinc-950"
-        data-layout={layout}
+        className={cn(
+          "flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950",
+          layout === "review" &&
+            !desktopWorkspace &&
+            "min-h-[calc(100dvh-3rem)]",
+        )}
       >
+        <div className="shrink-0">
         <ProjectHero
+          compact={!desktopWorkspace}
+          minimal={layout === "review" && !desktopWorkspace}
           title={project.title}
           clientName={project.clientName}
           description={project.description}
@@ -853,17 +1043,27 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           canUploadMedia={canUploadMedia}
           canManageAccess={canManageAccess}
         />
+        </div>
 
-        {assetBrowserToolbar}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950">
+        <div className="shrink-0">{assetBrowserToolbar}</div>
 
-        {activeCollection && activeCollection.kind === "user" && !activeCollection.sourceFolderId && (
-          <div className="border-b border-zinc-800/60 px-4 py-8 text-center sm:px-6 lg:px-8">
-            <p className="text-sm text-zinc-300">Add assets to this collection</p>
+        {activeCollection && activeCollection.kind === "user" && !collectionConfigured && (
+          <div className={cn("border-b border-zinc-800/60 py-8 text-center", WORKSPACE_CHROME_PADDING)}>
+            <p className="text-sm text-zinc-300">Configure this collection</p>
             <p className="mt-1 text-xs text-zinc-500">
-              Choose a source folder to pull assets into this view.
+              Save the current toolbar filters, or choose a source folder to scope assets.
             </p>
-            {folders.length > 0 && canEditProject && (
+            {canEditProject && (
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => void saveCollectionFilters()}
+                >
+                  Save current filters
+                </Button>
                 {folders.map((folder) => (
                   <Button
                     key={folder._id}
@@ -885,15 +1085,66 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
           </div>
         )}
 
-        <div className="workspace-content flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950">
-          {useReviewShell && selected ? (
+        {activeCollection && collectionConfigured && layout !== "review" && (
+          <div
+            className={cn(
+              "flex items-center justify-between border-b border-zinc-800/60 py-2",
+              WORKSPACE_CHROME_PADDING,
+            )}
+          >
+            <p className="text-xs text-zinc-500">
+              Collection{" "}
+              <span className="font-medium text-zinc-200">{activeCollection.title}</span>
+            </p>
+            {activeCollection.kind === "user" && canEditProject && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-zinc-400"
+                onClick={() => void saveCollectionFilters()}
+              >
+                Update filters
+              </Button>
+            )}
+          </div>
+        )}
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {useWorkspacePanels && selected ? (
             <ReviewWorkspaceShell
               projectId={projectId}
               viewerOpen={viewerOpen}
               infoOpen={infoOpen}
+              preferredLayout={panelLayout}
               assetBrowser={
-                <div className="min-h-0 flex-1 overflow-y-auto">
-                  {renderGridContent({ selectedId: selectedId ?? undefined })}
+                <div className="flex h-full min-h-0 flex-col overflow-hidden">
+                  <div className="min-h-0 flex-1 overflow-y-auto">
+                    {layout === "grid" || layout === "grouped" ? (
+                      renderGridContent({ selectedId: selectedId ?? undefined })
+                    ) : layout === "table" ? (
+                      <VideoTableView
+                        projectId={projectId}
+                        videos={filtered}
+                        selectedId={selectedId ?? undefined}
+                        checkedIds={checkedIds}
+                        onSelect={handleMediaSelect}
+                        onToggleAll={(checked) => {
+                          const ids = filtered.map((video) => video._id);
+                          setCheckedIds(checked ? ids : []);
+                          setLastCheckedId(checked ? (ids[ids.length - 1] ?? null) : null);
+                        }}
+                      />
+                    ) : (
+                      <VideoReviewMode
+                        videos={filtered}
+                        activeId={selectedId ?? undefined}
+                        onSelect={(id) => {
+                          handleMediaSelect(id);
+                        }}
+                        canEdit={canEditProject}
+                      />
+                    )}
+                  </div>
                 </div>
               }
               viewer={
@@ -901,6 +1152,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                   key={selected._id}
                   video={selected}
                   mode="admin"
+                  autoPlay={viewerAutoPlay}
                   drawMode={drawMode}
                   canAnnotate={canEditProject}
                   onDrawModeChange={setDrawMode}
@@ -923,7 +1175,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                   drawMode={drawMode}
                   onDrawModeChange={setDrawMode}
                   onSeek={(sec) => setSeekTo(sec)}
-                  onClose={() => setSelectedId(null)}
+                  onClose={closeSelectedAsset}
                   canEdit={canEditProject}
                   canManageFeedback={canEditProject}
                 />
@@ -934,8 +1186,11 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
             <div className={cn("flex min-h-0 min-w-0 flex-1", selected && "lg:flex-row")}>
               <div
                 className={cn(
-                  "min-h-0 min-w-0 flex-1 overflow-y-auto",
-                  selected && "lg:pr-0",
+                  "min-h-0 min-w-0 flex-1",
+                  layout === "review"
+                    ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+                    : "overflow-y-auto",
+                  selected && layout !== "review" && "lg:pr-0",
                 )}
               >
                 {layout === "grid" ? (
@@ -949,7 +1204,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                 ) : layout === "grouped" ? (
                   <VideoGroupedView
                     folders={
-                      activeFolderId || routeAssetClass || isFiltering
+                      activeFolderId || routeAssetClass || isFiltering || collectionBrowsing
                         ? []
                         : sortedFolders
                     }
@@ -990,7 +1245,7 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                     }
                     onSelect={handleMediaSelect}
                     onOpenImagePreview={(video) => setPreviewImageId(video._id)}
-                    onOpenVideoPreview={(video) => setPreviewVideoId(video._id)}
+                    onOpenVideoPreview={(video) => openVideoInWorkspace(video._id)}
                   />
                 ) : layout === "table" ? (
                   <VideoTableView
@@ -1016,42 +1271,151 @@ export function ProjectWorkspace({ projectId }: { projectId: Id<"projects"> }) {
                   />
                 )}
               </div>
-              {selected && !previewImage && !previewVideo && layout !== "review" && (infoOpen || !desktopWorkspace) && (
-                  <VideoDetailsPanel
-                    key={selected._id}
-                    video={selected}
-                    mode="admin"
-                    onClose={() => setSelectedId(null)}
-                    onExpand={() =>
-                      isImageAsset(selected)
-                        ? setPreviewImageId(selected._id)
-                        : setPreviewVideoId(selected._id)
-                    }
-                    canManageFeedback={canEditProject}
-                  />
+              {!desktopWorkspace && selected && layout !== "review" && (infoOpen || viewerOpen) && (
+                <>
+                  {viewerOpen && (
+                    <div className="sticky top-0 z-30 h-[min(42dvh,22rem)] shrink-0 border-b border-zinc-800/60 bg-zinc-950">
+                      <CenterAssetViewer
+                        key={selected._id}
+                        video={selected}
+                        mode="admin"
+                        autoPlay={viewerAutoPlay}
+                        drawMode={drawMode}
+                        canAnnotate={canEditProject}
+                        onDrawModeChange={setDrawMode}
+                        seekTo={seekTo}
+                        onTimeUpdate={setPlayhead}
+                        onFirstPlay={() => {
+                          if (!selected.viewed) {
+                            void markViewedAdmin({ videoId: selected._id });
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                  {infoOpen && (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="Close asset info"
+                        className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm"
+                        onClick={closeSelectedAsset}
+                      />
+                      <VideoInspectorPanel
+                        video={selected}
+                        mode="admin"
+                        compact
+                        playhead={playhead}
+                        drawMode={drawMode}
+                        onDrawModeChange={setDrawMode}
+                        onSeek={(sec) => setSeekTo(sec)}
+                        onClose={closeSelectedAsset}
+                        canEdit={canEditProject}
+                        canManageFeedback={canEditProject}
+                      />
+                    </>
+                  )}
+                </>
               )}
             </div>
           </div>
           )}
         </div>
+        </div>
         <ImageLightbox
           video={previewImage}
           mode="admin"
           canDownload={Boolean(previewImage?.downloadEnabled)}
+          hasPrev={hasPrevPreview}
+          hasNext={hasNextPreview}
+          onPrev={() => stepPreview(-1)}
+          onNext={() => stepPreview(1)}
           onClose={() => setPreviewImageId(null)}
-        />
-        <VideoLightbox
-          video={previewVideo}
-          mode="admin"
-          onClose={() => setPreviewVideoId(null)}
         />
       </div>
     </AdminGate>
   );
 }
 
+function ProjectHeroActions({
+  className,
+  compact = false,
+  hideUpload = false,
+  projectId,
+  visibility,
+  canManageAccess,
+  canEditProject,
+  canClearVideos,
+  canDeleteSelected,
+  selectedCount,
+  reprocessing,
+  canUploadMedia,
+  uploadHref,
+  onShare,
+  onReprocess,
+  onClearVideos,
+  onDeleteSelected,
+  onArchiveProject,
+}: {
+  className?: string;
+  compact?: boolean;
+  hideUpload?: boolean;
+  projectId: Id<"projects">;
+  visibility: ProjectVisibility;
+  canManageAccess: boolean;
+  canEditProject: boolean;
+  canClearVideos: boolean;
+  canDeleteSelected: boolean;
+  selectedCount: number;
+  reprocessing: boolean;
+  canUploadMedia: boolean;
+  uploadHref: string;
+  onShare: () => void;
+  onReprocess: () => void;
+  onClearVideos: () => void;
+  onDeleteSelected: () => void;
+  onArchiveProject: () => void;
+}) {
+  return (
+    <div className={className}>
+      <ProjectAccessPopover
+        compact={compact}
+        projectId={projectId}
+        visibility={visibility}
+        canManage={canManageAccess}
+      />
+      <ProjectActionsMenu
+        canManageAccess={canManageAccess}
+        canEditProject={canEditProject}
+        canClearVideos={canClearVideos}
+        canDeleteSelected={canDeleteSelected}
+        selectedCount={selectedCount}
+        reprocessing={reprocessing}
+        onShare={onShare}
+        onReprocess={onReprocess}
+        onClearVideos={onClearVideos}
+        onDeleteSelected={onDeleteSelected}
+        onArchiveProject={onArchiveProject}
+      />
+      {canUploadMedia && !hideUpload && (
+        <Link href={uploadHref}>
+          <Button
+            size="sm"
+            aria-label="Upload"
+            className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
+          >
+            <Upload className="h-4 w-4" />
+            Upload
+          </Button>
+        </Link>
+      )}
+    </div>
+  );
+}
+
 function ProjectHero({
   compact = false,
+  minimal = false,
   title,
   clientName,
   description,
@@ -1076,6 +1440,7 @@ function ProjectHero({
   canManageAccess,
 }: {
   compact?: boolean;
+  minimal?: boolean;
   title: string;
   clientName?: string;
   description?: string;
@@ -1116,9 +1481,20 @@ function ProjectHero({
     "--project-accent": accent,
     backgroundImage: bannerUrl
       ? `linear-gradient(90deg, rgba(9,9,11,0.68), rgba(9,9,11,0.22)), url("${bannerUrl}")`
-      : `radial-gradient(circle at 20% 0%, ${hexToRgba(accent, 0.2)}, transparent 32%), linear-gradient(135deg, #18181b, #09090b 70%)`,
+      : `radial-gradient(circle at 20% 0%, ${hexToRgba(accent, 0.2)}, transparent 32%), linear-gradient(135deg, #151517, #0b0b0d 70%)`,
     backgroundSize: "cover",
     backgroundPosition: "center",
+  } as CSSProperties;
+  const compactHeroStyle = {
+    ...heroStyle,
+    backgroundSize: bannerUrl ? "cover" : "100% 100%",
+  } as CSSProperties;
+  const mobileTopWashStyle = {
+    backgroundImage: bannerUrl
+      ? heroStyle.backgroundImage
+      : `radial-gradient(ellipse 120% 220% at 0% 0%, ${hexToRgba(accent, 0.42)}, transparent 58%), linear-gradient(180deg, #151517, #0b0b0d 85%)`,
+    backgroundSize: bannerUrl ? "cover" : "100% 100%",
+    backgroundPosition: "top center",
   } as CSSProperties;
 
   function resetIdentityDrafts() {
@@ -1209,32 +1585,54 @@ function ProjectHero({
     }
   }
 
-  return (
-    <div className="project-hero relative shrink-0 lg:border-b lg:border-zinc-800/60">
-      <div className={cn("hidden h-40 lg:block", compact && "h-24")} style={heroStyle} />
-      <div
-        className={cn(
-          "relative px-4 pb-3 pt-2 lg:-mt-16 lg:px-8 lg:pb-5 lg:pt-0",
-          compact && "-mt-10 pb-3 sm:-mt-12",
+  const identityBlock = (
+    <>
+        {!compact && (
+          <div className="rr-eyebrow mb-2 flex items-center gap-2 sm:mb-2.5">
+            <span>Projects</span>
+            <span className="text-zinc-700">/</span>
+            {canEditProject ? (
+              <button
+                type="button"
+                className="truncate text-left text-zinc-400 transition hover:text-zinc-200"
+                onClick={showIdentityEditor}
+                title="Edit client name"
+              >
+                {clientName ?? "Client"}
+              </button>
+            ) : (
+              <span className="truncate text-zinc-400">{clientName ?? "Client"}</span>
+            )}
+          </div>
         )}
-      >
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 lg:items-end lg:gap-5">
+        <div
+          className={cn(
+            "flex w-full min-w-0 gap-2.5 overflow-hidden sm:gap-3 lg:gap-4",
+            compact ? "items-end" : "items-center sm:items-end",
+          )}
+        >
           <div className="relative shrink-0">
             <button
               type="button"
               disabled={!canEditProject}
-              className="group grid h-11 w-11 place-items-center rounded-xl text-base font-semibold text-zinc-950 ring-2 ring-black/20 transition hover:brightness-110 lg:h-20 lg:w-20 lg:text-lg lg:ring-4 lg:ring-zinc-950"
+              className={cn(
+                "group grid place-items-center rounded-xl font-semibold text-zinc-950 transition hover:brightness-110",
+                compact
+                  ? "h-14 w-14 text-base sm:h-16 sm:w-16"
+                  : "h-14 w-14 text-base sm:h-16 sm:w-16 md:h-20 md:w-20 md:text-lg ring-4 ring-zinc-950",
+                minimal && "h-10 w-10 text-sm",
+              )}
               style={{ backgroundColor: accent }}
               onClick={openIdentityEditor}
               title={canEditProject ? "Edit project identity" : "View-only project"}
             >
               {initials(title)}
-              <span className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full border border-zinc-700 bg-zinc-900 text-zinc-300 opacity-0 shadow-sm transition group-hover:opacity-100">
+              <span className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full border border-zinc-700 bg-zinc-900 text-zinc-300 opacity-0 transition group-hover:opacity-100">
                 <Palette className="h-3.5 w-3.5" />
               </span>
             </button>
             {identityOpen && canEditProject && (
-              <div className="absolute left-0 top-full z-50 mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 shadow-2xl shadow-black/45">
+              <div className="rr-popover absolute left-0 top-full z-50 mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-white/[0.08] bg-[#0d0d0f] p-2.5">
                 <div className="space-y-2">
                   <Input
                     value={draftTitle}
@@ -1323,32 +1721,33 @@ function ProjectHero({
               </div>
             )}
           </div>
-          <div className="min-w-0 flex-1 basis-[calc(100%-4rem)] lg:basis-0">
-            <div className="mb-1 hidden items-center gap-2 text-[11px] text-zinc-500 lg:flex">
-              <span>Projects</span>
-              <span className="text-zinc-700">/</span>
-              {canEditProject ? (
-                <button
-                  type="button"
-                  className="truncate text-left text-zinc-400 transition hover:text-zinc-200"
-                  onClick={showIdentityEditor}
-                  title="Edit client name"
-                >
-                  {clientName ?? "Client"}
-                </button>
-              ) : (
-                <span className="truncate text-zinc-400">
-                  {clientName ?? "Client"}
-                </span>
+          <div className="min-w-0 flex-1">
+            <h1
+              className={cn(
+                "truncate text-lg font-semibold tracking-tight sm:text-xl lg:text-2xl",
+                "text-zinc-100",
+                minimal && "text-base sm:text-lg",
               )}
-            </div>
-            <h1 className="truncate text-lg font-semibold tracking-tight text-zinc-100 lg:text-2xl">
+            >
               {title}
             </h1>
-            <p className="mt-0.5 line-clamp-1 max-w-3xl text-xs leading-4 text-zinc-400 lg:mt-1 lg:min-h-5 lg:text-[13px] lg:leading-5 lg:text-zinc-500">
-              {description || clientName || "\u00a0"}
-            </p>
-            <div className="mt-2.5 hidden flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-zinc-600 lg:flex">
+            {!minimal && compact && clientName && (
+              <p className="mt-0.5 truncate text-[13px] leading-5 text-zinc-400">
+                {clientName}
+              </p>
+            )}
+            {!minimal && !compact && description && (
+              <p className="mt-1 line-clamp-1 min-h-5 max-w-3xl text-[13px] leading-5 text-zinc-500">
+                {description}
+              </p>
+            )}
+            {!minimal && compact && !clientName && description && (
+              <p className="mt-0.5 line-clamp-2 max-w-3xl text-[13px] leading-5 text-zinc-400">
+                {description}
+              </p>
+            )}
+            {!minimal && (
+            <div className="mt-2.5 hidden flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[10px] tracking-[0.12em] text-zinc-600 uppercase sm:flex">
               <span className="inline-flex items-center gap-1.5">
                 <User className="h-3 w-3" />
                 {canEditProject ? (
@@ -1368,42 +1767,85 @@ function ProjectHero({
                 <Clock className="h-3 w-3" />
                 Live workspace
               </span>
-              <span className="inline-flex items-center gap-1.5 text-zinc-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span className="inline-flex items-center gap-1.5 text-[var(--success)]/80">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
                 Review link ready
               </span>
             </div>
-          </div>
-          <div className="project-hero-actions flex w-full shrink-0 flex-wrap items-center justify-end gap-2 lg:w-auto">
-            <ProjectAccessPopover
-              projectId={projectId}
-              visibility={visibility}
-              canManage={canManageAccess}
-            />
-            <ProjectActionsMenu
-              canManageAccess={canManageAccess}
-              canEditProject={canEditProject}
-              canClearVideos={canClearVideos}
-              canDeleteSelected={canDeleteSelected}
-              selectedCount={selectedCount}
-              reprocessing={reprocessing}
-              onShare={onShare}
-              onReprocess={onReprocess}
-              onClearVideos={onClearVideos}
-              onDeleteSelected={onDeleteSelected}
-              onArchiveProject={onArchiveProject}
-            />
-            {canUploadMedia && (
-              <Link href={uploadHref}>
-                <Button size="sm" className="h-8 gap-1.5 px-2.5 text-xs">
-                  <Upload className="h-4 w-4" />
-                  Upload
-                </Button>
-              </Link>
             )}
           </div>
+          <ProjectHeroActions
+            compact={compact}
+            hideUpload={compact}
+            className="flex shrink-0 flex-nowrap items-center gap-1 sm:gap-2"
+            projectId={projectId}
+            visibility={visibility}
+            canManageAccess={canManageAccess}
+            canEditProject={canEditProject}
+            canClearVideos={canClearVideos}
+            canDeleteSelected={canDeleteSelected}
+            selectedCount={selectedCount}
+            reprocessing={reprocessing}
+            canUploadMedia={canUploadMedia}
+            uploadHref={uploadHref}
+            onShare={onShare}
+            onReprocess={onReprocess}
+            onClearVideos={onClearVideos}
+            onDeleteSelected={onDeleteSelected}
+            onArchiveProject={onArchiveProject}
+          />
         </div>
-      </div>
+    </>
+  );
+
+  return (
+    <div
+      className={cn(
+        "relative shrink-0",
+        !compact && "border-b border-zinc-800/60",
+      )}
+    >
+      {!compact && <div className="rr-ruler" aria-hidden />}
+      {compact && !minimal ? (
+        <div className="relative -mt-12 shrink-0 overflow-hidden pt-12">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-12 z-0 h-10"
+            style={mobileTopWashStyle}
+          />
+          <div
+            className={cn(
+              "relative z-10",
+              WORKSPACE_CHROME_PADDING,
+              "pb-2 pt-3",
+            )}
+          >
+            {identityBlock}
+          </div>
+        </div>
+      ) : (
+        <>
+          {!minimal && (
+            <div className="relative overflow-hidden">
+              <div
+                className="h-24 bg-cover bg-center sm:h-32 lg:h-40"
+                style={heroStyle}
+              />
+              <div className="rr-blueprint pointer-events-none absolute inset-0" aria-hidden />
+            </div>
+          )}
+          <div
+            className={cn(
+              "relative",
+              WORKSPACE_CHROME_PADDING,
+              compact && minimal && "py-1 pb-0",
+              !minimal && !compact && "-mt-10 pb-4 sm:-mt-12 sm:pb-4 lg:-mt-16 lg:pb-5",
+            )}
+          >
+            {identityBlock}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1455,7 +1897,7 @@ function ProjectActionsMenu({
         <Popover.Content
           align="end"
           sideOffset={8}
-          className="z-50 w-52 rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 shadow-2xl"
+          className="rr-popover z-50 w-52 rounded-xl border border-white/[0.08] bg-[#0d0d0f] p-1.5"
         >
           {canManageAccess && (
             <button
@@ -1518,10 +1960,12 @@ function ProjectActionsMenu({
 }
 
 function ProjectAccessPopover({
+  compact = false,
   projectId,
   visibility,
   canManage,
 }: {
+  compact?: boolean;
   projectId: Id<"projects">;
   visibility: ProjectVisibility;
   canManage: boolean;
@@ -1584,33 +2028,45 @@ function ProjectAccessPopover({
           type="button"
           variant="secondary"
           size="sm"
-          className="h-8 gap-2 px-2.5 text-xs sm:w-auto"
+          className={cn(
+            "h-8 shrink-0 text-xs",
+            compact ? "gap-1 px-1.5" : "gap-2 px-2.5 sm:w-auto",
+          )}
         >
-          <div className="isolate flex shrink-0 -space-x-1">
-            {(members ?? []).slice(0, 3).map((member, index) => (
+          <div className="flex shrink-0 gap-0.5">
+            {(members ?? []).slice(0, compact ? 2 : 3).map((member) => (
               <span
                 key={member.entryKey}
-                className="relative grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 border-zinc-800 bg-zinc-900 text-[9px] font-medium text-zinc-200"
-                style={{ zIndex: 3 - index }}
+                className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-zinc-950 bg-zinc-700 text-[9px] font-medium text-zinc-200"
                 title={member.name}
               >
-                {member.name.startsWith("*") ? <Users className="h-3 w-3" /> : member.name.slice(0, 1).toUpperCase()}
+                {member.name.slice(0, 1).toUpperCase()}
               </span>
             ))}
           </div>
-          <span className="tabular-nums text-zinc-300">
-            {members ? members.length : "…"}
-          </span>
-          <span className="hidden text-zinc-500 sm:inline">
-            {members?.length === 1 ? "person" : "people"}
-          </span>
+          {compact ? (
+            members && members.length > 2 ? (
+              <span className="text-[10px] tabular-nums text-zinc-400">
+                +{members.length - 2}
+              </span>
+            ) : null
+          ) : (
+            <span className="tabular-nums text-zinc-300">
+              {members ? members.length : "…"}
+            </span>
+          )}
+          {!compact && (
+            <span className="hidden text-zinc-500 sm:inline">
+              {members?.length === 1 ? "person" : "people"}
+            </span>
+          )}
         </Button>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
           align="start"
           sideOffset={8}
-          className="z-50 w-[21rem] max-w-[calc(100vw-1rem)] rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-zinc-200 shadow-2xl shadow-black/45"
+          className="rr-popover z-50 w-[21rem] max-w-[calc(100vw-1rem)] rounded-xl border border-white/[0.08] bg-[#0d0d0f] p-3 text-zinc-200"
         >
           <div className="mb-3 border-b border-zinc-800 pb-2">
             <p className="text-xs font-medium text-zinc-100">Project access</p>
@@ -1634,7 +2090,7 @@ function ProjectAccessPopover({
                     className={cn(
                       "rounded-md border px-2 py-1.5 text-left text-[11px] font-medium transition",
                       visibility === option.id
-                        ? "border-[var(--brand-accent)] bg-[color-mix(in_srgb,var(--brand-accent)_12%,#09090b)] text-[color-mix(in_srgb,var(--brand-accent)_70%,white)]"
+                        ? "border-[var(--brand-accent)] bg-[color-mix(in_srgb,var(--brand-accent)_12%,#0b0b0d)] text-[color-mix(in_srgb,var(--brand-accent)_70%,white)]"
                         : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200",
                     )}
                   >

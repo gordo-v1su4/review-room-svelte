@@ -3,7 +3,16 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "convex/react";
-import { Bookmark, Download, RotateCcw, Save, Trash2, X } from "lucide-react";
+import {
+  Bookmark,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  RotateCcw,
+  Save,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import type { VideoDoc } from "@/lib/smartViews";
@@ -13,9 +22,11 @@ import { VideoRatingControl } from "./VideoRatingControl";
 import { cn } from "@/lib/utils";
 import {
   ANNOTATION_COLORS,
+  AnnotationToolPicker,
   ImageAnnotationCanvas,
   annotationSignature,
   type AnnotationStroke,
+  type AnnotationTool,
 } from "./ImageAnnotationLayer";
 
 export function ImageLightbox({
@@ -23,19 +34,23 @@ export function ImageLightbox({
   mode,
   token,
   canDownload = false,
+  hasPrev = false,
+  hasNext = false,
+  onPrev,
+  onNext,
   onClose,
 }: {
   video: VideoDoc | null;
   mode: "admin" | "client";
   token?: string;
   canDownload?: boolean;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  onPrev?: () => void;
+  onNext?: () => void;
   onClose: () => void;
 }) {
   const imageUrl = useStorageUrl(video?.storageKey, video?.updatedAt);
-  const [loadedImage, setLoadedImage] = useState<{ url: string; aspect: number } | null>(null);
-  const imageAspect = loadedImage?.url === imageUrl
-    ? loadedImage.aspect
-    : video?.width && video?.height ? video.width / video.height : 1;
   const open = Boolean(video);
   const markViewedAdmin = useMutation(api.videos.markViewed);
   const markViewedClient = useMutation(api.reviewPublic.clientMarkViewed);
@@ -48,6 +63,7 @@ export function ImageLightbox({
   const [draftStrokes, setDraftStrokes] = useState<AnnotationStroke[]>([]);
   const [annotationColor, setAnnotationColor] = useState(ANNOTATION_COLORS[0]);
   const [annotationWidth, setAnnotationWidth] = useState(4);
+  const [annotationTool, setAnnotationTool] = useState<AnnotationTool>("pen");
   const [savingAnnotations, setSavingAnnotations] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const savedAnnotationSignature = useMemo(
@@ -146,22 +162,34 @@ export function ImageLightbox({
   return (
     <Dialog.Root open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-md" />
-        <Dialog.Content className="fixed inset-0 z-[90] grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-zinc-950/35 text-zinc-50 outline-none">
-          <div className="min-w-0 border-b border-white/10 bg-black/30 px-4 py-3 backdrop-blur sm:px-6 lg:pr-[36rem]">
-            <div className="min-w-0 pr-12 lg:pr-0">
+        <Dialog.Overlay className="rr-overlay fixed inset-0 z-[80] bg-black/75 backdrop-blur-md" />
+        <Dialog.Content className="rr-fullscreen fixed inset-0 z-[90] grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-zinc-950/35 text-zinc-50 outline-none">
+          <div className="min-w-0 border-b border-white/10 bg-black/30 px-4 py-3 pr-4 backdrop-blur sm:px-6 lg:pr-[36rem]">
+            <div className="min-w-0">
+              <p
+                className="rr-eyebrow mb-1"
+                style={{ color: "var(--brand-accent)" }}
+              >
+                Frame markup — Annotation
+              </p>
               <Dialog.Title className="truncate text-sm font-medium text-zinc-100">
                 {video?.title ?? "Image preview"}
               </Dialog.Title>
               {video?.originalFilename && (
-                <Dialog.Description className="mt-0.5 truncate text-[11px] text-zinc-500">
+                <Dialog.Description className="rr-readout mt-0.5 truncate text-[10px] tracking-[0.08em] text-zinc-500">
                   {video.originalFilename}
                 </Dialog.Description>
               )}
             </div>
-            <div className="mt-3 flex max-w-full flex-wrap items-center gap-2 rounded-lg bg-black/10 lg:fixed lg:right-14 lg:top-3 lg:z-[110] lg:mt-0 lg:max-w-[calc(100vw-4rem)] lg:flex-nowrap lg:justify-end">
+            <div className="fixed right-3 top-3 z-[110] flex max-w-[calc(100vw-1.5rem)] shrink-0 items-center justify-end gap-2 overflow-x-auto rounded-lg bg-black/10 pl-1 no-scrollbar">
               {video && (
                 <>
+                  <AnnotationToolPicker
+                    tool={annotationTool}
+                    onToolChange={setAnnotationTool}
+                    compact
+                    className="border-white/10 bg-white/5"
+                  />
                   <div
                     className="inline-flex items-center"
                     style={{
@@ -287,33 +315,55 @@ export function ImageLightbox({
                   )}
                 </>
               )}
-            </div>
-              <Dialog.Close className="absolute right-3 top-3 z-[110] grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white">
+              <Dialog.Close className="grid h-7 w-7 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white">
                 <X className="h-3.5 w-3.5" />
                 <span className="sr-only">Close image preview</span>
               </Dialog.Close>
+            </div>
           </div>
-          <div className="grid h-full min-h-0 place-items-center overflow-hidden px-3 py-4 [container-type:size] sm:px-8 sm:py-6">
+          <div className="relative grid h-full min-h-0 place-items-center overflow-hidden px-3 py-4 sm:px-8 sm:py-6">
+            {onPrev && (
+              <button
+                type="button"
+                title="Previous media (←)"
+                aria-label="Previous media"
+                disabled={!hasPrev}
+                onClick={onPrev}
+                className="absolute left-3 top-1/2 z-[100] grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-zinc-300 backdrop-blur transition hover:bg-black/65 hover:text-white disabled:pointer-events-none disabled:opacity-25 sm:left-5"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            )}
+            {onNext && (
+              <button
+                type="button"
+                title="Next media (→)"
+                aria-label="Next media"
+                disabled={!hasNext}
+                onClick={onNext}
+                className="absolute right-3 top-1/2 z-[100] grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-zinc-300 backdrop-blur transition hover:bg-black/65 hover:text-white disabled:pointer-events-none disabled:opacity-25 sm:right-5"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            )}
             {imageUrl ? (
               <div
-                className="relative inline-block max-w-full shadow-2xl shadow-black/60"
-                style={{ width: `min(100cqw, calc(100cqh * ${imageAspect}))`, maxHeight: "100%" }}
+                className="rr-frame relative inline-block max-w-full rounded-lg ring-1 ring-white/[0.08]"
+                style={{ maxHeight: "calc(100dvh - 8.5rem)" }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={imageUrl}
                   alt={video?.title ?? ""}
-                  className="block h-auto max-h-full w-full object-contain"
-                  onLoad={(event) => {
-                    const image = event.currentTarget;
-                    if (image.naturalHeight) setLoadedImage({ url: imageUrl, aspect: image.naturalWidth / image.naturalHeight });
-                  }}
+                  className="block h-auto w-auto max-w-full object-contain"
+                  style={{ maxHeight: "calc(100dvh - 8.5rem)" }}
                   draggable={false}
                 />
                 <ImageAnnotationCanvas
                   strokes={draftStrokes}
                   color={annotationColor}
                   width={annotationWidth}
+                  tool={annotationTool}
                   onChange={setDraftStrokes}
                 />
               </div>

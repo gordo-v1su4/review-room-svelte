@@ -124,7 +124,7 @@ export function VideoListView({
                     className={cn(
                       "h-3 w-3",
                       index < video.rating
-                        ? "fill-[var(--rating)] text-[var(--rating)]"
+                        ? "fill-yellow-400 text-yellow-400"
                         : "text-zinc-800",
                     )}
                   />
@@ -293,7 +293,7 @@ function VideoListThumbnail({ video }: { video: VideoDoc }) {
       )}
       {canScrub && hoverPct != null && (
         <div
-          className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-teal-300 shadow-[0_0_10px_rgba(45,212,191,0.85)]"
+          className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-teal-300 shadow-[0_0_10px_rgba(110,181,168,0.85)]"
           style={{ left: `${hoverPct * 100}%` }}
         />
       )}
