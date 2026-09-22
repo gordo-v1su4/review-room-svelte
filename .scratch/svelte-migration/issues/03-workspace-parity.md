@@ -31,3 +31,5 @@ Custom collection management and saved rules are locally verified in [collection
 Inline grid/list status editing and compact review action alignment are verified in [card-status-evidence.md](../card-status-evidence.md), including keyboard focus, field visibility and mobile touch targets. Remaining parity and live gates above remain open.
 
 Folder drag/drop is locally verified in [folder-drag-evidence.md](../folder-drag-evidence.md), with group selection, root targets, preserved active review and mobile Move fallback. Project administration and full live acceptance remain open.
+
+Project identity settings are locally verified in [project-identity-evidence.md](../project-identity-evidence.md). Name/client/description/accent/banner and compact desktop/mobile controls are implemented. Owner-only access management, membership, project archive and server persistence remain open.

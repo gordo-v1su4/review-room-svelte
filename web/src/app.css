@@ -968,11 +968,13 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 15px;
-  margin-bottom: 15px;
-  font-size: 12px;
-  background: #3d3020;
-  border-radius: 9px;
+  padding: 2px 10px;
+  margin-bottom: 14px;
+  font-size: 11px;
+  color: var(--muted);
+  background: linear-gradient(110deg, #15201e, #111617);
+  border: 1px solid #bddace10;
+  border-radius: 5px;
 }
 @media (min-width: 1600px) {
   .review-layout.has-active {
@@ -1345,8 +1347,8 @@ button {
 
 /* Compact studio controls: shared dimensions and interaction timing. */
 :root {
-  --control-height: 32px;
-  --control-radius: 7px;
+  --control-height: 28px;
+  --control-radius: 5px;
   --motion-fast: 110ms;
   --motion-settle: 180ms;
   --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);

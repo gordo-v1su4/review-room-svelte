@@ -5,6 +5,8 @@
   import { transitionCollectionState, collectionIsConfigured, queryCollectionAssets, type CollectionState, type CollectionAction } from '$lib/collections';
   import ImportOptions from '$lib/components/ImportOptions.svelte';
   import FolderActions from '$lib/components/FolderActions.svelte';
+  import ProjectIdentityDialog from '$lib/components/ProjectIdentityDialog.svelte';
+  import { updateProjectIdentity, prepareProjectBanner, type ProjectIdentity, type ProjectIdentityDraft } from '$lib/project-identity';
   import { transitionFolderState, folderCoverUrl, type FolderState, type FolderAction } from '$lib/project-folders';
   import { updateTags } from '$lib/bulk-tags';
   import StillViewer from '$lib/components/StillViewer.svelte';
@@ -33,7 +35,7 @@
   let session = $state.raw(createReviewSession([]));
   // This owner role is for device-local review only, never live authorization.
   const localAccess: ReviewAccess = { kind: 'project', memberRole: 'owner' };
-  let projects = $state([{ id: 'studio', name: 'Studio project' }]);
+  let projects = $state<ProjectIdentity[]>([{ id: 'studio', name: 'Studio project' }]);
   let projectId = $state('studio');
   let collections = $state.raw<CollectionState>({ collections: [] });
   let activeCollectionId = $state<string | null>(null);
@@ -75,6 +77,7 @@
   const thumbnails = createThumbnailExtractor({ concurrency: 2 });
   let disposed = false;
   const coverRequests = new Map<string, symbol>();
+  const identityRequests = new Map<string, symbol>();
   const active = $derived(assets.find(asset => asset.id === activeId));
   const scopedAssets = $derived(activeCollection?.sourceFolderId
     ? assets.filter(asset => asset.folderId === activeCollection.sourceFolderId)
@@ -309,10 +312,34 @@
     openFolder(id, 'all'); folderOpen = false;
     projectName = ''; projectDialog = false;
   }
+  async function saveProjectIdentity(id: string, draft: ProjectIdentityDraft) {
+    const original = projects.find(item => item.id === id);
+    if (!original || disposed) throw new Error('Project editing is unavailable.');
+    updateProjectIdentity(original, draft, folderAccess);
+    const request = Symbol(id);
+    identityRequests.set(id, request);
+    let prepared: string | undefined;
+    try {
+      if (draft.banner) prepared = await prepareProjectBanner(draft.banner);
+      if (disposed || identityRequests.get(id) !== request) return;
+      const current = projects.find(item => item.id === id);
+      if (!current) throw new Error('Project editing is unavailable.');
+      const next = updateProjectIdentity(current, { ...draft, bannerUrl: draft.banner === null ? null : prepared }, folderAccess);
+      projects = projects.map(item => item.id === id ? next : item);
+      if (current.bannerUrl && current.bannerUrl !== next.bannerUrl) URL.revokeObjectURL(current.bannerUrl);
+      prepared = undefined;
+      feedback = 'Project settings saved for this session.';
+    } finally {
+      if (prepared) URL.revokeObjectURL(prepared);
+      if (identityRequests.get(id) === request) identityRequests.delete(id);
+    }
+  }
   function filterBy(value: FilterId) { activeCollectionId = null; importOptions.folderId = null; activeFolderId = null; archived = false; filters = { ...defaultFilters(), statuses: value === 'all' || value === 'selected' ? [] : [value], selectedOnly: value === 'selected' }; query = ''; mediaType = 'all'; folderOpen = true; navOpen = false; }
   onDestroy(() => {
     disposed = true;
     coverRequests.clear();
+    identityRequests.clear();
+    for (const item of projects) if (item.bannerUrl) URL.revokeObjectURL(item.bannerUrl);
     thumbnails.dispose();
     for (const folder of organization.folders) if (folder.coverImageUrl) URL.revokeObjectURL(folder.coverImageUrl);
     for (const asset of media) {
@@ -342,7 +369,7 @@
       <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#if folderOpen}<ChevronRight size={13}/><strong>{locationName}</strong>{/if}</div><span class="avatar small">YO</span>
     </header>
     <div class="page-content" class:folder-workspace={folderOpen}>
-      <section class="project-heading"><div><h1>{folderOpen ? locationName : project.name}</h1>{#if !folderOpen}<p class="subtitle">Choose a folder to start reviewing.</p>{/if}</div><div class="project-tools">{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={(folderId, title) => organize({ type: 'rename', folderId, title })} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions folders={projectFolders} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "today’s date folder"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button></div></section>
+      <section class="project-heading" class:identity-banner={!folderOpen && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if !folderOpen && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1>{folderOpen ? locationName : project.name}</h1>{#if !folderOpen}<p class="subtitle" title={project.description}>{project.clientName || project.description || "Choose a folder to start reviewing."}</p>{/if}</div><div class="project-tools"><ProjectIdentityDialog {project} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={(folderId, title) => organize({ type: 'rename', folderId, title })} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions folders={projectFolders} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "today’s date folder"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button></div></section>
       {#if feedback}<div class="notice" role="status">{feedback}<button class="icon-button" aria-label="Dismiss message" onclick={() => feedback = ''}><X size={16}/></button></div>{/if}
       {#if !folderOpen}<section class="folder-shelf" aria-label="Media collections">
         {#each projectFolders as folder (folder.id)}
@@ -425,3 +452,11 @@
     </form>
   </Dialog.Content></Dialog.Portal>
 </Dialog.Root>
+
+<style>
+  .project-heading { position: relative; isolation: isolate; }
+  .project-heading-copy { min-width: 0; }
+  .project-heading-copy .subtitle { max-width: 52ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .identity-banner { padding: 16px; border-radius: 8px; background: #030605; }
+  .project-banner { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; opacity: .2; border-radius: inherit; pointer-events: none; }
+</style>
