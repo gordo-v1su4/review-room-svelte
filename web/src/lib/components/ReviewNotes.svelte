@@ -3,7 +3,8 @@
   import { ArrowUpRight, Check, Clock3, Flame, Heart, MessageSquare, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-svelte';
   import type { ReactionEmoji, ReviewComment } from '$lib/review-session';
 
-  let { comments, draft, time, isVideo, pinTime, onPinTime, onDraft, onPublish, onSeek, onComplete, onReact }: {
+  let { showHeader = true, comments, draft, time, isVideo, pinTime, onPinTime, onDraft, onPublish, onSeek, onComplete, onReact }: {
+    showHeader?: boolean;
     comments: readonly ReviewComment[];
     draft: string;
     time: number;
@@ -26,7 +27,7 @@
 </script>
 
 <section class="comments" aria-label="Review notes">
-  <div class="comments-title"><h3><MessageSquare size={16}/> Notes <span>{comments.length}</span></h3></div>
+  {#if showHeader}<div class="comments-title"><h3><MessageSquare size={16}/> Notes <span>{comments.length}</span></h3></div>{/if}
   {#if !comments.length}
     <p class="no-comments">No notes yet.</p>
   {:else}
@@ -44,7 +45,7 @@
             <p>{note.body}</p>
             <div class="note-actions">
               <div class="reaction-row" role="group" aria-label="Note reactions">
-                {#each reactions as reaction}
+                {#each reactions as reaction (reaction.emoji)}
                   {@const count = note.reactions?.[reaction.emoji]?.length ?? 0}
                   <Toggle.Root
                     class="note-action reaction"

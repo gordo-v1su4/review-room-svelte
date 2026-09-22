@@ -3,9 +3,11 @@
   import type { LocalAsset } from '$lib/review';
   import type { AssetReview, ReviewAction } from '$lib/review-session';
 
-  let { assets, activeId, onSelect, onReview }: {
+  let { assets, activeId, checkedIds = [], onSelect, onCheck, onReview }: {
     assets: readonly (LocalAsset & AssetReview)[];
     activeId: string | null;
+    checkedIds?: readonly string[];
+    onCheck: (id: string, event: MouseEvent, toggle?: boolean) => void;
     onSelect: (id: string) => void;
     onReview: (action: ReviewAction) => void;
   } = $props();
@@ -31,26 +33,27 @@
 <div class="asset-table-region" role="region" aria-label="Media review table" tabindex="0">
   <table>
     <caption class="visually-hidden">Media and review decisions</caption>
-    <thead><tr><th scope="col">Asset</th><th scope="col">Status</th><th scope="col">Rating</th><th scope="col">Shortlist</th><th scope="col">Notes</th></tr></thead>
+    <thead><tr><th scope="col"><span class="visually-hidden">Selection</span></th><th scope="col">Asset</th><th scope="col">Status</th><th scope="col">Rating</th><th scope="col">Shortlist</th><th scope="col">Notes</th></tr></thead>
     <tbody>
       {#each assets as asset (asset.id)}
         <tr class:active-row={activeId === asset.id}>
+          <td><input type="checkbox" aria-label={`Select ${asset.name}`} checked={checkedIds.includes(asset.id)} onclick={event => onCheck(asset.id, event, true)}/></td>
           <th scope="row">
-            <button type="button" class="asset-title" aria-current={activeId === asset.id ? 'true' : undefined} onclick={() => onSelect(asset.id)} title={asset.name}>
+            <button type="button" class="asset-title" aria-current={activeId === asset.id ? 'true' : undefined} onclick={event => event.metaKey || event.ctrlKey || event.shiftKey ? onCheck(asset.id, event) : onSelect(asset.id)} title={asset.name}>
               {#if asset.type === 'video'}<Film size={15}/>{:else}<Image size={15}/>{/if}
-              <span class="asset-name">{asset.name}</span><span class="media-kind">{asset.type === 'video' ? 'VID' : 'IMG'}</span>
+              <span class="asset-name">{asset.name}</span><span class="media-kind">{asset.assetClass}</span>
             </button>
           </th>
           <td>
             <select aria-label={`Status for ${asset.name}`} value={asset.status} onchange={event => changeStatus(asset.id, event.currentTarget.value)}>
               {#if asset.status === 'archived'}<option value="archived" disabled>Archived</option>{/if}
-              {#each statuses as status}<option value={status.value}>{status.label}</option>{/each}
+              {#each statuses as status (status.value)}<option value={status.value}>{status.label}</option>{/each}
             </select>
           </td>
           <td>
             <select aria-label={`Rating for ${asset.name}`} value={asset.rating} onchange={event => onReview({ type: 'rate', assetId: asset.id, rating: Number(event.currentTarget.value) })}>
               <option value={0}>Unrated</option>
-              {#each [1, 2, 3, 4, 5] as rating}<option value={rating}>{rating} {rating === 1 ? 'star' : 'stars'}</option>{/each}
+              {#each [1, 2, 3, 4, 5] as rating (rating)}<option value={rating}>{rating} {rating === 1 ? 'star' : 'stars'}</option>{/each}
             </select>
           </td>
           <td><button type="button" class="shortlist-control" aria-label={`Shortlist ${asset.name}`} aria-pressed={asset.shortlisted} onclick={() => onReview({ type: 'shortlist', assetId: asset.id, shortlisted: !asset.shortlisted })}><Bookmark size={15} fill={asset.shortlisted ? 'currentColor' : 'none'}/></button></td>

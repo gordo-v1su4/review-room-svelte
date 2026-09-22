@@ -1679,3 +1679,22 @@ select:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 .media-properties dt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .media-properties dd { margin: 0; }
 @media (max-width: 480px) { .project-tools { gap: 5px; } .project-tools .secondary-button { font-size: 10px; padding-inline: 7px; } }
+
+/* Compact, contextual browsing controls. */
+.selection-tools { display: flex; align-items: center; margin: 0 0 12px; }
+.select-visible-button { padding: 3px 0; background: transparent; color: var(--muted); font-size: 10px; }
+.selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 0; margin-bottom: 12px; border-block: 1px solid var(--border); font-size: 11px; }
+.selection-count { color: var(--teal); margin-right: auto; font-variant-numeric: tabular-nums; }
+.selection-bar button, .selection-bar select { background: var(--panel); color: var(--ink); border: 1px solid var(--border); border-radius: 5px; min-height: 28px; padding: 3px 7px; font: inherit; }
+.selection-bar button:hover { background: var(--raised); }
+.media-group + .media-group { margin-top: 24px; }
+.group-heading { display: flex; align-items: center; gap: 9px; font-size: 11px; font-weight: 500; text-transform: capitalize; padding-bottom: 10px; color: var(--ink); }
+.group-heading span { color: var(--muted); font-weight: 400; }
+.explorer-pane { container-type: inline-size; container-name: explorer; }
+@container explorer (min-width: 600px) { .toolbar .search { flex: 1 1 150px; width: auto; } }
+@media (pointer:coarse) { .selection-bar button, .selection-bar select, .select-visible-button { min-height: 44px; } }
+
+.inspector-tabs { display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+.inspector-tabs button { display: inline-flex; align-items: center; gap: 6px; align-self: stretch; padding: 0 2px; border: 0; border-bottom: 2px solid transparent; color: var(--muted); background: transparent; font-size: 12px; }
+.inspector-tabs button[data-state='active'] { color: var(--ink); border-bottom-color: var(--teal); }
+.inspector-tabs span { color: var(--muted); font-size: 10px; }

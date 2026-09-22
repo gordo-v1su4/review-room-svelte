@@ -1,6 +1,11 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import MediaThumbnail from '$lib/components/MediaThumbnail.svelte';
+  import { updateTags } from '$lib/bulk-tags';
+  import MediaCards from '$lib/components/MediaCards.svelte';
+  import AssetDetails from '$lib/components/AssetDetails.svelte';
+  import SelectionBar from '$lib/components/SelectionBar.svelte';
+  import { transitionSelection, type SelectionState } from '$lib/media-selection';
+  import { normalizeAppearance, type AppearanceValue } from '$lib/appearance';
   import AppearanceMenu from '$lib/components/AppearanceMenu.svelte';
   import ProjectTree from '$lib/components/ProjectTree.svelte';
   import WorkspacePanes from '$lib/components/WorkspacePanes.svelte';
@@ -8,9 +13,9 @@
   import ReviewNotes from '$lib/components/ReviewNotes.svelte';
   import WorkspaceFilters from '$lib/components/WorkspaceFilters.svelte';
   import AssetTable from '$lib/components/AssetTable.svelte';
-  import { queryWorkspace, type WorkspaceMediaType, type WorkspaceFilter } from '$lib/workspace';
+  import { queryWorkspace, groupWorkspaceAssets, type WorkspaceMediaType, type WorkspaceFilterState } from '$lib/workspace';
   import type { VideoStatus } from '../../../src/lib/types';
-  import { Dialog } from 'bits-ui';
+  import { Dialog, Tabs } from 'bits-ui';
   import { ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, PanelLeftClose, PanelLeftOpen, PanelRightOpen, ChevronRight } from 'lucide-svelte';
   import Player from '$lib/playback/Player.svelte';
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
@@ -26,7 +31,7 @@
   let folderOpen = $state(false);
   let navCollapsed = $state(false);
   let projectDialog = $state(false), projectName = $state('');
-  const allAssets = $derived(media.map(asset => ({ ...asset, ...session.assets[asset.id] })));
+  const allAssets = $derived(media.map(asset => ({ ...asset, ...session.assets[asset.id], commentsCount: session.assets[asset.id]?.comments.length ?? 0 })));
   const assets = $derived(allAssets.filter(asset => assetProjects[asset.id] === projectId));
   const project = $derived(projects.find(item => item.id === projectId)!);
   const treeProjects = $derived(projects.map(project => {
@@ -36,18 +41,45 @@
   const activeId = $derived(session.activeAssetId);
   function review(action: ReviewAction) { session = transitionReviewSession(session, action, localAccess); }
   type FilterId = 'all' | 'selected' | VideoStatus;
-  let query = $state(''), filter = $state<FilterId>('all'), view = $state<'grid' | 'list' | 'table'>('grid');
+  let query = $state(''), view = $state<'grid' | 'list' | 'table'>('grid');
   let mediaType = $state<WorkspaceMediaType | 'all'>('all');
-  let appearance = $state<{aspect: 'square' | 'landscape' | 'portrait'; fit: 'fit' | 'fill'; size: 'small' | 'medium' | 'large'}>({aspect: 'landscape', fit: 'fill', size: 'medium'});
-  let minRating = $state(0), sort = $state<WorkspaceFilter['sort']>();
+  const defaultFilters = (): WorkspaceFilterState => ({ search: '', statuses: [], assetClasses: [], tags: [], selectedOnly: false, minRating: 0, hasComments: false, sort: 'newest', groupBy: 'none' });
+  let filters = $state<WorkspaceFilterState>(defaultFilters());
+  const filter = $derived<FilterId>(filters.selectedOnly ? 'selected' : filters.statuses.length === 1 ? filters.statuses[0] : 'all');
+  let appearance = $state<AppearanceValue>(normalizeAppearance(null));
+  let checked = $state<SelectionState>({ ids: [], anchorId: null });
   let player = $state<ReturnType<typeof Player>>();
   let currentTime = $state(0), pinTime = $state(true), feedback = $state('');
   let navOpen = $state(false), showInspector = $state(false);
+  let inspectorTab = $state('notes');
+  const knownTags = $derived([...new Set(assets.flatMap(asset => asset.tags))]);
   let picker: HTMLInputElement;
   const thumbnails = createThumbnailExtractor({ concurrency: 2 });
   let disposed = false;
   const active = $derived(assets.find(asset => asset.id === activeId));
-  const visible = $derived(queryWorkspace(assets, { search: query, statuses: filter !== 'all' && filter !== 'selected' ? [filter] : undefined, shortlisted: filter === 'selected' ? true : undefined, mediaTypes: mediaType === 'all' ? undefined : [mediaType], minRating, sort }));
+  const visible = $derived(queryWorkspace(assets, { ...filters, search: query, shortlisted: filters.selectedOnly ? true : undefined, mediaTypes: mediaType === 'all' ? undefined : [mediaType] }));
+  const groups = $derived(groupWorkspaceAssets(visible, filters.groupBy));
+  const visibleIds = $derived(groups.flatMap(group => group.assets.map(asset => asset.id)));
+  $effect(() => {
+    const next = transitionSelection(checked, { type: 'reconcile', allIds: visibleIds });
+    if (next !== checked) checked = next;
+  });
+  function checkAsset(id: string, event: MouseEvent, toggle = false) {
+    checked = transitionSelection(checked, { type: 'click', id, visibleIds, shiftKey: event.shiftKey, metaKey: toggle || event.metaKey, ctrlKey: event.ctrlKey });
+  }
+  function batchReview(action: { type: 'status'; status: VideoStatus } | { type: 'rate'; rating: number } | { type: 'shortlist'; shortlisted: boolean }) {
+    const ids = new Set(checked.ids.filter(id => visibleIds.includes(id)));
+    let next = session;
+    for (const asset of assets) if (ids.has(asset.id)) next = transitionReviewSession(next, { ...action, assetId: asset.id }, localAccess);
+    session = next;
+  }
+  function batchTags(tags: string[], mode: 'add' | 'remove') {
+    const ids = new Set(checked.ids.filter(id => visibleIds.includes(id)));
+    media = media.map(asset => ids.has(asset.id) ? { ...asset, tags: updateTags(asset.tags, tags, mode) } : asset);
+  }
+  function updateAsset(id: string, fields: Partial<Pick<LocalAsset, 'assetClass' | 'assetCode' | 'tags' | 'duration' | 'width' | 'height' | 'fps' | 'codec' | 'metadata'>>) {
+    media = media.map(asset => asset.id === id ? { ...asset, ...fields } : asset);
+  }
   const approved = $derived(assets.filter(a => a.status === 'approved').length);
   function importFiles(files: FileList | null) {
     if (!files) return;
@@ -57,10 +89,10 @@
         const asset = openLocalAsset(file);
         added.push(asset);
         if (asset.type === 'video') {
-          void thumbnails.extract(file).then(({ blob }) => {
+          void thumbnails.extract(file).then(({ blob, duration, sourceWidth, sourceHeight }) => {
             if (disposed) return;
             const poster = URL.createObjectURL(blob);
-            media = media.map(item => item.id === asset.id ? { ...item, poster } : item);
+            media = media.map(item => item.id === asset.id ? { ...item, poster, duration, width: sourceWidth, height: sourceHeight } : item);
           }).catch(() => { /* The film placeholder remains usable when decoding fails. */ });
         }
       } catch { feedback = `Skipped ${file.name}: choose a video or image.`; }
@@ -70,7 +102,7 @@
     review({ type: 'add-assets', assets: added });
     if (added.length) {
       folderOpen = true;
-      filter = 'all'; query = ''; minRating = 0;
+      filters = defaultFilters(); query = ''; checked = transitionSelection(checked, { type: 'clear' });
       mediaType = added.every(asset => asset.type === added[0].type) ? added[0].type : 'all';
       select(null);
     }
@@ -81,8 +113,8 @@
     currentTime = 0;
   }
   function navigate(delta: number) {
-    const index = visible.findIndex(a => a.id === activeId);
-    const next = visible[index + delta]; if (next) select(next.id);
+    const index = visibleIds.indexOf(activeId ?? '');
+    const next = visibleIds[index + delta]; if (next) select(next);
   }
   function updateDraft(body: string) {
     if (!active) return;
@@ -96,8 +128,8 @@
     select(null);
     projectId = id;
     mediaType = collection === 'video' || collection === 'image' ? collection : 'all';
-    filter = collection === 'selected' ? 'selected' : 'all';
-    query = ''; minRating = 0;
+    filters = { ...defaultFilters(), selectedOnly: collection === 'selected' };
+    query = ''; checked = transitionSelection(checked, { type: 'clear' });
     folderOpen = true; navOpen = false;
   }
   function changeAppearance(value: typeof appearance) {
@@ -107,11 +139,11 @@
   onMount(() => {
     try {
       const value = JSON.parse(localStorage.getItem('review-room.appearance') ?? 'null');
-      if (value && ['square','landscape','portrait'].includes(value.aspect) && ['fit','fill'].includes(value.fit) && ['small','medium','large'].includes(value.size)) appearance = value;
+      appearance = normalizeAppearance(value);
     } catch { /* Retain defaults when storage is unavailable. */ }
   });
   function projectOverview() {
-    select(null); folderOpen = false; mediaType = 'all'; filter = 'all'; query = ''; minRating = 0; sort = undefined; navOpen = false;
+    select(null); folderOpen = false; mediaType = 'all'; filters = defaultFilters(); query = ''; checked = transitionSelection(checked, { type: 'clear' }); navOpen = false;
   }
   function createProject(event: SubmitEvent) {
     event.preventDefault();
@@ -121,7 +153,7 @@
     openFolder(id, 'all'); folderOpen = false;
     projectName = ''; projectDialog = false;
   }
-  function filterBy(value: FilterId) { filter = value; mediaType = 'all'; folderOpen = true; navOpen = false; }
+  function filterBy(value: FilterId) { filters = { ...defaultFilters(), statuses: value === 'all' || value === 'selected' ? [] : [value], selectedOnly: value === 'selected' }; query = ''; mediaType = 'all'; folderOpen = true; navOpen = false; }
   onDestroy(() => {
     disposed = true;
     thumbnails.dispose();
@@ -154,7 +186,7 @@
     <div class="page-content" class:folder-workspace={folderOpen}>
       <section class="project-heading"><div><h1>{folderOpen ? (mediaType === 'video' ? 'Videos' : mediaType === 'image' ? 'Images' : filter === 'selected' ? 'Shortlist' : 'All media') : project.name}</h1>{#if !folderOpen}<p class="subtitle">Choose a folder to start reviewing.</p>{/if}</div><div class="project-tools">{#if active}<button class="secondary-button" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<button class="primary-button" onclick={() => picker.click()}><Plus size={18}/> Add media</button></div></section>
       {#if !folderOpen}<section class="folder-shelf" aria-label="Media collections">
-        {#each [{ type: 'video' as const, name: 'Videos' }, { type: 'image' as const, name: 'Images' }] as collection}
+        {#each [{ type: 'video' as const, name: 'Videos' }, { type: 'image' as const, name: 'Images' }] as collection (collection.type)}
           <button class="folder-card" class:folder-active={mediaType === collection.type} aria-pressed={mediaType === collection.type} onclick={() => openFolder(projectId, collection.type)}>
             <FolderArtwork empty={!assets.some(asset => asset.type === collection.type)}/><strong>{collection.name}</strong><span>{assets.filter(asset => asset.type === collection.type).length} items</span>
           </button>
@@ -164,29 +196,52 @@
       {#snippet explorer()}
       <div class="collection-bar"><div class="collection-title"><h2>Media</h2><span class="count">{visible.length}</span></div><span class="local-badge">LOCAL SESSION</span></div>
       <div class="toolbar"><label class="search"><Search size={16}/><input aria-label="Search media" placeholder="Find a clip or image…" bind:value={query}/><kbd>⌕</kbd></label>
-        <WorkspaceFilters {filter} {mediaType} {minRating} {sort} onChange={values => { filter = values.filter; mediaType = values.mediaType; minRating = values.minRating; sort = values.sort; }}/>
+        <WorkspaceFilters value={filters} onChange={values => { filters = values; }}/>
 
         <AppearanceMenu value={appearance} onChange={changeAppearance}/>
         <div class="view-switch" aria-label="Media layout"><button class:chosen={view === 'grid'} aria-label="Grid view" aria-pressed={view === 'grid'} onclick={() => view = 'grid'}><Grid2X2 size={16}/></button><button class:chosen={view === 'list'} aria-label="List view" aria-pressed={view === 'list'} onclick={() => view = 'list'}><List size={18}/></button><button class:chosen={view === 'table'} aria-label="Table view" aria-pressed={view === 'table'} onclick={() => view = 'table'}><Table2 size={17}/></button></div>
       </div>
       {#if feedback}<div class="notice" role="status">{feedback}<button class="icon-button" aria-label="Dismiss message" onclick={() => feedback = ''}><X size={16}/></button></div>{/if}
+      {#if checked.ids.length}
+            <SelectionBar count={checked.ids.length} visibleCount={visible.length} access={localAccess} canEditMetadata={true} onTags={batchTags}
+              onselectvisible={() => checked = transitionSelection(checked, { type: 'select-visible', visibleIds })}
+              onclear={() => checked = transitionSelection(checked, { type: 'clear' })}
+              onshortlist={shortlisted => batchReview({ type: 'shortlist', shortlisted })}
+              onstatus={status => batchReview({ type: 'status', status })}
+              onrate={rating => batchReview({ type: 'rate', rating })}/>
+      {/if}
         <section class="library" aria-label="Media collection">
           {#if !assets.length}<div class="empty-state"><div class="empty-art"><Folder size={58} strokeWidth={1}/><span class="empty-plus"><Plus size={20}/></span></div><h2>Start with a cut.</h2><p>Open a video or image to start reviewing. Media stays on this device.</p><button class="primary-button" onclick={() => picker.click()}><Upload size={17}/> Open local media</button></div>
-          {:else if !visible.length}<div class="empty-state compact"><Search size={28}/><h2>No matching media</h2><p>Try another search or clear your filters.</p><button class="secondary-button" onclick={() => { query = ''; filter = 'all'; mediaType = 'all'; minRating = 0; }}>Clear filters</button></div>
-          {:else if view === 'table'}<AssetTable assets={visible} {activeId} onSelect={select} onReview={review}/>{:else}<div class:list-layout={view === 'list'} class="media-grid" data-thumbnail-fit={appearance.fit} style:--card-ratio={appearance.aspect === 'square' ? '1' : appearance.aspect === 'portrait' ? '9 / 16' : '16 / 9'} style:--card-fit={appearance.fit === 'fit' ? 'contain' : 'cover'} style:--card-width={appearance.size === 'small' ? '130px' : appearance.size === 'large' ? '280px' : '190px'}>{#each visible as asset (asset.id)}<button class:active-card={activeId === asset.id} class="media-card" onclick={() => select(asset.id)}><div class="thumbnail"><MediaThumbnail src={asset.url} poster={asset.poster} type={asset.type} name={asset.name}/><span class="asset-type">{asset.type === 'video' ? 'VID' : 'IMG'}</span>{#if asset.shortlisted}<span class="shortlist-icon"><Bookmark size={13} fill="currentColor"/></span>{/if}</div><div class="card-body"><strong>{asset.name}</strong><div><span>{(asset.size / 1048576).toFixed(1)} MB</span><span class={`status-dot ${asset.status === 'approved' ? 'approved' : asset.status === 'needs_changes' ? 'changes' : 'pending'}`}></span><span>{asset.status.replaceAll('_',' ')}</span></div></div></button>{/each}</div>{/if}
+          {:else if !visible.length}<div class="empty-state compact"><Search size={28}/><h2>No matching media</h2><p>Try another search or clear your filters.</p><button class="secondary-button" onclick={() => { query = ''; filters = defaultFilters(); mediaType = 'all'; }}>Clear filters</button></div>
+          {:else}
+            <div class="selection-tools"><button class="select-visible-button" onclick={() => checked = transitionSelection(checked, { type: 'select-visible', visibleIds })}>Select all {visible.length}</button></div>
+
+            {#each groups as group (group.id)}
+              <section class="media-group" aria-label={filters.groupBy === 'none' ? 'Assets' : group.label}>
+                {#if filters.groupBy !== 'none'}<h3 class="group-heading">{group.label}<span>{group.assets.length}</span></h3>{/if}
+                {#if view === 'table'}<AssetTable assets={group.assets} {activeId} checkedIds={checked.ids} onSelect={select} onCheck={checkAsset} onReview={review}/>
+                {:else}<MediaCards assets={group.assets} {activeId} checkedIds={checked.ids} {appearance} {view} onOpen={select} onCheck={checkAsset}/>{/if}
+              </section>
+            {/each}
+          {/if}
         </section>
       {/snippet}
       {#snippet viewer()}
         {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2>{active.name}</h2></div><button class="icon-button" aria-label="Close review" onclick={() => select(null)}><PanelRightClose size={18}/></button></div>
-          {#if active.type === 'video'}<Player bind:this={player} sourceBlob={active.sourceFile} diagnostics={false} src={active.url} name={active.name} ontime={t => currentTime = t}/>{:else}<div class="still-view"><img src={active.url} alt={active.name}/></div>{/if}
-          <div class="review-actions"><button class:shortlisted={active.shortlisted} class="secondary-button" aria-pressed={active.shortlisted} onclick={() => review({ type: 'shortlist', assetId: active.id, shortlisted: !active.shortlisted })}><Bookmark size={16}/> {active.shortlisted ? 'Shortlisted' : 'Shortlist'}</button><div class="rating" aria-label="Rating">{#each [1,2,3,4,5] as rating}<button aria-label={`Rate ${rating} stars`} aria-pressed={active.rating === rating} onclick={() => review({ type: 'rate', assetId: active.id, rating: active.rating === rating ? 0 : rating })}><Star size={17} fill={active.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}</div><div class="asset-nav"><button class="icon-button" aria-label="Previous asset" disabled={visible.findIndex(a => a.id === activeId) <= 0} onclick={() => navigate(-1)}><ArrowLeft size={17}/></button><button class="icon-button" aria-label="Next asset" disabled={visible.findIndex(a => a.id === activeId) >= visible.length - 1} onclick={() => navigate(1)}><ArrowRight size={17}/></button></div></div>
+          {#if active.type === 'video'}<Player bind:this={player} sourceBlob={active.sourceFile} diagnostics={false} src={active.url} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<div class="still-view"><img src={active.url} alt={active.name} onload={event => updateAsset(active.id, { width: (event.currentTarget as HTMLImageElement).naturalWidth, height: (event.currentTarget as HTMLImageElement).naturalHeight })}/></div>{/if}
+          <div class="review-actions"><button class:shortlisted={active.shortlisted} class="secondary-button" aria-pressed={active.shortlisted} onclick={() => review({ type: 'shortlist', assetId: active.id, shortlisted: !active.shortlisted })}><Bookmark size={16}/> {active.shortlisted ? 'Shortlisted' : 'Shortlist'}</button><div class="rating" aria-label="Rating">{#each [1,2,3,4,5] as rating (rating)}<button aria-label={`Rate ${rating} stars`} aria-pressed={active.rating === rating} onclick={() => review({ type: 'rate', assetId: active.id, rating: active.rating === rating ? 0 : rating })}><Star size={17} fill={active.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}</div><div class="asset-nav"><button class="icon-button" aria-label="Previous asset" disabled={visibleIds.indexOf(activeId ?? '') <= 0} onclick={() => navigate(-1)}><ArrowLeft size={17}/></button><button class="icon-button" aria-label="Next asset" disabled={visibleIds.indexOf(activeId ?? '') >= visibleIds.length - 1} onclick={() => navigate(1)}><ArrowRight size={17}/></button></div></div>
           <div class="decision-bar"><button class:decision-active={active.status === 'needs_changes'} class="secondary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'needs_changes' ? 'awaiting_review' : 'needs_changes' })}>Request changes</button><button class="primary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'approved' ? 'awaiting_review' : 'approved' })}><Check size={16}/>{active.status === 'approved' ? 'Approved' : 'Approve'}</button></div>
         </section>{/if}
       {/snippet}
       {#snippet inspector()}
-        {#if active}<section class="feedback-pane" aria-label="Feedback">
-          <ReviewNotes comments={active.comments} draft={active.draft.body} time={active.draft.body && active.draft.timecodeSec !== null ? active.draft.timecodeSec : currentTime} isVideo={active.type === 'video'} pinTime={active.draft.body ? active.draft.timecodeSec !== null : pinTime} onPinTime={value => { pinTime = value; review({type:'draft',assetId:active.id,body:active.draft.body,timecodeSec:value && active.type === 'video' ? currentTime : null}); }} onDraft={updateDraft} onPublish={comment} onSeek={time => player?.seek(time)} onComplete={commentId => review({type:'toggle-comment-complete',assetId:active.id,commentId,actorId:'local-reviewer',at:Date.now()})} onReact={(commentId,emoji) => review({type:'toggle-comment-reaction',assetId:active.id,commentId,actorId:'local-reviewer',emoji})}/>
-
+        {#if active}<section class="feedback-pane" aria-label="Asset inspector">
+          <Tabs.Root bind:value={inspectorTab}>
+            <Tabs.List class="inspector-tabs" aria-label="Asset inspector panels"><Tabs.Trigger value="notes">Notes <span>{active.comments.length}</span></Tabs.Trigger><Tabs.Trigger value="fields">Fields</Tabs.Trigger></Tabs.List>
+            <Tabs.Content value="notes">
+          <ReviewNotes showHeader={false} comments={active.comments} draft={active.draft.body} time={active.draft.body && active.draft.timecodeSec !== null ? active.draft.timecodeSec : currentTime} isVideo={active.type === 'video'} pinTime={active.draft.body ? active.draft.timecodeSec !== null : pinTime} onPinTime={value => { pinTime = value; review({type:'draft',assetId:active.id,body:active.draft.body,timecodeSec:value && active.type === 'video' ? currentTime : null}); }} onDraft={updateDraft} onPublish={comment} onSeek={time => player?.seek(time)} onComplete={commentId => review({type:'toggle-comment-complete',assetId:active.id,commentId,actorId:'local-reviewer',at:Date.now()})} onReact={(commentId,emoji) => review({type:'toggle-comment-reaction',assetId:active.id,commentId,actorId:'local-reviewer',emoji})}/>
+          </Tabs.Content>
+            <Tabs.Content value="fields"><AssetDetails asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset}/></Tabs.Content>
+          </Tabs.Root>
         </section>{/if}
       {/snippet}
       <div hidden={!folderOpen}><WorkspacePanes {explorer} {viewer} {inspector} hasActive={!!active} {showInspector}/></div>

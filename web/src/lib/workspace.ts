@@ -1,6 +1,9 @@
 import type { VideoStatus } from '../../../src/lib/types';
 
 export type WorkspaceMediaType = 'video' | 'image';
+export type WorkspaceAssetClass = 'VID' | 'IMG' | 'CTX' | 'STB';
+export type WorkspaceSort = 'newest' | 'oldest' | 'comments' | 'name' | 'name-desc' | 'status' | 'rating';
+export type WorkspaceGroupBy = 'none' | 'status' | 'class' | 'folder';
 export type WorkspaceAsset = Readonly<{
   id: string;
   name: string;
@@ -8,17 +11,42 @@ export type WorkspaceAsset = Readonly<{
   rating: number;
   shortlisted: boolean;
   type: WorkspaceMediaType;
+  assetClass?: WorkspaceAssetClass;
+  commentsCount?: number;
+  uploadedAt?: number;
+  folderId?: string | null;
+  folderName?: string;
+  tags?: readonly string[];
+  importedAt?: number;
 }>;
 
 export type WorkspaceFilter = Readonly<{
   search?: string;
   statuses?: readonly VideoStatus[];
+  assetClasses?: readonly WorkspaceAssetClass[];
+  tags?: readonly string[];
+  hasComments?: boolean;
   shortlisted?: boolean;
   minRating?: number;
   mediaTypes?: readonly WorkspaceMediaType[];
   visibleIds?: readonly string[];
-  sort?: 'name' | 'status' | 'rating';
+  sort?: WorkspaceSort;
+  groupBy?: WorkspaceGroupBy;
 }>;
+
+export type WorkspaceFilterState = Readonly<{
+  search: string;
+  tags: readonly string[];
+  statuses: readonly VideoStatus[];
+  assetClasses: readonly WorkspaceAssetClass[];
+  selectedOnly: boolean;
+  minRating: number;
+  hasComments: boolean;
+  sort: WorkspaceSort;
+  groupBy: WorkspaceGroupBy;
+}>;
+
+export type WorkspaceGroup<T extends WorkspaceAsset = WorkspaceAsset> = Readonly<{ id: string; label: string; assets: readonly T[] }>;
 
 const STATUS_ORDER: readonly VideoStatus[] = [
   'not_started', 'in_progress', 'awaiting_review', 'needs_changes', 'approved', 'final', 'omitted', 'archived',
@@ -34,6 +62,9 @@ export function queryWorkspace<T extends WorkspaceAsset>(assets: readonly T[], f
   const result = assets.filter((asset) =>
     (!search || asset.name.toLocaleLowerCase().includes(search)) &&
     (!statuses || statuses.has(asset.status)) &&
+    (!filter.assetClasses?.length || filter.assetClasses.includes(asset.assetClass ?? (asset.type === 'video' ? 'VID' : 'IMG'))) &&
+    (!filter.tags?.length || filter.tags.every((tag) => asset.tags?.some(value => value.trim().toLocaleLowerCase() === tag.trim().toLocaleLowerCase()))) &&
+    (!filter.hasComments || (asset.commentsCount ?? 0) > 0) &&
     (filter.shortlisted === undefined || asset.shortlisted === filter.shortlisted) &&
     asset.rating >= minimum &&
     (!mediaTypes || mediaTypes.has(asset.type)) &&
@@ -41,8 +72,23 @@ export function queryWorkspace<T extends WorkspaceAsset>(assets: readonly T[], f
   );
   return [...result].sort((left, right) => {
     if (filter.sort === 'name') return left.name.localeCompare(right.name) || left.id.localeCompare(right.id);
+    if (filter.sort === 'name-desc') return right.name.localeCompare(left.name) || left.id.localeCompare(right.id);
     if (filter.sort === 'rating') return right.rating - left.rating || left.id.localeCompare(right.id);
     if (filter.sort === 'status') return STATUS_ORDER.indexOf(left.status) - STATUS_ORDER.indexOf(right.status) || left.id.localeCompare(right.id);
+    if (filter.sort === 'newest') return (right.importedAt ?? right.uploadedAt ?? 0) - (left.importedAt ?? left.uploadedAt ?? 0) || left.id.localeCompare(right.id);
+    if (filter.sort === 'oldest') return (left.importedAt ?? left.uploadedAt ?? 0) - (right.importedAt ?? right.uploadedAt ?? 0) || left.id.localeCompare(right.id);
+    if (filter.sort === 'comments') return (right.commentsCount ?? 0) - (left.commentsCount ?? 0) || left.id.localeCompare(right.id);
     return 0;
   });
+}
+
+export function groupWorkspaceAssets<T extends WorkspaceAsset>(assets: readonly T[], groupBy: WorkspaceGroupBy = 'none'): WorkspaceGroup<T>[] {
+  if (groupBy === 'none') return [{ id: 'all', label: 'All', assets: [...assets] }];
+  const buckets = new Map<string, T[]>();
+  for (const asset of assets) {
+    const key = groupBy === 'status' ? asset.status : groupBy === 'class' ? (asset.assetClass ?? (asset.type === 'video' ? 'VID' : 'IMG')) : (asset.folderId ?? 'root');
+    const current = buckets.get(key) ?? [];
+    current.push(asset); buckets.set(key, current);
+  }
+  return [...buckets].sort(([a], [b]) => a.localeCompare(b)).map(([id, grouped]) => ({ id, label: groupBy === 'folder' ? (grouped[0]?.folderName ?? 'Project root') : id.replaceAll('_', ' '), assets: grouped }));
 }

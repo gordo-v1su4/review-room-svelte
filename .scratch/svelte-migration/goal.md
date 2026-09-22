@@ -34,3 +34,7 @@ Tooling and personal repository setup complete. Design direction and test seams 
 ## Latest increment: explorer and studio workflow
 
 See [explorer-studio-evidence.md](explorer-studio-evidence.md). Folder-only overview, explorer-first import, optional resizable viewer/notes, Appearance, lazy hover scrub, rectangular playheads, studio properties, MP4 worker/GPU previews/native fallback implemented and browser-checked with real Downloads media. 27 tests pass. Full parity and live release gates remain open; next local work is composable facets/grouping, remaining appearance fields, multiselection, full asset classes/inspector, and still review.
+
+## Latest increment: workspace controls and metadata
+
+See [workspace-metadata-evidence.md](workspace-metadata-evidence.md). Composable facets/grouping, field visibility/order, multiselection/batch review and tagging, and searchable typed metadata are implemented for local sessions and browser-checked. Dense cached hover previews also pass real-media browser checks; remaining independent work includes still-review/folder parity and playback benchmarks. Live shipping gates remain open.

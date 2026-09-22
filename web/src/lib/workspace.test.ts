@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { queryWorkspace, type WorkspaceAsset, type WorkspaceFilter } from './workspace';
+import { groupWorkspaceAssets, queryWorkspace, type WorkspaceAsset, type WorkspaceFilter } from './workspace';
 
 const assets: WorkspaceAsset[] = [
-  { id: 'b', name: 'Bravo', status: 'approved', rating: 4, shortlisted: true, type: 'video' },
-  { id: 'a', name: 'Alpha', status: 'needs_changes', rating: 2, shortlisted: false, type: 'image' },
-  { id: 'c', name: 'Charlie', status: 'final', rating: 5, shortlisted: false, type: 'video' },
+  { id: 'b', name: 'Bravo', status: 'approved', rating: 4, shortlisted: true, type: 'video', assetClass: 'VID', commentsCount: 2, importedAt: 2 },
+  { id: 'a', name: 'Alpha', status: 'needs_changes', rating: 2, shortlisted: false, type: 'image', assetClass: 'IMG', commentsCount: 1, importedAt: 3 },
+  { id: 'c', name: 'Charlie', status: 'final', rating: 5, shortlisted: false, type: 'video', assetClass: 'VID', commentsCount: 0, importedAt: 1 },
 ];
 
 describe('workspace query interface', () => {
@@ -32,4 +32,16 @@ describe('workspace query interface', () => {
   test('returns visible ids through the same public query interface', () => {
     expect(queryWorkspace(assets, { visibleIds: ['c', 'a'] }).map((asset) => asset.id)).toEqual(['a', 'c']);
   });
+  test('supports multiple statuses, independent classes, and comments sorting', () => {
+    expect(queryWorkspace(assets, { statuses: ['approved', 'final'], assetClasses: ['VID'], sort: 'comments' }).map((asset) => asset.id)).toEqual(['b', 'c']);
+    expect(queryWorkspace(assets, { sort: 'newest' }).map((asset) => asset.id)).toEqual(['a', 'b', 'c']);
+  });
+  test('groups by status and class without changing the source collection', () => {
+    expect(groupWorkspaceAssets(assets, 'class').map((group) => [group.id, group.assets.length])).toEqual([['IMG', 1], ['VID', 2]]);
+  });
+});
+
+test('tag search ignores case and surrounding spaces while requiring all requested tags', () => {
+  const tagged = [{ ...assets[0], tags: ['Night', 'Teal'] }, { ...assets[1], tags: ['Night'] }];
+  expect(queryWorkspace(tagged, { tags: [' night ', 'TEAL'] }).map(asset => asset.id)).toEqual(['b']);
 });

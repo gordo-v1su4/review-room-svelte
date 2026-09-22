@@ -3,6 +3,8 @@ export interface VideoThumbnail {
   blob: Blob;
   width: number;
   height: number;
+  sourceWidth: number;
+  sourceHeight: number;
   duration: number;
   time: number;
 }
@@ -106,6 +108,8 @@ function decodeFrame(file: Blob, signal: AbortSignal): Promise<VideoThumbnail> {
       const width = Math.max(1, Math.round(video.videoWidth * scale));
       const height = Math.max(1, Math.round(video.videoHeight * scale));
       const duration = video.duration;
+      const sourceWidth = video.videoWidth;
+      const sourceHeight = video.videoHeight;
       const time = video.currentTime;
       canvas.width = width; canvas.height = height;
       try {
@@ -113,7 +117,7 @@ function decodeFrame(file: Blob, signal: AbortSignal): Promise<VideoThumbnail> {
         if (!context) throw new Error('Thumbnail canvas is unavailable.');
         context.drawImage(video, 0, 0, width, height);
         canvas.toBlob((blob) => {
-          if (blob) finish({ blob, width, height, duration, time });
+          if (blob) finish({ blob, width, height, sourceWidth, sourceHeight, duration, time });
           else finish(undefined, new Error('Thumbnail image could not be encoded.'));
         }, 'image/jpeg', 0.82);
       } catch (error) { finish(undefined, error); }
