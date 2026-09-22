@@ -22,6 +22,12 @@ export function createPlaybackSession(media: MediaPort) {
       media.pause(); media.muted = true;
     },
     scrubTo: seek,
+    cancelScrub() {
+      if (disposed) return;
+      const previous = scrub; scrub = undefined;
+      if (previous) media.muted = previous.muted;
+      media.pause();
+    },
     async endScrub(time: number) {
       const previous = scrub; scrub = undefined;
       if (!previous) return;

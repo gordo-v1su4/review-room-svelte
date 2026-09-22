@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronDown, ChevronRight, Folder, Image, Plus, Video, Bookmark } from 'lucide-svelte';
+  import { ChevronDown, ChevronRight, Folder, Image, Plus, Video, Bookmark, Archive, Layers } from 'lucide-svelte';
 
   export type ProjectTreeCollection = 'all' | 'video' | 'image' | 'selected';
   export type ProjectTreeProject = Readonly<{
@@ -8,6 +8,8 @@
     videoCount: number;
     imageCount: number;
     shortlistCount: number;
+    archivedCount?: number;
+    folders?: readonly { id: string; title: string; count: number }[];
   }>;
 
   let {
@@ -16,12 +18,24 @@
     selectedCollection = 'all',
     onOpen,
     onCreate,
+    selectedFolderId = null,
+    archived = false,
+    overview = false,
+    onFolder,
+    onArchive,
+    onProject,
   }: {
     projects: readonly ProjectTreeProject[];
     selectedProjectId?: string;
     selectedCollection?: ProjectTreeCollection;
     onOpen: (projectId: string, collection: ProjectTreeCollection) => void;
     onCreate: () => void;
+    selectedFolderId?: string | null;
+    archived?: boolean;
+    overview?: boolean;
+    onFolder?: (projectId: string, folderId: string) => void;
+    onArchive?: (projectId: string) => void;
+    onProject?: (projectId: string) => void;
   } = $props();
 
   let collapsed = $state<Set<string>>(new Set());
@@ -47,7 +61,7 @@
         {@const isExpanded = !collapsed.has(project.id)}
         {@const isSelected = selectedProjectId === project.id}
         <li class="project-node">
-          <div class="project-row" class:selected={isSelected && selectedCollection === 'all'}>
+          <div class="project-row" class:selected={isSelected && overview}>
             <button
               class="disclosure"
               type="button"
@@ -57,7 +71,7 @@
             >
               {#if isExpanded}<ChevronDown size={14} />{:else}<ChevronRight size={14} />{/if}
             </button>
-            <button class="project-link" type="button" onclick={() => onOpen(project.id, 'all')}>
+            <button class="project-link" type="button" onclick={() => onProject ? onProject(project.id) : onOpen(project.id, 'all')}>
               <Folder size={15} strokeWidth={1.8} />
               <span class="project-name" title={project.name}>{project.name}</span>
               <span class="count">{project.videoCount + project.imageCount}</span>
@@ -66,21 +80,26 @@
 
           {#if isExpanded}
             <ul class="collection-list" aria-label={`${project.name} collections`}>
+              <li><button class="collection-link" class:selected={isSelected && !overview && !selectedFolderId && !archived && selectedCollection === 'all'} type="button" onclick={() => onOpen(project.id, 'all')}><Layers size={14}/><span>All media</span></button></li>
+              {#each project.folders ?? [] as folder (folder.id)}
+                <li><button class="collection-link" class:selected={isSelected && selectedFolderId === folder.id} type="button" onclick={() => onFolder?.(project.id, folder.id)}><Folder size={14}/><span>{folder.title}</span><span class="count">{folder.count}</span></button></li>
+              {/each}
               <li>
-                <button class:selected={isSelected && selectedCollection === 'video'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'video')}>
+                <button class:selected={isSelected && !selectedFolderId && !archived && selectedCollection === 'video'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'video')}>
                   <Video size={14} strokeWidth={1.8} /><span>Videos</span><span class="count">{project.videoCount}</span>
                 </button>
               </li>
               <li>
-                <button class:selected={isSelected && selectedCollection === 'image'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'image')}>
+                <button class:selected={isSelected && !selectedFolderId && !archived && selectedCollection === 'image'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'image')}>
                   <Image size={14} strokeWidth={1.8} /><span>Images</span><span class="count">{project.imageCount}</span>
                 </button>
               </li>
               <li>
-                <button class:selected={isSelected && selectedCollection === 'selected'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'selected')}>
+                <button class:selected={isSelected && !selectedFolderId && !archived && selectedCollection === 'selected'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'selected')}>
                   <Bookmark size={14} strokeWidth={1.8} /><span>Shortlist</span><span class="count">{project.shortlistCount}</span>
                 </button>
               </li>
+              {#if project.archivedCount}<li><button class="collection-link" class:selected={isSelected && archived} type="button" onclick={() => onArchive?.(project.id)}><Archive size={14}/><span>Archived</span><span class="count">{project.archivedCount}</span></button></li>{/if}
             </ul>
           {/if}
         </li>
@@ -112,4 +131,5 @@
   .collection-link { min-height: 31px; padding-left: 6px; color: #899491; border-radius: 7px; }
   .collection-link.selected { background: #ffffff0a; color: #a8ded2; }
   .empty { margin: 0 10px; color: #687371; font-size: 11px; }
+  @media (pointer: coarse) { .project-link, .collection-link, .add-project, .disclosure { min-height: 44px; } .add-project, .disclosure { min-width: 44px; } }
 </style>

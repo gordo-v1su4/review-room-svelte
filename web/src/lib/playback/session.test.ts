@@ -27,3 +27,27 @@ describe('review playback scrubbing', () => {
     expect(video.currentTime).toBe(7.5); expect(video.muted).toBe(false); expect(video.paused).toBe(false);
   });
 });
+
+test('canceling a scrub restores mute without resuming and preserves the reusable session', async () => {
+  let plays = 0;
+  const video = media({ async play() { plays++; this.paused = false; } });
+  const session = createPlaybackSession(video);
+  session.beginScrub(); session.scrubTo(6);
+  session.cancelScrub();
+  expect(video.muted).toBe(false);
+  expect(video.paused).toBe(true);
+  await session.endScrub(9);
+  expect(video.currentTime).toBe(6);
+  expect(plays).toBe(0);
+  session.seek(6.04);
+  expect(video.currentTime).toBe(6.04);
+  await video.play();
+  session.beginScrub(); session.scrubTo(7);
+  await session.endScrub(8);
+  expect(video.currentTime).toBe(8);
+  expect(video.paused).toBe(false);
+  expect(video.muted).toBe(false);
+  session.beginScrub(); session.dispose();
+  expect(video.muted).toBe(false);
+  expect(video.paused).toBe(true);
+});

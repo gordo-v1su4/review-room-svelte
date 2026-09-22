@@ -19,3 +19,5 @@ All applicable parity ledger rows pass on desktop and mobile; no hover-only acti
 ## Comments
 
 Implementation in progress. Workspace controls and local review/metadata slices are recorded in [workspace-metadata-evidence.md](../workspace-metadata-evidence.md). This ticket remains open until its full parity and live acceptance scope passes.
+
+Local flat folder organization and archive/restore are verified in [folders-transport-evidence.md](../folders-transport-evidence.md). Cover controls, date-folder fallback, custom collections and project administration are still open.

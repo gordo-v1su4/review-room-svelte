@@ -1698,3 +1698,13 @@ select:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 .inspector-tabs button { display: inline-flex; align-items: center; gap: 6px; align-self: stretch; padding: 0 2px; border: 0; border-bottom: 2px solid transparent; color: var(--muted); background: transparent; font-size: 12px; }
 .inspector-tabs button[data-state='active'] { color: var(--ink); border-bottom-color: var(--teal); }
 .inspector-tabs span { color: var(--muted); font-size: 10px; }
+
+/* Organization actions wrap as a group without squeezing the project title. */
+.project-tools { flex-wrap: wrap; justify-content: flex-end; }
+.project-heading > div:first-child { min-width: 0; }
+.project-heading h1 { overflow-wrap: anywhere; }
+.folder-card strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 700px) {
+  .project-heading, .folder-workspace .project-heading { flex-wrap: wrap; gap: 12px; }
+  .project-tools { width: 100%; justify-content: flex-start; }
+}

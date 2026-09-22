@@ -42,3 +42,7 @@ See [workspace-metadata-evidence.md](workspace-metadata-evidence.md). Composable
 ## Latest increment: still review and viewed state
 
 See [still-review-evidence.md](still-review-evidence.md). Four markup tools, per-asset draft/saved baselines, undo/clear, explicit local save, original download, fullscreen and viewed metadata are implemented. Real-image browser checks confirm draft isolation, normalized geometry and 390px/fullscreen preservation. 53 tests pass. Next independent work: real folder/project organization parity and measured playback performance. Live backend and release gates remain open.
+
+## Latest increment: real folders and transport controls
+
+See [folders-transport-evidence.md](folders-transport-evidence.md). Local real folders now support create, rename, scoped import, multi-asset moves, remove/archive and restore with retained review drafts. Player has compact controls, frame stepping and time/frame display; real-video desktop/mobile checks passed. 62 tests pass. Remaining independent work includes covers/date folders/custom collections, project administration, keyboard/a11y polish and measured native/accelerated performance; live integration and release gates remain open.

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Pause, Play, Volume2, VolumeX, Maximize, RotateCcw } from 'lucide-svelte';
+  import { Pause, Play, Volume2, VolumeX, Maximize, RotateCcw, StepBack, StepForward } from 'lucide-svelte';
+  import { frameReadout, frameStepTarget, validFrameRate } from './time-display';
   import { createPlaybackSession } from './session';
   import { observeNativePlayback, type PlaybackMetrics } from './diagnostics';
   import type { PreviewInfo } from './accelerated/protocol';
@@ -11,6 +12,10 @@
   let paused = $state(true), muted = $state(false), time = $state(0), duration = $state(0);
   let mediaWidth = $state(0), mediaHeight = $state(0), sourceInfo = $state<PreviewInfo>();
   const codecLabel = (codec: string) => codec.startsWith('avc') ? 'H.264' : /^(hvc|hev)/.test(codec) ? 'HEVC' : codec.startsWith('av01') ? 'AV1' : codec.startsWith('vp09') ? 'VP9' : codec;
+  let showFrames = $state(false);
+  const fps = $derived(sourceInfo?.estimatedFps);
+  const hasFrameRate = $derived(validFrameRate(fps));
+  const frameHint = $derived(hasFrameRate ? 'Step using the estimated source frame rate' : 'Frame stepping unavailable: source frame rate not detected');
   let error = $state(''), scrubbing = $state(false), ready = $state(false);
   let session: ReturnType<typeof createPlaybackSession> | undefined;
   let monitor: ReturnType<typeof observeNativePlayback> | undefined;
@@ -113,6 +118,20 @@
     monitor?.requestSeek(target);
     session.seek(target); time = video.currentTime; ontime(time);
   }
+  function stepFrame(direction: -1 | 1) {
+    if (!ready || !session) return;
+    const target = frameStepTarget(scrubbing ? time : video.currentTime, duration, fps, direction);
+    if (target === null) return;
+    // Cancel an active scrub without resuming or replacing the attachment-owned session.
+    if (scrubbing) {
+      releasePointer();
+      session.cancelScrub();
+    } else cancelPreview?.();
+    video.pause();
+    paused = true;
+    monitor?.requestSeek(target);
+    session.seek(target); time = video.currentTime; ontime(time);
+  }
   async function toggle() {
     const active = session;
     try { if (video.paused) await video.play(); else video.pause(); }
@@ -179,9 +198,11 @@
       <div class="track"><div class="played" style:width={`${duration ? time / duration * 100 : 0}%`}></div><span class="playhead" style:left={`${duration ? time / duration * 100 : 0}%`}></span></div>
     </div>
     <div class="transport">
+      <button class="icon-button" aria-label="Previous frame" title={frameHint} disabled={!ready || !hasFrameRate} onclick={() => stepFrame(-1)}><StepBack size={15}/></button>
       <button class="icon-button play-button" aria-label={paused ? 'Play' : 'Pause'} onclick={toggle} disabled={!ready}>{#if paused}<Play size={18} fill="currentColor"/>{:else}<Pause size={18}/>{/if}</button>
+      <button class="icon-button" aria-label="Next frame" title={frameHint} disabled={!ready || !hasFrameRate} onclick={() => stepFrame(1)}><StepForward size={15}/></button>
       <button class="icon-button" aria-label="Restart clip" onclick={() => seek(0)} disabled={!ready}><RotateCcw size={16}/></button>
-      <span class="timecode">{stamp(time)} <span>/ {stamp(duration)}</span></span>
+      <button class="timecode" aria-label={showFrames && hasFrameRate ? 'Show elapsed time and duration' : 'Show frame numbers and estimated FPS'} aria-pressed={showFrames && hasFrameRate} title={hasFrameRate ? 'Toggle time / frames (estimated average FPS)' : 'Frame rate not detected'} disabled={!hasFrameRate} onclick={() => showFrames = !showFrames}>{#if showFrames && hasFrameRate}{frameReadout(time, duration, fps)}{:else}{stamp(time)} <span>/ {stamp(duration)}</span>{/if}</button>
       <span class="transport-spacer"></span>
       <button class="icon-button" aria-label={muted ? 'Unmute' : 'Mute'} onclick={() => video.muted = !video.muted}>{#if muted}<VolumeX size={18}/>{:else}<Volume2 size={18}/>{/if}</button>
       <button class="icon-button" aria-label="Fullscreen" onclick={() => surface.requestFullscreen?.().catch(() => { error = 'Fullscreen is unavailable in this browser.'; })}><Maximize size={17}/></button>
@@ -197,3 +218,19 @@
     {#if sourceInfo?.codec}<div><dt>Codec</dt><dd title={sourceInfo.codec}>{codecLabel(sourceInfo.codec)}</dd></div>{/if}
   </dl>
 </div>
+
+<style>
+  .transport { flex-wrap: wrap; gap: 3px; }
+  .transport .icon-button { flex: 0 0 28px; min-width: 28px; width: 28px; min-height: 28px; height: 28px; padding: 0; border-radius: 4px; }
+  .transport .play-button { flex-basis: 36px; width: 36px; min-width: 36px; background: var(--raised); color: var(--ink); }
+  .transport .icon-button:disabled { opacity: .35; cursor: default; }
+  .transport .timecode { flex: 0 0 174px; width: 174px; min-height: 28px; margin: 0; padding: 0 4px; text-align: left; white-space: nowrap; border-radius: 4px; color: var(--ink); background: transparent; font-size: 10px; }
+  .transport .timecode:hover:not(:disabled) { background: var(--raised); }
+  .transport .timecode:disabled { opacity: 1; cursor: default; }
+  .transport button:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+  @media (pointer: coarse) {
+    .transport .icon-button { flex-basis: 44px; min-width: 44px; width: 44px; min-height: 44px; height: 44px; }
+    .transport .play-button { flex-basis: 48px; width: 48px; }
+    .transport .timecode { min-height: 44px; }
+  }
+</style>
