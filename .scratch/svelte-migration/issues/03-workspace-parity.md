@@ -37,3 +37,5 @@ Project identity settings are locally verified in [project-identity-evidence.md]
 Project-specific field visibility/order and shared display settings are locally verified in [appearance-preferences-evidence.md](../appearance-preferences-evidence.md), including legacy migration, project switching, reload and preserving a real-media playhead/draft. Authenticated per-user persistence remains open.
 
 Owner/admin project archive and restore are locally verified in [project-archive-evidence.md](../project-archive-evidence.md), including last-project, searchable restore, retained real media/feedback/drafts and mobile drawer flow. Live ownership, persistent archive state and share-token scope remain unverified; access management and membership remain open.
+
+Restored left/right asset keyboard navigation in visible order, including grid/table entry, boundary behavior and draft retention. Verified that text editing, timeline/pane controls and overlay focus retain their own keys; see [keyboard-navigation-evidence.md](../keyboard-navigation-evidence.md). Full accessibility matrix remains open.

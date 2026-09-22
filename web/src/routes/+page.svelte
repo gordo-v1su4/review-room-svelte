@@ -33,6 +33,7 @@
   import AssetTable from '$lib/components/AssetTable.svelte';
   import { queryWorkspace, groupWorkspaceAssets, type WorkspaceMediaType, type WorkspaceFilterState } from '$lib/workspace';
   import type { VideoStatus } from '../../../src/lib/types';
+  import { stepInList } from '../../../src/lib/mediaNavigation';
   import { Dialog, Tabs } from 'bits-ui';
   import { Play, Square, Repeat, ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, PanelLeftClose, PanelLeftOpen, PanelRightOpen, ChevronRight } from 'lucide-svelte';
   import Player from '$lib/playback/Player.svelte';
@@ -234,9 +235,23 @@
       });
     });
   });
-  function navigate(delta: number) {
-    const index = visibleIds.indexOf(activeId ?? '');
-    const next = visibleIds[index + delta]; if (next) select(next);
+  function navigate(direction: -1 | 1) {
+    const next = stepInList(visibleIds, activeId, direction);
+    if (next && next !== activeId) select(next);
+  }
+  function mediaKeydown(event: KeyboardEvent) {
+    if (!folderOpen || project.archived || event.defaultPrevented || event.isComposing
+      || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+      || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    // Portal overlays and navigation own their keyboard focus. Only the workspace browses media.
+    if (target !== document.body && !target.closest('main')) return;
+    if (target.isContentEditable || target.closest('input, textarea, select, [contenteditable], [role="slider"], [role="separator"], [role="tablist"], [role="menu"], [role="listbox"], [role="combobox"], [role="tree"], [role="application"], [role="dialog"], [role="alertdialog"]')) return;
+    const next = stepInList(visibleIds, activeId, event.key === 'ArrowRight' ? 1 : -1);
+    if (next && next !== activeId) {
+      event.preventDefault(); select(next);
+    }
   }
   function updateDraft(body: string) {
     if (!active) return;
@@ -468,6 +483,7 @@
     }
   });
 </script>
+<svelte:window onkeydown={mediaKeydown}/>
 <svelte:head><title>Review Room — Studio</title><meta name="description" content="A focused space to watch, consider, and refine your work."/></svelte:head>
 <input class="visually-hidden" tabindex="-1" aria-label="Choose local media" bind:this={picker} type="file" accept="video/*,image/*" multiple onchange={() => { importFiles(picker.files); picker.value = ''; }}/>
 {#snippet navigation()}
@@ -550,10 +566,10 @@
         </section>
       {/snippet}
       {#snippet viewer()}
-        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2>{active.name}</h2></div><button class="icon-button" aria-label="Close review" onclick={() => select(null)}><PanelRightClose size={18}/></button></div>
+        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 aria-live="polite">{active.name}</h2></div><button class="icon-button" aria-label="Close review" onclick={() => select(null)}><PanelRightClose size={18}/></button></div>
           {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={advancePreview} onfailure={previewFailed} sourceBlob={active.sourceFile} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
               canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => { updateAsset(active.id, info); readySource = active.url; }}/>{/if}
-          <div class="review-actions"><button class:shortlisted={active.shortlisted} class="secondary-button" aria-pressed={active.shortlisted} onclick={() => review({ type: 'shortlist', assetId: active.id, shortlisted: !active.shortlisted })}><Bookmark size={16}/> {active.shortlisted ? 'Shortlisted' : 'Shortlist'}</button><div class="rating" aria-label="Rating">{#each [1,2,3,4,5] as rating (rating)}<button aria-label={`Rate ${rating} stars`} aria-pressed={active.rating === rating} onclick={() => review({ type: 'rate', assetId: active.id, rating: active.rating === rating ? 0 : rating })}><Star size={17} fill={active.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}</div><div class="asset-nav"><button class="icon-button" aria-label="Previous asset" disabled={visibleIds.indexOf(activeId ?? '') <= 0} onclick={() => navigate(-1)}><ArrowLeft size={17}/></button><button class="icon-button" aria-label="Next asset" disabled={visibleIds.indexOf(activeId ?? '') >= visibleIds.length - 1} onclick={() => navigate(1)}><ArrowRight size={17}/></button></div></div>
+          <div class="review-actions"><button class:shortlisted={active.shortlisted} class="secondary-button" aria-pressed={active.shortlisted} onclick={() => review({ type: 'shortlist', assetId: active.id, shortlisted: !active.shortlisted })}><Bookmark size={16}/> {active.shortlisted ? 'Shortlisted' : 'Shortlist'}</button><div class="rating" aria-label="Rating">{#each [1,2,3,4,5] as rating (rating)}<button aria-label={`Rate ${rating} stars`} aria-pressed={active.rating === rating} onclick={() => review({ type: 'rate', assetId: active.id, rating: active.rating === rating ? 0 : rating })}><Star size={17} fill={active.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}</div><div class="asset-nav"><button class="icon-button" aria-label="Previous asset" aria-keyshortcuts="ArrowLeft" title="Previous asset (←)" disabled={visibleIds.indexOf(activeId ?? '') <= 0} onclick={() => navigate(-1)}><ArrowLeft size={17}/></button><button class="icon-button" aria-label="Next asset" aria-keyshortcuts="ArrowRight" title="Next asset (→)" disabled={visibleIds.indexOf(activeId ?? '') >= visibleIds.length - 1} onclick={() => navigate(1)}><ArrowRight size={17}/></button></div></div>
           <div class="decision-bar"><button class:decision-active={active.status === 'needs_changes'} class="secondary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'needs_changes' ? 'awaiting_review' : 'needs_changes' })}>Request changes</button><button class="primary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'approved' ? 'awaiting_review' : 'approved' })}><Check size={16}/>{active.status === 'approved' ? 'Approved' : 'Approve'}</button></div>
         </section>{/if}
       {/snippet}
