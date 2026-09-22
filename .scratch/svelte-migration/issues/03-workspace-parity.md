@@ -33,3 +33,5 @@ Inline grid/list status editing and compact review action alignment are verified
 Folder drag/drop is locally verified in [folder-drag-evidence.md](../folder-drag-evidence.md), with group selection, root targets, preserved active review and mobile Move fallback. Project administration and full live acceptance remain open.
 
 Project identity settings are locally verified in [project-identity-evidence.md](../project-identity-evidence.md). Name/client/description/accent/banner and compact desktop/mobile controls are implemented. Owner-only access management, membership, project archive and server persistence remain open.
+
+Project-specific field visibility/order and shared display settings are locally verified in [appearance-preferences-evidence.md](../appearance-preferences-evidence.md), including legacy migration, project switching, reload and preserving a real-media playhead/draft. Authenticated per-user persistence remains open.

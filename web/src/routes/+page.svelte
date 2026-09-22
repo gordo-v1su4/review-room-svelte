@@ -19,6 +19,7 @@
   import SelectionBar from '$lib/components/SelectionBar.svelte';
   import { transitionSelection, type SelectionState } from '$lib/media-selection';
   import { normalizeAppearance, type AppearanceValue } from '$lib/appearance';
+  import { createAppearancePreferences } from '$lib/appearance-preferences';
   import AppearanceMenu from '$lib/components/AppearanceMenu.svelte';
   import ProjectTree from '$lib/components/ProjectTree.svelte';
   import WorkspacePanes from '$lib/components/WorkspacePanes.svelte';
@@ -74,6 +75,7 @@
   let filters = $state<WorkspaceFilterState>(defaultFilters());
   const filter = $derived<FilterId>(filters.selectedOnly ? 'selected' : filters.statuses.length === 1 ? filters.statuses[0] : 'all');
   let appearance = $state<AppearanceValue>(normalizeAppearance(null));
+  let appearancePreferences: ReturnType<typeof createAppearancePreferences> | undefined;
   let checked = $state<SelectionState>({ ids: [], anchorId: null });
   let player = $state<ReturnType<typeof Player>>();
   let currentTime = $state(0), pinTime = $state(true), feedback = $state('');
@@ -186,6 +188,7 @@
   function openFolder(id: string, collection: 'all' | 'video' | 'image' | 'selected') {
     select(null);
     projectId = id;
+    if (appearancePreferences) appearance = appearancePreferences.load(id);
     activeCollectionId = null; activeFolderId = null; archived = false; importOptions.folderId = null;
     mediaType = collection === 'video' || collection === 'image' ? collection : 'all';
     filters = { ...defaultFilters(), selectedOnly: collection === 'selected' };
@@ -328,14 +331,13 @@
     feedback = `Restored ${assetIds.length} ${assetIds.length === 1 ? 'asset' : 'assets'} to Project root.`;
   }
   function changeAppearance(value: typeof appearance) {
-    appearance = value;
-    try { localStorage.setItem('review-room.appearance', JSON.stringify(value)); } catch { /* Preferences are optional. */ }
+    appearance = appearancePreferences?.save(projectId, value) ?? normalizeAppearance(value);
   }
   onMount(() => {
-    try {
-      const value = JSON.parse(localStorage.getItem('review-room.appearance') ?? 'null');
-      appearance = normalizeAppearance(value);
-    } catch { /* Retain defaults when storage is unavailable. */ }
+    let storage: Storage | undefined;
+    try { storage = localStorage; } catch { /* Some browsers deny storage entirely. */ }
+    appearancePreferences = createAppearancePreferences(projectId, storage);
+    appearance = appearancePreferences.load(projectId);
   });
   function projectOverview() {
     select(null); activeCollectionId = null; activeFolderId = null; archived = false; importOptions.folderId = null; folderOpen = false; mediaType = 'all'; filters = defaultFilters(); query = ''; checked = transitionSelection(checked, { type: 'clear' }); navOpen = false;
