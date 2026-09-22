@@ -16,4 +16,6 @@ Native image loading and video first-frame decoding validate each file before it
 
 ## Remaining gates
 
-Files remain local to the tab; no network upload or durable storage is claimed. Main-area OS file-drop handling is implemented, but browser automation rejected the native drag API, so this path still needs manual browser verification. Cancellation and destination-race behavior are controller-tested, not established by native browser interaction. Filename-extension fallback for files with absent MIME types remains a parity gap. Live uploads, authentication, authorization, persistence, multipart failures and URL refresh remain open.
+Files remain local to the tab; no network upload or durable storage is claimed. Main-area OS file-drop handling is implemented, but browser automation rejected the native drag API, so this path still needs manual browser verification. Cancellation and destination-race behavior are controller-tested, not established by native browser interaction. Live uploads, authentication, authorization, persistence, multipart failures and URL refresh remain open.
+
+Follow-up: restored the original filename-extension recognition contract for missing/generic MIME types: MP4/MOV/M4V/WebM/AVI/MKV and JPG/JPEG/PNG/GIF/WebP/AVIF, case-insensitive and final extension only. Three public import tests cover those formats, MIME-only recognition and unsupported/misleading suffixes. These are recognition tests, not evidence that every container/codec decodes in every browser; native first-frame validation remains mandatory.
