@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronDown, ChevronRight, Folder, Image, Plus, Video, Bookmark, Archive, Layers } from 'lucide-svelte';
+  import { ChevronDown, ChevronRight, Folder, Image, Plus, Video, Bookmark, Archive, Layers, ListFilter } from 'lucide-svelte';
 
   export type ProjectTreeCollection = 'all' | 'video' | 'image' | 'selected';
   export type ProjectTreeProject = Readonly<{
@@ -9,6 +9,7 @@
     imageCount: number;
     shortlistCount: number;
     archivedCount?: number;
+    collections?: readonly { id: string; title: string; count: number }[];
     folders?: readonly { id: string; title: string; count: number }[];
   }>;
 
@@ -19,6 +20,8 @@
     onOpen,
     onCreate,
     selectedFolderId = null,
+    selectedCustomCollectionId = null,
+    onCollection,
     archived = false,
     overview = false,
     onFolder,
@@ -31,6 +34,8 @@
     onOpen: (projectId: string, collection: ProjectTreeCollection) => void;
     onCreate: () => void;
     selectedFolderId?: string | null;
+    selectedCustomCollectionId?: string | null;
+    onCollection?: (projectId: string, collectionId: string) => void;
     archived?: boolean;
     overview?: boolean;
     onFolder?: (projectId: string, folderId: string) => void;
@@ -80,25 +85,28 @@
 
           {#if isExpanded}
             <ul class="collection-list" aria-label={`${project.name} collections`}>
-              <li><button class="collection-link" class:selected={isSelected && !overview && !selectedFolderId && !archived && selectedCollection === 'all'} type="button" onclick={() => onOpen(project.id, 'all')}><Layers size={14}/><span>All media</span></button></li>
+              <li><button class="collection-link" class:selected={isSelected && !selectedCustomCollectionId && !overview && !selectedFolderId && !archived && selectedCollection === 'all'} type="button" onclick={() => onOpen(project.id, 'all')}><Layers size={14}/><span>All media</span></button></li>
               {#each project.folders ?? [] as folder (folder.id)}
                 <li><button class="collection-link" class:selected={isSelected && selectedFolderId === folder.id} type="button" onclick={() => onFolder?.(project.id, folder.id)}><Folder size={14}/><span>{folder.title}</span><span class="count">{folder.count}</span></button></li>
               {/each}
               <li>
-                <button class:selected={isSelected && !selectedFolderId && !archived && selectedCollection === 'video'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'video')}>
+                <button class:selected={isSelected && !selectedCustomCollectionId && !selectedFolderId && !archived && selectedCollection === 'video'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'video')}>
                   <Video size={14} strokeWidth={1.8} /><span>Videos</span><span class="count">{project.videoCount}</span>
                 </button>
               </li>
               <li>
-                <button class:selected={isSelected && !selectedFolderId && !archived && selectedCollection === 'image'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'image')}>
+                <button class:selected={isSelected && !selectedCustomCollectionId && !selectedFolderId && !archived && selectedCollection === 'image'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'image')}>
                   <Image size={14} strokeWidth={1.8} /><span>Images</span><span class="count">{project.imageCount}</span>
                 </button>
               </li>
               <li>
-                <button class:selected={isSelected && !selectedFolderId && !archived && selectedCollection === 'selected'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'selected')}>
+                <button class:selected={isSelected && !selectedCustomCollectionId && !selectedFolderId && !archived && selectedCollection === 'selected'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'selected')}>
                   <Bookmark size={14} strokeWidth={1.8} /><span>Shortlist</span><span class="count">{project.shortlistCount}</span>
                 </button>
               </li>
+              {#each project.collections ?? [] as collection (collection.id)}
+                <li><button class="collection-link" class:selected={isSelected && selectedCustomCollectionId === collection.id} aria-current={isSelected && selectedCustomCollectionId === collection.id ? 'page' : undefined} type="button" onclick={() => onCollection?.(project.id, collection.id)}><ListFilter size={14}/><span>{collection.title}</span><span class="count">{collection.count}</span></button></li>
+              {/each}
               {#if project.archivedCount}<li><button class="collection-link" class:selected={isSelected && archived} type="button" onclick={() => onArchive?.(project.id)}><Archive size={14}/><span>Archived</span><span class="count">{project.archivedCount}</span></button></li>{/if}
             </ul>
           {/if}

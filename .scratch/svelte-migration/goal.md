@@ -54,3 +54,7 @@ See [import-destinations-evidence.md](import-destinations-evidence.md). Root imp
 ## Latest increment: folder covers
 
 See [folder-covers-evidence.md](folder-covers-evidence.md). Local custom cover selection/reset and original automatic image/video-poster fallback are restored, with bounded image previews and URL cleanup. Desktop/mobile real-file checks include corrupt-image recovery and corrected Escape focus restoration. 66 tests pass. Remaining organization/admin, performance, accessibility and live release gates keep this goal active.
+
+## Latest increment: custom collections
+
+See [collections-evidence.md](collections-evidence.md). Local saved filter/source-folder views, dynamic tree counts, rename/delete and keyboard/mobile controls are implemented and verified. 72 tests pass. Live persistence/authorization, remaining organization/admin, performance and release gates remain open.

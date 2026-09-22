@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import CollectionActions from '$lib/components/CollectionActions.svelte';
+  import { transitionCollectionState, collectionIsConfigured, queryCollectionAssets, type CollectionState, type CollectionAction } from '$lib/collections';
   import ImportOptions from '$lib/components/ImportOptions.svelte';
   import FolderActions from '$lib/components/FolderActions.svelte';
   import { transitionFolderState, folderCoverUrl, type FolderState, type FolderAction } from '$lib/project-folders';
@@ -32,6 +34,10 @@
   const localAccess: ReviewAccess = { kind: 'project', memberRole: 'owner' };
   let projects = $state([{ id: 'studio', name: 'Studio project' }]);
   let projectId = $state('studio');
+  let collections = $state.raw<CollectionState>({ collections: [] });
+  let activeCollectionId = $state<string | null>(null);
+  const activeCollection = $derived(collections.collections.find(collection => collection.id === activeCollectionId && collection.projectId === projectId));
+  const collectionAccess = $derived({ projectRoles: Object.fromEntries(projects.map(project => [project.id, 'owner' as const])) });
   let organization = $state.raw<FolderState>({ folders: [], placements: {} });
   let activeFolderId = $state<string | null>(null);
   let importOptions = $state<{ folderId: string | null; assetClass: 'VID' | 'IMG' | 'CTX' | 'STB' }>({ folderId: null, assetClass: 'VID' });
@@ -47,7 +53,7 @@
   const project = $derived(projects.find(item => item.id === projectId)!);
   const treeProjects = $derived(projects.map(project => {
     const items = allAssets.filter(asset => asset.projectId === project.id && !asset.archived);
-    return { ...project, folders: organization.folders.filter(folder => folder.projectId === project.id).map(folder => ({ ...folder, count: items.filter(asset => asset.folderId === folder.id).length })), archivedCount: allAssets.filter(asset => asset.projectId === project.id && asset.archived).length, videoCount: items.filter(asset => asset.type === 'video').length, imageCount: items.filter(asset => asset.type === 'image').length, shortlistCount: items.filter(asset => asset.shortlisted).length };
+    return { ...project, collections: collections.collections.filter(collection => collection.projectId === project.id).map(collection => ({ ...collection, count: queryCollectionAssets(collection, allAssets).length })), folders: organization.folders.filter(folder => folder.projectId === project.id).map(folder => ({ ...folder, count: items.filter(asset => asset.folderId === folder.id).length })), archivedCount: allAssets.filter(asset => asset.projectId === project.id && asset.archived).length, videoCount: items.filter(asset => asset.type === 'video').length, imageCount: items.filter(asset => asset.type === 'image').length, shortlistCount: items.filter(asset => asset.shortlisted).length };
   }));
   const activeId = $derived(session.activeAssetId);
   function review(action: ReviewAction) { session = transitionReviewSession(session, action, localAccess); }
@@ -69,7 +75,13 @@
   let disposed = false;
   const coverRequests = new Map<string, symbol>();
   const active = $derived(assets.find(asset => asset.id === activeId));
-  const visible = $derived(queryWorkspace(activeFolderId ? assets.filter(asset => asset.folderId === activeFolderId) : assets, { ...filters, search: query, shortlisted: filters.selectedOnly ? true : undefined, mediaTypes: mediaType === 'all' ? undefined : [mediaType] }));
+  const scopedAssets = $derived(activeCollection?.sourceFolderId
+    ? assets.filter(asset => asset.folderId === activeCollection.sourceFolderId)
+    : activeFolderId ? assets.filter(asset => asset.folderId === activeFolderId) : assets);
+  const visible = $derived(activeCollection && !collectionIsConfigured(activeCollection) ? [] : queryWorkspace(scopedAssets, {
+    ...filters, search: query, shortlisted: filters.selectedOnly ? true : undefined,
+    mediaTypes: mediaType === 'all' ? undefined : [mediaType]
+  }));
   const groups = $derived(groupWorkspaceAssets(visible, filters.groupBy));
   const visibleIds = $derived(groups.flatMap(group => group.assets.map(asset => asset.id)));
   $effect(() => {
@@ -155,13 +167,37 @@
   function openFolder(id: string, collection: 'all' | 'video' | 'image' | 'selected') {
     select(null);
     projectId = id;
-    activeFolderId = null; archived = false; importOptions.folderId = null;
+    activeCollectionId = null; activeFolderId = null; archived = false; importOptions.folderId = null;
     mediaType = collection === 'video' || collection === 'image' ? collection : 'all';
     filters = { ...defaultFilters(), selectedOnly: collection === 'selected' };
     query = ''; checked = transitionSelection(checked, { type: 'clear' });
     folderOpen = true; navOpen = false; feedback = '';
   }
-  const locationName = $derived(archived ? 'Archived' : activeFolder?.title ?? (mediaType === 'video' ? 'Videos' : mediaType === 'image' ? 'Images' : filter === 'selected' ? 'Shortlist' : 'All media'));
+  const locationName = $derived(archived ? 'Archived' : activeCollection?.title ?? activeFolder?.title ?? (mediaType === 'video' ? 'Videos' : mediaType === 'image' ? 'Images' : filter === 'selected' ? 'Shortlist' : 'All media'));
+  function changeCollections(action: CollectionAction) { collections = transitionCollectionState(collections, action, collectionAccess, organization.folders); }
+  function openCollection(id: string, collectionId: string) {
+    const collection = collections.collections.find(item => item.id === collectionId && item.projectId === id);
+    if (!collection) return;
+    openFolder(id, 'all');
+    activeCollectionId = collectionId;
+    filters = collection.filters ? { ...collection.filters } : defaultFilters();
+    query = filters.search;
+    mediaType = collection.mediaType ?? 'all';
+  }
+  function createCollection(title: string) {
+    const id = crypto.randomUUID();
+    changeCollections({ type: 'create', id, projectId, title });
+    openCollection(projectId, id);
+  }
+  function saveCollection(collectionId: string, sourceFolderId: string | undefined) {
+    changeCollections({ type: 'settings', collectionId, sourceFolderId, filters: { ...filters, search: query }, mediaType: mediaType === 'all' ? undefined : mediaType });
+    feedback = 'Collection rules saved for this session.';
+  }
+  function removeCollection(collectionId: string) {
+    changeCollections({ type: 'remove', collectionId });
+    if (activeCollectionId === collectionId) openFolder(projectId, 'all');
+    feedback = 'Collection deleted. Your media is unchanged.';
+  }
   function organize(action: FolderAction) { organization = transitionFolderState(organization, action, folderAccess); }
   function openRealFolder(id: string, folderId: string) { openFolder(id, 'all'); activeFolderId = folderId; importOptions.folderId = folderId; }
   function openProject(id: string) { openFolder(id, 'all'); folderOpen = false; }
@@ -238,7 +274,7 @@
     } catch { /* Retain defaults when storage is unavailable. */ }
   });
   function projectOverview() {
-    select(null); activeFolderId = null; archived = false; importOptions.folderId = null; folderOpen = false; mediaType = 'all'; filters = defaultFilters(); query = ''; checked = transitionSelection(checked, { type: 'clear' }); navOpen = false;
+    select(null); activeCollectionId = null; activeFolderId = null; archived = false; importOptions.folderId = null; folderOpen = false; mediaType = 'all'; filters = defaultFilters(); query = ''; checked = transitionSelection(checked, { type: 'clear' }); navOpen = false;
   }
   function createProject(event: SubmitEvent) {
     event.preventDefault();
@@ -248,7 +284,7 @@
     openFolder(id, 'all'); folderOpen = false;
     projectName = ''; projectDialog = false;
   }
-  function filterBy(value: FilterId) { importOptions.folderId = null; activeFolderId = null; archived = false; filters = { ...defaultFilters(), statuses: value === 'all' || value === 'selected' ? [] : [value], selectedOnly: value === 'selected' }; query = ''; mediaType = 'all'; folderOpen = true; navOpen = false; }
+  function filterBy(value: FilterId) { activeCollectionId = null; importOptions.folderId = null; activeFolderId = null; archived = false; filters = { ...defaultFilters(), statuses: value === 'all' || value === 'selected' ? [] : [value], selectedOnly: value === 'selected' }; query = ''; mediaType = 'all'; folderOpen = true; navOpen = false; }
   onDestroy(() => {
     disposed = true;
     coverRequests.clear();
@@ -265,11 +301,11 @@
 {#snippet navigation()}
   <div class="brand">review room.</div>
   <button class="workspace-name" onclick={projectOverview}>Personal workspace</button>
-  <ProjectTree overview={!folderOpen} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
+  <ProjectTree selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={!folderOpen} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
   <div class="nav-divider"></div><span class="nav-heading">REVIEW STATUS</span>
-  <button class:nav-active={filter === 'awaiting_review'} class="nav-item" onclick={() => filterBy('awaiting_review')}><span class="status-dot pending"></span> Awaiting review</button>
-  <button class:nav-active={filter === 'needs_changes'} class="nav-item" onclick={() => filterBy('needs_changes')}><span class="status-dot changes"></span> Needs changes</button>
-  <button class:nav-active={filter === 'approved'} class="nav-item" onclick={() => filterBy('approved')}><span class="status-dot approved"></span> Approved <span>{approved}</span></button>
+  <button class:nav-active={!activeCollection && filter === 'awaiting_review'} class="nav-item" onclick={() => filterBy('awaiting_review')}><span class="status-dot pending"></span> Awaiting review</button>
+  <button class:nav-active={!activeCollection && filter === 'needs_changes'} class="nav-item" onclick={() => filterBy('needs_changes')}><span class="status-dot changes"></span> Needs changes</button>
+  <button class:nav-active={!activeCollection && filter === 'approved'} class="nav-item" onclick={() => filterBy('approved')}><span class="status-dot approved"></span> Approved <span>{approved}</span></button>
   <div class="sidebar-bottom"><span class="mode-label"><span class="status-dot"></span> Local session</span><p>Stored in this tab until reload.</p></div>
 {/snippet}
 <div class="app-shell" class:nav-collapsed={navCollapsed}>
@@ -295,7 +331,7 @@
         <button class="folder-card" class:folder-active={filter === 'selected'} aria-pressed={filter === 'selected'} onclick={() => openFolder(projectId, 'selected')}><FolderArtwork empty={!assets.some(asset => asset.shortlisted)}/><strong>Shortlist</strong><span>{assets.filter(asset => asset.shortlisted).length} items</span></button>
       </section>{/if}
       {#snippet explorer()}
-      <div class="collection-bar"><div class="collection-title"><h2>Media</h2><span class="count">{visible.length}</span></div><span class="local-badge">LOCAL SESSION</span></div>
+      <div class="collection-bar"><div class="collection-title"><h2>Media</h2><span class="count">{visible.length}</span></div><CollectionActions {activeCollection} folders={projectFolders} canEdit={true} onCreate={createCollection} onRename={(collectionId, title) => changeCollections({ type: 'rename', collectionId, title })} onRemove={removeCollection} onSave={saveCollection}/></div>
       <div class="toolbar"><label class="search"><Search size={16}/><input aria-label="Search media" placeholder="Find a clip or image…" bind:value={query}/><kbd>⌕</kbd></label>
         <WorkspaceFilters value={filters} onChange={values => { filters = values; }}/>
 
@@ -311,7 +347,9 @@
               onrate={rating => batchReview({ type: 'rate', rating })}/>
       {/if}
         <section class="library" aria-label="Media collection">
-          {#if archived && !assets.length}<div class="empty-state compact"><Folder size={28}/><h2>No archived media</h2><p>Restored assets are available in All media.</p><button class="secondary-button" onclick={() => openFolder(projectId, 'all')}>All media</button></div>
+          {#if activeCollection && !collectionIsConfigured(activeCollection)}<div class="empty-state compact"><Folder size={28}/><h2>Configure this collection</h2><p>Set your filters, then choose Save collection rules in the collection menu. You can also scope it to a folder.</p></div>
+          {:else if activeCollection?.sourceFolderId && !projectFolders.some(folder => folder.id === activeCollection.sourceFolderId)}<div class="empty-state compact"><Folder size={28}/><h2>Source folder unavailable</h2><p>Choose another source in the collection settings.</p></div>
+          {:else if archived && !assets.length}<div class="empty-state compact"><Folder size={28}/><h2>No archived media</h2><p>Restored assets are available in All media.</p><button class="secondary-button" onclick={() => openFolder(projectId, 'all')}>All media</button></div>
           {:else if !assets.length || (activeFolderId && !assets.some(asset => asset.folderId === activeFolderId))}<div class="empty-state"><div class="empty-art"><Folder size={58} strokeWidth={1}/><span class="empty-plus"><Plus size={20}/></span></div><h2>{activeFolderId ? 'This folder is empty' : 'Add your first media'}</h2><p>Open a video or image to start reviewing. Media stays on this device.</p><button class="primary-button" onclick={() => picker.click()}><Upload size={17}/> Open local media</button></div>
           {:else if !visible.length}<div class="empty-state compact"><Search size={28}/><h2>No matching media</h2><p>Try another search or clear your filters.</p><button class="secondary-button" onclick={() => { query = ''; filters = defaultFilters(); mediaType = 'all'; }}>Clear filters</button></div>
           {:else}

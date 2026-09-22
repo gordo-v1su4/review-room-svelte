@@ -25,3 +25,5 @@ Local flat folder organization and archive/restore are verified in [folders-tran
 Date-folder fallback and import destination/classification are locally implemented and verified in [import-destinations-evidence.md](../import-destinations-evidence.md). The date-folder item above is closed for local behavior; live ingest/reservation acceptance remains open under 06/07.
 
 Cover controls and automatic image/video-poster fallback are locally verified in [folder-covers-evidence.md](../folder-covers-evidence.md). Folder drag/drop, custom collections and project administration remain open; live cover storage/authorization belong to integration acceptance.
+
+Custom collection management and saved rules are locally verified in [collections-evidence.md](../collections-evidence.md). Live persistence and authorization remain open; folder drag/drop and project administration are next independent parity work.
