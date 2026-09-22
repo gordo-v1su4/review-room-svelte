@@ -26,7 +26,7 @@
 </script>
 
 <section class="comments" aria-label="Review notes">
-  <div class="comments-title"><h3><MessageSquare size={16}/> Notes <span>{comments.length}</span></h3><span>THIS SESSION</span></div>
+  <div class="comments-title"><h3><MessageSquare size={16}/> Notes <span>{comments.length}</span></h3></div>
   {#if !comments.length}
     <p class="no-comments">No notes yet.</p>
   {:else}

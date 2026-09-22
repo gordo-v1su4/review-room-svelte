@@ -30,3 +30,7 @@ Work only in `gordo-v1su4/review-room-svelte`. Never push to Buzero. Do not acti
 ## Current state
 
 Tooling and personal repository setup complete. Design direction and test seams approved. The first Svelte workspace opens local video/images, preserves playback through responsive layout changes, and supports local review decisions and drafts. A source-backed parity ledger now tracks the remaining capabilities. Native playback and review-state tests pass; full parity, measured acceleration, live integration and shipping checks remain open. This document records the goal; it is not a completion report.
+
+## Latest increment: explorer and studio workflow
+
+See [explorer-studio-evidence.md](explorer-studio-evidence.md). Folder-only overview, explorer-first import, optional resizable viewer/notes, Appearance, lazy hover scrub, rectangular playheads, studio properties, MP4 worker/GPU previews/native fallback implemented and browser-checked with real Downloads media. 27 tests pass. Full parity and live release gates remain open; next local work is composable facets/grouping, remaining appearance fields, multiselection, full asset classes/inspector, and still review.

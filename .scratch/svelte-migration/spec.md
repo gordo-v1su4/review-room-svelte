@@ -97,3 +97,13 @@ Performance targets must be grounded in recorded baseline measurements and named
 - Folder artwork follows reference 01 proportions: tall rounded charcoal front, layered sheets, translucent smoked front with softly visible contents. Empty collections show no paper sheets.
 - Whites are subdued with a slight teal tint; selected folder containers are almost charcoal with only a faint dark teal gradient and hairline highlight.
 - Avoid stock marketing headings and oversized promotional empty states. Motion stays brief and restrained.
+
+- Frame.io is the explicit product baseline: project/folder browsing, retractable navigation tree, and separate adjustable explorer/viewer/feedback panes.
+- Opening a collection hides the large folder shelf. Project creation includes Videos, Images, and Shortlist collections; in this local slice they derive from each project's media and shortlist metadata.
+- Playback and seek indicators must always be thin tall rectangles, never circular knobs.
+- Use actual Downloads media for playback and layout acceptance. Pinterest contemporary-treatment research follows the main interaction work; latency remains the priority.
+
+- Project overview shows folders only. Folder entry/import opens the full explorer; select a clip to reveal viewer, with notes/info optional. Never auto-select media on import.
+- Restore Appearance controls (square, 16:9, 9:16, Fit/Fill, density) and cursor-driven card previews with a thin teal vertical playhead. Preserve the full original appearance/grouping/field preferences in the parity ledger.
+- Product UI shows studio source metadata (resolution, ratio, frame rate where measured, codec, duration), not developer latency telemetry. Surfaces use deeper black, restrained edge highlights, and aligned pane header baselines.
+- All original capabilities remain mandatory; reorganization and simplification do not authorize dropping any existing operation.
