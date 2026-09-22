@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import { ASSET_DRAG_TYPE, beginAssetDrag, folderDropAction, type AssetDrag } from '$lib/asset-drag';
   import CollectionActions from '$lib/components/CollectionActions.svelte';
   import { transitionCollectionState, collectionIsConfigured, queryCollectionAssets, type CollectionState, type CollectionAction } from '$lib/collections';
   import ImportOptions from '$lib/components/ImportOptions.svelte';
@@ -250,12 +251,36 @@
     if (previous) URL.revokeObjectURL(previous);
     if (activeFolderId === folderId) openFolder(projectId, 'all');
   }
-  function moveChecked(folderId: string | null) {
-    const assetIds = checked.ids.filter(id => visibleIds.includes(id));
+  function moveAssets(assetIds: readonly string[], folderId: string | null) {
     organize({ type: 'move', projectId, folderId: folderId ?? undefined, assetIds });
-    if (activeFolderId && activeFolderId !== folderId && activeId && assetIds.includes(activeId)) select(null);
     checked = transitionSelection(checked, { type: 'clear' });
     feedback = `Moved ${assetIds.length} ${assetIds.length === 1 ? 'asset' : 'assets'} to ${projectFolders.find(folder => folder.id === folderId)?.title ?? 'Project root'}.`;
+  }
+  function moveChecked(folderId: string | null) {
+    moveAssets(checked.ids.filter(id => visibleIds.includes(id)), folderId);
+  }
+  let dragged = $state<AssetDrag | null>(null);
+  let dragToken = '';
+  function endAssetDrag() { dragged = null; dragToken = ''; }
+  function startAssetDrag(event: DragEvent, id: string) {
+    endAssetDrag();
+    if (!event.dataTransfer || !folderAccess.isAdmin || archived) { event.preventDefault(); return; }
+    dragged = beginAssetDrag(id, checked.ids, visibleIds, organization);
+    if (!dragged || !folderAccess.editableProjectIds.includes(dragged.projectId)) { event.preventDefault(); endAssetDrag(); return; }
+    dragToken = crypto.randomUUID();
+    event.dataTransfer.setData(ASSET_DRAG_TYPE, dragToken);
+    event.dataTransfer.effectAllowed = 'move';
+  }
+  function canDropAssets(targetProjectId: string, folderId: string | null) {
+    return !!folderDropAction(dragged, targetProjectId, folderId, organization, folderAccess);
+  }
+  function dropAssets(event: DragEvent, targetProjectId: string, folderId: string | null) {
+    const action = folderDropAction(dragged, targetProjectId, folderId, organization, folderAccess);
+    const ownDrag = !!dragToken && event.dataTransfer?.getData(ASSET_DRAG_TYPE) === dragToken;
+    endAssetDrag();
+    if (!action || !ownDrag) return;
+    try { moveAssets(action.assetIds, folderId); }
+    catch (cause) { feedback = cause instanceof Error ? cause.message : 'Could not move media.'; }
   }
   function restoreChecked() {
     const assetIds = checked.ids.filter(id => visibleIds.includes(id));
@@ -301,7 +326,7 @@
 {#snippet navigation()}
   <div class="brand">review room.</div>
   <button class="workspace-name" onclick={projectOverview}>Personal workspace</button>
-  <ProjectTree selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={!folderOpen} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
+  <ProjectTree {canDropAssets} onDropAssets={dropAssets} dragActive={!!dragged} selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={!folderOpen} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
   <div class="nav-divider"></div><span class="nav-heading">REVIEW STATUS</span>
   <button class:nav-active={!activeCollection && filter === 'awaiting_review'} class="nav-item" onclick={() => filterBy('awaiting_review')}><span class="status-dot pending"></span> Awaiting review</button>
   <button class:nav-active={!activeCollection && filter === 'needs_changes'} class="nav-item" onclick={() => filterBy('needs_changes')}><span class="status-dot changes"></span> Needs changes</button>
@@ -358,8 +383,8 @@
             {#each groups as group (group.id)}
               <section class="media-group" aria-label={filters.groupBy === 'none' ? 'Assets' : group.label}>
                 {#if filters.groupBy !== 'none'}<h3 class="group-heading">{group.label}<span>{group.assets.length}</span></h3>{/if}
-                {#if view === 'table'}<AssetTable assets={group.assets} {activeId} checkedIds={checked.ids} onSelect={select} onCheck={checkAsset} onReview={review}/>
-                {:else}<MediaCards access={localAccess} onReview={review} assets={group.assets} {activeId} checkedIds={checked.ids} {appearance} {view} onOpen={select} onCheck={checkAsset}/>{/if}
+                {#if view === 'table'}<AssetTable onDragStart={startAssetDrag} onDragEnd={endAssetDrag} assets={group.assets} {activeId} checkedIds={checked.ids} onSelect={select} onCheck={checkAsset} onReview={review}/>
+                {:else}<MediaCards onDragStart={startAssetDrag} onDragEnd={endAssetDrag} access={localAccess} onReview={review} assets={group.assets} {activeId} checkedIds={checked.ids} {appearance} {view} onOpen={select} onCheck={checkAsset}/>{/if}
               </section>
             {/each}
           {/if}

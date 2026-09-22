@@ -29,3 +29,5 @@ Cover controls and automatic image/video-poster fallback are locally verified in
 Custom collection management and saved rules are locally verified in [collections-evidence.md](../collections-evidence.md). Live persistence and authorization remain open; folder drag/drop and project administration are next independent parity work.
 
 Inline grid/list status editing and compact review action alignment are verified in [card-status-evidence.md](../card-status-evidence.md), including keyboard focus, field visibility and mobile touch targets. Remaining parity and live gates above remain open.
+
+Folder drag/drop is locally verified in [folder-drag-evidence.md](../folder-drag-evidence.md), with group selection, root targets, preserved active review and mobile Move fallback. Project administration and full live acceptance remain open.

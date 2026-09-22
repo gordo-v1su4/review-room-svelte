@@ -3,9 +3,10 @@
   import type { LocalAsset } from '$lib/review';
   import type { AssetReview, ReviewAction } from '$lib/review-session';
 
-  let { assets, activeId, checkedIds = [], onSelect, onCheck, onReview }: {
+  let { assets, activeId, checkedIds = [], onSelect, onCheck, onReview, onDragStart, onDragEnd }: {
     assets: readonly (LocalAsset & AssetReview)[];
     activeId: string | null;
+    onDragStart?: (event: DragEvent, id: string) => void; onDragEnd?: () => void;
     checkedIds?: readonly string[];
     onCheck: (id: string, event: MouseEvent, toggle?: boolean) => void;
     onSelect: (id: string) => void;
@@ -39,7 +40,7 @@
         <tr class:active-row={activeId === asset.id}>
           <td><input type="checkbox" aria-label={`Select ${asset.name}`} checked={checkedIds.includes(asset.id)} onclick={event => onCheck(asset.id, event, true)}/></td>
           <th scope="row">
-            <button type="button" class="asset-title" aria-current={activeId === asset.id ? 'true' : undefined} onclick={event => event.metaKey || event.ctrlKey || event.shiftKey ? onCheck(asset.id, event) : onSelect(asset.id)} title={asset.name}>
+            <button type="button" class="asset-title" draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} aria-current={activeId === asset.id ? 'true' : undefined} onclick={event => event.metaKey || event.ctrlKey || event.shiftKey ? onCheck(asset.id, event) : onSelect(asset.id)} title={asset.name}>
               {#if asset.type === 'video'}<Film size={15}/>{:else}<Image size={15}/>{/if}
               <span class="asset-name">{asset.name}</span><span class="media-kind">{asset.assetClass}</span>
             </button>

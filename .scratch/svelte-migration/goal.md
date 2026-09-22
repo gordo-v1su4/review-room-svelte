@@ -62,3 +62,7 @@ See [collections-evidence.md](collections-evidence.md). Local saved filter/sourc
 ## Latest increment: inline card status
 
 See [card-status-evidence.md](card-status-evidence.md). Cards support permission-aware status editing; review actions are compact and left/right aligned. Real-video desktop/mobile, keyboard and Appearance visibility checks pass; 18 targeted tests pass. The overall goal remains active with the existing parity and live release gates.
+
+## Latest increment: folder drag/drop
+
+See [folder-drag-evidence.md](folder-drag-evidence.md). Native single/group moves from media cards and tables to real folders/root are verified with real media. Moving an active asset preserves playback position and comment draft; mobile retains the accessible Move dialog. 11 targeted tests pass. Project administration, performance, accessibility and live shipping gates remain open.

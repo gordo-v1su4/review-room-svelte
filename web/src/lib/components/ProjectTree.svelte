@@ -15,6 +15,9 @@
 
   let {
     projects = [],
+    dragActive = false,
+    canDropAssets = () => false,
+    onDropAssets,
     selectedProjectId,
     selectedCollection = 'all',
     onOpen,
@@ -29,6 +32,9 @@
     onProject,
   }: {
     projects: readonly ProjectTreeProject[];
+    dragActive?: boolean;
+    canDropAssets?: (projectId: string, folderId: string | null) => boolean;
+    onDropAssets?: (event: DragEvent, projectId: string, folderId: string | null) => void;
     selectedProjectId?: string;
     selectedCollection?: ProjectTreeCollection;
     onOpen: (projectId: string, collection: ProjectTreeCollection) => void;
@@ -45,6 +51,23 @@
 
   let collapsed = $state<Set<string>>(new Set());
 
+  let dropHover = $state<string | null>(null);
+  $effect(() => { if (!dragActive) dropHover = null; });
+  function dragOver(event: DragEvent, projectId: string, folderId: string | null) {
+    if (!canDropAssets(projectId, folderId)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    dropHover = folderId ?? projectId;
+  }
+  function dragLeave(event: DragEvent) {
+    if (!(event.relatedTarget instanceof Node) || !(event.currentTarget as HTMLElement).contains(event.relatedTarget)) dropHover = null;
+  }
+  function drop(event: DragEvent, projectId: string, folderId: string | null) {
+    dropHover = null;
+    if (!canDropAssets(projectId, folderId)) return;
+    event.preventDefault();
+    onDropAssets?.(event, projectId, folderId);
+  }
   function toggle(projectId: string) {
     const next = new Set(collapsed);
     if (next.has(projectId)) next.delete(projectId); else next.add(projectId);
@@ -52,7 +75,7 @@
   }
 </script>
 
-<nav class="project-tree" aria-label="Projects">
+<nav class="project-tree" aria-label="Projects" data-drag-active={dragActive}>
   <div class="tree-heading">
     <span>Projects</span>
     <button class="add-project" type="button" aria-label="Add project" title="Add project" onclick={onCreate}>
@@ -76,7 +99,7 @@
             >
               {#if isExpanded}<ChevronDown size={14} />{:else}<ChevronRight size={14} />{/if}
             </button>
-            <button class="project-link" type="button" onclick={() => onProject ? onProject(project.id) : onOpen(project.id, 'all')}>
+            <button class="project-link" class:drop-hover={dropHover === project.id} ondragover={event => dragOver(event, project.id, null)} ondragleave={dragLeave} ondrop={event => drop(event, project.id, null)} type="button" onclick={() => onProject ? onProject(project.id) : onOpen(project.id, 'all')}>
               <Folder size={15} strokeWidth={1.8} />
               <span class="project-name" title={project.name}>{project.name}</span>
               <span class="count">{project.videoCount + project.imageCount}</span>
@@ -85,9 +108,9 @@
 
           {#if isExpanded}
             <ul class="collection-list" aria-label={`${project.name} collections`}>
-              <li><button class="collection-link" class:selected={isSelected && !selectedCustomCollectionId && !overview && !selectedFolderId && !archived && selectedCollection === 'all'} type="button" onclick={() => onOpen(project.id, 'all')}><Layers size={14}/><span>All media</span></button></li>
+              <li><button class="collection-link" class:drop-hover={dropHover === project.id} ondragover={event => dragOver(event, project.id, null)} ondragleave={dragLeave} ondrop={event => drop(event, project.id, null)} class:selected={isSelected && !selectedCustomCollectionId && !overview && !selectedFolderId && !archived && selectedCollection === 'all'} type="button" onclick={() => onOpen(project.id, 'all')}><Layers size={14}/><span>All media</span></button></li>
               {#each project.folders ?? [] as folder (folder.id)}
-                <li><button class="collection-link" class:selected={isSelected && selectedFolderId === folder.id} type="button" onclick={() => onFolder?.(project.id, folder.id)}><Folder size={14}/><span>{folder.title}</span><span class="count">{folder.count}</span></button></li>
+                <li><button class="collection-link" class:drop-hover={dropHover === folder.id} ondragover={event => dragOver(event, project.id, folder.id)} ondragleave={dragLeave} ondrop={event => drop(event, project.id, folder.id)} class:selected={isSelected && selectedFolderId === folder.id} type="button" onclick={() => onFolder?.(project.id, folder.id)}><Folder size={14}/><span>{folder.title}</span><span class="count">{folder.count}</span></button></li>
               {/each}
               <li>
                 <button class:selected={isSelected && !selectedCustomCollectionId && !selectedFolderId && !archived && selectedCollection === 'video'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'video')}>
@@ -138,6 +161,7 @@
   .collection-list li::before { content: ''; position: absolute; top: 17px; left: -15px; width: 12px; border-top: 1px solid #ffffff12; }
   .collection-link { min-height: 31px; padding-left: 6px; color: #899491; border-radius: 7px; }
   .collection-link.selected { background: #ffffff0a; color: #a8ded2; }
+  .project-link.drop-hover, .collection-link.drop-hover { background: #15362e; box-shadow: inset 0 0 0 1px var(--teal); color: var(--ink); border-radius: 6px; }
   .empty { margin: 0 10px; color: #687371; font-size: 11px; }
   @media (pointer: coarse) { .project-link, .collection-link, .add-project, .disclosure { min-height: 44px; } .add-project, .disclosure { min-width: 44px; } }
 </style>
