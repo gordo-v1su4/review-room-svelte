@@ -1,3 +1,0 @@
-# Convex CLI emits JS stubs next to the TypeScript API. Do not treat them as app code.
-convex/_generated/*.js linguist-generated=true
-convex/_generated/*.d.ts linguist-generated=true

@@ -1,0 +1,11 @@
+*
+!package.json
+!bun.lock
+!svelte.config.js
+!vite.config.ts
+!tsconfig.json
+!vercel.json
+!src
+!src/**
+**/.env*
+**/*.test.ts

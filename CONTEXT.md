@@ -12,3 +12,5 @@ A client media review portal. Product rules live in `init-docs/01-PRD.md`; visua
 - **Fixture mode**: deterministic local data used for frontend work while backend repairs are deferred. It does not demonstrate live integration.
 
 Ownership: `gordo-v1su4/review-room-svelte`. Never push to Buzero. Backend remains Convex plus RustFS; replacing the frontend does not imply replacing persistence.
+
+The Svelte application is the single root application. The original Next.js frontend, startup scripts, GitHub deployment files and duplicate configuration were removed at the user's explicit request on 2026-09-22. For unfinished parity comparison, read the original source from Git commit `301495d`; do not restore a second runnable application. Backend and media-worker sources remain for deferred integration.

@@ -1,56 +1,24 @@
-![Review Room interface](docs/assets/review-room-preview.webp)
-
 # Review Room
 
-Client-facing video review workspace for uploading, scrubbing, shortlisting, commenting on, and approving clips.
+A Svelte 5 and TypeScript media review workspace. This is the only frontend in the repository.
 
-Production: [unfold-flower-gen.app](https://unfold-flower-gen.app)
-
-## Stack
-
-- Next.js App Router, React, TypeScript, Tailwind CSS
-- Convex for auth, project metadata, comments, ratings, and review state
-- RustFS/S3-compatible storage for uploaded videos and preview assets
-- Browser-generated thumbnails/scrub sprites, with an optional ffmpeg media worker fallback
-- Vercel for app hosting
-
-## Quick Start
-
-```bash
-bun install
-bun dev
-bun run worker:media
-```
-
-Copy `.env.example` to `.env.local` before running locally. The app expects Convex and RustFS/S3 env vars for real uploads.
-
-## Storage
-
-Video metadata lives in Convex. Original videos, thumbnails, scrub sprites, and project images live in RustFS through S3-compatible APIs.
-
-Browser uploads larger than 50 MiB automatically use S3 multipart upload in 50 MiB parts. This keeps every request below the 100 MB Cloudflare limit on the public RustFS hostname while preserving the original file as one object.
-
-## Deployment
-
-The Vercel production URL is public, but dashboard/admin pages still require app sign-in. Client review access is handled by Review Room share links.
-
-Production has two independent deployment surfaces:
-
-- Vercel deploys the Next.js frontend and API routes from `main`.
-- The `Deploy Convex` GitHub Actions workflow deploys self-hosted Convex whenever relevant backend files change on `main`.
-
-For a frontend + Convex change, confirm both deployments succeed before testing the production workflow. A Vercel deployment alone does not publish Convex functions.
-
-```bash
+```sh
+bun install --frozen-lockfile
+bun dev                 # http://127.0.0.1:5173
+bun run check
+bun test
 bun run build
-bun run deploy:convex
 ```
 
-Deployment notes live in [`docs/deploy-vercel-and-auth.md`](docs/deploy-vercel-and-auth.md).
+The workspace currently runs as a local, tab-scoped session. Imported files stay on the device; projects and reviews are not durable across refreshes. Live sign-in, persistence and shared-review integration remain deferred. Public review routes fail closed until configured.
 
-## Project Docs
+The explorer supports appearance controls, metadata fields, hover scrubbing, collections and folders. Selecting media opens the adjustable review panes. Native playback has capability-gated WebCodecs previews and WebGPU rendering with fallback.
 
-- [`init-docs/00-Creative-Brief.md`](init-docs/00-Creative-Brief.md)
-- [`init-docs/01-PRD.md`](init-docs/01-PRD.md)
-- [`init-docs/02-Design-Spec.md`](init-docs/02-Design-Spec.md)
-- [`documentation/notion-client-guide/README.md`](documentation/notion-client-guide/README.md) — client how-to and annotated screenshots
+- `src/routes/`: SvelteKit routes
+- `src/lib/`: domain logic, media adapters and Svelte components
+- `convex/`, `services/media-worker/`: retained backend sources for later integration
+- `.scratch/svelte-migration/`: specification, tickets and acceptance evidence
+
+Deploy only to personal Vercel scope `gordo-v1su4s-projects`, project `review-room-svelte`. The sole Git remote is the personal `gordo-v1su4/review-room-svelte` repository. Never push or deploy to Buzero.
+
+The original Next.js app and its configuration have been removed. Historical feature comparisons use Git commit `301495d`; no second app or duplicate lockfile is required. See the [remaining work](.scratch/svelte-migration/remaining-work.md) for release gates.

@@ -6,8 +6,6 @@ node_modules/
 # Build / cache
 dist/
 build/
-.next/
-.nuxt/
 .svelte-kit/
 .output/
 .turbo/
@@ -65,6 +63,3 @@ temp/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
-
-# SvelteKit generated output
-.svelte-kit/

@@ -1,3 +1,5 @@
+> Source inventory note (2026-09-22): legacy paths in this ledger refer to Git commit `301495d`. The Svelte app now lives at the root; historical `web/src/` references map to `src/`. Removing the old frontend does not complete the remaining parity or live acceptance gates.
+
 # Review Room parity ledger
 
 Status: inventory complete; implementation partial. The Svelte surface in `web/` is a device-local session workspace. Explorer, grouped filters, configurable card fields, selection and batch review, real-media playback, review notes, and the metadata inspector are being restored in tested slices. Still markup and viewed state are now locally verified in [still-review-evidence.md](still-review-evidence.md). See the evidence documents for verified behavior. It does not prove Convex auth, persistence, authorization, storage, uploads, public review, or production playback integration. Backend repair remains deferred.

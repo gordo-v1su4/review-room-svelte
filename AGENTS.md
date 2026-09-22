@@ -31,7 +31,10 @@ Do not duplicate facts across docs; update the doc that owns the topic.
 
 ```bash
 bun install
-bun dev                    # Next.js (port 3000)
+bun dev                    # SvelteKit (http://127.0.0.1:5173)
+bun run check
+bun test
+bun run build
 bunx convex dev            # local Convex OR homelab via .env.local
 bun run deploy:convex      # self-hosted: CONVEX_SELF_HOSTED_* set
 bun run worker:media       # ffmpeg thumbnail/sprite worker
@@ -42,15 +45,14 @@ Homelab env: copy from pindeck with `scripts/use-homelab-env.ps1`, then add `S3_
 ## Deployment invariant
 
 - This personal repository currently has no active deployment automation.
-- The inherited Convex workflow is archived in `docs/upstream-reference/` because it targets the original backend. Do not re-enable it or deploy to that target as part of the frontend migration.
+- The inherited deployment configuration and workflow have been removed. Never deploy to the original backend or Buzero. Personal Vercel scope: `gordo-v1su4s-projects`; project: `review-room-svelte`.
 - Frontend and Convex deployments are separate surfaces. Future integration requires explicit configuration and verification of each affected surface.
 
 ## Architecture
 
-- `src/app/` — Next.js App Router (`/dashboard`, `/review/[token]`, storage API routes)
+- `src/routes/` — SvelteKit workspace and token-scoped review routes
 - `convex/` — schema, auth, CRUD, public review mutations, HTTP worker callback
-- `src/components/` — UI by domain (`video/`, `project/`, `comments/`, `upload/`)
-- `src/lib/storage/` — S3 presign (RustFS path-style)
+- `src/lib/` — typed domain modules, media adapters, and Svelte components
 - `services/media-worker/` — homelab ffmpeg jobs
 - `docs/adr/` — infrastructure decisions
 
@@ -129,7 +131,7 @@ Single-context: root `CONTEXT.md` and the existing `docs/adr/`. See `docs/agents
 ## Ownership and migration
 
 - Work in `gordo-v1su4/review-room-svelte`, local directory `review-room-svelte`.
-- NEVER push to Buzero or Buzero-IO GitHub repositories. `upstream` is fetch-only; its push URL is disabled. GitHub operations default to the personal repository.
+- NEVER push to Buzero or Buzero-IO GitHub repositories. The Buzero remote has been removed. Only the personal `origin` remains.
 - Buzero disables forks; this is an independent private repository preserving the original Git history.
 - Migration specification: `.scratch/svelte-migration/spec.md`; numbered local issues in that directory's `issues/` folder.
 - Backend connectivity repair is deferred. Fixture-mode UI evidence is not proof of live persistence or authorization.
