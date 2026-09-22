@@ -1,7 +1,18 @@
-export type ProjectFolder = Readonly<{ id: string; projectId: string; title: string; order: number; coverAssetId?: string }>;
+export type ProjectFolder = Readonly<{ id: string; projectId: string; title: string; order: number; coverAssetId?: string; coverImageUrl?: string }>;
 export type AssetPlacement = Readonly<{ projectId: string; folderId?: string; archived?: boolean }>;
 export type FolderState = Readonly<{ folders: readonly ProjectFolder[]; placements: Readonly<Record<string, AssetPlacement>> }>;
 export type FolderAccess = Readonly<{ isAdmin: boolean; editableProjectIds: readonly string[]; memberProjectIds?: readonly string[] }>;
+type CoverAsset = Readonly<{ id: string; projectId?: string; folderId?: string; archived?: boolean; type: 'image' | 'video'; importedAt: number; url: string; poster?: string }>;
+/** Resolves local presentation URLs; persistent covers remain storage keys in the live adapter. */
+export function folderCoverUrl(folder: ProjectFolder, assets: readonly CoverAsset[]): string | undefined {
+  if (folder.coverImageUrl) return folder.coverImageUrl;
+  const eligible = assets.filter(asset => asset.projectId === folder.projectId && !asset.archived);
+  const explicit = eligible.find(asset => asset.id === folder.coverAssetId);
+  if (explicit) return explicit.type === 'image' ? explicit.url : explicit.poster;
+  const newest = eligible.filter(asset => asset.folderId === folder.id).sort((a, b) => b.importedAt - a.importedAt);
+  const image = newest.find(asset => asset.type === 'image');
+  return image?.url ?? newest.find(asset => asset.poster)?.poster;
+}
 export type FolderAction =
   | { type: 'create'; id: string; projectId: string; title: string }
   | { type: 'rename'; folderId: string; title: string }
@@ -9,6 +20,7 @@ export type FolderAction =
   | { type: 'register'; assetIds: readonly string[]; projectId: string; folderId?: string; dateFolder?: { id: string; dateKey: string } }
   | { type: 'restore'; assetIds: readonly string[]; projectId: string }
   | { type: 'remove'; folderId: string; disposition: 'move_to_root' | 'archive_assets' }
+  | { type: 'cover-image'; folderId: string; url?: string }
   | { type: 'cover'; folderId: string; assetId?: string };
 
 const validId = (id: string) => { if (typeof id !== 'string' || !id.trim() || id !== id.trim()) throw new Error('Invalid ID'); return id; };
@@ -74,6 +86,14 @@ export function transitionFolderState(state: FolderState, action: FolderAction, 
     const title = titleOf(action.title);
     if (state.folders.some(item => item.id !== folder!.id && item.projectId === projectId && item.title.trim().toLowerCase() === title.toLowerCase())) throw new Error('A folder with that name already exists');
     return { ...state, folders: state.folders.map(item => item.id === folder!.id ? { ...item, title } : item) };
+  }
+  if (action.type === 'cover-image') {
+    if (action.url !== undefined && !action.url.startsWith('blob:')) throw new Error('Choose a local cover image');
+    return { ...state, folders: state.folders.map(item => {
+      if (item.id !== folder!.id) return item;
+      const { coverImageUrl: _oldCover, coverAssetId: _oldAsset, ...rest } = item;
+      return { ...rest, ...(action.url === undefined ? {} : { coverImageUrl: action.url }) };
+    }) };
   }
   if (action.type === 'cover') {
     if (action.assetId !== undefined && asset(action.assetId).archived) throw new Error('Archived asset cannot be a cover');

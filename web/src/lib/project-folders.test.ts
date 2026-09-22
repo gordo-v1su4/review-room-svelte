@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { transitionFolderState, type FolderState } from './project-folders';
+import { transitionFolderState, folderCoverUrl, type FolderState } from './project-folders';
 const admin = { isAdmin: true, editableProjectIds: ['p'] };
 const empty: FolderState = { folders: [], placements: {} };
 test('admin creates a flat folder and members register imports without folder management access', () => {
@@ -76,4 +76,29 @@ test('date import respects explicit destinations and leaves no folders behind on
   expect(own.placements.new?.folderId).toBe('day');
   expect(own.folders[1]?.order).toBe(1);
   expect(empty.folders).toEqual([]);
+});
+test('only an editable project admin can replace or reset a custom cover', () => {
+  const action = { type: 'cover-image' as const, folderId: 'f', url: 'blob:chosen-cover' };
+  expect(() => transitionFolderState(populated, action, { isAdmin: false, editableProjectIds: ['p'] })).toThrow('Project access required');
+  expect(() => transitionFolderState(populated, action, { isAdmin: true, editableProjectIds: ['q'] })).toThrow('Project access required');
+  const covered = transitionFolderState(populated, action, admin);
+  expect(covered.folders[0]?.coverImageUrl).toBe('blob:chosen-cover');
+  expect(populated.folders[0]?.coverImageUrl).toBeUndefined();
+  const reset = transitionFolderState(covered, { type: 'cover-image', folderId: 'f' }, admin);
+  expect(reset.folders[0]?.coverImageUrl).toBeUndefined();
+  expect(reset.placements).toEqual(populated.placements);
+  const legacy = transitionFolderState(populated, { type: 'cover', folderId: 'f', assetId: 'a' }, admin);
+  expect(transitionFolderState(legacy, { type: 'cover-image', folderId: 'f' }, admin).folders[0]?.coverAssetId).toBeUndefined();
+});
+
+test('automatic cover prefers the newest image in the folder, then video posters, and ignores other folders and archived assets', () => {
+  const folder = populated.folders[0]!;
+  const image = { id: 'old', projectId: 'p', folderId: 'f', type: 'image' as const, importedAt: 1, url: 'blob:old-image' };
+  const video = { ...image, id: 'video', type: 'video' as const, importedAt: 5, url: 'blob:video', poster: 'blob:poster' };
+  const assets = [image, video, { ...image, id: 'new', importedAt: 2, url: 'blob:new-image' }, { ...image, id: 'foreign', projectId: 'q', importedAt: 9, url: 'blob:foreign' }, { ...image, id: 'moved', folderId: 'g', importedAt: 10, url: 'blob:moved' }, { ...image, id: 'archived', archived: true, importedAt: 11, url: 'blob:archived' }];
+  expect(folderCoverUrl(folder, assets)).toBe('blob:new-image');
+  expect(folderCoverUrl({ ...folder, coverImageUrl: 'blob:custom' }, assets)).toBe('blob:custom');
+  expect(folderCoverUrl(folder, [video])).toBe('blob:poster');
+  expect(folderCoverUrl(folder, [{ ...video, poster: undefined }])).toBeUndefined();
+  expect(folderCoverUrl(folder, [])).toBeUndefined();
 });

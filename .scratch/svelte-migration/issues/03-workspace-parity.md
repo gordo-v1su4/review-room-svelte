@@ -23,3 +23,5 @@ Implementation in progress. Workspace controls and local review/metadata slices 
 Local flat folder organization and archive/restore are verified in [folders-transport-evidence.md](../folders-transport-evidence.md). Cover controls, date-folder fallback, custom collections and project administration are still open.
 
 Date-folder fallback and import destination/classification are locally implemented and verified in [import-destinations-evidence.md](../import-destinations-evidence.md). The date-folder item above is closed for local behavior; live ingest/reservation acceptance remains open under 06/07.
+
+Cover controls and automatic image/video-poster fallback are locally verified in [folder-covers-evidence.md](../folder-covers-evidence.md). Folder drag/drop, custom collections and project administration remain open; live cover storage/authorization belong to integration acceptance.

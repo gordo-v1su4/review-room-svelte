@@ -50,3 +50,7 @@ See [folders-transport-evidence.md](folders-transport-evidence.md). Local real f
 ## Latest increment: import destinations and classification
 
 See [import-destinations-evidence.md](import-destinations-evidence.md). Root imports now create/reuse the original browser-local date folder; real-folder context and optional destination selection take precedence. Compact import options restore image/contact-sheet/storyboard classification with unchanged video semantics. Desktop/mobile real-media checks and rejected-file feedback pass; 64 tests pass. Cover controls, remaining organization/admin parity, measured playback and live release gates remain open.
+
+## Latest increment: folder covers
+
+See [folder-covers-evidence.md](folder-covers-evidence.md). Local custom cover selection/reset and original automatic image/video-poster fallback are restored, with bounded image previews and URL cleanup. Desktop/mobile real-file checks include corrupt-image recovery and corrected Escape focus restoration. 66 tests pass. Remaining organization/admin, performance, accessibility and live release gates keep this goal active.

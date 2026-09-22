@@ -2,7 +2,7 @@
   import { onDestroy, onMount } from 'svelte';
   import ImportOptions from '$lib/components/ImportOptions.svelte';
   import FolderActions from '$lib/components/FolderActions.svelte';
-  import { transitionFolderState, type FolderState, type FolderAction } from '$lib/project-folders';
+  import { transitionFolderState, folderCoverUrl, type FolderState, type FolderAction } from '$lib/project-folders';
   import { updateTags } from '$lib/bulk-tags';
   import StillViewer from '$lib/components/StillViewer.svelte';
   import { annotationsEqual } from '$lib/annotations';
@@ -67,6 +67,7 @@
   let picker: HTMLInputElement;
   const thumbnails = createThumbnailExtractor({ concurrency: 2 });
   let disposed = false;
+  const coverRequests = new Map<string, symbol>();
   const active = $derived(assets.find(asset => asset.id === activeId));
   const visible = $derived(queryWorkspace(activeFolderId ? assets.filter(asset => asset.folderId === activeFolderId) : assets, { ...filters, search: query, shortlisted: filters.selectedOnly ? true : undefined, mediaTypes: mediaType === 'all' ? undefined : [mediaType] }));
   const groups = $derived(groupWorkspaceAssets(visible, filters.groupBy));
@@ -170,8 +171,47 @@
     organize({ type: 'create', id, projectId, title });
     openRealFolder(projectId, id);
   }
+  async function setFolderCover(folderId: string, file: File | null) {
+    if (file && !file.type.startsWith('image/')) throw new Error('Choose an image for the folder cover.');
+    const request = Symbol();
+    coverRequests.set(folderId, request);
+    let url: string | undefined;
+    try {
+      if (file) {
+        const source = URL.createObjectURL(file);
+        try {
+          const image = new window.Image();
+          image.src = source;
+          await image.decode();
+          const scale = Math.min(1, 512 / Math.max(image.naturalWidth, image.naturalHeight));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+          canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+          const context = canvas.getContext('2d');
+          if (!context) throw new Error('Image preview is unavailable.');
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(new Error('Could not prepare the cover.')), 'image/webp', 0.85));
+          url = URL.createObjectURL(blob);
+        } catch {
+          throw new Error('This image could not be opened. Choose another image.');
+        } finally { URL.revokeObjectURL(source); }
+      }
+      if (disposed || coverRequests.get(folderId) !== request) throw new Error('This cover request is no longer active.');
+      const previous = organization.folders.find(folder => folder.id === folderId)?.coverImageUrl;
+      organize({ type: 'cover-image', folderId, url });
+      if (previous) URL.revokeObjectURL(previous);
+    } catch (cause) {
+      if (url) URL.revokeObjectURL(url);
+      throw cause;
+    } finally {
+      if (coverRequests.get(folderId) === request) coverRequests.delete(folderId);
+    }
+  }
   function removeFolder(folderId: string, disposition: 'move_to_root' | 'archive_assets') {
+    const previous = organization.folders.find(folder => folder.id === folderId)?.coverImageUrl;
     organize({ type: 'remove', folderId, disposition });
+    coverRequests.delete(folderId);
+    if (previous) URL.revokeObjectURL(previous);
     if (activeFolderId === folderId) openFolder(projectId, 'all');
   }
   function moveChecked(folderId: string | null) {
@@ -211,7 +251,9 @@
   function filterBy(value: FilterId) { importOptions.folderId = null; activeFolderId = null; archived = false; filters = { ...defaultFilters(), statuses: value === 'all' || value === 'selected' ? [] : [value], selectedOnly: value === 'selected' }; query = ''; mediaType = 'all'; folderOpen = true; navOpen = false; }
   onDestroy(() => {
     disposed = true;
+    coverRequests.clear();
     thumbnails.dispose();
+    for (const folder of organization.folders) if (folder.coverImageUrl) URL.revokeObjectURL(folder.coverImageUrl);
     for (const asset of media) {
       URL.revokeObjectURL(asset.url);
       if (asset.poster) URL.revokeObjectURL(asset.poster);
@@ -239,11 +281,11 @@
       <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#if folderOpen}<ChevronRight size={13}/><strong>{locationName}</strong>{/if}</div><span class="avatar small">YO</span>
     </header>
     <div class="page-content" class:folder-workspace={folderOpen}>
-      <section class="project-heading"><div><h1>{folderOpen ? locationName : project.name}</h1>{#if !folderOpen}<p class="subtitle">Choose a folder to start reviewing.</p>{/if}</div><div class="project-tools">{#if !archived}<FolderActions folders={projectFolders} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={(folderId, title) => organize({ type: 'rename', folderId, title })} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions folders={projectFolders} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "today’s date folder"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button></div></section>
+      <section class="project-heading"><div><h1>{folderOpen ? locationName : project.name}</h1>{#if !folderOpen}<p class="subtitle">Choose a folder to start reviewing.</p>{/if}</div><div class="project-tools">{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={(folderId, title) => organize({ type: 'rename', folderId, title })} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions folders={projectFolders} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "today’s date folder"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button></div></section>
       {#if feedback}<div class="notice" role="status">{feedback}<button class="icon-button" aria-label="Dismiss message" onclick={() => feedback = ''}><X size={16}/></button></div>{/if}
       {#if !folderOpen}<section class="folder-shelf" aria-label="Media collections">
         {#each projectFolders as folder (folder.id)}
-          <button class="folder-card" onclick={() => openRealFolder(projectId, folder.id)}><FolderArtwork empty={!assets.some(asset => asset.folderId === folder.id)}/><strong>{folder.title}</strong><span>{assets.filter(asset => asset.folderId === folder.id).length} items</span></button>
+          <button class="folder-card" onclick={() => openRealFolder(projectId, folder.id)}><FolderArtwork coverSrc={folderCoverUrl(folder, allAssets)} empty={!assets.some(asset => asset.folderId === folder.id)}/><strong>{folder.title}</strong><span>{assets.filter(asset => asset.folderId === folder.id).length} items</span></button>
         {/each}
         {#each [{ type: 'video' as const, name: 'Videos' }, { type: 'image' as const, name: 'Images' }] as collection (collection.type)}
           <button class="folder-card" class:folder-active={mediaType === collection.type} aria-pressed={mediaType === collection.type} onclick={() => openFolder(projectId, collection.type)}>

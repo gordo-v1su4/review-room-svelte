@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { label = '', empty = false }: { label?: string; empty?: boolean } = $props();
+  let { label = '', empty = false, coverSrc }: { label?: string; empty?: boolean; coverSrc?: string } = $props();
   const uid = $props.id();
 </script>
 
@@ -42,6 +42,7 @@
     <clipPath id={`${uid}-body`}>
       <path d="M28 74c0-11 8-19 19-19h74c5 0 8 1 13 4l20 11c4 2 8 3 14 3h24c12 0 20 9 20 21v69c0 12-9 21-21 21H49c-12 0-21-9-21-21z"/>
     </clipPath>
+    <clipPath id={`${uid}-cover`}><rect x="42" y="91" width="156" height="77" rx="5"/></clipPath>
     <filter id={`${uid}-soft`} x="-10%" y="-10%" width="120%" height="130%">
       <feGaussianBlur stdDeviation="1.6" />
     </filter>
@@ -72,6 +73,13 @@
   <!-- Reference front proportions: 184 wide × 129 tall (~1.43:1). -->
   <!-- Translucent smoked front with a thin polished rim. -->
   <path d="M28 74c0-11 8-19 19-19h74c5 0 8 1 13 4l20 11c4 2 8 3 14 3h24c12 0 20 9 20 21v69c0 12-9 21-21 21H49c-12 0-21-9-21-21z" fill={`url(#${uid}-front)`} fill-opacity="0.73" stroke="#a2b4ab" stroke-opacity="0.2" stroke-width="0.9" />
+  {#if coverSrc}
+    <g clip-path={`url(#${uid}-cover)`}>
+      <image href={coverSrc} x="42" y="91" width="156" height="77" preserveAspectRatio="xMidYMid slice"/>
+      <rect x="42" y="91" width="156" height="77" fill="#0a1713" opacity="0.12"/>
+    </g>
+    <rect x="42" y="91" width="156" height="77" rx="5" fill="none" stroke="#d3e5dd" stroke-opacity="0.12" stroke-width="0.8"/>
+  {/if}
   <path d="M30 74c0-10 7-17 17-17h74c4 0 7 1 12 4l20 11c5 2 9 3 15 3h24c10 0 18 8 18 19" fill="none" stroke="#c6d3cc" stroke-opacity="0.14" stroke-width="0.8" />
   {#if label}
     <text x="120" y="111" text-anchor="middle" fill="#c9cdcd" opacity="0.54" font-size="11" font-family="Inter, ui-sans-serif, sans-serif" letter-spacing="0.04em">{label}</text>
