@@ -9,6 +9,18 @@ This is a navigation list, not a replacement for the migration specification or 
 - [ ] Resume backend work when authorized: live sign-in, role enforcement, durable persistence, uploads/downloads and notifications. Resolve the concrete [public-review authorization findings](public-review-access-audit.md) before exposing shared review.
 - [ ] Release: full live end-to-end flows, deployment configuration and verified deployment; retire Next.js only after parity and live acceptance pass. Never push to Buzero.
 
+## Next tasks, in order
+
+1. Finish share administration and remaining public-review parity. The shared viewer now has local real-media acceptance; remote-source metadata and payload-refresh reconciliation remain required integration checks.
+2. Audit original-vs-Svelte feature parity, especially share management, notifications, account/project access and role-specific controls.
+3. Finish visual polish: compact project-settings controls, header alignment, restrained surfaces, consistent folders/cards/status colors, and responsive panes/drawers. Re-check existing fixes rather than assuming they remain broken.
+4. Complete playback acceptance across supported browsers: hover scrubbing, frame stepping, sequence playback, codec/GPU fallbacks, latency and dropped frames.
+5. Complete keyboard, focus, contrast, reduced-motion and mobile touch-target acceptance.
+6. When backend work resumes: resolve public-review authorization findings; prove sign-in, permissions, durable saves, uploads, downloads and notifications against live services.
+7. Run full live end-to-end acceptance and verify deployment. Retire the original Next.js app only after parity and live acceptance pass.
+
+Shared-review local acceptance is recorded in [shared-review-viewer-evidence.md](shared-review-viewer-evidence.md): 120 suite tests, desktop/mobile real-media scenarios and production fixture exclusion. Live integration is still unverified.
+
 Recent completed slices: [shortlist sequence playback](shortlist-preview-evidence.md), [asset keyboard navigation](keyboard-navigation-evidence.md), [mobile metadata sheet](mobile-metadata-evidence.md), and [shared-review access gates](public-review-gate-evidence.md).
 
 Source tickets: [03](issues/03-workspace-parity.md), [04](issues/04-review-feedback-sharing.md), [07](issues/07-integration-cutover.md). Ticket filenames and spec remain authoritative where this index is less detailed.

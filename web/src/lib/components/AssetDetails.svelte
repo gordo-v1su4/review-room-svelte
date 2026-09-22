@@ -1,9 +1,9 @@
 <script lang="ts">
   import { Plus, Search, X } from 'lucide-svelte';
-  import type { LocalAsset } from '$lib/review';
+  import type { ReviewAsset } from '$lib/review';
   import type { AssetReview } from '$lib/review-session';
   import { filterMetadataFields, normalizeCreativeMetadata, normalizeTags, type AssetMetadataPatch, type CreativeMetadata, type CustomMetadataField, type MetadataField, type MetadataFilter } from '$lib/asset-metadata';
-  let { asset, review, knownTags = [], canEdit = false, onChange }: { asset: LocalAsset; review?: AssetReview; knownTags?: readonly string[]; canEdit?: boolean; onChange: (id: string, patch: AssetMetadataPatch) => void } = $props();
+  let { asset, review, knownTags = [], canEdit = false, onChange }: { asset: ReviewAsset; review?: AssetReview; knownTags?: readonly string[]; canEdit?: boolean; onChange: (id: string, patch: AssetMetadataPatch) => void } = $props();
   const uid = $props.id();
   let group = $state<MetadataFilter['group']>('all');
   let presence = $state<MetadataFilter['presence']>('all');

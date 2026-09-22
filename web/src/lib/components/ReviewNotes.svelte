@@ -3,8 +3,10 @@
   import { ArrowUpRight, Check, Clock3, Flame, Heart, MessageSquare, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-svelte';
   import type { ReactionEmoji, ReviewComment } from '$lib/review-session';
 
-  let { showHeader = true, comments, draft, time, isVideo, pinTime, onPinTime, onDraft, onPublish, onSeek, onComplete, onReact }: {
+  let { showHeader = true, canManageFeedback = true, posting = false, comments, draft, time, isVideo, pinTime, onPinTime, onDraft, onPublish, onSeek, onComplete, onReact }: {
     showHeader?: boolean;
+    canManageFeedback?: boolean;
+    posting?: boolean;
     comments: readonly ReviewComment[];
     draft: string;
     time: number;
@@ -43,7 +45,7 @@
               {#if note.completedAt}<span class="handled-label"><Check size={12}/> Handled</span>{/if}
             </div>
             <p>{note.body}</p>
-            <div class="note-actions">
+            {#if canManageFeedback}<div class="note-actions">
               <div class="reaction-row" role="group" aria-label="Note reactions">
                 {#each reactions as reaction (reaction.emoji)}
                   {@const count = note.reactions?.[reaction.emoji]?.length ?? 0}
@@ -59,17 +61,17 @@
               <button type="button" class="note-action completion" onclick={() => onComplete(note.id)}>
                 {#if note.completedAt}<RotateCcw size={12}/> Reopen{:else}<Check size={13}/> Mark handled{/if}
               </button>
-            </div>
+            </div>{/if}
           </div>
         </article>
       {/each}
     </div>
   {/if}
-  <form onsubmit={event => { event.preventDefault(); if (draft.trim()) onPublish(); }}>
+  <form onsubmit={event => { event.preventDefault(); if (!posting && draft.trim()) onPublish(); }}>
     <textarea aria-label="Comment draft" placeholder="Add a note…" value={draft} oninput={event => onDraft(event.currentTarget.value)} rows="3"></textarea>
     <div class="composer-footer">
       {#if isVideo}<label class="time-toggle"><input type="checkbox" checked={pinTime} onchange={event => onPinTime(event.currentTarget.checked)}/><Clock3 size={13}/>{time.toFixed(2)}s</label>{:else}<span></span>{/if}
-      <button type="submit" class="send-button" aria-label="Add note" disabled={!draft.trim()}><ArrowUpRight size={18}/></button>
+      <button type="submit" class="send-button" aria-label="Add note" disabled={posting || !draft.trim()}><ArrowUpRight size={18}/></button>
     </div>
   </form>
 </section>

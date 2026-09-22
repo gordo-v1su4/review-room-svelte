@@ -2,12 +2,12 @@
   import { Dialog } from 'bits-ui';
   import { SlidersHorizontal, X } from 'lucide-svelte';
   import AssetDetails from './AssetDetails.svelte';
-  import type { LocalAsset } from '$lib/review';
+  import type { ReviewAsset } from '$lib/review';
   import type { AssetReview } from '$lib/review-session';
   import type { AssetMetadataPatch } from '$lib/asset-metadata';
 
   let { asset, review, knownTags, canEdit, onChange, onOpen, onDesktopClose }: {
-    asset: LocalAsset;
+    asset: ReviewAsset;
     review: AssetReview;
     knownTags: readonly string[];
     canEdit: boolean;

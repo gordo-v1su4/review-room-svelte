@@ -7,14 +7,15 @@
   import type { PreviewInfo } from './accelerated/protocol';
   import { createScrubPreview } from './accelerated/preview';
   import { createGpuPreviewRenderer, type GpuPreviewRenderer } from './accelerated/gpu-renderer';
-  let { src, name, sourceBlob, onready = (_: string) => {}, onended = (_: string) => {}, onfailure = (_: string) => {}, onViewed = () => {}, onmetadata = (_: PreviewInfo) => {}, ontime = (_: number) => {} }: { src: string; name: string; sourceBlob?: Blob; onready?: (source: string) => void; onended?: (source: string) => void; onfailure?: (source: string) => void; diagnostics?: boolean; onViewed?: () => void; onmetadata?: (info: PreviewInfo) => void; ontime?: (time: number) => void } = $props();
+  let { src, name, sourceBlob, mediaInfo, onready = (_: string) => {}, onended = (_: string) => {}, onfailure = (_: string) => {}, onViewed = () => {}, onmetadata = (_: PreviewInfo) => {}, ontime = (_: number) => {} }: { src: string; name: string; sourceBlob?: Blob; mediaInfo?: PreviewInfo; onready?: (source: string) => void; onended?: (source: string) => void; onfailure?: (source: string) => void; diagnostics?: boolean; onViewed?: () => void; onmetadata?: (info: PreviewInfo) => void; ontime?: (time: number) => void } = $props();
   let video: HTMLVideoElement;
   let surface: HTMLDivElement;
   let paused = $state(true), muted = $state(false), time = $state(0), duration = $state(0);
   let mediaWidth = $state(0), mediaHeight = $state(0), sourceInfo = $state<PreviewInfo>();
   const codecLabel = (codec: string) => codec.startsWith('avc') ? 'H.264' : /^(hvc|hev)/.test(codec) ? 'HEVC' : codec.startsWith('av01') ? 'AV1' : codec.startsWith('vp09') ? 'VP9' : codec;
   let showFrames = $state(false);
-  const fps = $derived(sourceInfo?.estimatedFps);
+  const effectiveInfo = $derived(sourceInfo ?? mediaInfo);
+  const fps = $derived(effectiveInfo?.estimatedFps);
   const hasFrameRate = $derived(validFrameRate(fps));
   const frameHint = $derived(hasFrameRate ? 'Step using the estimated source frame rate' : 'Frame stepping unavailable: source frame rate not detected');
   let error = $state(''), scrubbing = $state(false), ready = $state(false);
@@ -260,8 +261,8 @@
       <div><dt>Aspect ratio</dt><dd>{(mediaWidth / mediaHeight).toFixed(2)}:1</dd></div>
     {/if}
     {#if duration}<div><dt>Duration</dt><dd>{stamp(duration)}</dd></div>{/if}
-    {#if sourceInfo?.estimatedFps}<div><dt>Frame rate</dt><dd title="Estimated average from the source's first 120 packets">≈{Number(sourceInfo.estimatedFps.toFixed(2))} fps</dd></div>{/if}
-    {#if sourceInfo?.codec}<div><dt>Codec</dt><dd title={sourceInfo.codec}>{codecLabel(sourceInfo.codec)}</dd></div>{/if}
+    {#if effectiveInfo?.estimatedFps}<div><dt>Frame rate</dt><dd title={sourceInfo ? "Estimated average from the source’s first 120 packets" : "Frame rate supplied with this media"}>≈{Number(effectiveInfo.estimatedFps.toFixed(2))} fps</dd></div>{/if}
+    {#if effectiveInfo?.codec}<div><dt>Codec</dt><dd title={effectiveInfo.codec}>{codecLabel(effectiveInfo.codec)}</dd></div>{/if}
   </dl>
 </div>
 

@@ -2,18 +2,19 @@
   import AssetStatusMenu from './AssetStatusMenu.svelte';
   import { Bookmark, Check } from 'lucide-svelte';
   import MediaThumbnail from './MediaThumbnail.svelte';
-  import type { LocalAsset } from '$lib/review';
+  import type { ReviewAsset } from '$lib/review';
   import type { AssetReview, ReviewAccess, ReviewAction } from '$lib/review-session';
   import type { AppearanceValue } from '$lib/appearance';
   import { CARD_FIELD_DEFINITIONS, type CardFieldId } from '../../../../src/lib/cardFields';
 
-  type Asset = LocalAsset & AssetReview;
-  let { assets, activeId, checkedIds, appearance, view, onOpen, onCheck, access = { kind: 'none' }, onReview, onDragStart, onDragEnd }: {
-    assets: readonly Asset[]; activeId: string | null; checkedIds: readonly string[];
+  type Asset = ReviewAsset & AssetReview;
+  let { assets, activeId, checkedIds = [], appearance, view, onOpen, onCheck, busyIds = [], access = { kind: 'none' }, onReview, onDragStart, onDragEnd }: {
+    assets: readonly Asset[]; activeId: string | null; checkedIds?: readonly string[];
+    busyIds?: readonly string[];
     access?: ReviewAccess; onReview: (action: ReviewAction) => void;
     onDragStart?: (event: DragEvent, id: string) => void; onDragEnd?: () => void;
     appearance: AppearanceValue; view: 'grid' | 'list';
-    onOpen: (id: string) => void; onCheck: (id: string, event: MouseEvent, toggle?: boolean) => void;
+    onOpen: (id: string) => void; onCheck?: (id: string, event: MouseEvent, toggle?: boolean) => void;
   } = $props();
   const fields = $derived(appearance.fieldOrder.filter(id => appearance.visibleFields.includes(id)));
   const labels = Object.fromEntries(CARD_FIELD_DEFINITIONS.map(field => [field.id, field.label]));
@@ -40,9 +41,9 @@
   style:--card-fit={appearance.fit === 'fit' ? 'contain' : 'cover'}
   style:--card-width={appearance.size === 'small' ? '130px' : appearance.size === 'large' ? '280px' : '190px'}>
   {#each assets as asset (asset.id)}
-    <article class="media-card" class:active-card={activeId === asset.id} class:checked-card={checkedIds.includes(asset.id)}>
-      <button type="button" class="card-open" draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} aria-label={`Open ${asset.name}`} aria-current={activeId === asset.id ? 'true' : undefined}
-        onclick={event => event.metaKey || event.ctrlKey || event.shiftKey ? onCheck(asset.id, event) : onOpen(asset.id)}>
+    <article aria-busy={busyIds.includes(asset.id)} class="media-card" class:active-card={activeId === asset.id} class:checked-card={checkedIds.includes(asset.id)}>
+      <button type="button" class="card-open" data-asset-id={asset.id} draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} aria-label={`Open ${asset.name}`} aria-current={activeId === asset.id ? 'true' : undefined}
+        onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id)}>
         <div class="thumbnail">
           <MediaThumbnail src={asset.url} poster={asset.poster} type={asset.type} name={asset.name}/>
           <span class="asset-type">{asset.assetClass}</span>
@@ -50,15 +51,15 @@
         </div>
       </button>
       {#if appearance.showInfo}<div class="card-body">
-        <button class="card-name" type="button" draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} title={asset.name} onclick={event => event.metaKey || event.ctrlKey || event.shiftKey ? onCheck(asset.id, event) : onOpen(asset.id)}>{asset.name}</button>
+        <button class="card-name" type="button" draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} title={asset.name} onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id)}>{asset.name}</button>
         {#if fields.length}<div class="card-fields">{#each fields as field (field)}
-          {#if field === 'status'}<AssetStatusMenu status={asset.status} name={asset.name} {access} onChange={status => onReview({ type: 'status', assetId: asset.id, status })}/>
+          {#if field === 'status'}<AssetStatusMenu status={asset.status} name={asset.name} access={busyIds.includes(asset.id) ? { kind: 'none' } : access} onChange={status => onReview({ type: 'status', assetId: asset.id, status })}/>
           {:else}<span title={`${labels[field]}: ${fieldValue(asset, field)}`} aria-label={`${labels[field]}: ${fieldValue(asset, field)}`}>{fieldValue(asset, field)}</span>{/if}
         {/each}</div>{/if}
       </div>{/if}
-      <button type="button" class="card-check" role="checkbox" aria-checked={checkedIds.includes(asset.id)} aria-label={`Select ${asset.name}`} onclick={event => onCheck(asset.id, event, true)}>
+      {#if onCheck}<button type="button" class="card-check" role="checkbox" aria-checked={checkedIds.includes(asset.id)} aria-label={`Select ${asset.name}`} onclick={event => onCheck(asset.id, event, true)}>
         {#if checkedIds.includes(asset.id)}<Check size={12}/>{/if}
-      </button>
+      </button>{/if}
     </article>
   {/each}
 </div>

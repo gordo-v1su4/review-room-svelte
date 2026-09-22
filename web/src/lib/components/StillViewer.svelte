@@ -3,13 +3,14 @@
   import { ArrowUpRight, Circle, Download, Maximize, Minimize, Pencil, Save, Square, Trash2, Undo2 } from 'lucide-svelte';
   import type { AnnotationPoint, AnnotationStroke, AnnotationTool } from '$lib/annotations';
 
-  let { assetId, src, name, strokes, dirty, canAnnotate = false, canDownload = false, onChange, onSave, onmetadata, onViewed, onfailure }: {
+  let { assetId, src, name, strokes, dirty, canAnnotate = false, saveDisabled = false, canDownload = false, onChange, onSave, onmetadata, onViewed, onfailure }: {
     assetId: string;
     src: string;
     name: string;
     strokes: readonly AnnotationStroke[];
     dirty: boolean;
     canAnnotate?: boolean;
+    saveDisabled?: boolean;
     canDownload?: boolean;
     onChange: (strokes: AnnotationStroke[]) => void;
     onSave: () => void | Promise<void>;
@@ -102,7 +103,7 @@
     catch { message = 'Fullscreen is unavailable in this browser.'; }
   }
   async function save() {
-    if (!canAnnotate || !dirty || saving || active) return;
+    if (!canAnnotate || saveDisabled || !dirty || saving || active) return;
     saving = true; message = '';
     const savedAssetId = assetId;
     try { await onSave(); if (assetId === savedAssetId) message = 'Saved in this session.'; } catch (error) { if (assetId === savedAssetId) message = error instanceof Error ? error.message : 'Could not save markup.'; }
@@ -123,7 +124,7 @@
       <div class="tool-group" aria-label="Markup tools">{#each tools as item (item.id)}<button type="button" class:chosen={tool === item.id} aria-label={item.label} title={item.label} aria-pressed={tool === item.id} disabled={saving} onclick={() => { cancelStroke(); tool = item.id; }}><item.icon size={15}/></button>{/each}</div>
       <div class="tool-group colors" aria-label="Markup colors">{#each colors as item (item.value)}<button type="button" aria-label={`${item.label} markup`} title={item.label} aria-pressed={color === item.value} class:chosen={color === item.value} disabled={saving} onclick={() => color = item.value}><span style:background={item.value}></span></button>{/each}</div>
       <label class="stroke-size">Width<select aria-label="Markup width" bind:value={width} disabled={saving}><option value={2}>2 px</option><option value={3}>3 px</option><option value={5}>5 px</option><option value={8}>8 px</option></select></label>
-      <div class="tool-group actions"><button type="button" aria-label="Undo markup" title="Undo" disabled={!strokes.length || saving} onclick={() => { cancelStroke(); changeStrokes(strokes.slice(0, -1)); }}><Undo2 size={15}/></button><button type="button" aria-label="Clear markup" title="Clear markup" disabled={!strokes.length || saving} onclick={() => { cancelStroke(); changeStrokes([]); }}><Trash2 size={15}/></button><button type="button" class="save" disabled={!dirty || saving || Boolean(active)} onclick={save}><Save size={13}/>{saving ? 'Saving' : 'Save'}</button></div>
+      <div class="tool-group actions"><button type="button" aria-label="Undo markup" title="Undo" disabled={!strokes.length || saving} onclick={() => { cancelStroke(); changeStrokes(strokes.slice(0, -1)); }}><Undo2 size={15}/></button><button type="button" aria-label="Clear markup" title="Clear markup" disabled={!strokes.length || saving} onclick={() => { cancelStroke(); changeStrokes([]); }}><Trash2 size={15}/></button><button type="button" class="save" disabled={!dirty || saving || saveDisabled || Boolean(active)} onclick={save}><Save size={13}/>{saving ? 'Saving' : 'Save'}</button></div>
     {/if}
     <!-- Original media Blob URLs are downloads, not SvelteKit routes; do not resolve them. -->
     {#if canDownload}<a class="download" href={src} download={name} aria-label={`Download ${name}`} title="Download original"><Download size={15}/></a>{/if}
