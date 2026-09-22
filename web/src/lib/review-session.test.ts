@@ -82,3 +82,54 @@ test('adding media preserves active review and drafts, while closing only clears
   expect(session.assets.first.draft.body).toBe('Keep draft');
   expect(transitionReviewSession(session, { type: 'select', assetId: 'first' }).activeAssetId).toBe('first');
 });
+
+test('handling every note clears feedback attention and reopening restores it without changing approval', () => {
+  let session = createReviewSession([{ id: 'clip', status: 'approved', comments: [
+    { id: 'a', body: 'Fix title', timecodeSec: null }, { id: 'b', body: 'Lift sound', timecodeSec: 2 }
+  ] }]);
+  const access = { kind: 'project', memberRole: 'viewer' } as const;
+  session = transitionReviewSession(session, { type: 'toggle-comment-complete', assetId: 'clip', commentId: 'a', actorId: 'me', at: 100 }, access);
+  expect(session.assets.clip.comments[0].completedAt).toBe(100);
+  expect(session.assets.clip.feedbackNeedsAttention).toBe(true);
+  session = transitionReviewSession(session, { type: 'toggle-comment-complete', assetId: 'clip', commentId: 'b', actorId: 'me', at: 101 }, access);
+  expect(session.assets.clip.feedbackNeedsAttention).toBe(false);
+  session = transitionReviewSession(session, { type: 'toggle-comment-complete', assetId: 'clip', commentId: 'a', actorId: 'me', at: 102 }, access);
+  expect(session.assets.clip.comments[0].completedAt).toBeUndefined();
+  expect(session.assets.clip.comments[0].completedBy).toBeUndefined();
+  expect(session.assets.clip.feedbackNeedsAttention).toBe(true);
+  expect(session.assets.clip.status).toBe('approved');
+});
+
+test('reactions toggle per person and emoji without removing other reactions', () => {
+  const initial = createReviewSession([{ id: 'clip', comments: [{ id: 'a', body: 'Nice', timecodeSec: null }] }]);
+  const access = { kind: 'project', memberRole: 'viewer' } as const;
+  let session = transitionReviewSession(initial, { type: 'toggle-comment-reaction', assetId: 'clip', commentId: 'a', actorId: 'me', emoji: 'heart' }, access);
+  session = transitionReviewSession(session, { type: 'toggle-comment-reaction', assetId: 'clip', commentId: 'a', actorId: 'other', emoji: 'heart' }, access);
+  session = transitionReviewSession(session, { type: 'toggle-comment-reaction', assetId: 'clip', commentId: 'a', actorId: 'me', emoji: 'fire' }, access);
+  expect(session.assets.clip.comments[0].reactions).toEqual({ heart: ['me', 'other'], fire: ['me'] });
+  session = transitionReviewSession(session, { type: 'toggle-comment-reaction', assetId: 'clip', commentId: 'a', actorId: 'me', emoji: 'heart' }, access);
+  expect(session.assets.clip.comments[0].reactions).toEqual({ heart: ['other'], fire: ['me'] });
+  expect(initial.assets.clip.comments[0].reactions).toBeUndefined();
+});
+
+test('share-link access cannot handle or react to comments and missing comments fail safely', () => {
+  const session = createReviewSession([{ id: 'clip', comments: [{ id: 'a', body: 'Note', timecodeSec: null }] }]);
+  const actions = [
+    { type: 'toggle-comment-complete', assetId: 'clip', commentId: 'a', actorId: 'me', at: 100 },
+    { type: 'toggle-comment-reaction', assetId: 'clip', commentId: 'a', actorId: 'me', emoji: 'thumbs_up' }
+  ] as const;
+  for (const action of actions) {
+    expect(() => transitionReviewSession(session, action, { kind: 'share' })).toThrow('Project membership required');
+    expect(() => transitionReviewSession(session, { ...action, commentId: 'missing' }, { kind: 'project', memberRole: 'viewer' })).toThrow('Comment not found');
+  }
+  expect(session.assets.clip.comments[0].completedAt).toBeUndefined();
+  expect(session.assets.clip.comments[0].reactions).toBeUndefined();
+});
+
+test('publishing a new note restores feedback attention after all previous notes were handled', () => {
+  const initial = createReviewSession([{ id: 'clip', comments: [{ id: 'a', body: 'Old', timecodeSec: null, completedAt: 10, completedBy: 'me' }], draft: { body: 'One more', timecodeSec: null } }]);
+  expect(initial.assets.clip.feedbackNeedsAttention).toBe(false);
+  const next = transitionReviewSession(initial, { type: 'publish-comment', assetId: 'clip', commentId: 'b' }, { kind: 'share' });
+  expect(next.assets.clip.feedbackNeedsAttention).toBe(true);
+  expect(next.assets.clip.comments[0].completedAt).toBe(10);
+});

@@ -88,3 +88,12 @@ The user accepted all five recommendations in one round; no additional interview
 5. Test review actions and permissions; playback, seeking and fallback; uploads and failure handling; resize without loss of playback or drafts; actual desktop/mobile browser flows. Tests observe public interfaces and user-visible behavior.
 
 Performance targets must be grounded in recorded baseline measurements and named media/device conditions. The architecture must not claim that WebGPU itself guarantees lower latency.
+
+## Live design refinements accepted 2026-09-22
+
+- Identity is only `review room.`; remove the rr monogram and stacked brand/workspace taglines.
+- Use one main line, with at most one smaller supporting line where needed.
+- Default primary/secondary controls are visually compact (32px desktop, 34px mobile); preserve usable touch hit areas.
+- Folder artwork follows reference 01 proportions: tall rounded charcoal front, layered sheets, translucent smoked front with softly visible contents. Empty collections show no paper sheets.
+- Whites are subdued with a slight teal tint; selected folder containers are almost charcoal with only a faint dark teal gradient and hairline highlight.
+- Avoid stock marketing headings and oversized promotional empty states. Motion stays brief and restrained.

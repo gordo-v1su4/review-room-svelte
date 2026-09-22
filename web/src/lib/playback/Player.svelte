@@ -1,12 +1,15 @@
 <script lang="ts">
   import { Pause, Play, Volume2, VolumeX, Maximize, RotateCcw } from 'lucide-svelte';
   import { createPlaybackSession } from './session';
-  let { src, name, ontime = (_: number) => {} }: { src: string; name: string; ontime?: (time: number) => void } = $props();
+  import { observeNativePlayback, type PlaybackMetrics } from './diagnostics';
+  let { src, name, diagnostics = false, ontime = (_: number) => {} }: { src: string; name: string; diagnostics?: boolean; ontime?: (time: number) => void } = $props();
   let video: HTMLVideoElement;
   let surface: HTMLDivElement;
   let paused = $state(true), muted = $state(false), time = $state(0), duration = $state(0);
   let error = $state(''), scrubbing = $state(false), ready = $state(false);
   let session: ReturnType<typeof createPlaybackSession> | undefined;
+  let monitor: ReturnType<typeof observeNativePlayback> | undefined;
+  let metrics = $state<PlaybackMetrics>();
   let pointerId: number | undefined;
   let scrubber: HTMLElement | undefined;
   const stamp = (n: number) => `${Math.floor(n / 60).toString().padStart(2, '0')}:${Math.floor(n % 60).toString().padStart(2, '0')}`;
@@ -18,21 +21,32 @@
   }
   function attachMedia(node: HTMLVideoElement, source: string) {
     let attached = createPlaybackSession(node);
+    let observer = observeNativePlayback(node, next => metrics = next);
+    monitor = observer;
     session = attached;
     return {
       update(nextSource: string) {
         if (nextSource === source) return;
-        attached.dispose(); releasePointer();
+        observer.dispose(); attached.dispose(); releasePointer();
         source = nextSource;
         ready = false; error = ''; time = 0; duration = 0; paused = true; muted = node.muted;
         attached = createPlaybackSession(node); session = attached;
+        observer = observeNativePlayback(node, next => metrics = next); monitor = observer;
         ontime(0);
       },
       destroy() {
-        attached.dispose(); releasePointer();
+        observer.dispose(); attached.dispose(); releasePointer();
         if (session === attached) session = undefined;
+        if (monitor === observer) monitor = undefined;
       },
     };
+  }
+  /** Seek a review note without restarting playback or changing its paused state. */
+  export function seek(seconds: number) {
+    if (!ready || !session || scrubbing || !Number.isFinite(seconds) || duration <= 0) return;
+    const target = Math.max(0, Math.min(duration, seconds));
+    monitor?.requestSeek(target);
+    session.seek(target); time = video.currentTime; ontime(time);
   }
   async function toggle() {
     const active = session;
@@ -51,7 +65,7 @@
   }
   function move(event: PointerEvent) {
     if (!scrubbing || event.pointerId !== pointerId) return;
-    time = target(event); session?.scrubTo(time); ontime(time);
+    time = target(event); monitor?.requestSeek(time); session?.scrubTo(time); ontime(time);
   }
   async function finish(event: PointerEvent) {
     if (!scrubbing || event.pointerId !== pointerId) return;
@@ -62,6 +76,7 @@
     const active = session;
     releasePointer();
     ontime(time);
+    monitor?.requestSeek(time);
     try { await active?.endScrub(time); } catch { if (active === session) error = 'Tap Play to resume.'; }
   }
   function cancel(event: PointerEvent) {
@@ -75,7 +90,7 @@
     else if (event.key === 'Home') next = 0;
     else if (event.key === 'End') next = duration;
     else return;
-    event.preventDefault(); session?.seek(next); time = video.currentTime; ontime(time);
+    event.preventDefault(); seek(next);
   }
 </script>
 <div class="player" bind:this={surface}>
@@ -99,11 +114,23 @@
     </div>
     <div class="transport">
       <button class="icon-button play-button" aria-label={paused ? 'Play' : 'Pause'} onclick={toggle} disabled={!ready}>{#if paused}<Play size={18} fill="currentColor"/>{:else}<Pause size={18}/>{/if}</button>
-      <button class="icon-button" aria-label="Restart clip" onclick={() => session?.seek(0)}><RotateCcw size={16}/></button>
+      <button class="icon-button" aria-label="Restart clip" onclick={() => seek(0)} disabled={!ready}><RotateCcw size={16}/></button>
       <span class="timecode">{stamp(time)} <span>/ {stamp(duration)}</span></span>
       <span class="transport-spacer"></span>
       <button class="icon-button" aria-label={muted ? 'Unmute' : 'Mute'} onclick={() => video.muted = !video.muted}>{#if muted}<VolumeX size={18}/>{:else}<Volume2 size={18}/>{/if}</button>
       <button class="icon-button" aria-label="Fullscreen" onclick={() => surface.requestFullscreen?.().catch(() => { error = 'Fullscreen is unavailable in this browser.'; })}><Maximize size={17}/></button>
     </div>
   </div>
+  {#if diagnostics && metrics}
+    <details class="playback-diagnostics">
+      <summary>Playback diagnostics</summary>
+      <dl>
+        <dt>Active adapter</dt><dd>Native HTML video</dd>
+        <dt>First loaded frame</dt><dd>{metrics.firstLoadedFrameMs === null ? 'Pending' : `${metrics.firstLoadedFrameMs.toFixed(1)} ms`}</dd>
+        <dt>Last seek completed</dt><dd>{metrics.lastSeekMs === null ? 'Not measured' : `${metrics.lastSeekMs.toFixed(1)} ms`}</dd>
+        <dt>Dropped / total frames</dt><dd>{metrics.totalFrames === null ? 'Unavailable' : `${metrics.droppedFrames} / ${metrics.totalFrames}`}</dd>
+      </dl>
+      <p>Load start → loaded data; latest seek request → seeked event. These measure media readiness, not display presentation. Frame counters are browser-reported for this source.</p>
+    </details>
+  {/if}
 </div>
