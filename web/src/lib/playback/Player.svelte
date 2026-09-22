@@ -7,7 +7,7 @@
   import type { PreviewInfo } from './accelerated/protocol';
   import { createScrubPreview } from './accelerated/preview';
   import { createGpuPreviewRenderer, type GpuPreviewRenderer } from './accelerated/gpu-renderer';
-  let { src, name, sourceBlob, onViewed = () => {}, onmetadata = (_: PreviewInfo) => {}, ontime = (_: number) => {} }: { src: string; name: string; sourceBlob?: Blob; diagnostics?: boolean; onViewed?: () => void; onmetadata?: (info: PreviewInfo) => void; ontime?: (time: number) => void } = $props();
+  let { src, name, sourceBlob, onready = (_: string) => {}, onViewed = () => {}, onmetadata = (_: PreviewInfo) => {}, ontime = (_: number) => {} }: { src: string; name: string; sourceBlob?: Blob; onready?: (source: string) => void; diagnostics?: boolean; onViewed?: () => void; onmetadata?: (info: PreviewInfo) => void; ontime?: (time: number) => void } = $props();
   let video: HTMLVideoElement;
   let surface: HTMLDivElement;
   let paused = $state(true), muted = $state(false), time = $state(0), duration = $state(0);
@@ -115,10 +115,11 @@
   }
   /** Seek a review note without restarting playback or changing its paused state. */
   export function seek(seconds: number) {
-    if (!ready || !session || scrubbing || !Number.isFinite(seconds) || duration <= 0) return;
+    if (!ready || !session || scrubbing || !Number.isFinite(seconds) || duration <= 0) return false;
     const target = Math.max(0, Math.min(duration, seconds));
     monitor?.requestSeek(target);
     session.seek(target); time = video.currentTime; ontime(time);
+    return true;
   }
   function stepFrame(direction: -1 | 1) {
     if (!ready || !session) return;
@@ -186,7 +187,7 @@
     <video bind:this={video} use:attachMedia={src} {src} playsinline preload="metadata" aria-label={name}
       onloadstart={() => { ready = false; error = ''; time = 0; duration = 0; }}
       onloadedmetadata={() => { duration = Number.isFinite(video.duration) ? video.duration : 0; mediaWidth = video.videoWidth; mediaHeight = video.videoHeight; }}
-      onloadeddata={() => ready = true}
+      onloadeddata={() => { ready = true; onready(video.currentSrc); }}
       ontimeupdate={() => { if (!scrubbing) { time = video.currentTime; ontime(time); } }}
       onplay={() => { paused = false; onViewed(); }} onpause={() => paused = true}
       onvolumechange={() => muted = video.muted}

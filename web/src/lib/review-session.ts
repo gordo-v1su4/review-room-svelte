@@ -4,7 +4,7 @@ import type { VideoStatus } from '../../../src/lib/types';
 export type ReviewDraft = Readonly<{ body: string; timecodeSec: number | null }>;
 /** Local participant IDs model independent toggles; live Convex summaries expose counts only. */
 export type ReactionEmoji = 'thumbs_up' | 'thumbs_down' | 'fire' | 'heart';
-export type ReviewComment = Readonly<{ id: string; body: string; timecodeSec: number | null; completedAt?: number; completedBy?: string; reactions?: Readonly<Partial<Record<ReactionEmoji, readonly string[]>>> }>;
+export type ReviewComment = Readonly<{ id: string; body: string; timecodeSec: number | null; authorName?: string; authorRole?: 'admin' | 'client'; createdAt?: number; completedAt?: number; completedBy?: string; reactions?: Readonly<Partial<Record<ReactionEmoji, readonly string[]>>> }>;
 export type AssetReview = Readonly<{
   id: string;
   status: VideoStatus;
@@ -30,7 +30,7 @@ export type ReviewAction =
   | { type: 'status'; assetId: string; status: VideoStatus }
   | { type: 'rate'; assetId: string; rating: number }
   | { type: 'shortlist'; assetId: string; shortlisted: boolean }
-  | { type: 'publish-comment'; assetId: string; commentId: string }
+  | { type: 'publish-comment'; assetId: string; commentId: string; author?: { name: string; role: 'admin' | 'client' }; createdAt?: number }
   | { type: 'select'; assetId: string | null }
   | { type: 'draft'; assetId: string; body: string; timecodeSec: number | null };
 
@@ -84,7 +84,8 @@ export function transitionReviewSession(session: ReviewSession, action: ReviewAc
     const body = asset.draft.body.trim();
     if (!body) throw new Error('Comment cannot be empty');
     if (!action.commentId || asset.comments.some(comment => comment.id === action.commentId)) throw new Error('Comment ID must be unique');
-    next = { ...asset, feedbackNeedsAttention: true, draft: { body: '', timecodeSec: null }, comments: [...asset.comments, { id: action.commentId, body, timecodeSec: asset.draft.timecodeSec }] };
+    if (action.createdAt !== undefined && (!Number.isFinite(action.createdAt) || action.createdAt < 0)) throw new Error('Comment timestamp must be nonnegative and finite');
+    next = { ...asset, feedbackNeedsAttention: true, draft: { body: '', timecodeSec: null }, comments: [...asset.comments, { id: action.commentId, body, timecodeSec: asset.draft.timecodeSec, ...(action.author ? { authorName: action.author.name.trim() || 'Reviewer', authorRole: action.author.role } : {}), ...(action.createdAt !== undefined ? { createdAt: action.createdAt } : {}) }] };
   } else if (action.type === 'toggle-comment-complete') {
     if (access.kind !== 'project') throw new Error('Project membership required');
     if (!action.actorId.trim()) throw new Error('Actor required');

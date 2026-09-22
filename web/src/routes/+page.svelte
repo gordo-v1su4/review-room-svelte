@@ -20,6 +20,8 @@
   import ProjectTree from '$lib/components/ProjectTree.svelte';
   import WorkspacePanes from '$lib/components/WorkspacePanes.svelte';
   import FolderArtwork from '$lib/components/FolderArtwork.svelte';
+  import FeedbackInbox from '$lib/components/FeedbackInbox.svelte';
+  import { feedbackDigests, type FeedbackNote } from '$lib/feedback-inbox';
   import ReviewNotes from '$lib/components/ReviewNotes.svelte';
   import WorkspaceFilters from '$lib/components/WorkspaceFilters.svelte';
   import AssetTable from '$lib/components/AssetTable.svelte';
@@ -54,6 +56,8 @@
   const allAssets = $derived(media.map(asset => ({ ...asset, ...session.assets[asset.id], ...organization.placements[asset.id], status: organization.placements[asset.id]?.archived ? 'archived' as VideoStatus : session.assets[asset.id].status, folderName: organization.folders.find(folder => folder.id === organization.placements[asset.id]?.folderId)?.title, commentsCount: session.assets[asset.id]?.comments.length ?? 0 })));
   const assets = $derived(allAssets.filter(asset => asset.projectId === projectId && (Boolean(asset.archived) === archived || (!archived && filters.statuses.includes('archived')))));
   const project = $derived(projects.find(item => item.id === projectId)!);
+  const inbox = $derived(feedbackDigests(projects, allAssets, { isAdmin: folderAccess.isAdmin, projectIds: folderAccess.editableProjectIds }));
+  let inboxSeek = $state<{ assetId: string; time: number } | null>(null);
   const treeProjects = $derived(projects.map(project => {
     const items = allAssets.filter(asset => asset.projectId === project.id && !asset.archived);
     return { ...project, collections: collections.collections.filter(collection => collection.projectId === project.id).map(collection => ({ ...collection, count: queryCollectionAssets(collection, allAssets).length })), folders: organization.folders.filter(folder => folder.projectId === project.id).map(folder => ({ ...folder, count: items.filter(asset => asset.folderId === folder.id).length })), archivedCount: allAssets.filter(asset => asset.projectId === project.id && asset.archived).length, videoCount: items.filter(asset => asset.type === 'video').length, imageCount: items.filter(asset => asset.type === 'image').length, shortlistCount: items.filter(asset => asset.shortlisted).length };
@@ -153,6 +157,7 @@
 
   function select(id: string | null) {
     if (id === activeId) return;
+    inboxSeek = null;
     review({ type: 'select', assetId: id });
     currentTime = 0;
   }
@@ -166,7 +171,7 @@
   }
   function comment() {
     if (!active?.draft.body.trim()) return;
-    review({ type: 'publish-comment', assetId: active.id, commentId: crypto.randomUUID() });
+    review({ type: 'publish-comment', assetId: active.id, commentId: crypto.randomUUID(), author: { name: 'You', role: 'admin' }, createdAt: Date.now() });
   }
   function openFolder(id: string, collection: 'all' | 'video' | 'image' | 'selected') {
     select(null);
@@ -176,6 +181,27 @@
     filters = { ...defaultFilters(), selectedOnly: collection === 'selected' };
     query = ''; checked = transitionSelection(checked, { type: 'clear' });
     folderOpen = true; navOpen = false; feedback = '';
+  }
+  function openInboxNote(note: FeedbackNote) {
+    const asset = allAssets.find(item => item.id === note.assetId && item.projectId === note.projectId && !item.archived);
+    if (!asset || !inbox.some(group => group.comments.some(item => item.commentId === note.commentId && item.assetId === note.assetId))) return;
+    const sameAsset = activeId === asset.id;
+    openFolder(asset.projectId, 'all');
+    activeFolderId = asset.folderId ?? null;
+    importOptions.folderId = activeFolderId;
+    select(asset.id); showInspector = true; inspectorTab = 'notes';
+    if (asset.type === 'video' && note.timecodeSec !== null) {
+      inboxSeek = { assetId: asset.id, time: note.timecodeSec };
+      if (sameAsset && player?.seek(note.timecodeSec)) inboxSeek = null;
+    }
+  }
+  function applyInboxSeek(source: string) {
+    if (!inboxSeek || active?.id !== inboxSeek.assetId || active.url !== source) return;
+    if (player?.seek(inboxSeek.time)) inboxSeek = null;
+  }
+  function toggleInboxNote(note: FeedbackNote) {
+    if (!inbox.some(group => group.comments.some(item => item.commentId === note.commentId && item.assetId === note.assetId))) return;
+    review({ type: 'toggle-comment-complete', assetId: note.assetId, commentId: note.commentId, actorId: 'local-reviewer', at: Date.now() });
   }
   const locationName = $derived(archived ? 'Archived' : activeCollection?.title ?? activeFolder?.title ?? (mediaType === 'video' ? 'Videos' : mediaType === 'image' ? 'Images' : filter === 'selected' ? 'Shortlist' : 'All media'));
   function changeCollections(action: CollectionAction) { collections = transitionCollectionState(collections, action, collectionAccess, organization.folders); }
@@ -354,6 +380,7 @@
   <div class="brand">review room.</div>
   <button class="workspace-name" onclick={projectOverview}>Personal workspace</button>
   <ProjectTree {canDropAssets} onDropAssets={dropAssets} dragActive={!!dragged} selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={!folderOpen} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
+  {#if folderAccess.isAdmin}<FeedbackInbox groups={inbox} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}
   <div class="nav-divider"></div><span class="nav-heading">REVIEW STATUS</span>
   <button class:nav-active={!activeCollection && filter === 'awaiting_review'} class="nav-item" onclick={() => filterBy('awaiting_review')}><span class="status-dot pending"></span> Awaiting review</button>
   <button class:nav-active={!activeCollection && filter === 'needs_changes'} class="nav-item" onclick={() => filterBy('needs_changes')}><span class="status-dot changes"></span> Needs changes</button>
@@ -419,7 +446,7 @@
       {/snippet}
       {#snippet viewer()}
         {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2>{active.name}</h2></div><button class="icon-button" aria-label="Close review" onclick={() => select(null)}><PanelRightClose size={18}/></button></div>
-          {#if active.type === 'video'}<Player bind:this={player} sourceBlob={active.sourceFile} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={true}
+          {#if active.type === 'video'}<Player bind:this={player} onready={applyInboxSeek} sourceBlob={active.sourceFile} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={true}
               canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => updateAsset(active.id, info)}/>{/if}
           <div class="review-actions"><button class:shortlisted={active.shortlisted} class="secondary-button" aria-pressed={active.shortlisted} onclick={() => review({ type: 'shortlist', assetId: active.id, shortlisted: !active.shortlisted })}><Bookmark size={16}/> {active.shortlisted ? 'Shortlisted' : 'Shortlist'}</button><div class="rating" aria-label="Rating">{#each [1,2,3,4,5] as rating (rating)}<button aria-label={`Rate ${rating} stars`} aria-pressed={active.rating === rating} onclick={() => review({ type: 'rate', assetId: active.id, rating: active.rating === rating ? 0 : rating })}><Star size={17} fill={active.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}</div><div class="asset-nav"><button class="icon-button" aria-label="Previous asset" disabled={visibleIds.indexOf(activeId ?? '') <= 0} onclick={() => navigate(-1)}><ArrowLeft size={17}/></button><button class="icon-button" aria-label="Next asset" disabled={visibleIds.indexOf(activeId ?? '') >= visibleIds.length - 1} onclick={() => navigate(1)}><ArrowRight size={17}/></button></div></div>
           <div class="decision-bar"><button class:decision-active={active.status === 'needs_changes'} class="secondary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'needs_changes' ? 'awaiting_review' : 'needs_changes' })}>Request changes</button><button class="primary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'approved' ? 'awaiting_review' : 'approved' })}><Check size={16}/>{active.status === 'approved' ? 'Approved' : 'Approve'}</button></div>

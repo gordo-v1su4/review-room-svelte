@@ -159,3 +159,9 @@ test('markup drafts and saved baselines stay with each asset and revoked access 
   expect(session.assets.first.annotations.saved).toEqual([stroke]);
   expect(initial.assets.first.annotations.draft).toEqual([]);
 });
+
+test('published notes retain author and timestamp for the feedback inbox', () => {
+  const session = createReviewSession([{ id: 'clip', draft: { body: 'Trim opening', timecodeSec: 0 } }]);
+  const published = transitionReviewSession(session, { type: 'publish-comment', assetId: 'clip', commentId: 'c', author: { name: 'Casey', role: 'client' }, createdAt: 1790112000000 }, { kind: 'share' });
+  expect(published.assets.clip.comments[0]).toMatchObject({ authorName: 'Casey', authorRole: 'client', createdAt: 1790112000000, timecodeSec: 0 });
+});

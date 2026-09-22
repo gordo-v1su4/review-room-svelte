@@ -19,3 +19,5 @@ Fixture role and token scenarios pass; live security/persistence gates remain ex
 ## Comments
 
 Implementation in progress. Workspace controls and local review/metadata slices are recorded in [workspace-metadata-evidence.md](../workspace-metadata-evidence.md). This ticket remains open until its full parity and live acceptance scope passes.
+
+Local inbox grouping, search, handling/reopening and exact review-context navigation are verified in [feedback-inbox-evidence.md](../feedback-inbox-evidence.md). Author/timestamp retention is restored. Live inbox/notifications, durable routes, public review and persistence remain open.

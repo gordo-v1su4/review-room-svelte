@@ -34,9 +34,9 @@
     <div class="comment-list">
       {#each comments as note (note.id)}
         <article class="comment" aria-label={note.completedAt ? 'Handled note' : 'Open note'}>
-          <span class="avatar small" aria-hidden="true">YO</span>
+          <span class="avatar small" aria-hidden="true">{(note.authorName ?? "You").slice(0, 2).toUpperCase()}</span>
           <div class="note-content">
-            <div class="note-heading"><strong>You</strong>
+            <div class="note-heading"><strong>{note.authorName ?? "You"}</strong>{#if note.authorRole}<span class="author-role">{note.authorRole === "admin" ? "Team" : "Client"}</span>{/if}
               {#if note.timecodeSec !== null && isVideo}
                 <button type="button" class="note-time seek-note" aria-label={`Seek to ${note.timecodeSec.toFixed(2)} seconds`} onclick={() => onSeek(note.timecodeSec!)}><Clock3 size={12}/>{note.timecodeSec.toFixed(2)}s</button>
               {/if}
@@ -75,6 +75,7 @@
 </section>
 
 <style>
+  .author-role { font-size: 10px; color: var(--muted); }
   .note-content { min-width: 0; flex: 1; }
   .note-heading, .handled-label, .seek-note, .note-actions, .reaction-row { display: flex; align-items: center; }
   .note-heading { gap: 8px; flex-wrap: wrap; }
