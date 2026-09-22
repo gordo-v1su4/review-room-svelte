@@ -9,6 +9,6 @@ This is a navigation list, not a replacement for the migration specification or 
 - [ ] Resume backend work when authorized: live sign-in, role enforcement, durable persistence, uploads/downloads and notifications. Resolve the concrete [public-review authorization findings](public-review-access-audit.md) before exposing shared review.
 - [ ] Release: full live end-to-end flows, deployment configuration and verified deployment; retire Next.js only after parity and live acceptance pass. Never push to Buzero.
 
-Recent completed slices: [shortlist sequence playback](shortlist-preview-evidence.md), [asset keyboard navigation](keyboard-navigation-evidence.md), and [mobile metadata sheet](mobile-metadata-evidence.md).
+Recent completed slices: [shortlist sequence playback](shortlist-preview-evidence.md), [asset keyboard navigation](keyboard-navigation-evidence.md), [mobile metadata sheet](mobile-metadata-evidence.md), and [shared-review access gates](public-review-gate-evidence.md).
 
 Source tickets: [03](issues/03-workspace-parity.md), [04](issues/04-review-feedback-sharing.md), [07](issues/07-integration-cutover.md). Ticket filenames and spec remain authoritative where this index is less detailed.

@@ -25,3 +25,5 @@ Local inbox grouping, search, handling/reopening and exact review-context naviga
 Shortlist sequence preview is restored with native video ended transitions, timed stills, looping, Stop and draft-preserving responsive playback. See [shortlist-preview-evidence.md](../shortlist-preview-evidence.md). Public-token integration remains open and is gated by the [access audit](../public-review-access-audit.md).
 
 Mobile notes now stay beneath the player while secondary metadata opens in a resize-stable sheet. Real-video playback, comment-draft retention, field editing and focus return verified in [mobile-metadata-evidence.md](../mobile-metadata-evidence.md). Full acceptance matrix remains open.
+
+The Svelte shared-review access controller, gate screens and fail-closed token route are implemented and locally verified in [public-review-gate-evidence.md](../public-review-gate-evidence.md). Actual shared viewer, share administration and live adapter/authorization remain open.
