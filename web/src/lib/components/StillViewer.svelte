@@ -3,7 +3,7 @@
   import { ArrowUpRight, Circle, Download, Maximize, Minimize, Pencil, Save, Square, Trash2, Undo2 } from 'lucide-svelte';
   import type { AnnotationPoint, AnnotationStroke, AnnotationTool } from '$lib/annotations';
 
-  let { assetId, src, name, strokes, dirty, canAnnotate = false, canDownload = false, onChange, onSave, onmetadata, onViewed }: {
+  let { assetId, src, name, strokes, dirty, canAnnotate = false, canDownload = false, onChange, onSave, onmetadata, onViewed, onfailure }: {
     assetId: string;
     src: string;
     name: string;
@@ -15,6 +15,7 @@
     onSave: () => void | Promise<void>;
     onmetadata?: (size: { width: number; height: number }) => void;
     onViewed?: () => void;
+    onfailure?: (source: string) => void;
   } = $props();
   let root: HTMLDivElement;
   let surface: HTMLDivElement;
@@ -131,7 +132,7 @@
   <div class="still-stage">
     {#if failedSource === src}<p class="image-error" role="status">Could not load this image.</p>{/if}
     <div class="image-content" class:failed={failedSource === src}>
-      <img {src} alt={name} draggable="false" onload={imageLoaded} onerror={() => { failedSource = src; cancelStroke(); }}/>
+      <img {src} alt={name} draggable="false" onload={imageLoaded} onerror={() => { failedSource = src; cancelStroke(); onfailure?.(src); }}/>
       <!-- The drawing surface is an image-editing application with a labelled keyboard cancellation action. -->
       <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
       <div class="drawing-surface" class:editable={canAnnotate && !saving} bind:this={surface} role="application" tabindex={canAnnotate ? 0 : -1} aria-label={canAnnotate ? `Annotate ${name}. Drag to draw; Escape cancels the current stroke.` : `Markup for ${name}`} onpointerdown={start} onpointermove={move} onpointerup={finish} onpointercancel={cancelStroke} onlostpointercapture={cancelStroke} onkeydown={keydown}>

@@ -7,7 +7,7 @@
   import type { PreviewInfo } from './accelerated/protocol';
   import { createScrubPreview } from './accelerated/preview';
   import { createGpuPreviewRenderer, type GpuPreviewRenderer } from './accelerated/gpu-renderer';
-  let { src, name, sourceBlob, onready = (_: string) => {}, onViewed = () => {}, onmetadata = (_: PreviewInfo) => {}, ontime = (_: number) => {} }: { src: string; name: string; sourceBlob?: Blob; onready?: (source: string) => void; diagnostics?: boolean; onViewed?: () => void; onmetadata?: (info: PreviewInfo) => void; ontime?: (time: number) => void } = $props();
+  let { src, name, sourceBlob, onready = (_: string) => {}, onended = (_: string) => {}, onfailure = (_: string) => {}, onViewed = () => {}, onmetadata = (_: PreviewInfo) => {}, ontime = (_: number) => {} }: { src: string; name: string; sourceBlob?: Blob; onready?: (source: string) => void; onended?: (source: string) => void; onfailure?: (source: string) => void; diagnostics?: boolean; onViewed?: () => void; onmetadata?: (info: PreviewInfo) => void; ontime?: (time: number) => void } = $props();
   let video: HTMLVideoElement;
   let surface: HTMLDivElement;
   let paused = $state(true), muted = $state(false), time = $state(0), duration = $state(0);
@@ -19,6 +19,7 @@
   const frameHint = $derived(hasFrameRate ? 'Step using the estimated source frame rate' : 'Frame stepping unavailable: source frame rate not detected');
   let error = $state(''), scrubbing = $state(false), ready = $state(false);
   let session: ReturnType<typeof createPlaybackSession> | undefined;
+  let transportRequest = 0;
   let monitor: ReturnType<typeof observeNativePlayback> | undefined;
   let metrics = $state<PlaybackMetrics>();
   let previewVisible = $state(false), previewBackend = $state('Native only'), previewCodec = $state('Not checked');
@@ -99,6 +100,7 @@
     return {
       update(nextSource: string) {
         if (nextSource === source) return;
+        transportRequest += 1;
         observer.dispose(); attached.dispose(); releasePointer();
         source = nextSource; mediaWidth = 0; mediaHeight = 0;
         ready = false; error = ''; time = 0; duration = 0; paused = true; muted = node.muted;
@@ -107,6 +109,7 @@
         ontime(0);
       },
       destroy() {
+        transportRequest += 1;
         observer.dispose(); attached.dispose(); releasePointer();
         if (session === attached) session = undefined;
         if (monitor === observer) monitor = undefined;
@@ -120,6 +123,44 @@
     monitor?.requestSeek(target);
     session.seek(target); time = video.currentTime; ontime(time);
     return true;
+  }
+  function matchesSource(expectedSource: string) {
+    if (!video || src !== expectedSource) return false;
+    try {
+      const expectedUrl = new URL(expectedSource, video.ownerDocument.baseURI).href;
+      return video.src === expectedUrl && video.currentSrc === expectedUrl;
+    } catch { return false; }
+  }
+  /** Sequence playback starts only after the requested source has become ready. */
+  export async function playFromStart(expectedSource: string): Promise<boolean> {
+    const active = session;
+    if (!active || !ready || video.readyState < 2 || duration <= 0 || !matchesSource(expectedSource)) return false;
+    const request = ++transportRequest;
+    if (scrubbing) { releasePointer(); active.cancelScrub(); }
+    else cancelPreview?.();
+    error = '';
+    try {
+      monitor?.requestSeek(0);
+      active.seek(0); time = video.currentTime; ontime(time);
+      await video.play();
+      return request === transportRequest && active === session && matchesSource(expectedSource) && !video.paused;
+    } catch {
+      if (request === transportRequest && active === session && matchesSource(expectedSource)) {
+        error = 'Playback could not start automatically. Tap Play to continue.';
+      }
+      return false;
+    }
+  }
+  /** Stop sequence playback without losing position or leaving a scrub muted. */
+  export function pause() {
+    transportRequest += 1;
+    if (scrubbing) { releasePointer(); session?.cancelScrub(); }
+    else cancelPreview?.();
+    video?.pause();
+    paused = true;
+  }
+  function ended() {
+    if (!scrubbing && ready && session && video.ended && matchesSource(src)) onended(video.currentSrc);
   }
   function stepFrame(direction: -1 | 1) {
     if (!ready || !session) return;
@@ -137,8 +178,9 @@
   }
   async function toggle() {
     const active = session;
+    const request = ++transportRequest;
     try { if (video.paused) await video.play(); else video.pause(); }
-    catch { if (active === session) error = 'Playback could not start. Try again or choose another file.'; }
+    catch { if (active === session && request === transportRequest) error = 'Playback could not start. Try again or choose another file.'; }
   }
   function target(event: PointerEvent) {
     const bounds = event.currentTarget instanceof HTMLElement ? event.currentTarget.getBoundingClientRect() : { left: 0, width: 1 };
@@ -161,10 +203,11 @@
   }
   async function settleScrub() {
     const active = session;
+    const request = transportRequest;
     releasePointer();
     ontime(time);
     monitor?.requestSeek(time);
-    try { await active?.endScrub(time); } catch { if (active === session) error = 'Tap Play to resume.'; }
+    try { await active?.endScrub(time); } catch { if (active === session && request === transportRequest) error = 'Tap Play to resume.'; }
   }
   function cancel(event: PointerEvent) {
     if (scrubbing && event.pointerId === pointerId) void settleScrub();
@@ -189,9 +232,9 @@
       onloadedmetadata={() => { duration = Number.isFinite(video.duration) ? video.duration : 0; mediaWidth = video.videoWidth; mediaHeight = video.videoHeight; }}
       onloadeddata={() => { ready = true; onready(video.currentSrc); }}
       ontimeupdate={() => { if (!scrubbing) { time = video.currentTime; ontime(time); } }}
-      onplay={() => { paused = false; onViewed(); }} onpause={() => paused = true}
+      onplay={() => { paused = false; error = ''; onViewed(); }} onpause={() => paused = true} onended={ended}
       onvolumechange={() => muted = video.muted}
-      onerror={() => error = 'This file could not be played. Try a browser-supported MP4 or WebM.'}></video>
+      onerror={() => { error = 'This file could not be played. Try a browser-supported MP4 or WebM.'; onfailure(src); }}></video>
     {#key sourceBlob}<canvas class="preview-canvas" use:attachPreview={sourceBlob} aria-hidden="true" style:visibility={previewVisible ? 'visible' : 'hidden'}></canvas>{/key}
     {#if error}<div class="player-message" role="alert">{error}</div>{:else if !ready}<div class="player-message">Preparing playback…</div>{/if}
   </div>

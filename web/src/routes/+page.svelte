@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
+  import { startShortlistPreview, advanceShortlistPreview, type ShortlistPreview } from '$lib/playback/shortlist-preview';
   import { ASSET_DRAG_TYPE, beginAssetDrag, folderDropAction, type AssetDrag } from '$lib/asset-drag';
   import CollectionActions from '$lib/components/CollectionActions.svelte';
   import { transitionCollectionState, collectionIsConfigured, queryCollectionAssets, type CollectionState, type CollectionAction } from '$lib/collections';
@@ -33,7 +34,7 @@
   import { queryWorkspace, groupWorkspaceAssets, type WorkspaceMediaType, type WorkspaceFilterState } from '$lib/workspace';
   import type { VideoStatus } from '../../../src/lib/types';
   import { Dialog, Tabs } from 'bits-ui';
-  import { ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, PanelLeftClose, PanelLeftOpen, PanelRightOpen, ChevronRight } from 'lucide-svelte';
+  import { Play, Square, Repeat, ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, PanelLeftClose, PanelLeftOpen, PanelRightOpen, ChevronRight } from 'lucide-svelte';
   import Player from '$lib/playback/Player.svelte';
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
   import { type LocalAsset } from '$lib/review';
@@ -82,6 +83,9 @@
   let appearancePreferences: ReturnType<typeof createAppearancePreferences> | undefined;
   let checked = $state<SelectionState>({ ids: [], anchorId: null });
   let player = $state<ReturnType<typeof Player>>();
+  let preview = $state.raw<ShortlistPreview | null>(null);
+  let loopPreview = $state(false), readySource = $state('');
+  const shortlistIds = $derived(allAssets.filter(asset => asset.projectId === projectId && !asset.archived && asset.shortlisted).map(asset => asset.id));
   let currentTime = $state(0), pinTime = $state(true), feedback = $state('');
   let navOpen = $state(false), showInspector = $state(false);
   let inspectorTab = $state('notes');
@@ -173,11 +177,63 @@
   }
 
   function select(id: string | null) {
+    stopPreview();
     if (id === activeId) return;
-    inboxSeek = null;
+    inboxSeek = null; readySource = '';
     review({ type: 'select', assetId: id });
     currentTime = 0;
   }
+  function stopPreview() {
+    if (preview) { preview = null; player?.pause(); }
+  }
+  function applyPreview(next: ShortlistPreview | null) {
+    if (!next) { stopPreview(); return; }
+    if (activeId !== next.currentId) readySource = '';
+    review({ type: 'select', assetId: next.currentId });
+    currentTime = 0; preview = next;
+  }
+  function startPreview() {
+    const ids = [...shortlistIds];
+    const alreadyReady = readySource;
+    const firstSource = allAssets.find(asset => asset.id === ids[0])?.url;
+    openFolder(projectId, 'selected');
+    applyPreview(startShortlistPreview(ids));
+    // Svelte keeps the existing media node when the final selection is unchanged.
+    if (firstSource === alreadyReady) readySource = alreadyReady;
+  }
+  function advancePreview(source: string) {
+    if (!preview || active?.url !== source || active.id !== preview.currentId) return;
+    applyPreview(advanceShortlistPreview(preview, shortlistIds, loopPreview));
+  }
+  function previewFailed(source: string) {
+    if (!preview || active?.url !== source) return;
+    stopPreview(); feedback = 'Preview stopped because this media could not be loaded.';
+  }
+  function mediaReady(source: string) { readySource = source; applyInboxSeek(source); }
+  $effect(() => {
+    const eligible = shortlistIds;
+    if (preview && !eligible.includes(preview.currentId)) {
+      untrack(() => { if (preview) applyPreview(advanceShortlistPreview(preview, eligible, loopPreview)); });
+    }
+  });
+  $effect(() => {
+    const run = preview;
+    const source = readySource;
+    if (!run || !source) return;
+    // Metadata and review edits must not restart a running preview.
+    return untrack(() => {
+      if (!active || active.id !== run.currentId || active.url !== source) return;
+      if (active.type === 'image') {
+        const timer = setTimeout(() => { if (preview === run) advancePreview(source); }, 2500);
+        return () => clearTimeout(timer);
+      }
+      void player?.playFromStart(source).then(started => {
+        if (!started && preview === run) {
+          stopPreview(); feedback = 'Preview stopped. Press Play to review this clip, or try Preview shortlist again.';
+        }
+      });
+    });
+  });
   function navigate(delta: number) {
     const index = visibleIds.indexOf(activeId ?? '');
     const next = visibleIds[index + delta]; if (next) select(next);
@@ -397,7 +453,7 @@
       if (identityRequests.get(id) === request) identityRequests.delete(id);
     }
   }
-  function filterBy(value: FilterId) { if (project.archived) return; activeCollectionId = null; importOptions.folderId = null; activeFolderId = null; archived = false; filters = { ...defaultFilters(), statuses: value === 'all' || value === 'selected' ? [] : [value], selectedOnly: value === 'selected' }; query = ''; mediaType = 'all'; folderOpen = true; navOpen = false; }
+  function filterBy(value: FilterId) { stopPreview(); if (project.archived) return; activeCollectionId = null; importOptions.folderId = null; activeFolderId = null; archived = false; filters = { ...defaultFilters(), statuses: value === 'all' || value === 'selected' ? [] : [value], selectedOnly: value === 'selected' }; query = ''; mediaType = 'all'; folderOpen = true; navOpen = false; }
   onDestroy(() => {
     disposed = true;
     coverRequests.clear();
@@ -459,6 +515,13 @@
         <AppearanceMenu value={appearance} onChange={changeAppearance}/>
         <div class="view-switch" aria-label="Media layout"><button class:chosen={view === 'grid'} aria-label="Grid view" aria-pressed={view === 'grid'} onclick={() => view = 'grid'}><Grid2X2 size={16}/></button><button class:chosen={view === 'list'} aria-label="List view" aria-pressed={view === 'list'} onclick={() => view = 'list'}><List size={18}/></button><button class:chosen={view === 'table'} aria-label="Table view" aria-pressed={view === 'table'} onclick={() => view = 'table'}><Table2 size={17}/></button></div>
       </div>
+      {#if !archived && (shortlistIds.length || preview)}
+        <div class="shortlist-preview" aria-label="Shortlist playback">
+          <button class="secondary-button" onclick={preview ? stopPreview : startPreview}>{#if preview}<Square size={12} fill="currentColor"/>Stop preview{:else}<Play size={13}/>Preview shortlist{/if}</button>
+          <button class="preview-loop" aria-label="Loop shortlist" aria-pressed={loopPreview} onclick={() => loopPreview = !loopPreview}><Repeat size={14}/></button>
+          <span role="status">{preview ? `${preview.ids.indexOf(preview.currentId) + 1} / ${preview.ids.length}` : `${shortlistIds.length} selected`}</span>
+        </div>
+      {/if}
       {#if checked.ids.length}
             <SelectionBar count={checked.ids.length} visibleCount={visible.length} access={localAccess} canEditMetadata={true} onTags={batchTags}
               onselectvisible={() => checked = transitionSelection(checked, { type: 'select-visible', visibleIds })}
@@ -488,8 +551,8 @@
       {/snippet}
       {#snippet viewer()}
         {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2>{active.name}</h2></div><button class="icon-button" aria-label="Close review" onclick={() => select(null)}><PanelRightClose size={18}/></button></div>
-          {#if active.type === 'video'}<Player bind:this={player} onready={applyInboxSeek} sourceBlob={active.sourceFile} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={true}
-              canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => updateAsset(active.id, info)}/>{/if}
+          {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={advancePreview} onfailure={previewFailed} sourceBlob={active.sourceFile} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
+              canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => { updateAsset(active.id, info); readySource = active.url; }}/>{/if}
           <div class="review-actions"><button class:shortlisted={active.shortlisted} class="secondary-button" aria-pressed={active.shortlisted} onclick={() => review({ type: 'shortlist', assetId: active.id, shortlisted: !active.shortlisted })}><Bookmark size={16}/> {active.shortlisted ? 'Shortlisted' : 'Shortlist'}</button><div class="rating" aria-label="Rating">{#each [1,2,3,4,5] as rating (rating)}<button aria-label={`Rate ${rating} stars`} aria-pressed={active.rating === rating} onclick={() => review({ type: 'rate', assetId: active.id, rating: active.rating === rating ? 0 : rating })}><Star size={17} fill={active.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}</div><div class="asset-nav"><button class="icon-button" aria-label="Previous asset" disabled={visibleIds.indexOf(activeId ?? '') <= 0} onclick={() => navigate(-1)}><ArrowLeft size={17}/></button><button class="icon-button" aria-label="Next asset" disabled={visibleIds.indexOf(activeId ?? '') >= visibleIds.length - 1} onclick={() => navigate(1)}><ArrowRight size={17}/></button></div></div>
           <div class="decision-bar"><button class:decision-active={active.status === 'needs_changes'} class="secondary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'needs_changes' ? 'awaiting_review' : 'needs_changes' })}>Request changes</button><button class="primary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'approved' ? 'awaiting_review' : 'approved' })}><Check size={16}/>{active.status === 'approved' ? 'Approved' : 'Approve'}</button></div>
         </section>{/if}
@@ -523,6 +586,14 @@
 </Dialog.Root>
 
 <style>
+  .shortlist-preview { display: flex; align-items: center; gap: 7px; padding: 0 0 12px; }
+  .shortlist-preview .secondary-button,.preview-loop { height: 28px; min-height: 28px; padding: 0 9px; font-size: 11px; }
+  .preview-loop { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); background: var(--panel); cursor: pointer; }
+  .preview-loop[aria-pressed='true'] { color: var(--teal); background: var(--raised); }
+  .preview-loop:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }
+  .shortlist-preview > span { color: var(--muted); font: 10px monospace; }
+  @media (pointer: coarse) { .shortlist-preview .secondary-button,.preview-loop { min-width: 44px; min-height: 44px; } }
+
   .archived-project-state { padding: clamp(28px, 6vw, 72px) 0; }
   .archived-project-state h2 { font-size: 18px; font-weight: 500; }
   .archived-project-state p { margin: 8px 0 20px; color: var(--muted); font-size: 12px; }
