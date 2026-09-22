@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dev } from '$app/environment';
   import { Pause, Play, Volume2, VolumeX, Maximize, RotateCcw, StepBack, StepForward } from 'lucide-svelte';
   import { frameReadout, frameStepTarget, validFrameRate } from './time-display';
   import { createPlaybackSession } from './session';
@@ -22,13 +23,14 @@
   let metrics = $state<PlaybackMetrics>();
   let previewVisible = $state(false), previewBackend = $state('Native only'), previewCodec = $state('Not checked');
   let previewDecodeMs = $state<number | null>(null), previewRequestMs = $state<number | null>(null);
+  let previewTime = $state<number | null>(null);
   let requestPreview: ((time: number) => void) | undefined;
   let cancelPreview: (() => void) | undefined;
   function attachPreview(canvas: HTMLCanvasElement, blob: Blob | undefined) {
     function connect(source: Blob | undefined) {
       sourceInfo = undefined;
       previewVisible = false; previewBackend = 'Native only'; previewCodec = 'Not checked';
-      previewDecodeMs = null; previewRequestMs = null;
+      previewDecodeMs = null; previewRequestMs = null; previewTime = null;
       if (!source) return () => {};
       let stopped = false, renderReady = false;
       let gpu: GpuPreviewRenderer | null = null;
@@ -53,7 +55,7 @@
             } finally { frame.bitmap.close(); }
           } else frame.bitmap.close();
           if (shown && !stopped) {
-            previewVisible = true; previewDecodeMs = frame.decodeMs; previewRequestMs = frame.requestMs;
+            previewVisible = true; previewDecodeMs = frame.decodeMs; previewRequestMs = frame.requestMs; previewTime = frame.time;
             previewBackend = gpu ? 'WebCodecs worker + WebGPU' : 'WebCodecs worker + Canvas 2D';
           }
         },
@@ -177,7 +179,7 @@
     event.preventDefault(); seek(next);
   }
 </script>
-<div class="player" bind:this={surface}>
+<div class="player" bind:this={surface} data-playback={dev ? JSON.stringify({ native: metrics, preview: { backend: previewBackend, codec: previewCodec, decodeMs: previewDecodeMs, requestMs: previewRequestMs, time: previewTime, visible: previewVisible }, scrubbing }) : undefined}>
   <div class="picture">
     <!-- The persistent media element survives layout changes. -->
     <!-- svelte-ignore a11y_media_has_caption -->

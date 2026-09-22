@@ -66,3 +66,7 @@ See [card-status-evidence.md](card-status-evidence.md). Cards support permission
 ## Latest increment: folder drag/drop
 
 See [folder-drag-evidence.md](folder-drag-evidence.md). Native single/group moves from media cards and tables to real folders/root are verified with real media. Moving an active asset preserves playback position and comment draft; mobile retains the accessible Move dialog. 11 targeted tests pass. Project administration, performance, accessibility and live shipping gates remain open.
+
+## Latest increment: measured playback and status colors
+
+Distinct shared status colors are implemented and browser-verified on cards/menus/table. See [playback-measurements.md](playback-measurements.md) for actual H.264 WebCodecs/WebGPU scrub measurements, native unsupported-container fallback and uninterrupted resize through 360–1440px. Eight playback tests pass; Svelte diagnostics are clean. This single-machine local sample does not close cross-browser, performance-budget or live release gates.

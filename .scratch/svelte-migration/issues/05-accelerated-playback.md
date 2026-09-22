@@ -1,6 +1,6 @@
 # 05 — Validate and implement accelerated playback
 
-Status: needs-triage
+Status: ready-for-agent
 Type: task
 Blocked by: 02
 
@@ -18,4 +18,4 @@ Record real-media first-frame/seek/drop measurements and active adapter in targe
 
 ## Comments
 
-Draft ticket; no implementation claimed.
+Worker/WebCodecs and WebGPU scrub preview are implemented with native primary playback/fallback. Actual local H.264 rendering, concurrent seek measurements, VP9 WebM native fallback and state-preserving responsive playback are recorded in [playback-measurements.md](../playback-measurements.md). This ticket remains open for the broader browser/media/device matrix, isolated comparisons, device-loss and sustained resource acceptance; no universal acceleration benefit is claimed.
