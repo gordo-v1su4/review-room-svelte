@@ -1,8 +1,8 @@
 # 02 — Build a first Svelte review slice
 
-Status: needs-triage
+Status: completed (local slice only)
 Type: task
-Blocked by: 01
+Dependency: 01 inventory available; broader baseline measurements remain open
 
 ## Scope
 
@@ -18,4 +18,4 @@ Desktop and phone can open media and retain comment draft and playback state thr
 
 ## Comments
 
-Draft ticket; no implementation claimed.
+Implemented in `web/`. Browser acceptance and review findings: [first-slice-evidence.md](../first-slice-evidence.md). This ticket does not complete the migration or live integration gates.

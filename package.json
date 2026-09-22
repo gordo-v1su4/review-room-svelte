@@ -9,7 +9,11 @@
     "lint": "eslint .",
     "deploy:convex": "convex deploy",
     "worker:media": "bun --env-file=.env.local run services/media-worker/index.ts",
-    "docs:annotate": "bun documentation/notion-client-guide/marker-editor/server.ts"
+    "docs:annotate": "bun documentation/notion-client-guide/marker-editor/server.ts",
+    "dev:svelte": "bun run --cwd web dev",
+    "check:svelte": "bun run --cwd web check",
+    "build:svelte": "bun run --cwd web build",
+    "test:svelte": "bun run --cwd web test"
   },
   "dependencies": {
     "@auth/core": "^0.37.4",

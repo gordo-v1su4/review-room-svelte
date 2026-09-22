@@ -1,6 +1,6 @@
 # Review Room Svelte migration
 
-Status: draft for implementation planning. Tooling setup is the first deliverable; application rewrite has not started.
+Status: direction and test seams approved after one interview round. Persistent shipping goal active; first local Svelte review slice implemented, full parity and live release gates remain open.
 
 ## Outcome
 
@@ -67,12 +67,24 @@ Primary references: https://www.w3.org/TR/webcodecs/ and https://github.com/w3c/
 - Limit layout motion to useful short transitions; no animated width/height churn throughout video playback.
 - Verify loading, empty, error and denied states on desktop and mobile, not only populated happy paths.
 
-## Proposed test seams — awaiting agreement before tests
+## Approved test seams
 
-Matt's TDD skill requires agreement on seams before tests are written. Proposed public interfaces: review-session actions and observable state; playback commands and events; upload queue commands and state; user-visible routing/responsive flows. Use one failing behavior test, one minimal implementation, then the next slice. Keep tests independent of component internals. Standards/spec review follows implementation.
+The user approved these test seams in the single grill-with-docs round. Public interfaces: review-session actions and observable state; playback commands and events; upload queue commands and state; user-visible routing/responsive flows. Use one failing behavior test, one minimal implementation, then the next slice. Keep tests independent of component internals. Standards/spec review follows implementation.
 
 Fixture-based frontend evidence can demonstrate UI behavior and contracts, but cannot prove production authorization, persistence, OAuth, signed URLs or remote uploads. Those remain final integration gates after backend repair.
 
 ## Completion gates
 
 All parity ledger rows have evidence; keyboard/touch and continuous resize checks pass; supported real-media playback and fallback are measured; production role and share-link flows persist correctly; deployed frontend and backend are separately verified if either is changed. Retire React/Next only after these gates. No paid generation or production data mutations are part of setup.
+
+## Accepted interview decisions
+
+The user accepted all five recommendations in one round; no additional interview round is required for these decisions.
+
+1. Preserve capabilities, permissions and data semantics while freely consolidating menus, moving controls and replacing awkward workflows.
+2. During scrubbing, the main video follows the pointer/finger continuously with audio muted. When decoding cannot keep up, show preview frames and seek precisely on release. Restore the pre-scrub mute preference afterward.
+3. Mobile review keeps the player visible above comments and primary review actions. Filters, metadata and secondary controls use sheets.
+4. Motion is quiet by default, with restrained character at key transitions. Playback, scrubbing and input feedback never wait for an animation.
+5. Test review actions and permissions; playback, seeking and fallback; uploads and failure handling; resize without loss of playback or drafts; actual desktop/mobile browser flows. Tests observe public interfaces and user-visible behavior.
+
+Performance targets must be grounded in recorded baseline measurements and named media/device conditions. The architecture must not claim that WebGPU itself guarantees lower latency.

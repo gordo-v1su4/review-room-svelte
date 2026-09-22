@@ -1,0 +1,80 @@
+import type { VideoStatus } from '../../../src/lib/types';
+
+export type ReviewDraft = Readonly<{ body: string; timecodeSec: number | null }>;
+export type ReviewComment = Readonly<{ id: string; body: string; timecodeSec: number | null }>;
+export type AssetReview = Readonly<{
+  id: string;
+  status: VideoStatus;
+  rating: number;
+  shortlisted: boolean;
+  draft: ReviewDraft;
+  comments: readonly ReviewComment[];
+}>;
+export type ReviewSession = Readonly<{
+  activeAssetId: string | null;
+  assets: Readonly<Record<string, AssetReview>>;
+}>;
+export type ReviewAccess = { kind: 'none' } | { kind: 'share' } | { kind: 'project'; memberRole: 'owner' | 'editor' | 'viewer' };
+export type ReviewAction =
+  | { type: 'add-assets'; assets: readonly { id: string }[] }
+  | { type: 'status'; assetId: string; status: VideoStatus }
+  | { type: 'rate'; assetId: string; rating: number }
+  | { type: 'shortlist'; assetId: string; shortlisted: boolean }
+  | { type: 'publish-comment'; assetId: string; commentId: string }
+  | { type: 'select'; assetId: string | null }
+  | { type: 'draft'; assetId: string; body: string; timecodeSec: number | null };
+
+/** Own this state above responsive panels; media URLs and playback remain caller-owned. */
+export function createReviewSession(assets: readonly ({ id: string } & Partial<Omit<AssetReview, 'id'>>)[]): ReviewSession {
+  return {
+    activeAssetId: assets[0]?.id ?? null,
+    assets: Object.fromEntries(assets.map(asset => [asset.id, {
+      id: asset.id, status: asset.status ?? 'awaiting_review', rating: asset.rating ?? 0,
+      shortlisted: asset.shortlisted ?? false,
+      draft: { ...(asset.draft ?? { body: '', timecodeSec: null }) },
+      comments: (asset.comments ?? []).map(comment => ({ ...comment }))
+    }]))
+  };
+}
+
+/**
+ * UI/local review transitions only, NOT authorization or persistence.
+ * Access must come from the server-validated project membership or review link.
+ * Live callers must await the corresponding Convex mutation before applying a
+ * publish/status/rate/shortlist transition (or retain the prior state to roll back).
+ * Map shortlisted to videos.isSelect and timecodeSec null to omitted on writes.
+ * Status policy follows videos.updateMetadata and reviewPublic.clientSetStatus;
+ * destructive archive actions need their separate server/admin checks.
+ */
+export function transitionReviewSession(session: ReviewSession, action: ReviewAction, access: ReviewAccess = { kind: 'none' }): ReviewSession {
+  if (action.type === 'add-assets') {
+    const added = createReviewSession(action.assets.filter(asset => !Object.hasOwn(session.assets, asset.id)));
+    return { activeAssetId: session.activeAssetId ?? added.activeAssetId, assets: { ...session.assets, ...added.assets } };
+  }
+  if (action.type === 'select' && action.assetId === null) return { ...session, activeAssetId: null };
+  if (action.assetId === null) return session;
+  const asset = Object.hasOwn(session.assets, action.assetId) ? session.assets[action.assetId] : undefined;
+  if (!asset) throw new Error('Asset not found');
+  if (action.type === 'select') return { ...session, activeAssetId: action.assetId };
+  if (action.type !== 'draft' && access.kind === 'none') throw new Error('Review access required');
+  let next: AssetReview;
+  if (action.type === 'publish-comment') {
+    const body = asset.draft.body.trim();
+    if (!body) throw new Error('Comment cannot be empty');
+    if (!action.commentId || asset.comments.some(comment => comment.id === action.commentId)) throw new Error('Comment ID must be unique');
+    next = { ...asset, draft: { body: '', timecodeSec: null }, comments: [...asset.comments, { id: action.commentId, body, timecodeSec: asset.draft.timecodeSec }] };
+  } else if (action.type === 'status') {
+    const allowed = access.kind === 'project' ? access.memberRole !== 'viewer' : access.kind === 'share' && ['awaiting_review', 'in_progress', 'needs_changes', 'approved'].includes(action.status);
+    if (!allowed) throw new Error('Status change not allowed');
+    next = { ...asset, status: action.status };
+  } else if (action.type === 'rate') {
+    if (!Number.isFinite(action.rating)) throw new Error('Rating must be finite');
+    next = { ...asset, rating: Math.max(0, Math.min(5, Math.round(action.rating))) };
+  } else if (action.type === 'shortlist') {
+    next = { ...asset, shortlisted: action.shortlisted };
+  } else {
+    if (action.timecodeSec !== null && (!Number.isFinite(action.timecodeSec) || action.timecodeSec < 0)) throw new Error('Timecode must be nonnegative and finite');
+    next = { ...asset, draft: { body: action.body, timecodeSec: action.timecodeSec } };
+  }
+  return { ...session, assets: { ...session.assets, [asset.id]: next } };
+}
