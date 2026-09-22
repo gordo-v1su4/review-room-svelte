@@ -10,7 +10,7 @@
   let open = $state(false);
   let search = $state('');
   let notice = $state('');
-  let searchInput: HTMLInputElement | undefined;
+  let searchInput = $state<HTMLInputElement>();
   const visible = $derived.by(() => {
     const query = search.trim().toLocaleLowerCase();
     return projects.filter(project => !query || [project.name, project.clientName ?? ''].some(value => value.toLocaleLowerCase().includes(query)));
