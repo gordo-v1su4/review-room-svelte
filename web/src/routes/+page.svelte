@@ -17,6 +17,7 @@
   import StillViewer from '$lib/components/StillViewer.svelte';
   import { annotationsEqual } from '$lib/annotations';
   import MediaCards from '$lib/components/MediaCards.svelte';
+  import MetadataSheet from '$lib/components/MetadataSheet.svelte';
   import AssetDetails from '$lib/components/AssetDetails.svelte';
   import SelectionBar from '$lib/components/SelectionBar.svelte';
   import { transitionSelection, type SelectionState } from '$lib/media-selection';
@@ -90,6 +91,8 @@
   let currentTime = $state(0), pinTime = $state(true), feedback = $state('');
   let navOpen = $state(false), showInspector = $state(false);
   let inspectorTab = $state('notes');
+  let compactInspector = $state(false);
+  let notesTrigger = $state<HTMLButtonElement | null>(null);
   const knownTags = $derived([...new Set(assets.flatMap(asset => asset.tags))]);
   let picker: HTMLInputElement;
   const thumbnails = createThumbnailExtractor({ concurrency: 2 });
@@ -430,6 +433,13 @@
     appearance = appearancePreferences?.save(projectId, value) ?? normalizeAppearance(value);
   }
   onMount(() => {
+    const query = window.matchMedia('(max-width: 760px)');
+    const sync = () => { compactInspector = query.matches; };
+    sync();
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  });
+  onMount(() => {
     let storage: Storage | undefined;
     try { storage = localStorage; } catch { /* Some browsers deny storage entirely. */ }
     appearancePreferences = createAppearancePreferences(projectId, storage);
@@ -575,8 +585,11 @@
       {/snippet}
       {#snippet inspector()}
         {#if active}<section class="feedback-pane" aria-label="Asset inspector">
-          <Tabs.Root bind:value={inspectorTab}>
-            <Tabs.List class="inspector-tabs" aria-label="Asset inspector panels"><Tabs.Trigger value="notes">Notes <span>{active.comments.length}</span></Tabs.Trigger><Tabs.Trigger value="fields">Fields</Tabs.Trigger></Tabs.List>
+          <Tabs.Root value={compactInspector ? 'notes' : inspectorTab} onValueChange={value => { if (!compactInspector) inspectorTab = value; }}>
+            <div class="inspector-heading">
+              <Tabs.List class="inspector-tabs" aria-label="Asset inspector panels"><Tabs.Trigger value="notes" bind:ref={notesTrigger}>Notes <span>{active.comments.length}</span></Tabs.Trigger>{#if !compactInspector}<Tabs.Trigger value="fields">Fields</Tabs.Trigger>{/if}</Tabs.List>
+              <MetadataSheet asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onOpen={stopPreview} onDesktopClose={() => notesTrigger?.focus()}/>
+            </div>
             <Tabs.Content value="notes">
           <ReviewNotes showHeader={false} comments={active.comments} draft={active.draft.body} time={active.draft.body && active.draft.timecodeSec !== null ? active.draft.timecodeSec : currentTime} isVideo={active.type === 'video'} pinTime={active.draft.body ? active.draft.timecodeSec !== null : pinTime} onPinTime={value => { pinTime = value; review({type:'draft',assetId:active.id,body:active.draft.body,timecodeSec:value && active.type === 'video' ? currentTime : null}); }} onDraft={updateDraft} onPublish={comment} onSeek={time => player?.seek(time)} onComplete={commentId => review({type:'toggle-comment-complete',assetId:active.id,commentId,actorId:'local-reviewer',at:Date.now()})} onReact={(commentId,emoji) => review({type:'toggle-comment-reaction',assetId:active.id,commentId,actorId:'local-reviewer',emoji})}/>
           </Tabs.Content>
