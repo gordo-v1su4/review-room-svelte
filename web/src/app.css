@@ -1709,3 +1709,8 @@ select:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
   .project-heading, .folder-workspace .project-heading { flex-wrap: wrap; gap: 12px; }
   .project-tools { width: 100%; justify-content: flex-start; }
 }
+
+/* Review actions align with shortlist and retain compact widths. */
+.decision-bar { justify-content: space-between; padding-inline: 10px; }
+.decision-bar > button { flex: 0 1 auto; }
+.decision-bar > .secondary-button { justify-content: flex-start; text-align: left; }

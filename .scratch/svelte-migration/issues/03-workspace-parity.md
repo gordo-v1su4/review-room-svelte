@@ -27,3 +27,5 @@ Date-folder fallback and import destination/classification are locally implement
 Cover controls and automatic image/video-poster fallback are locally verified in [folder-covers-evidence.md](../folder-covers-evidence.md). Folder drag/drop, custom collections and project administration remain open; live cover storage/authorization belong to integration acceptance.
 
 Custom collection management and saved rules are locally verified in [collections-evidence.md](../collections-evidence.md). Live persistence and authorization remain open; folder drag/drop and project administration are next independent parity work.
+
+Inline grid/list status editing and compact review action alignment are verified in [card-status-evidence.md](../card-status-evidence.md), including keyboard focus, field visibility and mobile touch targets. Remaining parity and live gates above remain open.

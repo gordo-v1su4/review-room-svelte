@@ -58,3 +58,7 @@ See [folder-covers-evidence.md](folder-covers-evidence.md). Local custom cover s
 ## Latest increment: custom collections
 
 See [collections-evidence.md](collections-evidence.md). Local saved filter/source-folder views, dynamic tree counts, rename/delete and keyboard/mobile controls are implemented and verified. 72 tests pass. Live persistence/authorization, remaining organization/admin, performance and release gates remain open.
+
+## Latest increment: inline card status
+
+See [card-status-evidence.md](card-status-evidence.md). Cards support permission-aware status editing; review actions are compact and left/right aligned. Real-video desktop/mobile, keyboard and Appearance visibility checks pass; 18 targeted tests pass. The overall goal remains active with the existing parity and live release gates.

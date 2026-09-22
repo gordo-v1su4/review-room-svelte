@@ -1,14 +1,16 @@
 <script lang="ts">
+  import AssetStatusMenu from './AssetStatusMenu.svelte';
   import { Bookmark, Check } from 'lucide-svelte';
   import MediaThumbnail from './MediaThumbnail.svelte';
   import type { LocalAsset } from '$lib/review';
-  import type { AssetReview } from '$lib/review-session';
+  import type { AssetReview, ReviewAccess, ReviewAction } from '$lib/review-session';
   import type { AppearanceValue } from '$lib/appearance';
   import { CARD_FIELD_DEFINITIONS, type CardFieldId } from '../../../../src/lib/cardFields';
 
   type Asset = LocalAsset & AssetReview;
-  let { assets, activeId, checkedIds, appearance, view, onOpen, onCheck }: {
+  let { assets, activeId, checkedIds, appearance, view, onOpen, onCheck, access = { kind: 'none' }, onReview }: {
     assets: readonly Asset[]; activeId: string | null; checkedIds: readonly string[];
+    access?: ReviewAccess; onReview: (action: ReviewAction) => void;
     appearance: AppearanceValue; view: 'grid' | 'list';
     onOpen: (id: string) => void; onCheck: (id: string, event: MouseEvent, toggle?: boolean) => void;
   } = $props();
@@ -45,10 +47,14 @@
           <span class="asset-type">{asset.assetClass}</span>
           {#if asset.shortlisted}<span class="shortlist-icon"><Bookmark size={13} fill="currentColor"/></span>{/if}
         </div>
-        {#if appearance.showInfo}<div class="card-body"><strong title={asset.name}>{asset.name}</strong>
-          {#if fields.length}<div class="card-fields">{#each fields as field (field)}<span title={`${labels[field]}: ${fieldValue(asset, field)}`} aria-label={`${labels[field]}: ${fieldValue(asset, field)}`}>{fieldValue(asset, field)}</span>{/each}</div>{/if}
-        </div>{/if}
       </button>
+      {#if appearance.showInfo}<div class="card-body">
+        <button class="card-name" type="button" title={asset.name} onclick={event => event.metaKey || event.ctrlKey || event.shiftKey ? onCheck(asset.id, event) : onOpen(asset.id)}>{asset.name}</button>
+        {#if fields.length}<div class="card-fields">{#each fields as field (field)}
+          {#if field === 'status'}<AssetStatusMenu status={asset.status} name={asset.name} {access} onChange={status => onReview({ type: 'status', assetId: asset.id, status })}/>
+          {:else}<span title={`${labels[field]}: ${fieldValue(asset, field)}`} aria-label={`${labels[field]}: ${fieldValue(asset, field)}`}>{fieldValue(asset, field)}</span>{/if}
+        {/each}</div>{/if}
+      </div>{/if}
       <button type="button" class="card-check" role="checkbox" aria-checked={checkedIds.includes(asset.id)} aria-label={`Select ${asset.name}`} onclick={event => onCheck(asset.id, event, true)}>
         {#if checkedIds.includes(asset.id)}<Check size={12}/>{/if}
       </button>
@@ -59,16 +65,17 @@
 <style>
   .media-card { position: relative; }
   .card-open { display: block; width: 100%; padding: 0; color: inherit; background: transparent; text-align: left; }
-  .list-layout .media-card { display: block; }
-  .list-layout .card-open { display: flex; align-items: center; }
+  .list-layout .media-card { display: flex; align-items: center; }
+  .list-layout .card-open { flex: 0 0 74px; width: 74px; }
   .card-check { position: absolute; top: 7px; left: 7px; display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid #a5bab663; border-radius: 4px; background: #0c1112c9; color: var(--teal); opacity: 0; transition: opacity 90ms; }
   .media-card:hover .card-check, .media-card:focus-within .card-check, .checked-card .card-check { opacity: 1; }
   .checked-card { outline: 1px solid var(--teal); outline-offset: -1px; }
   .card-check[aria-checked='true'] { background: #224c43; border-color: var(--teal); }
-  .card-body { padding: 10px; }
-  .card-body .card-fields { overflow: hidden; white-space: nowrap; margin-top: 5px; gap: 0; font-size: 10px; }
-  .card-fields span { flex-shrink: 0; }
-  .card-fields span + span::before { content: '·'; margin: 0 6px; color: var(--muted); }
+  .card-body { min-width: 0; padding: 8px 10px; }
+  .card-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 12px; font-weight: 550; text-align: left; }
+  .card-name:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }
+  .card-body .card-fields { display: flex; align-items: center; flex-wrap: wrap; white-space: nowrap; margin-top: 3px; gap: 0 8px; font-size: 10px; }
+  .card-fields > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .card-open:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
   @media (pointer: coarse) { .card-check { opacity: 1; width: 32px; height: 32px; } .card-check::before { content: ''; position: absolute; inset: -6px; } }
 </style>
