@@ -46,3 +46,7 @@ See [still-review-evidence.md](still-review-evidence.md). Four markup tools, per
 ## Latest increment: real folders and transport controls
 
 See [folders-transport-evidence.md](folders-transport-evidence.md). Local real folders now support create, rename, scoped import, multi-asset moves, remove/archive and restore with retained review drafts. Player has compact controls, frame stepping and time/frame display; real-video desktop/mobile checks passed. 62 tests pass. Remaining independent work includes covers/date folders/custom collections, project administration, keyboard/a11y polish and measured native/accelerated performance; live integration and release gates remain open.
+
+## Latest increment: import destinations and classification
+
+See [import-destinations-evidence.md](import-destinations-evidence.md). Root imports now create/reuse the original browser-local date folder; real-folder context and optional destination selection take precedence. Compact import options restore image/contact-sheet/storyboard classification with unchanged video semantics. Desktop/mobile real-media checks and rejected-file feedback pass; 64 tests pass. Cover controls, remaining organization/admin parity, measured playback and live release gates remain open.

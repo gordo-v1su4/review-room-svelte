@@ -50,3 +50,30 @@ test('permissions, names, IDs and registration are validated before any bulk mut
   const covered = transitionFolderState(populated, { type: 'cover', folderId: 'g', assetId: 'a' }, admin);
   expect(transitionFolderState(covered, { type: 'remove', folderId: 'f', disposition: 'archive_assets' }, admin).folders[0]?.coverAssetId).toBeUndefined();
 });
+test('root imports reuse a flat date folder per project without granting members folder management', () => {
+  const member = { isAdmin: false, editableProjectIds: [], memberProjectIds: ['p'] };
+  const first = transitionFolderState(empty, { type: 'register', projectId: 'p', assetIds: ['a'], dateFolder: { id: 'day', dateKey: '20260922' } }, member);
+  expect(first.folders).toEqual([{ id: 'day', projectId: 'p', title: '20260922', order: 1 }]);
+  expect(first.placements.a).toEqual({ projectId: 'p', folderId: 'day' });
+  const second = transitionFolderState(first, { type: 'register', projectId: 'p', assetIds: ['b'], dateFolder: { id: 'unused', dateKey: '20260922' } }, member);
+  expect(second.folders).toHaveLength(1);
+  expect(second.placements.b?.folderId).toBe('day');
+  expect(() => transitionFolderState(second, { type: 'create', id: 'manual', projectId: 'p', title: 'Manual' }, member)).toThrow('Project access required');
+  const nextDay = transitionFolderState(second, { type: 'register', projectId: 'p', assetIds: ['c'], dateFolder: { id: 'tomorrow', dateKey: '20260923' } }, member);
+  expect(nextDay.folders[1]).toEqual({ id: 'tomorrow', projectId: 'p', title: '20260923', order: 2 });
+});
+test('date import respects explicit destinations and leaves no folders behind on rejected or empty batches', () => {
+  const dateFolder = { id: 'day', dateKey: '20260922' };
+  const explicit = transitionFolderState(populated, { type: 'register', projectId: 'p', assetIds: ['new'], folderId: 'g', dateFolder }, admin);
+  expect(explicit.placements.new?.folderId).toBe('g');
+  expect(explicit.folders).toEqual(populated.folders);
+  expect(transitionFolderState(empty, { type: 'register', projectId: 'p', assetIds: [], dateFolder }, admin)).toBe(empty);
+  expect(() => transitionFolderState(populated, { type: 'register', projectId: 'p', assetIds: ['new', 'a'], dateFolder }, admin)).toThrow();
+  expect(() => transitionFolderState(empty, { type: 'register', projectId: 'p', assetIds: ['new'], dateFolder }, { isAdmin: false, editableProjectIds: [] })).toThrow();
+  expect(() => transitionFolderState(empty, { type: 'register', projectId: 'p', assetIds: ['new'], dateFolder: { id: 'day', dateKey: '2026-09-22' } }, admin)).toThrow('Upload date must be YYYYMMDD');
+  const otherProject: FolderState = { folders: [{ id: 'foreign-day', projectId: 'q', title: '20260922', order: 99 }], placements: {} };
+  const own = transitionFolderState(otherProject, { type: 'register', projectId: 'p', assetIds: ['new'], dateFolder }, admin);
+  expect(own.placements.new?.folderId).toBe('day');
+  expect(own.folders[1]?.order).toBe(1);
+  expect(empty.folders).toEqual([]);
+});

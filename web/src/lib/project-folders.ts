@@ -5,7 +5,8 @@ export type FolderAccess = Readonly<{ isAdmin: boolean; editableProjectIds: read
 export type FolderAction =
   | { type: 'create'; id: string; projectId: string; title: string }
   | { type: 'rename'; folderId: string; title: string }
-  | { type: 'move' | 'register'; assetIds: readonly string[]; projectId: string; folderId?: string }
+  | { type: 'move'; assetIds: readonly string[]; projectId: string; folderId?: string }
+  | { type: 'register'; assetIds: readonly string[]; projectId: string; folderId?: string; dateFolder?: { id: string; dateKey: string } }
   | { type: 'restore'; assetIds: readonly string[]; projectId: string }
   | { type: 'remove'; folderId: string; disposition: 'move_to_root' | 'archive_assets' }
   | { type: 'cover'; folderId: string; assetId?: string };
@@ -32,7 +33,22 @@ export function transitionFolderState(state: FolderState, action: FolderAction, 
   if (action.type === 'register') {
     const ids = [...new Set(action.assetIds.map(validId))];
     if (ids.some(id => Object.hasOwn(state.placements, id))) throw new Error('Asset already registered');
-    return { ...state, placements: { ...state.placements, ...Object.fromEntries(ids.map(id => [id, { projectId, ...(action.folderId === undefined ? {} : { folderId: action.folderId }) }])) } };
+    if (!ids.length) return state;
+    let folders = state.folders;
+    let folderId = action.folderId;
+    if (action.dateFolder && !/^\d{8}$/.test(action.dateFolder.dateKey)) throw new Error('Upload date must be YYYYMMDD');
+    if (folderId === undefined && action.dateFolder) {
+      const { id, dateKey } = action.dateFolder;
+      folderId = folders.find(item => item.projectId === projectId && item.title === dateKey)?.id;
+      if (!folderId) {
+        validId(id);
+        if (folders.some(item => item.id === id)) throw new Error('Folder ID already exists');
+        const order = folders.filter(item => item.projectId === projectId).reduce((max, item) => Math.max(max, item.order), 0) + 1;
+        folders = [...folders, { id, projectId, title: dateKey, order }];
+        folderId = id;
+      }
+    }
+    return { folders, placements: { ...state.placements, ...Object.fromEntries(ids.map(id => [id, { projectId, ...(folderId === undefined ? {} : { folderId }) }])) } };
   }
   const asset = (id: string) => {
     validId(id);
