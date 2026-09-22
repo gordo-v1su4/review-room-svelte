@@ -1,3 +1,4 @@
+import { createAnnotationState, transitionAnnotations, validateAnnotations, type AnnotationAction, type AnnotationState } from './annotations';
 import type { VideoStatus } from '../../../src/lib/types';
 
 export type ReviewDraft = Readonly<{ body: string; timecodeSec: number | null }>;
@@ -9,6 +10,8 @@ export type AssetReview = Readonly<{
   status: VideoStatus;
   rating: number;
   shortlisted: boolean;
+  viewed: boolean;
+  annotations: AnnotationState;
   draft: ReviewDraft;
   comments: readonly ReviewComment[];
   feedbackNeedsAttention: boolean;
@@ -19,6 +22,8 @@ export type ReviewSession = Readonly<{
 }>;
 export type ReviewAccess = { kind: 'none' } | { kind: 'share' } | { kind: 'project'; memberRole: 'owner' | 'editor' | 'viewer' };
 export type ReviewAction =
+  | { type: 'annotate'; assetId: string; action: AnnotationAction }
+  | { type: 'mark-viewed'; assetId: string }
   | { type: 'toggle-comment-reaction'; assetId: string; commentId: string; actorId: string; emoji: ReactionEmoji }
   | { type: 'toggle-comment-complete'; assetId: string; commentId: string; actorId: string; at: number }
   | { type: 'add-assets'; assets: readonly { id: string }[] }
@@ -35,7 +40,8 @@ export function createReviewSession(assets: readonly ({ id: string } & Partial<O
     activeAssetId: assets[0]?.id ?? null,
     assets: Object.fromEntries(assets.map(asset => [asset.id, {
       id: asset.id, status: asset.status ?? 'awaiting_review', rating: asset.rating ?? 0,
-      shortlisted: asset.shortlisted ?? false,
+      shortlisted: asset.shortlisted ?? false, viewed: asset.viewed ?? false,
+      annotations: asset.annotations ? { saved: validateAnnotations(asset.annotations.saved), draft: validateAnnotations(asset.annotations.draft) } : createAnnotationState(),
       feedbackNeedsAttention: (asset.comments ?? []).some(comment => !comment.completedAt),
       draft: { ...(asset.draft ?? { body: '', timecodeSec: null }) },
       comments: (asset.comments ?? []).map(comment => ({ ...comment }))
@@ -70,7 +76,11 @@ export function transitionReviewSession(session: ReviewSession, action: ReviewAc
   if (action.type === 'select') return { ...session, activeAssetId: action.assetId };
   if (action.type !== 'draft' && access.kind === 'none') throw new Error('Review access required');
   let next: AssetReview;
-  if (action.type === 'publish-comment') {
+  if (action.type === 'annotate') {
+    next = { ...asset, annotations: transitionAnnotations(asset.annotations, action.action) };
+  } else if (action.type === 'mark-viewed') {
+    next = { ...asset, viewed: true };
+  } else if (action.type === 'publish-comment') {
     const body = asset.draft.body.trim();
     if (!body) throw new Error('Comment cannot be empty');
     if (!action.commentId || asset.comments.some(comment => comment.id === action.commentId)) throw new Error('Comment ID must be unique');

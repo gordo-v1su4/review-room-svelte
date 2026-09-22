@@ -1,6 +1,6 @@
 # 04 — Port decisions, feedback and sharing
 
-Status: needs-triage
+Status: ready-for-agent
 Type: task
 Blocked by: 03
 
@@ -18,4 +18,4 @@ Fixture role and token scenarios pass; live security/persistence gates remain ex
 
 ## Comments
 
-Draft ticket; no implementation claimed.
+Implementation in progress. Workspace controls and local review/metadata slices are recorded in [workspace-metadata-evidence.md](../workspace-metadata-evidence.md). This ticket remains open until its full parity and live acceptance scope passes.

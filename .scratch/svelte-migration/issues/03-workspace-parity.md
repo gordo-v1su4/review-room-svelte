@@ -1,6 +1,6 @@
 # 03 — Port workspace browsing and organization
 
-Status: needs-triage
+Status: ready-for-agent
 Type: task
 Blocked by: 02
 
@@ -18,4 +18,4 @@ All applicable parity ledger rows pass on desktop and mobile; no hover-only acti
 
 ## Comments
 
-Draft ticket; no implementation claimed.
+Implementation in progress. Workspace controls and local review/metadata slices are recorded in [workspace-metadata-evidence.md](../workspace-metadata-evidence.md). This ticket remains open until its full parity and live acceptance scope passes.

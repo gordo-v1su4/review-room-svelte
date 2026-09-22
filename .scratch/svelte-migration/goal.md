@@ -38,3 +38,7 @@ See [explorer-studio-evidence.md](explorer-studio-evidence.md). Folder-only over
 ## Latest increment: workspace controls and metadata
 
 See [workspace-metadata-evidence.md](workspace-metadata-evidence.md). Composable facets/grouping, field visibility/order, multiselection/batch review and tagging, and searchable typed metadata are implemented for local sessions and browser-checked. Dense cached hover previews also pass real-media browser checks; remaining independent work includes still-review/folder parity and playback benchmarks. Live shipping gates remain open.
+
+## Latest increment: still review and viewed state
+
+See [still-review-evidence.md](still-review-evidence.md). Four markup tools, per-asset draft/saved baselines, undo/clear, explicit local save, original download, fullscreen and viewed metadata are implemented. Real-image browser checks confirm draft isolation, normalized geometry and 390px/fullscreen preservation. 53 tests pass. Next independent work: real folder/project organization parity and measured playback performance. Live backend and release gates remain open.

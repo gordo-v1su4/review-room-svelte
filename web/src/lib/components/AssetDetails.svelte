@@ -22,6 +22,7 @@
     { id: 'shortlist', label: 'Shortlist', group: 'essentials', value: review ? (review.shortlisted ? 'Selected' : 'Not selected') : null, filled: review?.shortlisted ?? false },
     { id: 'assetClass', label: 'Asset class', group: 'essentials', value: asset.assetClass },
     { id: 'assetCode', label: 'Asset code', group: 'essentials', value: asset.assetCode },
+    { id: 'viewed', label: 'Viewed', group: 'review', value: review ? (review.viewed ? 'Yes' : 'No') : null },
     { id: 'comments', label: 'Comments', group: 'review', value: review?.comments.length ?? null, filled: Boolean(review?.comments.length) },
     { id: 'attention', label: 'Needs attention', group: 'review', value: review ? (review.feedbackNeedsAttention ? 'Yes' : 'No') : null, filled: review?.feedbackNeedsAttention ?? false },
     { id: 'filename', label: 'Filename', group: 'file', value: asset.sourceFile.name },

@@ -133,3 +133,29 @@ test('publishing a new note restores feedback attention after all previous notes
   expect(next.assets.clip.feedbackNeedsAttention).toBe(true);
   expect(next.assets.clip.comments[0].completedAt).toBe(10);
 });
+
+test('viewed state is independent, monotonic, and requires review access', () => {
+  const initial = createReviewSession([{ id: 'still' }, { id: 'clip' }]);
+  expect(initial.assets.still.viewed).toBe(false);
+  expect(() => transitionReviewSession(initial, { type: 'mark-viewed', assetId: 'still' })).toThrow('Review access required');
+  const viewed = transitionReviewSession(initial, { type: 'mark-viewed', assetId: 'still' }, { kind: 'share' });
+  expect(viewed.assets.still.viewed).toBe(true);
+  expect(viewed.assets.clip.viewed).toBe(false);
+  expect(viewed.assets.still.status).toBe('awaiting_review');
+  expect(transitionReviewSession(viewed, { type: 'mark-viewed', assetId: 'still' }, { kind: 'project', memberRole: 'viewer' }).assets.still.viewed).toBe(true);
+});
+
+test('markup drafts and saved baselines stay with each asset and revoked access cannot save', () => {
+  const access = { kind: 'project', memberRole: 'viewer' } as const;
+  const stroke = { id: 's1', color: '#ef4444', width: 4, tool: 'rect' as const, points: [{ x: .1, y: .2 }, { x: .7, y: .8 }] };
+  const initial = createReviewSession([{ id: 'first' }, { id: 'second' }]);
+  let session = transitionReviewSession(initial, { type: 'annotate', assetId: 'first', action: { type: 'replace', strokes: [stroke] } }, access);
+  session = transitionReviewSession(session, { type: 'select', assetId: 'second' });
+  expect(session.assets.first.annotations.draft).toEqual([stroke]);
+  expect(session.assets.first.annotations.saved).toEqual([]);
+  expect(session.assets.second.annotations.draft).toEqual([]);
+  expect(() => transitionReviewSession(session, { type: 'annotate', assetId: 'first', action: { type: 'save' } })).toThrow('Review access required');
+  session = transitionReviewSession(session, { type: 'annotate', assetId: 'first', action: { type: 'save' } }, { kind: 'share' });
+  expect(session.assets.first.annotations.saved).toEqual([stroke]);
+  expect(initial.assets.first.annotations.draft).toEqual([]);
+});
