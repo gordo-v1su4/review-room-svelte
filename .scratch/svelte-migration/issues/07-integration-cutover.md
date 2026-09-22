@@ -19,3 +19,5 @@ All ledger rows have evidence; remaining backend failures resolved; explicit dep
 ## Comments
 
 Draft ticket; no implementation claimed.
+
+Read-only public-review audit identified concrete authorization blockers in the inherited backend. See [public-review-access-audit.md](../public-review-access-audit.md) for source evidence and required direct-endpoint acceptance scenarios. Backend repairs remain deferred; do not connect a supposedly protected replacement UI to the unchecked contract.
