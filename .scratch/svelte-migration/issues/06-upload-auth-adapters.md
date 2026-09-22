@@ -18,4 +18,4 @@ Local contract and failure scenarios pass; multipart, URL refresh, sign-in/reset
 
 ## Comments
 
-Draft ticket; no implementation claimed.
+Local import preparation and queue implemented; [acceptance evidence](../import-queue-evidence.md). Concurrency is bounded, destinations are captured before preparation, and each file has failure/retry/cancel state. This does not implement network uploading or authentication. Multipart storage, URL refresh, authorization, persistence and live failure verification remain open.

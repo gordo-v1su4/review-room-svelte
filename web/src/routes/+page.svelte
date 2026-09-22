@@ -3,6 +3,9 @@
   import { ASSET_DRAG_TYPE, beginAssetDrag, folderDropAction, type AssetDrag } from '$lib/asset-drag';
   import CollectionActions from '$lib/components/CollectionActions.svelte';
   import { transitionCollectionState, collectionIsConfigured, queryCollectionAssets, type CollectionState, type CollectionAction } from '$lib/collections';
+  import ImportQueue from '$lib/components/ImportQueue.svelte';
+  import { createImportQueue, type ImportJob, type ImportTarget } from '$lib/import-queue';
+  import { prepareLocalImport } from '$lib/local-import';
   import ImportOptions from '$lib/components/ImportOptions.svelte';
   import FolderActions from '$lib/components/FolderActions.svelte';
   import ProjectIdentityDialog from '$lib/components/ProjectIdentityDialog.svelte';
@@ -31,7 +34,7 @@
   import { ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, PanelLeftClose, PanelLeftOpen, PanelRightOpen, ChevronRight } from 'lucide-svelte';
   import Player from '$lib/playback/Player.svelte';
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
-  import { openLocalAsset, type LocalAsset } from '$lib/review';
+  import { type LocalAsset } from '$lib/review';
   import { createReviewSession, transitionReviewSession, type ReviewAction, type ReviewAccess } from '$lib/review-session';
   let media = $state<LocalAsset[]>([]);
   let session = $state.raw(createReviewSession([]));
@@ -80,6 +83,14 @@
   let picker: HTMLInputElement;
   const thumbnails = createThumbnailExtractor({ concurrency: 2 });
   let disposed = false;
+  let importJobs = $state.raw<readonly ImportJob[]>([]);
+  const importQueue = createImportQueue({
+    prepare: prepareLocalImport,
+    commit: commitImport,
+    release: asset => { URL.revokeObjectURL(asset.url); if (asset.poster) URL.revokeObjectURL(asset.poster); },
+    onChange: jobs => importJobs = jobs,
+    concurrency: 2
+  });
   const coverRequests = new Map<string, symbol>();
   const identityRequests = new Map<string, symbol>();
   const active = $derived(assets.find(asset => asset.id === activeId));
@@ -113,46 +124,45 @@
     media = media.map(asset => asset.id === id ? { ...asset, ...fields } : asset);
   }
   const approved = $derived(assets.filter(a => a.status === 'approved').length);
-  function importFiles(files: FileList | null) {
-    if (!files) return;
-    const added: LocalAsset[] = [];
-    const skipped: string[] = [];
-    for (const file of files) {
-      try {
-        const asset = openLocalAsset(file);
-        if (asset.type === 'image') asset.assetClass = importOptions.assetClass === 'VID' ? 'IMG' : importOptions.assetClass;
-        added.push(asset);
-      } catch { skipped.push(file.name); }
-    }
-    if (!added.length) {
-      if (skipped.length) feedback = 'Choose video or image files to import.';
-      return;
-    }
+  function importFiles(files: FileList | readonly File[] | null) {
+    if (!files?.length) return;
     const today = new Date();
     const dateKey = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-    try {
-      organization = transitionFolderState(organization, {
-        type: 'register', projectId, assetIds: added.map(asset => asset.id),
-        folderId: importOptions.folderId ?? undefined,
-        dateFolder: { id: crypto.randomUUID(), dateKey }
-      }, folderAccess);
-    } catch (cause) {
-      for (const asset of added) URL.revokeObjectURL(asset.url);
-      feedback = cause instanceof Error ? cause.message : 'Could not import media.';
-      return;
-    }
-    media.push(...added);
-    review({ type: 'add-assets', assets: added });
-    const destination = organization.placements[added[0].id].folderId!;
-    openRealFolder(projectId, destination);
-    feedback = skipped.length ? `Imported ${added.length}. Skipped ${skipped.length} unsupported ${skipped.length === 1 ? 'file' : 'files'}.` : '';
-    for (const asset of added) if (asset.type === 'video') {
+    const target: ImportTarget = { projectId, folderId: importOptions.folderId ?? undefined, dateKey, dateFolderId: crypto.randomUUID(), assetClass: importOptions.assetClass };
+    const destinationLabel = `${project.name} / ${projectFolders.find(folder => folder.id === target.folderId)?.title ?? dateKey}`;
+    importQueue.enqueue(Array.from(files, file => ({ file, target, destinationLabel })));
+  }
+  function commitImport(asset: LocalAsset, target: ImportTarget) {
+    if (disposed) throw new Error('The workspace is closed.');
+    if (media.some(item => item.id === asset.id)) throw new Error('This import is already in the workspace.');
+    if (asset.type === 'image') asset.assetClass = target.assetClass === 'VID' ? 'IMG' : target.assetClass;
+    const next = transitionFolderState(organization, {
+      type: 'register', projectId: target.projectId, assetIds: [asset.id], folderId: target.folderId,
+      dateFolder: { id: target.dateFolderId, dateKey: target.dateKey }
+    }, folderAccess);
+    const previousActive = activeId;
+    const enterImportedFolder = projectId === target.projectId && !folderOpen && !previousActive;
+    organization = next;
+    media = [...media, asset];
+    review({ type: 'add-assets', assets: [asset] });
+    review({ type: 'select', assetId: previousActive });
+    // An import must not move someone who has since navigated to another project or review.
+    if (enterImportedFolder) openRealFolder(target.projectId, next.placements[asset.id].folderId!);
+    if (asset.type === 'video') {
       void thumbnails.extract(asset.sourceFile).then(({ blob, duration, sourceWidth, sourceHeight }) => {
         if (disposed) return;
         const poster = URL.createObjectURL(blob);
         media = media.map(item => item.id === asset.id ? { ...item, poster, duration, width: sourceWidth, height: sourceHeight } : item);
-      }).catch(() => { /* The film placeholder remains usable when decoding fails. */ });
+      }).catch(() => { /* Native playback remains available if a poster cannot be generated. */ });
     }
+  }
+  function dragFiles(event: DragEvent) {
+    if (!event.dataTransfer?.types.includes('Files')) return;
+    event.preventDefault(); event.dataTransfer.dropEffect = 'copy';
+  }
+  function dropFiles(event: DragEvent) {
+    if (!event.dataTransfer?.files.length) return;
+    event.preventDefault(); importFiles(event.dataTransfer.files);
   }
 
   function select(id: string | null) {
@@ -366,6 +376,7 @@
     coverRequests.clear();
     identityRequests.clear();
     for (const item of projects) if (item.bannerUrl) URL.revokeObjectURL(item.bannerUrl);
+    importQueue.dispose();
     thumbnails.dispose();
     for (const folder of organization.folders) if (folder.coverImageUrl) URL.revokeObjectURL(folder.coverImageUrl);
     for (const asset of media) {
@@ -389,14 +400,14 @@
 {/snippet}
 <div class="app-shell" class:nav-collapsed={navCollapsed}>
   <aside class="sidebar" inert={navCollapsed} aria-hidden={navCollapsed}>{@render navigation()}</aside>
-  <main>
+  <main ondragover={dragFiles} ondrop={dropFiles}>
     <header class="topbar">
       <button class="icon-button desktop-nav-toggle" aria-label={navCollapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!navCollapsed} onclick={() => navCollapsed = !navCollapsed}>{#if navCollapsed}<PanelLeftOpen size={18}/>{:else}<PanelLeftClose size={18}/>{/if}</button>
       <Dialog.Root bind:open={navOpen}><Dialog.Trigger class="icon-button mobile-menu" aria-label="Open navigation"><Menu size={20}/></Dialog.Trigger><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="nav-drawer"><Dialog.Title class="visually-hidden">Workspace navigation</Dialog.Title><Dialog.Description class="visually-hidden">Browse local media and review status</Dialog.Description><Dialog.Close class="icon-button drawer-close" aria-label="Close navigation"><X size={20}/></Dialog.Close>{@render navigation()}</Dialog.Content></Dialog.Portal></Dialog.Root>
       <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#if folderOpen}<ChevronRight size={13}/><strong>{locationName}</strong>{/if}</div><span class="avatar small">YO</span>
     </header>
     <div class="page-content" class:folder-workspace={folderOpen}>
-      <section class="project-heading" class:identity-banner={!folderOpen && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if !folderOpen && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1>{folderOpen ? locationName : project.name}</h1>{#if !folderOpen}<p class="subtitle" title={project.description}>{project.clientName || project.description || "Choose a folder to start reviewing."}</p>{/if}</div><div class="project-tools"><ProjectIdentityDialog {project} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={(folderId, title) => organize({ type: 'rename', folderId, title })} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions folders={projectFolders} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "today’s date folder"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button></div></section>
+      <section class="project-heading" class:identity-banner={!folderOpen && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if !folderOpen && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1>{folderOpen ? locationName : project.name}</h1>{#if !folderOpen}<p class="subtitle" title={project.description}>{project.clientName || project.description || "Choose a folder to start reviewing."}</p>{/if}</div><div class="project-tools"><ImportQueue jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/><ProjectIdentityDialog {project} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={(folderId, title) => organize({ type: 'rename', folderId, title })} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions folders={projectFolders} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "today’s date folder"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button></div></section>
       {#if feedback}<div class="notice" role="status">{feedback}<button class="icon-button" aria-label="Dismiss message" onclick={() => feedback = ''}><X size={16}/></button></div>{/if}
       {#if !folderOpen}<section class="folder-shelf" aria-label="Media collections">
         {#each projectFolders as folder (folder.id)}
