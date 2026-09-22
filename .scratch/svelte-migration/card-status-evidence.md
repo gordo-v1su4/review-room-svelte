@@ -9,3 +9,7 @@
 - Direct Svelte diagnostics: zero errors/warnings. Review session and media selection tests: 18 pass, 87 assertions. No dev-server restart or SvelteKit sync was used, preserving the user's active local tab. Temporary QA tab closed.
 
 Existing configurable metadata remains compact; this increment does not claim custom field schema administration or Frame.io's full metadata catalog. Live storage and full shipping acceptance remain open.
+
+## Status colors
+
+Added shared semantic tokens for every status: slate Not started, blue In progress, amber Awaiting review, coral Needs changes, mint Approved, violet Final, taupe Omitted and muted slate Archived. Cards use a restrained tinted background, menus use matching markers/text, table selects and sidebar status indicators share the same tokens. Labels/checkmarks remain available independently of color. Real-video browser QA confirmed all seven editable menu colors differ, with In progress matching rgb(160,196,255) on card and table. Svelte diagnostics: zero errors/warnings.

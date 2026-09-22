@@ -46,7 +46,7 @@
             </button>
           </th>
           <td>
-            <select aria-label={`Status for ${asset.name}`} value={asset.status} onchange={event => changeStatus(asset.id, event.currentTarget.value)}>
+            <select class="asset-status-select" data-status={asset.status} aria-label={`Status for ${asset.name}`} value={asset.status} onchange={event => changeStatus(asset.id, event.currentTarget.value)}>
               {#if asset.status === 'archived'}<option value="archived" disabled>Archived</option>{/if}
               {#each statuses as status (status.value)}<option value={status.value}>{status.label}</option>{/each}
             </select>

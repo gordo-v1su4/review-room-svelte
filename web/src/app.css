@@ -19,10 +19,27 @@
   --ink: #e8eceb;
   --teal: #7dd9c8;
   --accent: #235e55;
+  --status-not-started: #b6bfc2;
+  --status-in-progress: #a0c4ff;
+  --status-awaiting-review: #e0c073;
+  --status-needs-changes: #f09c93;
+  --status-approved: #77d8b5;
+  --status-final: #c4a7ed;
+  --status-omitted: #bfaa95;
+  --status-archived: #838e92;
   --radius: 14px;
   background: var(--canvas);
   color: var(--ink);
 }
+[data-status='not_started'] { --status-tone: var(--status-not-started); }
+[data-status='in_progress'] { --status-tone: var(--status-in-progress); }
+[data-status='awaiting_review'] { --status-tone: var(--status-awaiting-review); }
+[data-status='needs_changes'] { --status-tone: var(--status-needs-changes); }
+[data-status='approved'] { --status-tone: var(--status-approved); }
+[data-status='final'] { --status-tone: var(--status-final); }
+[data-status='omitted'] { --status-tone: var(--status-omitted); }
+[data-status='archived'] { --status-tone: var(--status-archived); }
+.asset-status-select[data-status] { color: var(--status-tone); border-color: color-mix(in srgb, var(--status-tone) 24%, transparent); }
 * {
   box-sizing: border-box;
 }
@@ -216,13 +233,13 @@ button {
   background: var(--teal);
 }
 .status-dot.pending {
-  background: #b5ad85;
+  background: var(--status-awaiting-review);
 }
 .status-dot.changes {
-  background: #dba179;
+  background: var(--status-needs-changes);
 }
 .status-dot.approved {
-  background: #79b895;
+  background: var(--status-approved);
 }
 .sidebar-bottom {
   margin-top: auto;
