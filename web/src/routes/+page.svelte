@@ -9,7 +9,8 @@
   import ImportOptions from '$lib/components/ImportOptions.svelte';
   import FolderActions from '$lib/components/FolderActions.svelte';
   import ProjectIdentityDialog from '$lib/components/ProjectIdentityDialog.svelte';
-  import { updateProjectIdentity, prepareProjectBanner, type ProjectIdentity, type ProjectIdentityDraft } from '$lib/project-identity';
+  import ArchivedProjects from '$lib/components/ArchivedProjects.svelte';
+  import { updateProjectIdentity, setProjectArchived, prepareProjectBanner, type ProjectIdentity, type ProjectIdentityDraft } from '$lib/project-identity';
   import { transitionFolderState, folderCoverUrl, type FolderState, type FolderAction } from '$lib/project-folders';
   import { updateTags } from '$lib/bulk-tags';
   import StillViewer from '$lib/components/StillViewer.svelte';
@@ -43,26 +44,29 @@
   const localAccess: ReviewAccess = { kind: 'project', memberRole: 'owner' };
   let projects = $state<ProjectIdentity[]>([{ id: 'studio', name: 'Studio project' }]);
   let projectId = $state('studio');
+  const activeProjects = $derived(projects.filter(item => !item.archived));
+  const archivedProjects = $derived(projects.filter(item => item.archived));
+  const projectOwnerAccess = $derived({ isAdmin: true, ownedProjectIds: projects.map(item => item.id) });
   let collections = $state.raw<CollectionState>({ collections: [] });
   let activeCollectionId = $state<string | null>(null);
   const activeCollection = $derived(collections.collections.find(collection => collection.id === activeCollectionId && collection.projectId === projectId));
-  const collectionAccess = $derived({ projectRoles: Object.fromEntries(projects.map(project => [project.id, 'owner' as const])) });
+  const collectionAccess = $derived({ projectRoles: Object.fromEntries(activeProjects.map(project => [project.id, 'owner' as const])) });
   let organization = $state.raw<FolderState>({ folders: [], placements: {} });
   let activeFolderId = $state<string | null>(null);
   let importOptions = $state<{ folderId: string | null; assetClass: 'VID' | 'IMG' | 'CTX' | 'STB' }>({ folderId: null, assetClass: 'VID' });
   let archived = $state(false);
-  const folderAccess = $derived({ isAdmin: true, editableProjectIds: projects.map(project => project.id) });
+  const folderAccess = $derived({ isAdmin: true, editableProjectIds: activeProjects.map(project => project.id) });
   const projectFolders = $derived(organization.folders.filter(folder => folder.projectId === projectId));
   const activeFolder = $derived(projectFolders.find(folder => folder.id === activeFolderId));
   let folderOpen = $state(false);
   let navCollapsed = $state(false);
   let projectDialog = $state(false), projectName = $state('');
   const allAssets = $derived(media.map(asset => ({ ...asset, ...session.assets[asset.id], ...organization.placements[asset.id], status: organization.placements[asset.id]?.archived ? 'archived' as VideoStatus : session.assets[asset.id].status, folderName: organization.folders.find(folder => folder.id === organization.placements[asset.id]?.folderId)?.title, commentsCount: session.assets[asset.id]?.comments.length ?? 0 })));
-  const assets = $derived(allAssets.filter(asset => asset.projectId === projectId && (Boolean(asset.archived) === archived || (!archived && filters.statuses.includes('archived')))));
+  const assets = $derived(projects.find(item => item.id === projectId)?.archived ? [] : allAssets.filter(asset => asset.projectId === projectId && (Boolean(asset.archived) === archived || (!archived && filters.statuses.includes('archived')))));
   const project = $derived(projects.find(item => item.id === projectId)!);
-  const inbox = $derived(feedbackDigests(projects, allAssets, { isAdmin: folderAccess.isAdmin, projectIds: folderAccess.editableProjectIds }));
+  const inbox = $derived(feedbackDigests(activeProjects, allAssets, { isAdmin: folderAccess.isAdmin, projectIds: folderAccess.editableProjectIds }));
   let inboxSeek = $state<{ assetId: string; time: number } | null>(null);
-  const treeProjects = $derived(projects.map(project => {
+  const treeProjects = $derived(activeProjects.map(project => {
     const items = allAssets.filter(asset => asset.projectId === project.id && !asset.archived);
     return { ...project, collections: collections.collections.filter(collection => collection.projectId === project.id).map(collection => ({ ...collection, count: queryCollectionAssets(collection, allAssets).length })), folders: organization.folders.filter(folder => folder.projectId === project.id).map(folder => ({ ...folder, count: items.filter(asset => asset.folderId === folder.id).length })), archivedCount: allAssets.filter(asset => asset.projectId === project.id && asset.archived).length, videoCount: items.filter(asset => asset.type === 'video').length, imageCount: items.filter(asset => asset.type === 'image').length, shortlistCount: items.filter(asset => asset.shortlisted).length };
   }));
@@ -128,6 +132,7 @@
   const approved = $derived(assets.filter(a => a.status === 'approved').length);
   function importFiles(files: FileList | readonly File[] | null) {
     if (!files?.length) return;
+    if (project.archived) { feedback = 'Restore this project before adding media.'; return; }
     const today = new Date();
     const dateKey = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
     const target: ImportTarget = { projectId, folderId: importOptions.folderId ?? undefined, dateKey, dateFolderId: crypto.randomUUID(), assetClass: importOptions.assetClass };
@@ -186,6 +191,7 @@
     review({ type: 'publish-comment', assetId: active.id, commentId: crypto.randomUUID(), author: { name: 'You', role: 'admin' }, createdAt: Date.now() });
   }
   function openFolder(id: string, collection: 'all' | 'video' | 'image' | 'selected') {
+    if (!activeProjects.some(item => item.id === id)) return;
     select(null);
     projectId = id;
     if (appearancePreferences) appearance = appearancePreferences.load(id);
@@ -330,6 +336,25 @@
     select(null); checked = transitionSelection(checked, { type: 'clear' });
     feedback = `Restored ${assetIds.length} ${assetIds.length === 1 ? 'asset' : 'assets'} to Project root.`;
   }
+  function archiveProject(id: string) {
+    const original = projects.find(item => item.id === id);
+    if (!original) return;
+    const next = setProjectArchived(original, true, projectOwnerAccess);
+    if (projectId === id) projectOverview();
+    identityRequests.delete(id);
+    for (const folder of organization.folders) if (folder.projectId === id) coverRequests.delete(folder.id);
+    projects = projects.map(item => item.id === id ? next : item);
+    for (const job of importJobs) if (job.target.projectId === id && (job.status === 'queued' || job.status === 'preparing')) importQueue.cancel(job.id);
+    feedback = '';
+  }
+  function restoreProject(id: string) {
+    const original = projects.find(item => item.id === id);
+    if (!original) return;
+    const next = setProjectArchived(original, false, projectOwnerAccess);
+    projects = projects.map(item => item.id === id ? next : item);
+    openProject(id);
+    feedback = 'Project restored.';
+  }
   function changeAppearance(value: typeof appearance) {
     appearance = appearancePreferences?.save(projectId, value) ?? normalizeAppearance(value);
   }
@@ -372,7 +397,7 @@
       if (identityRequests.get(id) === request) identityRequests.delete(id);
     }
   }
-  function filterBy(value: FilterId) { activeCollectionId = null; importOptions.folderId = null; activeFolderId = null; archived = false; filters = { ...defaultFilters(), statuses: value === 'all' || value === 'selected' ? [] : [value], selectedOnly: value === 'selected' }; query = ''; mediaType = 'all'; folderOpen = true; navOpen = false; }
+  function filterBy(value: FilterId) { if (project.archived) return; activeCollectionId = null; importOptions.folderId = null; activeFolderId = null; archived = false; filters = { ...defaultFilters(), statuses: value === 'all' || value === 'selected' ? [] : [value], selectedOnly: value === 'selected' }; query = ''; mediaType = 'all'; folderOpen = true; navOpen = false; }
   onDestroy(() => {
     disposed = true;
     coverRequests.clear();
@@ -393,11 +418,12 @@
   <div class="brand">review room.</div>
   <button class="workspace-name" onclick={projectOverview}>Personal workspace</button>
   <ProjectTree {canDropAssets} onDropAssets={dropAssets} dragActive={!!dragged} selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={!folderOpen} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
+  <ArchivedProjects projects={archivedProjects} onRestore={restoreProject}/>
   {#if folderAccess.isAdmin}<FeedbackInbox groups={inbox} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}
   <div class="nav-divider"></div><span class="nav-heading">REVIEW STATUS</span>
-  <button class:nav-active={!activeCollection && filter === 'awaiting_review'} class="nav-item" onclick={() => filterBy('awaiting_review')}><span class="status-dot pending"></span> Awaiting review</button>
-  <button class:nav-active={!activeCollection && filter === 'needs_changes'} class="nav-item" onclick={() => filterBy('needs_changes')}><span class="status-dot changes"></span> Needs changes</button>
-  <button class:nav-active={!activeCollection && filter === 'approved'} class="nav-item" onclick={() => filterBy('approved')}><span class="status-dot approved"></span> Approved <span>{approved}</span></button>
+  <button class:nav-active={!activeCollection && filter === 'awaiting_review'} class="nav-item" disabled={!!project.archived} onclick={() => filterBy('awaiting_review')}><span class="status-dot pending"></span> Awaiting review</button>
+  <button class:nav-active={!activeCollection && filter === 'needs_changes'} class="nav-item" disabled={!!project.archived} onclick={() => filterBy('needs_changes')}><span class="status-dot changes"></span> Needs changes</button>
+  <button class:nav-active={!activeCollection && filter === 'approved'} class="nav-item" disabled={!!project.archived} onclick={() => filterBy('approved')}><span class="status-dot approved"></span> Approved <span>{approved}</span></button>
   <div class="sidebar-bottom"><span class="mode-label"><span class="status-dot"></span> Local session</span><p>Stored in this tab until reload.</p></div>
 {/snippet}
 <div class="app-shell" class:nav-collapsed={navCollapsed}>
@@ -409,9 +435,12 @@
       <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#if folderOpen}<ChevronRight size={13}/><strong>{locationName}</strong>{/if}</div><span class="avatar small">YO</span>
     </header>
     <div class="page-content" class:folder-workspace={folderOpen}>
-      <section class="project-heading" class:identity-banner={!folderOpen && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if !folderOpen && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1>{folderOpen ? locationName : project.name}</h1>{#if !folderOpen}<p class="subtitle" title={project.description}>{project.clientName || project.description || "Choose a folder to start reviewing."}</p>{/if}</div><div class="project-tools"><ImportQueue jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/><ProjectIdentityDialog {project} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={(folderId, title) => organize({ type: 'rename', folderId, title })} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions folders={projectFolders} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "today’s date folder"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button></div></section>
+      <section class="project-heading" class:identity-banner={!folderOpen && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if !folderOpen && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1>{folderOpen ? locationName : project.name}</h1>{#if !folderOpen}<p class="subtitle" title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description || "Choose a folder to start reviewing."}</p>{/if}</div><div class="project-tools"><ImportQueue jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}<ProjectIdentityDialog {project} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={(folderId, title) => organize({ type: 'rename', folderId, title })} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions folders={projectFolders} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "today’s date folder"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
       {#if feedback}<div class="notice" role="status">{feedback}<button class="icon-button" aria-label="Dismiss message" onclick={() => feedback = ''}><X size={16}/></button></div>{/if}
-      {#if !folderOpen}<section class="folder-shelf" aria-label="Media collections">
+      {#if project.archived}<section class="archived-project-state" aria-label="Archived project">
+        <h2>This project is archived.</h2><p>Your media, folders and feedback are retained.</p>
+        <div><button class="primary-button" onclick={() => restoreProject(project.id)}>Restore project</button><button class="secondary-button" onclick={() => projectDialog = true}>New project</button></div>
+      </section>{:else if !folderOpen}<section class="folder-shelf" aria-label="Media collections">
         {#each projectFolders as folder (folder.id)}
           <button class="folder-card" onclick={() => openRealFolder(projectId, folder.id)}><FolderArtwork coverSrc={folderCoverUrl(folder, allAssets)} empty={!assets.some(asset => asset.folderId === folder.id)}/><strong>{folder.title}</strong><span>{assets.filter(asset => asset.folderId === folder.id).length} items</span></button>
         {/each}
@@ -476,7 +505,7 @@
           </Tabs.Root>
         </section>{/if}
       {/snippet}
-      <div hidden={!folderOpen}><WorkspacePanes {explorer} {viewer} {inspector} hasActive={!!active} {showInspector}/></div>
+      <div hidden={!folderOpen || !!project.archived}><WorkspacePanes {explorer} {viewer} {inspector} hasActive={!!active} {showInspector}/></div>
       <footer class="workspace-footer"><span>Local workspace · unsaved session</span><span>review room.</span></footer>
     </div>
   </main>
@@ -494,6 +523,10 @@
 </Dialog.Root>
 
 <style>
+  .archived-project-state { padding: clamp(28px, 6vw, 72px) 0; }
+  .archived-project-state h2 { font-size: 18px; font-weight: 500; }
+  .archived-project-state p { margin: 8px 0 20px; color: var(--muted); font-size: 12px; }
+  .archived-project-state > div { display: flex; flex-wrap: wrap; gap: 8px; }
   .project-heading { position: relative; isolation: isolate; }
   .project-heading-copy { min-width: 0; }
   .project-heading-copy .subtitle { max-width: 52ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

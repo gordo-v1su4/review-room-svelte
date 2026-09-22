@@ -35,3 +35,5 @@ Folder drag/drop is locally verified in [folder-drag-evidence.md](../folder-drag
 Project identity settings are locally verified in [project-identity-evidence.md](../project-identity-evidence.md). Name/client/description/accent/banner and compact desktop/mobile controls are implemented. Owner-only access management, membership, project archive and server persistence remain open.
 
 Project-specific field visibility/order and shared display settings are locally verified in [appearance-preferences-evidence.md](../appearance-preferences-evidence.md), including legacy migration, project switching, reload and preserving a real-media playhead/draft. Authenticated per-user persistence remains open.
+
+Owner/admin project archive and restore are locally verified in [project-archive-evidence.md](../project-archive-evidence.md), including last-project, searchable restore, retained real media/feedback/drafts and mobile drawer flow. Live ownership, persistent archive state and share-token scope remain unverified; access management and membership remain open.

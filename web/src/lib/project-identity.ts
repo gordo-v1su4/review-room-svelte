@@ -1,11 +1,19 @@
-export type ProjectIdentity = Readonly<{ id: string; name: string; clientName?: string; description?: string; brandColor?: string; bannerUrl?: string }>;
+export type ProjectIdentity = Readonly<{ id: string; name: string; clientName?: string; description?: string; brandColor?: string; bannerUrl?: string; archived?: boolean }>;
 export type ProjectIdentityDraft = { name: string; clientName: string; description: string; brandColor: string; banner?: File | null };
 type IdentityPatch = Omit<ProjectIdentityDraft, 'banner'> & { bannerUrl?: string | null };
 type IdentityAccess = Readonly<{ isAdmin: boolean; editableProjectIds: readonly string[] }>;
 
+/** Local archive state; live ownership and authorization remain server-owned. */
+export function setProjectArchived(project: ProjectIdentity, archived: boolean, access: Readonly<{ isAdmin: boolean; ownedProjectIds: readonly string[] }>): ProjectIdentity {
+  if (!access.isAdmin || !access.ownedProjectIds.includes(project.id)) throw new Error('Project owner and admin access required.');
+  const { archived: _archived, ...identity } = project;
+  return archived ? { ...identity, archived: true } : identity;
+}
+
 /** Local metadata only. Visibility, membership and storage authorization stay server-owned. */
 export function updateProjectIdentity(project: ProjectIdentity, patch: IdentityPatch, access: IdentityAccess): ProjectIdentity {
   if (!access.isAdmin || !access.editableProjectIds.includes(project.id)) throw new Error('Project editing is unavailable.');
+  if (project.archived) throw new Error('Restore the project before editing.');
   const name = patch.name.trim();
   if (!name) throw new Error('Enter a project name.');
   if (!/^#[0-9a-f]{6}$/i.test(patch.brandColor)) throw new Error('Choose a six-digit hex color.');

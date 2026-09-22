@@ -137,7 +137,7 @@
       {/each}
     </ul>
   {:else}
-    <p class="empty">No projects yet.</p>
+    <p class="empty">No active projects.</p>
   {/if}
 </nav>
 
