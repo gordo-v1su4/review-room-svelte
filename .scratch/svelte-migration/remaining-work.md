@@ -11,7 +11,7 @@ This is a navigation list, not a replacement for the migration specification or 
 
 ## Next tasks, in order
 
-1. Finish share administration and remaining public-review parity. The shared viewer now has local real-media acceptance; remote-source metadata and payload-refresh reconciliation remain required integration checks.
+1. Connect and verify the implemented share administration after backend work resumes; finish remaining public-review parity. The shared viewer now has local real-media acceptance; remote-source metadata and payload-refresh reconciliation remain required integration checks.
 2. Audit original-vs-Svelte feature parity, especially share management, notifications, account/project access and role-specific controls.
 3. Finish visual polish: compact project-settings controls, header alignment, restrained surfaces, consistent folders/cards/status colors, and responsive panes/drawers. Re-check existing fixes rather than assuming they remain broken.
 4. Complete playback acceptance across supported browsers: hover scrubbing, frame stepping, sequence playback, codec/GPU fallbacks, latency and dropped frames.
@@ -26,3 +26,5 @@ Recent completed slices: [shortlist sequence playback](shortlist-preview-evidenc
 Source tickets: [03](issues/03-workspace-parity.md), [04](issues/04-review-feedback-sharing.md), [07](issues/07-integration-cutover.md). Ticket filenames and spec remain authoritative where this index is less detailed.
 
 Personal frontend deployment is READY at https://review-room-svelte.vercel.app. Root cleanup, project editing/color and hosted playback evidence: [root-cleanup-deployment-evidence.md](root-cleanup-deployment-evidence.md). Live persistence and release gates above remain open.
+
+Compact toolbar, borderless cards, direct ratings and local share-administration acceptance: [compact-controls-share-evidence.md](compact-controls-share-evidence.md).

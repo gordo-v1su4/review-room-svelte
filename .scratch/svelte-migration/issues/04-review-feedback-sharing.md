@@ -27,3 +27,5 @@ Shortlist sequence preview is restored with native video ended transitions, time
 Mobile notes now stay beneath the player while secondary metadata opens in a resize-stable sheet. Real-video playback, comment-draft retention, field editing and focus return verified in [mobile-metadata-evidence.md](../mobile-metadata-evidence.md). Full acceptance matrix remains open.
 
 The Svelte shared-review access controller, gate screens and fail-closed token route are implemented and locally verified in [public-review-gate-evidence.md](../public-review-gate-evidence.md). The shared viewer is locally implemented and verified in [shared-review-viewer-evidence.md](../shared-review-viewer-evidence.md). Share administration, notifications, full parity and live adapter/authorization remain open.
+
+Share-administration frontend is now implemented through a fail-closed gateway and locally verified; see [compact-controls-share-evidence.md](../compact-controls-share-evidence.md). Live share authorization/persistence and notifications remain open.

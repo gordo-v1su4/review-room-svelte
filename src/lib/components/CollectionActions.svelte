@@ -61,7 +61,7 @@
 
 {#if canEdit}
   <div class="collection-actions">
-    <button type="button" class="collection-button" bind:this={newTrigger} onclick={() => begin('create')}><Layers size={14}/>New collection</button>
+    <button type="button" class="collection-button explorer-tool" aria-label="New collection" title="New collection" bind:this={newTrigger} onclick={() => begin('create')}><Layers size={14}/><span class="explorer-tool-label">New collection</span></button>
     {#if activeCollection}
       <DropdownMenu.Root bind:open={menuOpen}>
         <DropdownMenu.Trigger bind:ref={menuTrigger} class="collection-button collection-menu-trigger" aria-label={`Collection settings for ${activeCollection.title}`} title="Collection settings"><MoreHorizontal size={16}/></DropdownMenu.Trigger>

@@ -124,7 +124,7 @@ Build the black-and-white field from Tailwind **zinc** (preferred) or **neutral*
 
 ### Color discipline — brand ≠ semantic
 Two separate, non-overlapping color sources (this avoids the clash where a per-project accent fights the status pills):
-- **Brand accent** (`project.brandColor`) — used *only* for branding: banner treatment and the primary CTA. Never for status.
+- **Brand accent** (`project.brandColor`) — carries through the banner, upload CTA, selected project/folder navigation, active workspace controls, and a restrained tint in the smoked folder artwork. Selected sidebar destinations share one borderless, dark gradient. Controls have a faint brighter top edge and quieter sides/bottom; never a uniform saturated outline. Papers and uploaded covers retain their own colors. Never recolor review status or approval actions.
 - **Semantic palette** (fixed, restrained, brand-independent): `success` (approved), `warning` (needs changes), `info`/`selected`, `danger` (error), plus neutral pills for in-progress states. Status pills always draw from here.
 
 The media thumbnails provide essentially all the saturated color on screen; chrome stays neutral. Define tokens: `background, surface, surfaceElevated, border, borderSubtle, textPrimary, textSecondary, textMuted, brandAccent, success, warning, info, danger, selected, approved`.

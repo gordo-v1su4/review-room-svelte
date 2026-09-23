@@ -39,7 +39,7 @@
 </script>
 
 <Popover.Root>
-  <Popover.Trigger class="secondary-button appearance-trigger"><LayoutGrid size={14}/> Appearance</Popover.Trigger>
+  <Popover.Trigger class="secondary-button appearance-trigger explorer-tool" aria-label="Appearance" title="Appearance"><LayoutGrid size={14}/><span class="explorer-tool-label">Appearance</span></Popover.Trigger>
   <Popover.Portal>
     <Popover.Content class="appearance-popover" sideOffset={8} align="end" collisionPadding={12} aria-label="Appearance">
       <div class="appearance-heading"><h3>Appearance</h3><Popover.Close class="appearance-close" aria-label="Close appearance"><X size={15}/></Popover.Close></div>

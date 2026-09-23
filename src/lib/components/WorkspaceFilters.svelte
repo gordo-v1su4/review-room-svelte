@@ -21,7 +21,7 @@
   function activeCount() { const applied = appliedValue(); return applied.statuses.length + applied.assetClasses.length + Number(applied.selectedOnly) + Number(applied.hasComments) + Number(applied.minRating > 0) + Number(applied.sort !== 'newest') + Number(applied.groupBy !== 'none') + Number(applied.tags.length > 0); }
 </script>
 <Dialog.Root bind:open>
-  <Dialog.Trigger class="secondary-button" onclick={openFilters}><SlidersHorizontal size={16} /> Filters{#if activeCount()} · {activeCount()}{/if}</Dialog.Trigger>
+  <Dialog.Trigger class="secondary-button explorer-tool filter-trigger" aria-label={activeCount() ? `Filters, ${activeCount()} active` : "Filters"} title={activeCount() ? `Filters, ${activeCount()} active` : "Filters"} onclick={openFilters}><SlidersHorizontal size={16} /><span class="explorer-tool-label">Filters{#if activeCount()} · {activeCount()}{/if}</span>{#if activeCount()}<span class="explorer-tool-indicator" aria-hidden="true"></span>{/if}</Dialog.Trigger>
   <Dialog.Portal><Dialog.Overlay class="dialog-overlay" /><Dialog.Content class="filter-sheet" aria-label="Workspace filters">
     <div class="sheet-heading"><Dialog.Title>Filter media</Dialog.Title><Dialog.Close class="icon-button" aria-label="Close filters"><X size={18} /></Dialog.Close></div>
     <Dialog.Description>Focus on the next decision.</Dialog.Description>
@@ -31,15 +31,20 @@
     <label class="filter-field">Minimum rating<select bind:value={draft.minRating}>{#each [0,1,2,3,4,5] as rating (rating)}<option value={rating}>{rating ? `${rating}+ stars` : 'Any rating'}</option>{/each}</select></label>
     <label class="filter-field">Sort by<select bind:value={draft.sort}><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="comments">Most comments</option><option value="name">Name</option><option value="name-desc">Name (Z–A)</option><option value="status">Status</option><option value="rating">Rating</option></select></label>
     <label class="filter-field">Group by<select bind:value={draft.groupBy}><option value="none">No grouping</option><option value="status">Status</option><option value="class">Media class</option><option value="folder">Folder</option></select></label>
-    <label class="filter-check"><input type="checkbox" bind:checked={draft.selectedOnly} /> Shortlist only</label><label class="filter-check"><input type="checkbox" bind:checked={draft.hasComments} /> Has comments</label>
+    <div class="filter-checks"><label class="filter-check"><input type="checkbox" bind:checked={draft.selectedOnly} />Shortlist only</label><label class="filter-check"><input type="checkbox" bind:checked={draft.hasComments} />Has comments</label></div>
     <div class="filter-actions"><button type="button" class="secondary-button" onclick={clear}>Clear</button><button type="button" class="primary-button" onclick={apply}><Check size={16} /> Apply</button></div>
   </Dialog.Content></Dialog.Portal>
 </Dialog.Root>
 
 <style>
   .filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; margin-top: 5px; }
-  .class-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .class-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .class-grid .filter-option { white-space: nowrap; }
+  .filter-checks { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 14px; }
+  .filter-check { display: inline-flex; align-items: center; gap: 7px; min-height: 28px; color: var(--ink); font-size: 11px; white-space: nowrap; cursor: pointer; }
+  .filter-check input { width: 13px; height: 13px; margin: 0; accent-color: var(--teal); }
   .filter-option { min-height: 30px; padding: 0 7px; font-size: 11px; }
   .filter-section { margin-top: 12px; }
   .filter-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+  @media (pointer: coarse) { .filter-check, .filter-option { min-height: 44px; } }
 </style>
