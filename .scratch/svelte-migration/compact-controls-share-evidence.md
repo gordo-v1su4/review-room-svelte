@@ -21,4 +21,4 @@ Fixtures are not live access or persistence evidence. Historical backend support
 
 Project accents now reach selected navigation, active controls and a quiet folder-shell tint. The main project row is brighter than nested selections; all selected nav rows remain borderless. A purple (#7e14b8) identity was applied through the phone settings UI and verified in the portaled navigation drawer. Semantic status colors are unchanged. Phone drawer navigation closes on collection selection.
 
-Final list-card adjustment: thumbnail and row measured identical top/bottom and 76px height in the browser; media-card border 0px, radius 6px. Rating and metadata align beside the full-height thumbnail.
+Final list-card adjustment: thumbnail and row measured identical top/bottom and 80px height in the browser; media-card border 0px, radius 6px. Rating and metadata align beside the 128px-wide full-height thumbnail. List thumbnails explicitly use cover to avoid Fit letterboxing; grid Fit/Fill remains configurable.
