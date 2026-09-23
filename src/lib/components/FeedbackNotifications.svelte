@@ -4,10 +4,11 @@
   import FeedbackInbox from './FeedbackInbox.svelte';
   import type { FeedbackDigest, FeedbackNote } from '$lib/feedback-inbox';
 
-  let { groups, onOpenNote, onToggleComplete }: {
+  let { groups, onOpenNote, onToggleComplete, onNavigateFocus }: {
     groups: readonly FeedbackDigest[];
     onOpenNote: (note: FeedbackNote) => void;
     onToggleComplete: (note: FeedbackNote) => void;
+    onNavigateFocus?: () => boolean;
   } = $props();
   let open = $state(false);
   let inboxOpen = $state(false);
@@ -36,7 +37,7 @@
     </Popover.Content>
   </Popover.Portal>
 </Popover.Root>
-<FeedbackInbox {groups} {onOpenNote} {onToggleComplete} bind:open={inboxOpen} showTrigger={false} onRestoreFocus={() => trigger?.focus()}/>
+<FeedbackInbox {groups} {onNavigateFocus} {onOpenNote} {onToggleComplete} bind:open={inboxOpen} showTrigger={false} onRestoreFocus={() => trigger?.focus()}/>
 
 <style>
   :global(.notifications-trigger) { position: relative; flex-shrink: 0; width: 30px; height: 30px; }

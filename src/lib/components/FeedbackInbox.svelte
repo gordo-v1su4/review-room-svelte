@@ -3,14 +3,16 @@
   import { ArrowUpRight, Check, Inbox, RotateCcw, Search, X } from 'lucide-svelte';
   import type { FeedbackDigest, FeedbackNote } from '$lib/feedback-inbox';
 
-  let { groups, onOpenNote, onToggleComplete, open = $bindable(false), showTrigger = true, onRestoreFocus }: {
+  let { groups, onOpenNote, onToggleComplete, open = $bindable(false), showTrigger = true, onRestoreFocus, onNavigateFocus }: {
     open?: boolean; showTrigger?: boolean;
     onRestoreFocus?: () => void;
+    onNavigateFocus?: () => boolean;
     groups: readonly FeedbackDigest[];
     onOpenNote: (note: FeedbackNote) => void;
     onToggleComplete: (note: FeedbackNote) => void;
   } = $props();
 
+  let navigatingToNote = false;
   let search = $state('');
   let scope = $state<'open' | 'all'>('open');
   const openCount = $derived(groups.reduce((count, group) => count + group.needsAttentionCount, 0));
@@ -37,6 +39,7 @@
     return `${Math.floor(whole / 60).toString().padStart(2, '0')}:${(whole % 60).toString().padStart(2, '0')}`;
   }
   function openNote(note: FeedbackNote) {
+    navigatingToNote = true;
     open = false;
     onOpenNote(note);
   }
@@ -48,7 +51,9 @@
   </Dialog.Trigger>{/if}
   <Dialog.Portal>
     <Dialog.Overlay class="dialog-overlay"/>
-    <Dialog.Content class="filter-sheet inbox-sheet" onCloseAutoFocus={event => { if (onRestoreFocus) { event.preventDefault(); onRestoreFocus(); } }}>
+    <Dialog.Content class="filter-sheet inbox-sheet" onCloseAutoFocus={event => { if (navigatingToNote && onNavigateFocus?.()) event.preventDefault();
+      else if (onRestoreFocus) { event.preventDefault(); onRestoreFocus(); }
+      navigatingToNote = false; }}>
       <div class="inbox-heading">
         <Dialog.Title class="dialog-title">Feedback inbox</Dialog.Title>
         <Dialog.Close class="inbox-close" aria-label="Close feedback inbox"><X size={17}/></Dialog.Close>

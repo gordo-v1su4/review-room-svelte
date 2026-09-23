@@ -19,4 +19,4 @@ The production default remains an unavailable gateway with every provider disabl
 - Real local Downloads clip `camera_rotating_around_rapper_in_music_video_a51538.mp4`: account dialog open/close retained the same media source, readyState 4, paused playhead at 1.00s, and unsent comment `Account dialog retains this unsent draft.`
 - Fixture browser warnings/errors: none observed.
 
-Production verification is recorded after deployment. These results prove the frontend seam only; live authentication and shipping gates remain open.
+Production commit `f91b362562f950ad6b1b6e5c2c6303f7f4c8e033` was READY in personal Vercel deployment `dpl_EjBqkFjKhoYX9swU3MXB8vd7wdsY`; canonical alias resolved to it. Browser verified root Account dialog and `/sign-in` show the unavailable service state, and `/dev/account-access` returns 404. No warning/error was observed before the deliberate 404 navigation. These results prove the frontend seam only; live authentication and shipping gates remain open.

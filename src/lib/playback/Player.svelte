@@ -237,10 +237,10 @@
       onvolumechange={() => muted = video.muted}
       onerror={() => { error = 'This file could not be played. Try a browser-supported MP4 or WebM.'; onfailure(src); }}></video>
     {#key sourceBlob}<canvas class="preview-canvas" use:attachPreview={sourceBlob} aria-hidden="true" style:visibility={previewVisible ? 'visible' : 'hidden'}></canvas>{/key}
-    {#if error}<div class="player-message" role="alert">{error}</div>{:else if !ready}<div class="player-message">Preparing playback…</div>{/if}
+    {#if error}<div class="player-message" role="alert">{error}</div>{:else if !ready}<div class="player-message" role="status">Preparing playback…</div>{/if}
   </div>
   <div class="playback-controls">
-    <div class="scrubber" role="slider" tabindex="0" aria-label="Video timeline" aria-valuemin="0" aria-valuemax={duration || 1} aria-valuenow={time} aria-valuetext={stamp(time)} aria-disabled={!ready}
+    <div class="scrubber" role="slider" tabindex={ready ? 0 : -1} aria-label="Video timeline" aria-valuemin="0" aria-valuemax={duration || 1} aria-valuenow={time} aria-valuetext={stamp(time)} aria-disabled={!ready}
       onpointerdown={start} onpointermove={move} onpointerup={finish} onpointercancel={cancel} onlostpointercapture={cancel} onkeydown={keyboard}>
       <div class="track"><div class="played" style:width={`${duration ? time / duration * 100 : 0}%`}></div><span class="playhead" style:left={`${duration ? time / duration * 100 : 0}%`}></span></div>
     </div>

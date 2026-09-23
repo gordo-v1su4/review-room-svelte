@@ -36,3 +36,5 @@ Project visibility, members and email/domain-rule controls now have [local proje
 Playback now has an [isolated native/worker comparison](isolated-playback-evidence.md) and renderer cleanup regression tests. Native remains the primary path; physical devices, longer media, sustained resource budgets and live integration still require acceptance.
 
 Account/sign-in frontend flows and the workspace Account dialog now have [local desktop/mobile acceptance](account-access-evidence.md). The unavailable production gateway is intentional; live auth, private routes, session transitions, role integration and clearing private state on sign-out remain open.
+
+Review keyboard entry/return and inbox-to-note focus now have [desktop/mobile browser acceptance](review-focus-evidence.md). The full accessibility and browser matrix is still open.

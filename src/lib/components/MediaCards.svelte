@@ -14,7 +14,7 @@
     access?: ReviewAccess; onReview: (action: ReviewAction) => void;
     onDragStart?: (event: DragEvent, id: string) => void; onDragEnd?: () => void;
     appearance: AppearanceValue; view: 'grid' | 'list';
-    onOpen: (id: string) => void; onCheck?: (id: string, event: MouseEvent, toggle?: boolean) => void;
+    onOpen: (id: string, event: MouseEvent) => void; onCheck?: (id: string, event: MouseEvent, toggle?: boolean) => void;
   } = $props();
   const fields = $derived(appearance.fieldOrder.filter(id => appearance.visibleFields.includes(id)));
   const labels = Object.fromEntries(CARD_FIELD_DEFINITIONS.map(field => [field.id, field.label]));
@@ -43,7 +43,7 @@
   {#each assets as asset (asset.id)}
     <article aria-busy={busyIds.includes(asset.id)} class="media-card" class:active-card={activeId === asset.id} class:checked-card={checkedIds.includes(asset.id)}>
       <button type="button" class="card-open" data-asset-id={asset.id} draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} aria-label={`Open ${asset.name}`} aria-current={activeId === asset.id ? 'true' : undefined}
-        onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id)}>
+        onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id, event)}>
         <div class="thumbnail">
           <MediaThumbnail src={asset.url} poster={asset.poster} type={asset.type} name={asset.name}/>
           <span class="asset-type">{asset.assetClass}</span>
@@ -51,7 +51,7 @@
         </div>
       </button>
       {#if appearance.showInfo}<div class="card-body">
-        <button class="card-name" type="button" draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} title={asset.name} onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id)}>{asset.name}</button>
+        <button class="card-name" type="button" draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} title={asset.name} onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id, event)}>{asset.name}</button>
         {#if fields.length}<div class="card-fields">{#each fields as field (field)}
           {#if field === 'status'}<AssetStatusMenu status={asset.status} name={asset.name} access={busyIds.includes(asset.id) ? { kind: 'none' } : access} onChange={status => onReview({ type: 'status', assetId: asset.id, status })}/>
           {:else if field === 'rating'}<div class="card-rating" role="group" aria-label={`Rating for ${asset.name}`}>
