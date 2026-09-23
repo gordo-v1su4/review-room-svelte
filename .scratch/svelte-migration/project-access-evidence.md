@@ -17,4 +17,6 @@ The state controller applies only confirmed gateway snapshots, validates project
 
 ## Remaining acceptance
 
-This is fixture and frontend evidence only. Live sign-in, authorization, identity/rule matching, visibility semantics, immediate permission changes, persistent membership and reload behavior still require the authorized backend integration. Production must reject `/dev/project-access` with 404; verify after this commit deploys.
+This is fixture and frontend evidence only. Live sign-in, authorization, identity/rule matching, visibility semantics, immediate permission changes, persistent membership and reload behavior still require the authorized backend integration.
+
+Production verification: commit `477f425` deployed READY to the personal Vercel production alias. Browser verified unavailable-service state, no mutation controls, Escape focus return and no console warnings/errors. `/dev/project-access` returned HTTP 404.

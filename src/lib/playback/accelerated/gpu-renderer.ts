@@ -78,6 +78,7 @@ export async function createGpuPreviewRenderer(
       dispose,
     };
   } catch (error) {
+    if (signal?.aborted) { dispose(); return null; }
     fail(error instanceof Error ? error.message : 'WebGPU unavailable.'); return null;
   }
 }
