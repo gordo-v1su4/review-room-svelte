@@ -71,7 +71,12 @@
   .media-card { position: relative; }
   .card-open { display: block; width: 100%; padding: 0; color: inherit; background: transparent; text-align: left; }
   .list-layout .media-card { display: flex; align-items: center; }
-  .list-layout .card-open { flex: 0 0 74px; width: 74px; }
+  .list-layout .card-open { position: relative; align-self: stretch; flex: 0 0 112px; width: 112px; min-height: 76px; }
+  .list-layout .card-open .thumbnail { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; }
+  .list-layout .card-body { padding: 8px 12px; }
+  .list-layout .card-rating { flex: 0 0 auto; }
+  .list-layout .card-fields { column-gap: 12px; }
+  @media (max-width: 480px) { .list-layout .card-open { flex-basis: 92px; width: 92px; } }
   .card-check { position: absolute; top: 7px; left: 7px; display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid #a5bab663; border-radius: 4px; background: #0c1112c9; color: var(--teal); opacity: 0; transition: opacity 90ms; }
   .media-card:hover .card-check, .media-card:focus-within .card-check, .checked-card .card-check { opacity: 1; }
   .card-check[aria-checked='true'] { background: #224c43; border-color: var(--teal); }

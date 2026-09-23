@@ -20,3 +20,5 @@
 Fixtures are not live access or persistence evidence. Historical backend supports optional expiresAt enforcement but no expiry-setting or revocation mutation. Before live sharing, resolve the public-review access audit, safe summary DTOs, role inconsistencies, passcode proof, per-operation expiry/archive checks, asset-bound download authorization and reviewer identity isolation. Notifications and full role-specific parity remain open.
 
 Project accents now reach selected navigation, active controls and a quiet folder-shell tint. The main project row is brighter than nested selections; all selected nav rows remain borderless. A purple (#7e14b8) identity was applied through the phone settings UI and verified in the portaled navigation drawer. Semantic status colors are unchanged. Phone drawer navigation closes on collection selection.
+
+Final list-card adjustment: thumbnail and row measured identical top/bottom and 76px height in the browser; media-card border 0px, radius 6px. Rating and metadata align beside the full-height thumbnail.
