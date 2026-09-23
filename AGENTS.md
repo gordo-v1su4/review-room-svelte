@@ -44,7 +44,7 @@ Homelab env: copy from pindeck with `scripts/use-homelab-env.ps1`, then add `S3_
 
 ## Deployment invariant
 
-- This personal repository currently has no active deployment automation.
+- Personal GitHub repository `gordo-v1su4/review-room-svelte` is connected to Vercel; pushes to production branch `main` auto-deploy. Verified through the Vercel project API on 2026-09-22.
 - The inherited deployment configuration and workflow have been removed. Never deploy to the original backend or Buzero. Personal Vercel scope: `gordo-v1su4s-projects`; project: `review-room-svelte`.
 - Frontend and Convex deployments are separate surfaces. Future integration requires explicit configuration and verification of each affected surface.
 

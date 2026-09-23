@@ -28,3 +28,5 @@ Source tickets: [03](issues/03-workspace-parity.md), [04](issues/04-review-feedb
 Personal frontend deployment is READY at https://review-room-svelte.vercel.app. Root cleanup, project editing/color and hosted playback evidence: [root-cleanup-deployment-evidence.md](root-cleanup-deployment-evidence.md). Live persistence and release gates above remain open.
 
 Compact toolbar, borderless cards, direct ratings and local share-administration acceptance: [compact-controls-share-evidence.md](compact-controls-share-evidence.md).
+
+Header notification preview and inbox handoff are locally verified in [notification shortcut acceptance](notification-shortcut-evidence.md). Live delivery/persistence and account/project-access parity remain open.

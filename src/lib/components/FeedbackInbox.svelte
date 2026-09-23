@@ -3,13 +3,14 @@
   import { ArrowUpRight, Check, Inbox, RotateCcw, Search, X } from 'lucide-svelte';
   import type { FeedbackDigest, FeedbackNote } from '$lib/feedback-inbox';
 
-  let { groups, onOpenNote, onToggleComplete }: {
+  let { groups, onOpenNote, onToggleComplete, open = $bindable(false), showTrigger = true, onRestoreFocus }: {
+    open?: boolean; showTrigger?: boolean;
+    onRestoreFocus?: () => void;
     groups: readonly FeedbackDigest[];
     onOpenNote: (note: FeedbackNote) => void;
     onToggleComplete: (note: FeedbackNote) => void;
   } = $props();
 
-  let open = $state(false);
   let search = $state('');
   let scope = $state<'open' | 'all'>('open');
   const openCount = $derived(groups.reduce((count, group) => count + group.needsAttentionCount, 0));
@@ -42,12 +43,12 @@
 </script>
 
 <Dialog.Root bind:open>
-  <Dialog.Trigger class="nav-item inbox-trigger" aria-label={`Feedback inbox, ${openCount} open notes`}>
+  {#if showTrigger}<Dialog.Trigger class="nav-item inbox-trigger" aria-label={`Feedback inbox, ${openCount} open notes`}>
     <Inbox size={15}/><span class="inbox-trigger-label">Feedback inbox</span><span class="inbox-count">{openCount}</span>
-  </Dialog.Trigger>
+  </Dialog.Trigger>{/if}
   <Dialog.Portal>
     <Dialog.Overlay class="dialog-overlay"/>
-    <Dialog.Content class="filter-sheet inbox-sheet">
+    <Dialog.Content class="filter-sheet inbox-sheet" onCloseAutoFocus={event => { if (onRestoreFocus) { event.preventDefault(); onRestoreFocus(); } }}>
       <div class="inbox-heading">
         <Dialog.Title class="dialog-title">Feedback inbox</Dialog.Title>
         <Dialog.Close class="inbox-close" aria-label="Close feedback inbox"><X size={17}/></Dialog.Close>
