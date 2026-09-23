@@ -182,7 +182,7 @@
   .media-thumbnail { position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden; background: #171b1b; }
   .media-thumbnail img, .media-thumbnail video, .media-thumbnail canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: var(--card-fit, cover); display: block; }
   .media-thumbnail img { opacity: 1; transition: opacity 110ms ease-out; }
-  .poster-placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: #6f7c78; font-size: 10px; letter-spacing: .05em; }
+  .poster-placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 10px; letter-spacing: .05em; }
   .poster-placeholder.hidden { opacity: 0; }
   .media-thumbnail img.hidden { opacity: 0; }
   .media-thumbnail video, .media-thumbnail canvas { opacity: 0; pointer-events: none; }

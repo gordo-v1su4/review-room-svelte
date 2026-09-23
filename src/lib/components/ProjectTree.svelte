@@ -163,7 +163,7 @@
   .project-link { font-weight: 560; }
   .project-link:hover, .collection-link:hover { color: #dbe8e4; }
   .project-name, .collection-link span:not(.count) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .count { flex-shrink: 0; margin-left: auto; min-width: 20px; padding: 2px 5px; border-radius: 5px; background: #ffffff08; color: #77827f; font-size: 10px; text-align: center; }
+  .count { flex-shrink: 0; margin-left: auto; min-width: 20px; padding: 2px 5px; border-radius: 5px; background: #ffffff08; color: var(--ink); font-size: 10px; text-align: center; }
   .collection-list { position: relative; margin: 1px 0 7px 18px; padding-left: 17px; }
   .collection-list::before { content: ''; position: absolute; top: -3px; bottom: 9px; left: 2px; border-left: 1px solid #ffffff12; }
   .collection-list li { position: relative; }
@@ -171,6 +171,6 @@
   .collection-link { min-height: 31px; padding-left: 6px; color: #899491; border-radius: 7px; }
   .collection-link.selected { background: #ffffff0a; color: #a8ded2; }
   .project-link.drop-hover, .collection-link.drop-hover { background: #15362e; box-shadow: inset 0 0 0 1px var(--teal); color: var(--ink); border-radius: 6px; }
-  .empty { margin: 0 10px; color: #687371; font-size: 11px; }
+  .empty { margin: 0 10px; color: var(--muted); font-size: 11px; }
   @media (pointer: coarse) { .project-link, .collection-link, .add-project, .edit-project, .disclosure { min-height: 44px; } .add-project, .edit-project, .disclosure { min-width: 44px; } }
 </style>

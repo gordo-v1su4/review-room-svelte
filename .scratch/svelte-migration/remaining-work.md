@@ -38,3 +38,5 @@ Playback now has an [isolated native/worker comparison](isolated-playback-eviden
 Account/sign-in frontend flows and the workspace Account dialog now have [local desktop/mobile acceptance](account-access-evidence.md). The unavailable production gateway is intentional; live auth, private routes, session transitions, role integration and clearing private state on sign-out remain open.
 
 Review keyboard entry/return and inbox-to-note focus now have [desktop/mobile browser acceptance](review-focus-evidence.md). The full accessibility and browser matrix is still open.
+
+Small-label contrast and desktop/mobile Reduce Motion checks are recorded in [contrast-motion-evidence.md](contrast-motion-evidence.md). Next concrete frontend defect: confirming project archive removes the focused dialog trigger and leaves focus on BODY; add destination focus and verify restore flows.

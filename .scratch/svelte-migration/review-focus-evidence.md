@@ -21,4 +21,6 @@ IAB local workspace with real Downloads clip `camera_rotating_around_rapper_in_m
 
 ## Validation and limits
 
+Production follow-up: personal deployment `2cb971618d4b42fe963a98333d480c9c9e47794f` was verified at `https://review-room-svelte.vercel.app/`. In a fresh tab, the same real Downloads clip opened by Enter with focus on the review H2; Tab then Enter closed review and returned focus to its card. Pointer entry retained card focus. Playback advanced past 6 seconds with native readyState 4 and a local blob source. A device-local note opened through Notifications → View inbox → Open note transferred focus to the selected Notes 1 tab. No warning/error logs were captured. This verifies hosted frontend behavior, not remote media upload, live notes or persistence.
+
 156 tests /849 assertions pass; Svelte check 0 errors/0 warnings and build pass. These are scoped browser focus checks, not a screen-reader certification or complete accessibility audit. Speech/caption support, contrast audit and physical browser/device coverage remain unverified. Existing pane-arrow, timeline-arrow and edit-field key ownership evidence remains in keyboard-navigation-evidence.md. Backend and live authorization gates remain deferred.
