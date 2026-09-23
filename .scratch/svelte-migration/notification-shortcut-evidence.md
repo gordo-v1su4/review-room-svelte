@@ -18,3 +18,5 @@ Project visibility, direct membership and email/domain access rules still need t
 ## Deployment configuration
 
 Vercel project API initially reported no Git link. Connected the existing personal project to `gordo-v1su4/review-room-svelte`; API now confirms GitHub and production branch `main`. Local checkout has its own `.git`, and GitHub reports `isFork: false`.
+
+Standalone checkout moved to `/Users/robertspaniolo/Documents/Github/review-room-svelte` at the user's request. Its own `.git`, personal origin and Vercel link are preserved. Vite restarted from this directory on 127.0.0.1:5173. Main push `fb3cd12` triggered a Production deployment automatically.

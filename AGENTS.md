@@ -130,7 +130,7 @@ Single-context: root `CONTEXT.md` and the existing `docs/adr/`. See `docs/agents
 
 ## Ownership and migration
 
-- Work in `gordo-v1su4/review-room-svelte`, local directory `review-room-svelte`.
+- Work in `gordo-v1su4/review-room-svelte`, local directory `/Users/robertspaniolo/Documents/Github/review-room-svelte`. This is the standalone app checkout; do not work from the old `Documents/ChatGPT/review-room-black` container.
 - NEVER push to Buzero or Buzero-IO GitHub repositories. The Buzero remote has been removed. Only the personal `origin` remains.
 - Buzero disables forks; this is an independent private repository preserving the original Git history.
 - Migration specification: `.scratch/svelte-migration/spec.md`; numbered local issues in that directory's `issues/` folder.
