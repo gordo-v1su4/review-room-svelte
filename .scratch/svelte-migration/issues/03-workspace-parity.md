@@ -39,3 +39,5 @@ Project-specific field visibility/order and shared display settings are locally 
 Owner/admin project archive and restore are locally verified in [project-archive-evidence.md](../project-archive-evidence.md), including last-project, searchable restore, retained real media/feedback/drafts and mobile drawer flow. Live ownership, persistent archive state and share-token scope remain unverified; access management and membership remain open.
 
 Restored left/right asset keyboard navigation in visible order, including grid/table entry, boundary behavior and draft retention. Verified that text editing, timeline/pane controls and overlay focus retain their own keys; see [keyboard-navigation-evidence.md](../keyboard-navigation-evidence.md). Full accessibility matrix remains open.
+
+Project access frontend is locally verified in [project-access-evidence.md](../project-access-evidence.md): visibility, members, email/domain rules, editor/viewer roles, owner-only management, confirmed saves and failure/cancellation recovery. The real workspace reports unavailable access management until backend integration resumes; live authorization and persistence remain open.

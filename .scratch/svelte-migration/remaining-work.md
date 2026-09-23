@@ -30,3 +30,5 @@ Personal frontend deployment is READY at https://review-room-svelte.vercel.app. 
 Compact toolbar, borderless cards, direct ratings and local share-administration acceptance: [compact-controls-share-evidence.md](compact-controls-share-evidence.md).
 
 Header notification preview and inbox handoff are locally verified in [notification shortcut acceptance](notification-shortcut-evidence.md). Live delivery/persistence and account/project-access parity remain open.
+
+Project visibility, members and email/domain-rule controls now have [local project-access acceptance](project-access-evidence.md). Remaining access work is live integration/authorization/persistence and account/sign-in parity; fixture success does not close those gates.
