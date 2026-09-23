@@ -19,3 +19,5 @@ Local contract and failure scenarios pass; multipart, URL refresh, sign-in/reset
 ## Comments
 
 Local import preparation and queue implemented; [acceptance evidence](../import-queue-evidence.md). Concurrency is bounded, destinations are captured before preparation, and each file has failure/retry/cancel state. This does not implement network uploading or authentication. Multipart storage, URL refresh, authorization, persistence and live failure verification remain open.
+
+Account frontend flows now have [isolated acceptance](../account-access-evidence.md): sign-in/signup, enabled providers, recovery, denial and confirmed sign-out; production remains explicitly unavailable. Live auth/session routing, private-state clearing, role enforcement and network adapters remain open.

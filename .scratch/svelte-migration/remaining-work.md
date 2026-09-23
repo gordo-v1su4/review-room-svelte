@@ -31,6 +31,8 @@ Compact toolbar, borderless cards, direct ratings and local share-administration
 
 Header notification preview and inbox handoff are locally verified in [notification shortcut acceptance](notification-shortcut-evidence.md). Live delivery/persistence and account/project-access parity remain open.
 
-Project visibility, members and email/domain-rule controls now have [local project-access acceptance](project-access-evidence.md). Remaining access work is live integration/authorization/persistence and account/sign-in parity; fixture success does not close those gates.
+Project visibility, members and email/domain-rule controls now have [local project-access acceptance](project-access-evidence.md). Remaining access work is live integration/authorization/persistence and live account/session integration; fixture success does not close those gates.
 
 Playback now has an [isolated native/worker comparison](isolated-playback-evidence.md) and renderer cleanup regression tests. Native remains the primary path; physical devices, longer media, sustained resource budgets and live integration still require acceptance.
+
+Account/sign-in frontend flows and the workspace Account dialog now have [local desktop/mobile acceptance](account-access-evidence.md). The unavailable production gateway is intentional; live auth, private routes, session transitions, role integration and clearing private state on sign-out remain open.
