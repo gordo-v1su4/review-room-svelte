@@ -71,8 +71,8 @@
   .media-card { position: relative; }
   .card-open { display: block; width: 100%; padding: 0; color: inherit; background: transparent; text-align: left; }
   .list-layout .media-card { display: flex; align-items: center; }
-  .list-layout .card-open { position: relative; align-self: stretch; flex: 0 0 112px; width: 112px; min-height: 76px; }
-  .list-layout .card-open .thumbnail { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; }
+  .list-layout .card-open { position: relative; align-self: stretch; flex: 0 0 128px; width: 128px; min-height: 80px; }
+  .list-layout .card-open .thumbnail { --card-fit: cover; position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; }
   .list-layout .card-body { padding: 8px 12px; }
   .list-layout .card-rating { flex: 0 0 auto; }
   .list-layout .card-fields { column-gap: 12px; }
