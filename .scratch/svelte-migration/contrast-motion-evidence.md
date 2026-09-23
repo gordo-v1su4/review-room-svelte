@@ -28,6 +28,8 @@ The public shortlist slideshow is explicitly started by the user and exposes Sto
 
 Svelte check: 0 errors, 0 warnings. Production build and diff whitespace check pass. No domain logic changed; the existing 156-test result belongs to the preceding focus commit and was not rerun for these three CSS declarations.
 
-Observed remaining focus defect: confirming Archive project closes the dialog and removes its trigger, leaving focus on BODY. Next acceptance should restore focus to the archived-project heading or Restore project action, with an equivalent check when restoring from the archive list. This is not fixed by the contrast change.
+The archive/restore focus defect observed during this audit was subsequently fixed and verified in [project-lifecycle-focus-evidence.md](project-lifecycle-focus-evidence.md).
+
+Production receipt: commit `f2c701b6796b9ba82d6da66affbf1df4d7666283`, personal Vercel deployment `dpl_3DLAsirYNRozvp88Pb7ds1YsXcs4`, READY at `https://review-room-svelte.vercel.app/`. A fresh IAB tab confirmed Videos navigation, all four tree counts at `rgb(205, 215, 211)`, no horizontal overflow and no captured warning/error logs.
 
 Live auth, authorization, persistence, upload/download and backend gates remain open. Physical devices, screen readers, full contrast coverage and the supported playback browser matrix remain outstanding.

@@ -39,4 +39,4 @@ Account/sign-in frontend flows and the workspace Account dialog now have [local 
 
 Review keyboard entry/return and inbox-to-note focus now have [desktop/mobile browser acceptance](review-focus-evidence.md). The full accessibility and browser matrix is still open.
 
-Small-label contrast and desktop/mobile Reduce Motion checks are recorded in [contrast-motion-evidence.md](contrast-motion-evidence.md). Next concrete frontend defect: confirming project archive removes the focused dialog trigger and leaves focus on BODY; add destination focus and verify restore flows.
+Small-label contrast and desktop/mobile Reduce Motion checks are recorded in [contrast-motion-evidence.md](contrast-motion-evidence.md). The subsequent archive/restore focus defect is fixed with [project lifecycle focus acceptance](project-lifecycle-focus-evidence.md), including multi-project desktop restore and nested mobile dialogs.

@@ -4,12 +4,13 @@
   import { Archive, ImagePlus, Settings2, X } from 'lucide-svelte';
   import type { ProjectIdentity, ProjectIdentityDraft } from '$lib/project-identity';
 
-  let { project, canEdit, onSave, canArchive = false, onArchive, open = $bindable(false) }: {
+  let { project, canEdit, onSave, canArchive = false, onArchive, onArchiveFocus, open = $bindable(false) }: {
     project: ProjectIdentity;
     canEdit: boolean;
     onSave: (draft: ProjectIdentityDraft) => Promise<void>;
     canArchive?: boolean;
     onArchive?: () => void;
+    onArchiveFocus?: () => void;
     open?: boolean;
   } = $props();
 
@@ -26,6 +27,7 @@
   let nameInput: HTMLInputElement | undefined;
   let draftProjectId = '';
   let session = 0;
+  let archivedOnClose = false;
   const preview = $derived(banner === null ? undefined : stagedUrl || project.bannerUrl);
 
   function releasePreview() {
@@ -80,6 +82,7 @@
     if (busy || !canEdit || !canArchive || !onArchive || project.id !== draftProjectId) return;
     try {
       onArchive();
+      archivedOnClose = true;
       setOpen(false);
     } catch (cause) {
       error = cause instanceof Error ? cause.message : 'Could not archive the project.';
@@ -108,7 +111,10 @@
   <Dialog.Trigger class="identity-trigger" aria-label="Project settings" title="Project settings" disabled={!canEdit}><Settings2 size={15}/></Dialog.Trigger>
   <Dialog.Portal>
     <Dialog.Overlay class="dialog-overlay"/>
-    <Dialog.Content class="filter-sheet identity-sheet" onOpenAutoFocus={focusName}>
+    <Dialog.Content class="filter-sheet identity-sheet" onOpenAutoFocus={focusName} onCloseAutoFocus={event => {
+      if (archivedOnClose && onArchiveFocus) { event.preventDefault(); onArchiveFocus(); }
+      archivedOnClose = false;
+    }}>
       <div class="sheet-heading"><Dialog.Title class="dialog-title">Project settings</Dialog.Title><Dialog.Close class="identity-close" aria-label="Close project settings"><X size={17}/></Dialog.Close></div>
       <Dialog.Description>Project identity. Changes are stored in this tab.</Dialog.Description>
       <form onsubmit={save} aria-busy={busy}>

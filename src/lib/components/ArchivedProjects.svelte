@@ -2,15 +2,18 @@
   import { Dialog } from 'bits-ui';
   import { Archive, RotateCcw, Search, X } from 'lucide-svelte';
 
-  let { projects, onRestore }: {
+  let { projects, onRestore, closeOnRestore = false, onNavigateFocus }: {
     projects: readonly { id: string; name: string; clientName?: string }[];
     onRestore: (id: string) => void;
+    closeOnRestore?: boolean;
+    onNavigateFocus?: () => void;
   } = $props();
 
   let open = $state(false);
   let search = $state('');
   let notice = $state('');
   let searchInput = $state<HTMLInputElement>();
+  let navigatingOnClose = false;
   const visible = $derived.by(() => {
     const query = search.trim().toLocaleLowerCase();
     return projects.filter(project => !query || [project.name, project.clientName ?? ''].some(value => value.toLocaleLowerCase().includes(query)));
@@ -24,8 +27,9 @@
   function restore(id: string) {
     const project = projects.find(item => item.id === id);
     if (!project) return;
-    if (projects.length === 1) setOpen(false);
+    const closing = projects.length === 1 || closeOnRestore;
     onRestore(id);
+    if (closing) { navigatingOnClose = true; setOpen(false); }
     notice = `${project.name} restored.`;
     if (open) searchInput?.focus();
   }
@@ -38,7 +42,10 @@
     </Dialog.Trigger>
     <Dialog.Portal>
       <Dialog.Overlay class="dialog-overlay"/>
-      <Dialog.Content class="filter-sheet archived-sheet">
+      <Dialog.Content class="filter-sheet archived-sheet" onCloseAutoFocus={event => {
+        if (navigatingOnClose && onNavigateFocus) { event.preventDefault(); onNavigateFocus(); }
+        navigatingOnClose = false;
+      }}>
         <div class="archived-heading"><Dialog.Title class="dialog-title">Archived projects</Dialog.Title><Dialog.Close class="archived-close" aria-label="Close archived projects"><X size={17}/></Dialog.Close></div>
         <Dialog.Description class="archived-description">Restore a project to return it to your workspace. Changes are stored in this tab.</Dialog.Description>
         <label class="archived-search"><Search size={14}/><input bind:this={searchInput} type="search" bind:value={search} placeholder="Search projects" aria-label="Search archived projects"/></label>
