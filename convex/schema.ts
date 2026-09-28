@@ -239,7 +239,7 @@ const applicationTables = {
     originalFilename: v.string(),
     mimeType: v.string(),
     sizeBytes: v.number(),
-    status: v.union(v.literal("pending"), v.literal("complete"), v.literal("failed")),
+    status: v.union(v.literal("pending"), v.literal("finalizing"), v.literal("complete"), v.literal("failed")),
     expiresAt: v.number(),
     createdAt: v.number(),
   }).index("by_project", ["projectId"]),

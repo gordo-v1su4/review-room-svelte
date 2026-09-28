@@ -6,12 +6,11 @@ import { endOwnerSession, requireOwner } from '$lib/server/owner-auth';
 
 function value(form: FormData, name: string) { return String(form.get(name) ?? '').trim(); }
 function origins(form: FormData) { return value(form, 'origins').split(/[\s,]+/).filter(Boolean); }
-function done() { redirect(303, '/studio'); }
+function done() { redirect(303, '/?sharing=1'); }
 
 export const load: PageServerLoad = async ({ cookies, setHeaders }) => {
   requireOwner(cookies);
-  setHeaders({ 'cache-control': 'private, no-store', 'x-robots-tag': 'noindex' });
-  return { snapshot: await db().query(personal.snapshot, {}) };
+  redirect(303, '/?sharing=1');
 };
 
 export const actions: Actions = {
@@ -23,7 +22,9 @@ export const actions: Actions = {
   updateProject: async ({ cookies, request }) => {
     requireOwner(cookies); const form = await request.formData();
     await db().mutation(personal.updateProject, { projectId: value(form, 'projectId') as Id<'projects'>,
-      title: value(form, 'title'), description: value(form, 'description') }); done();
+      title: value(form, 'title'), description: value(form, 'description'),
+      clientName: form.has('clientName') ? value(form, 'clientName') : undefined,
+      brandColor: form.has('brandColor') ? value(form, 'brandColor') : undefined }); done();
   },
   archiveProject: async ({ cookies, request }) => {
     requireOwner(cookies); const form = await request.formData();

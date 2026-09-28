@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Stage1Select from '$lib/components/Stage1Select.svelte';
   import type { Doc } from '../../../convex/_generated/dataModel';
   type Props = {
     showcase: Doc<'showcases'>;
@@ -23,9 +24,9 @@
     <input type="hidden" name="showcaseId" value={showcase._id} />
     <label>Title <input name="title" value={showcase.title} required maxlength="120" /></label>
     <label>Allowed site origins <input name="origins" value={showcase.allowedOrigins.join(', ')} required /></label>
-    <div class="add"><label>Add published video <select bind:value={pick}><option value="">Choose video</option>{#each publications.filter((item) => !item.revokedAt) as item}<option value={item._id}>{title(item._id)}</option>{/each}</select></label><button type="button" onclick={() => { if (pick && !order.includes(pick)) order = [...order, pick]; }}>Add</button></div>
+    <div class="add"><div class="field"><span>Add published video</span><Stage1Select label="Add published video" items={publications.filter((item) => !item.revokedAt).map((item) => ({ value: item._id, label: title(item._id) }))} placeholder="Choose video" bind:value={pick} /></div><button type="button" onclick={() => { if (pick && !order.includes(pick)) order = [...order, pick]; }}>Add</button></div>
     <ol>{#each order as id, index (id)}<li><input type="hidden" name="publicationIds" value={id}/><span>{title(id)}</span><button type="button" onclick={() => move(index, -1)} aria-label={`Move ${title(id)} up`}>↑</button><button type="button" onclick={() => move(index, 1)} aria-label={`Move ${title(id)} down`}>↓</button><button type="button" onclick={() => order = order.filter((item) => item !== id)}>Remove</button></li>{/each}</ol>
     <button class="save">Save showcase</button>
   </form>
 </details>
-<style>.editor{border-top:1px solid var(--border);padding:12px 0}.editor summary{cursor:pointer;color:var(--teal)}form{display:grid;gap:12px;margin:12px 0}label{display:grid;gap:6px;color:var(--muted);font-size:13px}input,select{background:var(--raised);color:var(--ink);border:1px solid var(--control-border);border-radius:8px;padding:10px;width:100%}.add{display:flex;align-items:end;gap:10px}.add label{flex:1}ol{padding-left:18px}li{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}li span{flex:1}button{background:var(--raised);border:1px solid var(--control-border);padding:9px 12px;border-radius:8px}button.save{background:var(--accent);justify-self:start}</style>
+<style>.editor{border-top:1px solid var(--border);padding:12px 0}.editor summary{cursor:pointer;color:var(--teal);font-size:11px}form{display:grid;gap:12px;margin:12px 0}label,.field{display:grid;gap:6px;color:var(--muted);font-size:11px}input{background:var(--canvas);color:var(--ink);border:1px solid var(--border);border-radius:5px;padding:9px;width:100%;font-size:12px}.add{display:flex;align-items:end;gap:10px}.add .field{flex:1;min-width:0}ol{padding-left:18px}li{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}li span{flex:1}button{background:var(--raised);border:1px solid var(--border);padding:7px 10px;border-radius:5px;font-size:11px}button.save{background:var(--accent);justify-self:start}</style>

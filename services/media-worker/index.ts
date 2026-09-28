@@ -10,14 +10,16 @@ import { randomUUID } from "node:crypto";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 const PORT = Number(process.env.MEDIA_WORKER_PORT ?? 8787);
-const SECRET = process.env.MEDIA_WORKER_SECRET || "dev";
-const CONVEX_SITE =
-  process.env.NEXT_PUBLIC_CONVEX_SITE_URL ??
-  process.env.CONVEX_SITE_URL ??
-  "https://unfold-site.serving.cloud";
+const SECRET = process.env.MEDIA_WORKER_SECRET;
+const CONVEX_SITE = process.env.CONVEX_SITE_URL;
+if (!SECRET) throw new Error("Missing env: MEDIA_WORKER_SECRET");
+if (CONVEX_SITE !== "https://review-convex-site.v1su4.dev") {
+  throw new Error("Unexpected Review Room Convex site target");
+}
 const FFMPEG = process.env.FFMPEG_PATH ?? "ffmpeg";
 const FFPROBE = process.env.FFPROBE_PATH ?? "ffprobe";
 const S3_BUCKET = process.env.S3_BUCKET;
+if (S3_BUCKET !== "review-room-svelte") throw new Error("Unexpected Review Room bucket");
 
 let s3: S3Client | null = null;
 

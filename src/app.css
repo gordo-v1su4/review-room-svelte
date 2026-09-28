@@ -560,8 +560,9 @@ button {
 }
 .asset-type {
   position: absolute;
-  left: 10px;
-  bottom: 10px;
+  pointer-events: none;
+  left: 8px;
+  bottom: 7px;
   font-size: 8px;
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -572,6 +573,7 @@ button {
 }
 .shortlist-icon {
   position: absolute;
+  pointer-events: none;
   right: 9px;
   top: 9px;
   color: #aadbc7;
@@ -912,8 +914,8 @@ button {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: #020805b8;
-  backdrop-filter: blur(5px);
+  background: #0208054d;
+  backdrop-filter: blur(3px);
   z-index: 30;
 }
 .nav-drawer {
@@ -1503,22 +1505,16 @@ button {
 .nav-item {
   min-height: 36px;
   font-size: 12px;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 .workspace-name {
-  border-radius: 7px;
+  border-radius: 4px;
   padding: 10px 9px;
 }
 .nav-divider {
   margin-block: 20px;
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .media-card .thumbnail img {
-    transition: scale 220ms var(--motion-ease);
-  }
-  .media-card:hover .thumbnail img {
-    scale: 1.025;
-  }
   .primary-button:hover > svg {
     translate: 1px 0;
   }
@@ -1698,7 +1694,6 @@ button {
 .media-grid:not(.list-layout) .thumbnail { aspect-ratio: var(--card-ratio,16 / 9); }
 .media-grid .thumbnail img { object-fit: var(--card-fit,cover); }
 .thumbnail { background: #080b0c; }
-@media (hover:hover) { .media-grid[data-thumbnail-fit="fit"] .media-card:hover .thumbnail img { transform: none; } }
 .project-tools { display: flex; gap: 8px; align-items: center; }
 .media-properties { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 14px; margin: 0; padding: 10px 16px; border-top: 1px solid var(--border); color: var(--muted); font: 10px/1.5 ui-monospace,monospace; }
 .media-properties div { display: flex; gap: 5px; }
@@ -1799,10 +1794,10 @@ button {
 /* Project identity is a quiet accent across the workspace, separate from review status. */
 .app-shell, .nav-drawer {
   --project-selection: linear-gradient(165deg,
-    color-mix(in srgb, var(--project-accent, #14b8a6) 5%, #222826),
-    color-mix(in srgb, var(--project-accent, #14b8a6) 4%, #191f1d) 48%,
-    color-mix(in srgb, var(--project-accent, #14b8a6) 2%, #101514));
-  --project-ink: color-mix(in srgb, var(--project-accent, #14b8a6) 20%, #dae1de);
+    color-mix(in srgb, var(--project-accent, #14b8a6) 3%, #1c2422),
+    color-mix(in srgb, var(--project-accent, #14b8a6) 2%, #151d1b) 48%,
+    color-mix(in srgb, var(--project-accent, #14b8a6) 1%, #101614));
+  --project-ink: color-mix(in srgb, var(--project-accent, #14b8a6) 12%, #dae1de);
   --project-edge-top: color-mix(in srgb, color-mix(in srgb, var(--project-accent, #14b8a6) 18%, #a8b5ae) 36%, transparent);
   --project-edge-side: color-mix(in srgb, var(--project-accent, #14b8a6) 16%, #26312d);
   --project-edge-bottom: color-mix(in srgb, var(--project-accent, #14b8a6) 10%, #17211d);
@@ -1817,8 +1812,8 @@ button {
 }
 :is(.app-shell, .nav-drawer) .project-tree .project-row.selected {
   background: linear-gradient(105deg,
-    color-mix(in srgb, var(--project-accent, #14b8a6) 12%, #303a36),
-    color-mix(in srgb, var(--project-accent, #14b8a6) 4%, #1b2420));
+    color-mix(in srgb, var(--project-accent, #14b8a6) 6%, #252e2a),
+    color-mix(in srgb, var(--project-accent, #14b8a6) 2%, #18211d));
 }
 .app-shell .project-heading .primary-button,
 .app-shell .empty-state .primary-button {
@@ -1848,6 +1843,24 @@ button {
 .app-shell .folder-card:hover {
   background: var(--project-selection);
 }
+
+/* Portal surfaces share the same smoked glass treatment. Keep the content behind
+   menus visible without lowering the opacity of their text and controls. */
+body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu,
+  .folder-menu, .playback-mode-menu, .import-options-popover, .import-queue-popover,
+  .notifications-popover, .appearance-popover, .bulk-tags-popover,
+  .stage1-select-content, .stage1-date-content) {
+  background: color-mix(in srgb, var(--raised) 58%, transparent);
+  backdrop-filter: blur(4px);
+  scrollbar-color: rgb(77 155 141 / 72%) transparent;
+  scrollbar-width: thin;
+}
+body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu,
+  .folder-menu, .playback-mode-menu, .import-options-popover, .import-queue-popover,
+  .notifications-popover, .appearance-popover, .bulk-tags-popover,
+  .stage1-select-content, .stage1-date-content)::-webkit-scrollbar {
+  width: 4px;
+}
 /* Tint the smoked shell only; papers and uploaded covers keep their original colors. */
 .app-shell .folder-artwork linearGradient[id$='-back'] stop:first-child {
   stop-color: color-mix(in srgb, var(--project-accent, #14b8a6) 7%, #292c2b);
@@ -1863,4 +1876,42 @@ button {
 }
 .app-shell .folder-artwork linearGradient[id$='-front'] stop:nth-child(4) {
   stop-color: color-mix(in srgb, var(--project-accent, #14b8a6) 8%, #363d3a);
+}
+
+/* Let navigation and workspace share one continuous surface. */
+.app-shell {
+  background:
+    radial-gradient(ellipse 85% 50% at 5% 0%, #171e1d 0%, transparent 72%),
+    linear-gradient(90deg, transparent 0%, rgb(0 0 0 / 15%) 42%, #000 100%),
+    linear-gradient(180deg, #131918 0%, #0a100e 55%, #000 100%);
+}
+.app-shell > .sidebar {
+  background: transparent;
+  border-right: 0;
+}
+.app-shell > main {
+  min-width: 0;
+  background: transparent;
+}
+.app-shell .topbar {
+  background: transparent;
+  border-bottom: 0;
+  box-shadow: none;
+}
+.app-shell .page-content {
+  min-height: calc(100svh - 58px);
+  margin: 0;
+  border-radius: 16px 0 0 0;
+  background: #000;
+}
+.app-shell .project-tree .count {
+  min-width: 18px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--project-accent, #14b8a6) 7%, transparent);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 760px) {
+  .app-shell .page-content { min-height: calc(100svh - 54px); border-radius: 0; }
 }

@@ -11,8 +11,8 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { basename, join } from "path";
 import { spawnSync } from "child_process";
 
-const API = "https://outline.serving.cloud/api";
-const DOC_ID = "258f2d90-aabf-4a0f-ba09-994669ce8ff3";
+const API = process.env.OUTLINE_API_URL?.replace(/\/$/, "");
+const DOC_ID = process.env.OUTLINE_DOC_ID;
 const ROOT = join(import.meta.dir);
 const SHOTS = join(ROOT, "screenshots");
 const OPTIMIZED = join(ROOT, ".outline-upload");
@@ -20,6 +20,9 @@ const KEY = process.env.OUTLINE_KEY?.trim();
 if (!KEY) {
   console.error("Missing OUTLINE_KEY — add it to .env.local (see .env.example)");
   process.exit(1);
+}
+if (!API || !DOC_ID) {
+  throw new Error("Set OUTLINE_API_URL and OUTLINE_DOC_ID for the intended documentation target");
 }
 
 type ImageItem = {
@@ -281,7 +284,7 @@ function buildMarkdown(ids: Record<string, string>) {
   }).join("\n\n---\n\n");
 
   return `
-This is the client / guest reviewer guide for **Review Room** (https://unfold-flower-gen.app).
+This is the client / guest reviewer guide for **Review Room** (https://review-room-svelte.vercel.app).
 
 Instructions are written as text so they stay searchable. Screenshots are tight crops of the control you need, with one teal box + arrow when a control needs pointing out.
 
@@ -373,7 +376,7 @@ async function main() {
     fullWidth: true,
   });
 
-  console.log("DONE", `https://outline.serving.cloud${info.data.url}`);
+  console.log("DONE", new URL(info.data.url, API).toString());
 }
 
 main().catch((err) => {

@@ -54,6 +54,7 @@ export const listVideosByToken = query({
         status: video.status, viewed: video.viewed, rating: video.rating,
         isSelect: video.isSelect, commentCount: video.commentCount,
         durationSec: video.durationSec, width: video.width, height: video.height,
+        hasPoster: Boolean(video.thumbnailKey),
         order: video.order, downloadEnabled: link.canDownload && video.downloadEnabled,
         annotationStrokes: video.annotationStrokes,
       }));

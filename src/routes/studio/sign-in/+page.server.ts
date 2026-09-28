@@ -4,7 +4,7 @@ import { ownerSignedIn, passwordMatches, startOwnerSession } from '$lib/server/o
 
 export const load: PageServerLoad = ({ cookies, setHeaders }) => {
   setHeaders({ 'cache-control': 'no-store', 'x-robots-tag': 'noindex' });
-  if (ownerSignedIn(cookies)) redirect(303, '/studio');
+  if (ownerSignedIn(cookies)) redirect(303, '/');
 };
 
 export const actions: Actions = {
@@ -12,6 +12,6 @@ export const actions: Actions = {
     const form = await request.formData();
     if (!passwordMatches(String(form.get('password') ?? ''))) return fail(401, { invalid: true });
     startOwnerSession(cookies);
-    redirect(303, '/studio');
+    redirect(303, '/');
   }
 };

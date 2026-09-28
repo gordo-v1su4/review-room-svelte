@@ -12,7 +12,7 @@ Review Room stores metadata in Convex and media in RustFS. Production Pindeck al
 
 | Layer | Choice |
 |-------|--------|
-| **Convex** | **Personal Review Room deployment:** `https://review-convex.v1su4.dev` (client), `https://review-convex-site.v1su4.dev` (HTTP/actions). Dedicated `review-room-svelte-convex` Compose project and volume on app-vm. Deploy with the matching `CONVEX_SELF_HOSTED_URL` and `CONVEX_SELF_HOSTED_ADMIN_KEY`. Never point this app at an Unfold or Pindeck instance. |
+| **Convex** | **Personal Review Room deployment:** `https://review-convex.v1su4.dev` (client), `https://review-convex-site.v1su4.dev` (HTTP/actions). Dedicated `review-room-svelte-convex` Compose project and volume on app-vm. Deploy with the matching `CONVEX_SELF_HOSTED_URL` and `CONVEX_SELF_HOSTED_ADMIN_KEY`. |
 | **Auth** | `@convex-dev/auth` with Password + Google + GitHub (Pindeck pattern). Admin role on `appUsers`. |
 | **Media uploads (browser)** | SvelteKit server upload sessions → private RustFS `review-room-svelte` bucket (`S3_*` env, path-style). Files over 50 MiB need multipart upload with parts below the proxied endpoint's request limit. The server verifies the stored object before finalizing the asset. |
 | **Media processing** | Homelab worker (`services/media-worker`) calls ffmpeg for thumbnail + sprite sheet; updates Convex `videos` keys. Can alternatively call `MEDIA_GATEWAY_URL` `/process-image` when `USE_MEDIA_GATEWAY=1`. |
@@ -43,9 +43,9 @@ Review Room stores metadata in Convex and media in RustFS. Production Pindeck al
 
 ## Consequences
 
-- `.env.local` is required for live dev; values must use the personal Review Room instance and scoped bucket credentials. Earlier local files may still point at Unfold and must never be used for deployment.
+- `.env.local` is required for live dev; values must use the personal Review Room instance and scoped bucket credentials.
 - Worker must run on a host with ffmpeg and network access to RustFS + Convex.
 
 ## Personal isolation, 2026-09-28
 
-The new backend is on app-vm at `/opt/review-room-svelte-convex` with its own Docker volume, Tailscale-bound ports `13230` and `13231`, and public Caddy routes above. The private RustFS bucket is `review-room-svelte`; the scoped service account can read and write only its `assets/*` keys. Instance and storage secrets are separate BWS `REVIEW_ROOM_*` records. Provisioning source is in `infra/personal-backend/`. No data or credentials were copied from Unfold.
+The new backend is on app-vm at `/opt/review-room-svelte-convex` with its own Docker volume, Tailscale-bound ports `13230` and `13231`, and public Caddy routes above. The private RustFS bucket is `review-room-svelte`; the scoped service account can read and write only its `assets/*` keys. Instance and storage secrets are separate BWS `REVIEW_ROOM_*` records. Provisioning source is in `infra/personal-backend/`.

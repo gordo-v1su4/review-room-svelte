@@ -4,11 +4,12 @@
   import { Archive, ImagePlus, Settings2, X } from 'lucide-svelte';
   import type { ProjectIdentity, ProjectIdentityDraft } from '$lib/project-identity';
 
-  let { project, canEdit, onSave, canArchive = false, onArchive, onArchiveFocus, open = $bindable(false) }: {
+  let { project, canEdit, onSave, canArchive = false, persistent = false, onArchive, onArchiveFocus, open = $bindable(false) }: {
     project: ProjectIdentity;
     canEdit: boolean;
     onSave: (draft: ProjectIdentityDraft) => Promise<void>;
     canArchive?: boolean;
+    persistent?: boolean;
     onArchive?: () => void;
     onArchiveFocus?: () => void;
     open?: boolean;
@@ -116,19 +117,19 @@
       archivedOnClose = false;
     }}>
       <div class="sheet-heading"><Dialog.Title class="dialog-title">Project settings</Dialog.Title><Dialog.Close class="identity-close" aria-label="Close project settings"><X size={17}/></Dialog.Close></div>
-      <Dialog.Description>Project identity. Changes are stored in this tab.</Dialog.Description>
+      <Dialog.Description>{persistent ? 'Project identity is saved privately.' : 'Project identity. Changes are stored in this tab.'}</Dialog.Description>
       <form onsubmit={save} aria-busy={busy}>
         <fieldset disabled={busy || !canEdit || confirmingArchive}>
           <label>Project name<input bind:this={nameInput} bind:value={name} required maxlength="100" autocomplete="off"/></label>
           <label>Client<input bind:value={clientName} maxlength="100" autocomplete="organization" placeholder="Optional"/></label>
           <label>Description<textarea bind:value={description} rows="3" maxlength="2000" placeholder="Optional"></textarea></label>
           <label class="color-field"><span>Brand color</span><input type="color" bind:value={brandColor}/><span class="color-value">{brandColor}</span></label>
-          <div class="banner-field">
+          {#if !persistent}<div class="banner-field">
             <span>Banner</span>
             {#if preview}<img class="banner-preview" src={preview} alt="Project banner preview"/>{/if}
             <input bind:this={bannerInput} type="file" accept="image/*" aria-label="Project banner image" hidden onchange={chooseBanner}/>
             <div class="banner-actions"><button type="button" onclick={() => bannerInput?.click()}><ImagePlus size={14}/>{preview ? 'Replace image' : 'Choose image'}</button><button type="button" disabled={!preview} onclick={removeBanner}>Remove</button></div>
-          </div>
+          </div>{/if}
         </fieldset>
         {#if error}<p class="identity-error" role="alert">{error}</p>{/if}
         {#if canEdit && canArchive && onArchive}
