@@ -1,190 +1,26 @@
-# Deploy — Vercel + homelab Convex + RustFS
+# Personal Review Room deployment
 
-Review Room uses **Next.js** (not Vite). Pindeck uses Vite; the URLs are the same, but the browser env names are different.
+This SvelteKit app runs at `https://review-room-svelte.vercel.app`. The private owner workspace is `/`; reviewers use private `/review/[token]` links. Publication is optional and requires an explicit owner action.
 
-## Production deployment contract
+## Dedicated services
 
-Review Room has two independent production deployment surfaces:
+| Setting | Required value |
+| --- | --- |
+| `REVIEW_ROOM_CONVEX_URL` | `https://review-convex.v1su4.dev` |
+| `CONVEX_SELF_HOSTED_URL` (deploy only) | `https://review-convex.v1su4.dev` |
+| `S3_ENDPOINT` | `https://s3.v1su4.dev` |
+| `S3_BUCKET` | `review-room-svelte` |
 
-| Surface | Production target | Automatic deployment |
-|---------|-------------------|----------------------|
-| Next.js frontend + API routes | Vercel / `https://unfold-flower-gen.app` | Vercel deploys pushes to `main` |
-| Convex schema + functions | Self-hosted / `https://unfold.serving.cloud` | `.github/workflows/deploy-convex.yml` deploys relevant pushes to `main` |
+The Convex deployment is the `review-room-svelte-convex` Compose project on app-vm with its own Docker volume. RustFS uses a private bucket and a service account scoped to this app. Deployment source and recovery notes are in `infra/personal-backend/`. Never substitute another application's Convex URL, admin key, bucket, or storage credentials.
 
-A Vercel deployment never publishes `convex/`. A cross-layer correction is complete only after both deployments succeed and the affected production role completes the final user-visible workflow.
+## Private Vercel settings
 
-The Convex workflow runs when `convex/**`, `convex.json`, `package.json`, `bun.lock`, or the workflow itself changes. It also supports a manual `workflow_dispatch` run. GitHub repository secrets must contain:
+Set `REVIEW_ROOM_CONVEX_ADMIN_KEY`, `REVIEW_ROOM_OWNER_PASSWORD`, `REVIEW_ROOM_SESSION_SECRET`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY` as private environment variables. Set the four endpoint values above, plus `S3_REGION=us-east-1`. The owner cookie and all Convex admin and S3 access stay server-side. Do not expose these as `PUBLIC_` or `NEXT_PUBLIC_` variables.
 
-- `CONVEX_SELF_HOSTED_URL` — must equal `https://unfold.serving.cloud`; the workflow refuses any other target.
-- `CONVEX_SELF_HOSTED_ADMIN_KEY` — the Review Room self-hosted deployment admin key.
+`src/lib/server/personal.ts` rejects any backend or bucket target outside the dedicated Review Room deployment. Missing settings fail with 503. The media worker also requires the dedicated Convex site URL (`https://review-convex-site.v1su4.dev`), bucket, and a nonempty worker secret.
 
-If the automatic workflow cannot run, deploy manually from a trusted checkout with the same variables in `.env.local`:
+## Deploy and verify
 
-```bash
-bun run deploy:convex
-```
+Use Bun for checks and the Vercel CLI. Deploy only a reviewed snapshot of the personal repository, preserving any unrelated local changes. Verify the production alias is Ready, then use the in-app browser to verify owner sign-in and the original workspace UI. Test private review, upload, explicit publication, replacement, revocation, and showcase against the deployed routes before closing the related Linear issues.
 
-After a cross-layer fix:
-
-1. Confirm the Vercel production deployment succeeded.
-2. Confirm the GitHub `Deploy Convex` run succeeded for the same `main` commit.
-3. Exercise the production workflow with the affected role and media/data type.
-4. Confirm the final persisted result, not only the absence of an error toast.
-
-## NEXT_PUBLIC_* for Review Room
-
-| Pindeck (Vite) | Review Room (Next.js) | Used by |
-|----------------|----------------------|---------|
-| `VITE_CONVEX_URL` | `NEXT_PUBLIC_CONVEX_URL` | Browser Convex client |
-| `VITE_CONVEX_SITE_URL` | `NEXT_PUBLIC_CONVEX_SITE_URL` | Docs / optional client |
-| — | (server only) | Next API routes |
-
-Use `NEXT_PUBLIC_*` in Review Room. If copying Pindeck env locally, run `scripts/use-homelab-env.ps1`; it reads Pindeck `VITE_*` values and writes Review Room `NEXT_PUBLIC_*` values. Do not keep duplicate `VITE_*` aliases in this repo.
-
-### Homelab vs local Convex
-
-For **self-hosted production** (pindeck pattern, Review Room deployment):
-
-- Set `NEXT_PUBLIC_CONVEX_URL=https://unfold.serving.cloud`
-- Set `NEXT_PUBLIC_CONVEX_SITE_URL=https://unfold-site.serving.cloud`
-- Set `CONVEX_SELF_HOSTED_URL` + `CONVEX_SELF_HOSTED_ADMIN_KEY` for `bun run deploy:convex`
-- **Remove** `CONVEX_DEPLOYMENT` if it points at anonymous local `127.0.0.1:3210` — that overrides homelab deploy
-
----
-
-## Vercel environment variables
-
-In the Vercel project → Settings → Environment Variables, set:
-
-### Browser (Production + Preview)
-
-| Variable | Example |
-|----------|---------|
-| `NEXT_PUBLIC_CONVEX_URL` | `https://unfold.serving.cloud` |
-| `NEXT_PUBLIC_CONVEX_SITE_URL` | `https://unfold-site.serving.cloud` |
-| `SITE_URL` | `https://your-app.vercel.app` (your Vercel URL after first deploy) |
-
-Vercel must use `NEXT_PUBLIC_*` for browser-exposed Convex URLs.
-
-### Server-only (never `NEXT_PUBLIC_`)
-
-| Variable | Purpose |
-|----------|---------|
-| `S3_ENDPOINT` | RustFS S3 API |
-| `S3_PUBLIC_BASE_URL` | Public object base |
-| `S3_BUCKET` | e.g. `unfold-review-room` (your bucket) |
-| `S3_ACCESS_KEY_ID` | RustFS key |
-| `S3_SECRET_ACCESS_KEY` | RustFS secret |
-| `S3_FORCE_PATH_STYLE` | `true` |
-| `MEDIA_WORKER_SECRET` | Shared secret for worker + `/api/media/enqueue` |
-| `MEDIA_WORKER_URL` | Homelab worker URL if not localhost; required for Vercel Production and Preview uploads to generate thumbnails/scrub sprites |
-
-Or, if using the media gateway instead of direct S3 presign: `MEDIA_GATEWAY_*` and `USE_MEDIA_GATEWAY=1`.
-
-**RustFS / S3 vars are not in Convex** — they stay on Vercel (Next presign routes) or your worker host.
-
----
-
-## JWT_PRIVATE_KEY (Convex Auth)
-
-Password sign-in is handled by **Convex Auth on the Convex backend**, not Next.js.
-
-`JWT_PRIVATE_KEY` in your local `.env.local` is **not** read by Convex functions. It must live on the **Convex deployment** (homelab dashboard or CLI).
-
-### Generate keys (once per deployment)
-
-From the project root:
-
-```bash
-bunx @convex-dev/auth
-```
-
-Follow prompts, or generate manually per [Convex Auth manual setup](https://labs.convex.dev/auth/setup/manual):
-
-```bash
-bunx jose-cli  # or use the generateKeys.mjs script from the docs
-```
-
-You need **two** variables on the Convex deployment:
-
-| Convex env var | Description |
-|----------------|-------------|
-| `JWT_PRIVATE_KEY` | PKCS#8 private key (`-----BEGIN PRIVATE KEY-----`) |
-| `JWKS` | JSON Web Key Set (matching public key) |
-
-### Set on self-hosted Convex
-
-With homelab admin key (same as pindeck deploy):
-
-```bash
-# CONVEX_SELF_HOSTED_URL and CONVEX_SELF_HOSTED_ADMIN_KEY in .env.local
-bunx convex env set JWT_PRIVATE_KEY -- "<paste PKCS8 key>"
-bunx convex env set JWKS '<paste jwks json>'
-bunx convex env set SITE_URL "https://your-app.vercel.app"
-```
-
-Also ensure `CONVEX_SITE_URL` on the backend matches your HTTP actions host (`https://unfold-site.serving.cloud`).
-
-### Google / GitHub (same as pindeck)
-
-On the **Convex deployment** env (not Vercel):
-
-| Variable | Purpose |
-|----------|---------|
-| `AUTH_GOOGLE_ID` | Google OAuth client ID |
-| `AUTH_GOOGLE_SECRET` | Google OAuth secret |
-| `AUTH_GITHUB_ID` | GitHub OAuth app ID |
-| `AUTH_GITHUB_SECRET` | GitHub OAuth secret |
-
-Review Room uses a separate homelab Convex deployment from pindeck. Reuse the same provider setup pattern, but set these on the Review Room deployment.
-
-OAuth redirect URIs in Google/GitHub consoles must include Convex Auth callback URLs on your **Convex site** host (see [Convex Auth docs](https://labs.convex.dev/auth)). `SITE_URL` should be your Review Room origin (`http://localhost:3000` locally, Vercel URL in prod).
-
-### Password reset email
-
-Review Room uses Convex Auth's two-step password reset flow: the user requests
-an 8-digit email code, then submits that code with a new password. Codes expire
-after 10 minutes, failed attempts are rate-limited by Convex Auth, and a
-successful reset invalidates the account's other sessions.
-
-Password reset delivery uses Resend over HTTPS. Set these on the **Unfold Convex
-deployment**, not Vercel:
-
-| Variable | Purpose |
-|----------|---------|
-| `AUTH_RESEND_KEY` | Resend API key with send access |
-| `AUTH_RESEND_FROM` | Verified sender: `Review Room <no-reply@mail.unfold-flower-gen.app>` |
-
-From the canonical Review Room checkout with the Unfold self-hosted URL and
-admin key in `.env.local`:
-
-```bash
-bunx convex env set AUTH_RESEND_KEY --from-file <one-use-key-file>
-bunx convex env set AUTH_RESEND_FROM "Review Room <no-reply@mail.unfold-flower-gen.app>"
-```
-
-Do not reuse the Pindeck Convex deployment or put the Resend key in tracked
-files. The durable key reference is BWS project `hermes_keys`, secret
-`PROXMOX_HOME_HOSTINGER_UNFOLD_CONVEX_PRIVATE_AUTH_RESEND_KEY`; the sender is
-mirrored as `PROXMOX_HOME_HOSTINGER_UNFOLD_CONVEX_AUTH_RESEND_FROM`. After
-setting the values and deploying `convex/`, confirm that “Forgot
-password?” appears, request a code for a password account, complete the reset,
-and verify that the new password works while the old password fails.
-
-### After Vercel deploy
-
-1. Deploy to Vercel → note the production URL.
-2. Set `SITE_URL` on **Convex** to that URL (auth redirects).
-3. Set `SITE_URL` on **Vercel** to the same value (optional, for any server-side links).
-
----
-
-## Quick checklist
-
-1. `.env.local`: homelab Convex URLs + RustFS `S3_*` or `MEDIA_GATEWAY_*`
-2. GitHub secrets: `CONVEX_SELF_HOSTED_URL` + `CONVEX_SELF_HOSTED_ADMIN_KEY`
-3. Push relevant changes to `main` and confirm the `Deploy Convex` workflow succeeds
-4. Convex deployment env: `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`, and `AUTH_RESEND_*` for password reset
-5. Vercel env: `NEXT_PUBLIC_CONVEX_URL`, `S3_*`, `SITE_URL`
-6. `bun run worker:media` on homelab (or set `MEDIA_WORKER_URL` on Vercel)
-7. For cross-layer fixes, verify the affected production flow only after both Vercel and Convex finish
+The old account and password reset guide does not apply to Stage 1. Stage 1 uses a private owner password and scoped reviewer links. Public sign-up and external OAuth are not configured.

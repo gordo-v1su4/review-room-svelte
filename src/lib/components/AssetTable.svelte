@@ -1,10 +1,10 @@
 <script lang="ts">
   import { Bookmark, Film, Image } from 'lucide-svelte';
-  import type { LocalAsset } from '$lib/review';
+  import type { ReviewAsset } from '$lib/review';
   import type { AssetReview, ReviewAction } from '$lib/review-session';
 
   let { assets, activeId, checkedIds = [], onSelect, onCheck, onReview, onDragStart, onDragEnd }: {
-    assets: readonly (LocalAsset & AssetReview)[];
+    assets: readonly (ReviewAsset & AssetReview)[];
     activeId: string | null;
     onDragStart?: (event: DragEvent, id: string) => void; onDragEnd?: () => void;
     checkedIds?: readonly string[];

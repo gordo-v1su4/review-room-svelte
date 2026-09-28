@@ -5,7 +5,7 @@ export type ImportRequest = { file: File; target: ImportTarget; destinationLabel
 export type ImportJob = ImportRequest & { id: string; status: 'queued' | 'preparing' | 'ready' | 'failed' | 'cancelled'; error?: string };
 type ImportPort = {
   prepare: (file: File, signal: AbortSignal) => Promise<LocalAsset>;
-  commit: (asset: LocalAsset, target: ImportTarget) => void;
+  commit: (asset: LocalAsset, target: ImportTarget) => void | Promise<void>;
   release: (asset: LocalAsset) => void;
   onChange: (jobs: readonly ImportJob[]) => void;
   concurrency?: number;
@@ -40,7 +40,7 @@ export function createImportQueue(port: ImportPort) {
     try {
       prepared = await port.prepare(job.file, controller.signal);
       if (disposed || controller.signal.aborted) return;
-      port.commit({ ...prepared, id: job.id }, job.target);
+      await port.commit({ ...prepared, id: job.id }, job.target);
       prepared = undefined;
       job.status = 'ready';
     } catch (error) {

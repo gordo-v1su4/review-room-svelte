@@ -1,4 +1,4 @@
-export const HOVER_FRAME_POSITIONS = 96;
+export const HOVER_FRAME_POSITIONS = 192;
 export const HOVER_FRAME_EDGE = 320;
 
 export type HoverFrame = { readonly width: number; readonly height: number; close(): void };

@@ -12,12 +12,12 @@ Review Room stores metadata in Convex and media in RustFS. Production Pindeck al
 
 | Layer | Choice |
 |-------|--------|
-| **Convex** | **Review Room deployment:** `https://unfold.serving.cloud` (client), `https://unfold-site.serving.cloud` (HTTP/actions). **Pindeck** uses `convex.serving.cloud` / `convex-site.serving.cloud` on the same VPS — separate instances, do not mix env vars. Deploy with `CONVEX_SELF_HOSTED_URL` + `CONVEX_SELF_HOSTED_ADMIN_KEY`. Do **not** set `CONVEX_DEPLOYMENT` from pindeck or local anonymous dev unless intentional. |
+| **Convex** | **Personal Review Room deployment:** `https://review-convex.v1su4.dev` (client), `https://review-convex-site.v1su4.dev` (HTTP/actions). Dedicated `review-room-svelte-convex` Compose project and volume on app-vm. Deploy with the matching `CONVEX_SELF_HOSTED_URL` and `CONVEX_SELF_HOSTED_ADMIN_KEY`. |
 | **Auth** | `@convex-dev/auth` with Password + Google + GitHub (Pindeck pattern). Admin role on `appUsers`. |
-| **Media uploads (browser)** | Next.js presign routes → RustFS S3 API (`S3_*` env, path-style). Files over 50 MiB use S3 multipart upload with 50 MiB parts so the proxied public endpoint stays below Cloudflare's 100 MB per-request limit. Fallback documented in `.env.example` for `MEDIA_GATEWAY_*` if presign is blocked by CORS. |
+| **Media uploads (browser)** | SvelteKit server upload sessions → private RustFS `review-room-svelte` bucket (`S3_*` env, path-style). Files over 50 MiB need multipart upload with parts below the proxied endpoint's request limit. The server verifies the stored object before finalizing the asset. |
 | **Media processing** | Homelab worker (`services/media-worker`) calls ffmpeg for thumbnail + sprite sheet; updates Convex `videos` keys. Can alternatively call `MEDIA_GATEWAY_URL` `/process-image` when `USE_MEDIA_GATEWAY=1`. |
 | **Public object URLs** | Presigned GET from Next.js, or `S3_PUBLIC_BASE_URL` + key when objects are public-read. |
-| **Frontend deploy** | Vercel (or `bun dev` locally); env points at homelab Convex + storage. |
+| **Frontend deploy** | Personal Vercel project `review-room-svelte` (or `bun dev` locally); env points only at the personal Convex instance and private bucket. |
 
 ## Homelab endpoint map (from Pindeck)
 
@@ -29,7 +29,7 @@ Review Room stores metadata in Convex and media in RustFS. Production Pindeck al
 | `CONVEX_SELF_HOSTED_ADMIN_KEY` | Deploy admin key (secret, not committed) |
 | `S3_ENDPOINT` | RustFS S3 API (e.g. `https://s3.v1su4.dev`) |
 | `S3_PUBLIC_BASE_URL` | Public read base (e.g. `https://s3.v1su4.dev`) |
-| `S3_BUCKET` | Bucket (e.g. `review-room`) |
+| `S3_BUCKET` | `review-room-svelte` |
 | `S3_FORCE_PATH_STYLE` | `true` for RustFS |
 | `MEDIA_GATEWAY_URL` | Optional: `https://media.v1su4.dev` |
 | `MEDIA_GATEWAY_TOKEN` | Bearer for gateway writes |
@@ -43,5 +43,9 @@ Review Room stores metadata in Convex and media in RustFS. Production Pindeck al
 
 ## Consequences
 
-- `.env.local` is required for dev; values mirror Pindeck homelab, not Convex Cloud templates.
+- `.env.local` is required for live dev; values must use the personal Review Room instance and scoped bucket credentials.
 - Worker must run on a host with ffmpeg and network access to RustFS + Convex.
+
+## Personal isolation, 2026-09-28
+
+The new backend is on app-vm at `/opt/review-room-svelte-convex` with its own Docker volume, Tailscale-bound ports `13230` and `13231`, and public Caddy routes above. The private RustFS bucket is `review-room-svelte`; the scoped service account can read and write only its `assets/*` keys. Instance and storage secrets are separate BWS `REVIEW_ROOM_*` records. Provisioning source is in `infra/personal-backend/`.

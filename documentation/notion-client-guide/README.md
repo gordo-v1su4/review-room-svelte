@@ -1,6 +1,6 @@
 # Review Room — Client How-To
 
-Guide for shared clients / guest reviewers on https://unfold-flower-gen.app.
+Archived draft guide. The current app is https://review-room-svelte.vercel.app. Verify each instruction against the deployed UI before sharing this guide with reviewers.
 
 **How this doc is written (ftrack-style):**
 - Instructions live in this text so they stay searchable.
@@ -8,7 +8,7 @@ Guide for shared clients / guest reviewers on https://unfold-flower-gen.app.
 - Images may have one teal box + arrow, or plain teal numbers (font ~40, no circles).
 - Do not bake step copy into the PNGs.
 
-**Outline:** https://outline.serving.cloud/doc/review-room-client-how-to-tyvVldHFgb
+Publishing this draft requires an explicitly configured `OUTLINE_API_URL` and `OUTLINE_DOC_ID`.
 
 ---
 

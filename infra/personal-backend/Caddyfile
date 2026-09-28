@@ -1,0 +1,7 @@
+review-convex.v1su4.dev {
+    reverse_proxy 127.0.0.1:13230
+}
+
+review-convex-site.v1su4.dev {
+    reverse_proxy 127.0.0.1:13231
+}
