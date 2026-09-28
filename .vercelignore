@@ -7,5 +7,7 @@
 !vercel.json
 !src
 !src/**
+!convex
+!convex/**
 **/.env*
 **/*.test.ts
