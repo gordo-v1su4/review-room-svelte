@@ -1,5 +1,5 @@
 <script lang="ts">let { data, form } = $props();</script>
-<svelte:head><title>Private review · Review Room</title><meta name="robots" content="noindex, nofollow" /><meta name="referrer" content="no-referrer" /></svelte:head>
+<svelte:head><title>Private review · Review Room</title><meta name="robots" content="noindex, nofollow" /><meta name="referrer" content="same-origin" /></svelte:head>
 <main class="shell">
   <header><p class="eyebrow">Private review</p><h1>{data.locked ? 'Enter your passcode' : data.project.project.title}</h1>
     {#if !data.locked && data.project.project.description}<p class="muted">{data.project.project.description}</p>{/if}</header>

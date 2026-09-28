@@ -7,7 +7,7 @@ import { dev } from '$app/environment';
 function cookieName(token: string) { return `rr_review_${token.slice(0, 24)}`; }
 
 export const load: PageServerLoad = async ({ params, cookies, setHeaders }) => {
-  setHeaders({ 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex, nofollow' });
+  setHeaders({ 'cache-control': 'private, no-store', 'referrer-policy': 'same-origin', 'x-robots-tag': 'noindex, nofollow' });
   const token = params.token;
   const state = await db().query(links.getAccessState, { token });
   if (!state.available) throw error(404, 'Review unavailable');
