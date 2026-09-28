@@ -16,6 +16,8 @@ import type * as http from "../http.js";
 import type * as inbox from "../inbox.js";
 import type * as lib_access from "../lib/access.js";
 import type * as lib_passwordReset from "../lib/passwordReset.js";
+import type * as lib_reviewAccess from "../lib/reviewAccess.js";
+import type * as personal from "../personal.js";
 import type * as projects from "../projects.js";
 import type * as reviewLinks from "../reviewLinks.js";
 import type * as reviewPublic from "../reviewPublic.js";
@@ -38,6 +40,8 @@ declare const fullApi: ApiFromModules<{
   inbox: typeof inbox;
   "lib/access": typeof lib_access;
   "lib/passwordReset": typeof lib_passwordReset;
+  "lib/reviewAccess": typeof lib_reviewAccess;
+  personal: typeof personal;
   projects: typeof projects;
   reviewLinks: typeof reviewLinks;
   reviewPublic: typeof reviewPublic;

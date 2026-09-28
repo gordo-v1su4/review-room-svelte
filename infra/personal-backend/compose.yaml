@@ -1,0 +1,30 @@
+name: review-room-svelte-convex
+services:
+  backend:
+    image: ghcr.io/get-convex/convex-backend@sha256:d9b46c8a7f4ed7724dc9325b7a215d6818953bf8b951c884eb916ae890e0e3c9
+    restart: unless-stopped
+    stop_signal: SIGINT
+    stop_grace_period: 30s
+    env_file: /opt/review-room-svelte-convex/private.env
+    environment:
+      INSTANCE_NAME: review-room-svelte
+      CONVEX_CLOUD_ORIGIN: https://review-convex.v1su4.dev
+      CONVEX_SITE_ORIGIN: https://review-convex-site.v1su4.dev
+      DISABLE_BEACON: "true"
+      DISABLE_METRICS_ENDPOINT: "true"
+    ports:
+      - "127.0.0.1:13230:3210"
+      - "100.118.78.13:13230:3210"
+      - "127.0.0.1:13231:3211"
+      - "100.118.78.13:13231:3211"
+    volumes:
+      - data:/convex/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3210/version"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+volumes:
+  data:
+    name: review-room-svelte-convex-data

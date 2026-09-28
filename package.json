@@ -13,16 +13,17 @@
     "docs:annotate": "bun documentation/notion-client-guide/marker-editor/server.ts"
   },
   "dependencies": {
+    "@auth/core": "^0.37.4",
+    "@aws-sdk/client-s3": "^3.1000.0",
+    "@aws-sdk/s3-request-presigner": "^3.1141.0",
+    "@convex-dev/auth": "^0.0.90",
     "@skeletonlabs/skeleton": "^4",
     "@sveltejs/kit": "^2",
     "bits-ui": "^2",
+    "convex": "^1.33.0",
     "lucide-svelte": "^0.577.0",
     "mediabunny": "^1.59.0",
-    "svelte": "^5",
-    "@auth/core": "^0.37.4",
-    "@aws-sdk/client-s3": "^3.1000.0",
-    "@convex-dev/auth": "^0.0.90",
-    "convex": "^1.33.0"
+    "svelte": "^5"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^6",

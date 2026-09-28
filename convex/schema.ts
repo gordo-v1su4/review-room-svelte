@@ -160,6 +160,7 @@ const applicationTables = {
         v.literal("error"),
       ),
     ),
+    currentVersionId: v.optional(v.id("assetVersions")),
   })
     .index("by_project", ["projectId"])
     .index("by_project_folder", ["projectId", "folderId"])
@@ -196,9 +197,13 @@ const applicationTables = {
     projectId: v.id("projects"),
     token: v.string(),
     passcodeHash: v.optional(v.string()),
+    passcodeSalt: v.optional(v.string()),
     canDownload: v.boolean(),
     appearance: v.optional(reviewAppearance),
     expiresAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    failedAttempts: v.optional(v.number()),
+    lockedUntil: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_token", ["token"])
@@ -207,8 +212,59 @@ const applicationTables = {
   reviewerSessions: defineTable({
     token: v.string(),
     displayName: v.string(),
+    accessKeyHash: v.string(),
+    expiresAt: v.number(),
     createdAt: v.number(),
-  }).index("by_token", ["token"]),
+  })
+    .index("by_token", ["token"])
+    .index("by_token_access_key_hash", ["token", "accessKeyHash"]),
+
+  assetVersions: defineTable({
+    assetId: v.id("videos"),
+    version: v.number(),
+    originalKey: v.string(),
+    posterKey: v.optional(v.string()),
+    mimeType: v.string(),
+    sizeBytes: v.number(),
+    etag: v.optional(v.string()),
+    processingState: v.union(v.literal("ready"), v.literal("error")),
+    createdAt: v.number(),
+  }).index("by_asset", ["assetId"]),
+
+  uploadSessions: defineTable({
+    projectId: v.id("projects"),
+    assetId: v.optional(v.id("videos")),
+    completedAssetId: v.optional(v.id("videos")),
+    objectKey: v.string(),
+    originalFilename: v.string(),
+    mimeType: v.string(),
+    sizeBytes: v.number(),
+    status: v.union(v.literal("pending"), v.literal("complete"), v.literal("failed")),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  }).index("by_project", ["projectId"]),
+
+  publications: defineTable({
+    assetId: v.id("videos"),
+    versionId: v.id("assetVersions"),
+    slug: v.string(),
+    allowedOrigins: v.array(v.string()),
+    revokedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_asset", ["assetId"]),
+
+  showcases: defineTable({
+    title: v.string(),
+    slug: v.string(),
+    publicationIds: v.array(v.id("publications")),
+    allowedOrigins: v.array(v.string()),
+    revokedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_slug", ["slug"]),
 
   workspacePreferences: defineTable({
     projectId: v.id("projects"),

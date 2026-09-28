@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { getReviewLink, getReviewerSession } from "./lib/reviewAccess";
 
 const annotationToolValidator = v.optional(
   v.union(
@@ -25,59 +26,50 @@ const annotationStrokeValidator = v.object({
   ),
 });
 
-async function getLink(ctx: QueryCtx, token: string) {
-  const link = await ctx.db
-    .query("reviewLinks")
-    .withIndex("by_token", (q) => q.eq("token", token))
-    .unique();
-  if (!link) throw new Error("Invalid review link");
-  if (link.expiresAt && link.expiresAt < Date.now()) {
-    throw new Error("Review link expired");
-  }
-  return link;
-}
-
 export const getProjectByToken = query({
-  args: { token: v.string() },
+  args: { token: v.string(), accessKey: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const link = await getLink(ctx, args.token);
-    const project = await ctx.db.get(link.projectId);
-    if (!project || project.archived) throw new Error("Project not found");
-    return { project, link };
+    const { link, project } = await getReviewLink(ctx, args.token, args.accessKey);
+    return {
+      project: { id: project._id, title: project.title, description: project.description },
+      link: { canDownload: link.canDownload, appearance: link.appearance },
+    };
   },
 });
 
 export const listVideosByToken = query({
-  args: { token: v.string() },
+  args: { token: v.string(), accessKey: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const link = await getLink(ctx, args.token);
+    const { link } = await getReviewLink(ctx, args.token, args.accessKey);
     const videos = await ctx.db
       .query("videos")
       .withIndex("by_project", (q) => q.eq("projectId", link.projectId))
       .collect();
     return videos
-      .filter((v) => v.status !== "archived")
-      .sort((a, b) => a.order - b.order);
+      .filter((video) => video.status !== "archived" && video.processingStatus === "ready")
+      .sort((a, b) => a.order - b.order)
+      .map((video) => ({
+        id: video._id, title: video.title, assetCode: video.assetCode,
+        assetClass: video.assetClass, mimeType: video.mimeType, sizeBytes: video.sizeBytes,
+        status: video.status, viewed: video.viewed, rating: video.rating,
+        isSelect: video.isSelect, commentCount: video.commentCount,
+        durationSec: video.durationSec, width: video.width, height: video.height,
+        order: video.order, downloadEnabled: link.canDownload && video.downloadEnabled,
+        annotationStrokes: video.annotationStrokes,
+      }));
   },
 });
 
 export const getReviewerName = query({
-  args: { token: v.string() },
+  args: { token: v.string(), accessKey: v.string() },
   handler: async (ctx, args) => {
-    const session = await ctx.db
-      .query("reviewerSessions")
-      .withIndex("by_token", (q) => q.eq("token", args.token))
-      .unique();
-    return session?.displayName ?? null;
+    await getReviewLink(ctx, args.token, args.accessKey);
+    return (await getReviewerSession(ctx, args.token, args.accessKey)).displayName;
   },
 });
 
-async function reviewerNameForToken(ctx: QueryCtx | MutationCtx, token: string) {
-  const session = await ctx.db
-    .query("reviewerSessions")
-    .withIndex("by_token", (q) => q.eq("token", token))
-    .unique();
-  return session?.displayName ?? "Reviewer";
+async function reviewerNameForToken(ctx: QueryCtx | MutationCtx, token: string, accessKey?: string) {
+  return accessKey ? (await getReviewerSession(ctx, token, accessKey)).displayName : "Reviewer";
 }
 
 async function withReactionSummaries(ctx: QueryCtx, comments: Doc<"comments">[]) {
@@ -101,31 +93,22 @@ async function withReactionSummaries(ctx: QueryCtx, comments: Doc<"comments">[])
 }
 
 export const setReviewerName = mutation({
-  args: { token: v.string(), displayName: v.string() },
+  args: { token: v.string(), accessKey: v.string(), displayName: v.string() },
   handler: async (ctx, args) => {
-    await getLink(ctx, args.token);
-    const existing = await ctx.db
-      .query("reviewerSessions")
-      .withIndex("by_token", (q) => q.eq("token", args.token))
-      .unique();
-    if (existing) {
-      await ctx.db.patch(existing._id, { displayName: args.displayName });
-      return;
-    }
-    await ctx.db.insert("reviewerSessions", {
-      token: args.token,
-      displayName: args.displayName,
-      createdAt: Date.now(),
-    });
+    await getReviewLink(ctx, args.token, args.accessKey);
+    const session = await getReviewerSession(ctx, args.token, args.accessKey);
+    const displayName = args.displayName.trim().slice(0, 100);
+    if (!displayName) throw new Error("Reviewer name required");
+    await ctx.db.patch(session._id, { displayName });
   },
 });
 
 export const clientMarkViewed = mutation({
-  args: { token: v.string(), videoId: v.id("videos") },
+  args: { token: v.string(), accessKey: v.optional(v.string()), videoId: v.id("videos") },
   handler: async (ctx, args) => {
-    const link = await getLink(ctx, args.token);
+    const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
     const video = await ctx.db.get(args.videoId);
-    if (!video || video.projectId !== link.projectId) {
+    if (!video || video.projectId !== link.projectId || video.status === "archived" || video.processingStatus !== "ready") {
       throw new Error("Video not found");
     }
     if (!video.viewed) {
@@ -137,11 +120,11 @@ export const clientMarkViewed = mutation({
 });
 
 export const clientSetRating = mutation({
-  args: { token: v.string(), videoId: v.id("videos"), rating: v.number() },
+  args: { token: v.string(), accessKey: v.optional(v.string()), videoId: v.id("videos"), rating: v.number() },
   handler: async (ctx, args) => {
-    const link = await getLink(ctx, args.token);
+    const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
     const video = await ctx.db.get(args.videoId);
-    if (!video || video.projectId !== link.projectId) {
+    if (!video || video.projectId !== link.projectId || video.status === "archived" || video.processingStatus !== "ready") {
       throw new Error("Video not found");
     }
     const rating = Math.max(0, Math.min(5, Math.round(args.rating)));
@@ -150,11 +133,11 @@ export const clientSetRating = mutation({
 });
 
 export const clientToggleSelect = mutation({
-  args: { token: v.string(), videoId: v.id("videos") },
+  args: { token: v.string(), accessKey: v.optional(v.string()), videoId: v.id("videos") },
   handler: async (ctx, args) => {
-    const link = await getLink(ctx, args.token);
+    const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
     const video = await ctx.db.get(args.videoId);
-    if (!video || video.projectId !== link.projectId) {
+    if (!video || video.projectId !== link.projectId || video.status === "archived" || video.processingStatus !== "ready") {
       throw new Error("Video not found");
     }
     await ctx.db.patch(args.videoId, {
@@ -166,14 +149,14 @@ export const clientToggleSelect = mutation({
 
 export const clientSaveAnnotations = mutation({
   args: {
-    token: v.string(),
+    token: v.string(), accessKey: v.optional(v.string()),
     videoId: v.id("videos"),
     strokes: v.array(annotationStrokeValidator),
   },
   handler: async (ctx, args) => {
-    const link = await getLink(ctx, args.token);
+    const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
     const video = await ctx.db.get(args.videoId);
-    if (!video || video.projectId !== link.projectId) {
+    if (!video || video.projectId !== link.projectId || video.status === "archived" || video.processingStatus !== "ready") {
       throw new Error("Video not found");
     }
     const strokes = normalizeStrokes(args.strokes);
@@ -194,15 +177,15 @@ const clientStatusValidator = v.union(
 
 export const clientSetStatus = mutation({
   args: {
-    token: v.string(),
+    token: v.string(), accessKey: v.optional(v.string()),
     videoId: v.id("videos"),
     status: clientStatusValidator,
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const link = await getLink(ctx, args.token);
+    const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
     const video = await ctx.db.get(args.videoId);
-    if (!video || video.projectId !== link.projectId) {
+    if (!video || video.projectId !== link.projectId || video.status === "archived" || video.processingStatus !== "ready") {
       throw new Error("Video not found");
     }
     const now = Date.now();
@@ -216,11 +199,11 @@ export const clientSetStatus = mutation({
 });
 
 export const clientApprove = mutation({
-  args: { token: v.string(), videoId: v.id("videos") },
+  args: { token: v.string(), accessKey: v.optional(v.string()), videoId: v.id("videos") },
   handler: async (ctx, args) => {
-    const link = await getLink(ctx, args.token);
+    const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
     const video = await ctx.db.get(args.videoId);
-    if (!video || video.projectId !== link.projectId) {
+    if (!video || video.projectId !== link.projectId || video.status === "archived" || video.processingStatus !== "ready") {
       throw new Error("Video not found");
     }
     const now = Date.now();
@@ -265,11 +248,11 @@ function normalizeStrokes(strokes: Array<{
 }
 
 export const clientRequestChanges = mutation({
-  args: { token: v.string(), videoId: v.id("videos") },
+  args: { token: v.string(), accessKey: v.optional(v.string()), videoId: v.id("videos") },
   handler: async (ctx, args) => {
-    const link = await getLink(ctx, args.token);
+    const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
     const video = await ctx.db.get(args.videoId);
-    if (!video || video.projectId !== link.projectId) {
+    if (!video || video.projectId !== link.projectId || video.status === "archived" || video.processingStatus !== "ready") {
       throw new Error("Video not found");
     }
     await ctx.db.patch(args.videoId, {
@@ -280,11 +263,11 @@ export const clientRequestChanges = mutation({
 });
 
 export const listCommentsByVideo = query({
-  args: { token: v.string(), videoId: v.id("videos") },
+  args: { token: v.string(), accessKey: v.optional(v.string()), videoId: v.id("videos") },
   handler: async (ctx, args) => {
-    const link = await getLink(ctx, args.token);
+    const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
     const video = await ctx.db.get(args.videoId);
-    if (!video || video.projectId !== link.projectId) {
+    if (!video || video.projectId !== link.projectId || video.status === "archived" || video.processingStatus !== "ready") {
       throw new Error("Video not found");
     }
     const comments = await ctx.db
@@ -300,18 +283,18 @@ export const listCommentsByVideo = query({
 
 export const clientAddComment = mutation({
   args: {
-    token: v.string(),
+    token: v.string(), accessKey: v.optional(v.string()),
     videoId: v.id("videos"),
     body: v.string(),
     timecodeSec: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const link = await getLink(ctx, args.token);
+    const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
     const video = await ctx.db.get(args.videoId);
-    if (!video || video.projectId !== link.projectId) {
+    if (!video || video.projectId !== link.projectId || video.status === "archived" || video.processingStatus !== "ready") {
       throw new Error("Video not found");
     }
-    const authorName = await reviewerNameForToken(ctx, args.token);
+    const authorName = await reviewerNameForToken(ctx, args.token, args.accessKey);
     await ctx.db.insert("comments", {
       videoId: args.videoId,
       projectId: video.projectId,
