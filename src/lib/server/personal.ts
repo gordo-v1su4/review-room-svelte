@@ -1,7 +1,7 @@
 import { ConvexHttpClient } from 'convex/browser';
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server';
 import { internal, api } from '../../../convex/_generated/api';
-import { S3Client, HeadObjectCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '$env/dynamic/private';
 import { error } from '@sveltejs/kit';
@@ -45,13 +45,32 @@ export async function uploadUrl(key: string, mimeType: string) {
 }
 
 export async function verifiedObject(key: string) {
-  return await storage().send(new HeadObjectCommand({ Bucket: bucket(), Key: key }));
+  const result = await storage().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+  if (!result.Body) throw error(404, 'Original unavailable');
+  await result.Body.transformToWebStream().cancel();
+  return result;
 }
 
 export async function mediaResponse(key: string, mimeType: string, range?: string) {
   try {
-    const result = await storage().send(new GetObjectCommand({ Bucket: bucket(), Key: key, Range: range }));
-    if (!result.Body) throw error(404, 'Media unavailable');
+    const result = await storage().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+    if (!result.Body || result.ContentLength === undefined) throw error(404, 'Media unavailable');
+    const total = result.ContentLength;
+    let start = 0;
+    let end = total - 1;
+    if (range) {
+      const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+      if (!match || (!match[1] && !match[2])) {
+        await result.Body.transformToWebStream().cancel();
+        return new Response(null, { status: 416, headers: { 'content-range': `bytes */${total}` } });
+      }
+      if (match[1]) { start = Number(match[1]); end = match[2] ? Math.min(Number(match[2]), total - 1) : total - 1; }
+      else { start = Math.max(0, total - Number(match[2])); }
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= total) {
+        await result.Body.transformToWebStream().cancel();
+        return new Response(null, { status: 416, headers: { 'content-range': `bytes */${total}` } });
+      }
+    }
     const headers = new Headers({
       'content-type': mimeType,
       'accept-ranges': 'bytes',
@@ -59,9 +78,27 @@ export async function mediaResponse(key: string, mimeType: string, range?: strin
       'x-content-type-options': 'nosniff',
       'cross-origin-resource-policy': 'same-origin'
     });
-    if (result.ContentLength !== undefined) headers.set('content-length', String(result.ContentLength));
-    if (result.ContentRange) headers.set('content-range', result.ContentRange);
-    return new Response(result.Body.transformToWebStream() as ReadableStream, { status: result.ContentRange ? 206 : 200, headers });
+    headers.set('content-length', String(end - start + 1));
+    if (range) headers.set('content-range', `bytes ${start}-${end}/${total}`);
+    const source = result.Body.transformToWebStream().getReader();
+    let offset = 0;
+    const body = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        while (offset <= end) {
+          const { done, value } = await source.read();
+          if (done) { controller.close(); return; }
+          const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
+          const from = Math.max(0, start - offset);
+          const to = Math.min(chunk.length, end - offset + 1);
+          offset += chunk.length;
+          if (from < to) { controller.enqueue(chunk.subarray(from, to)); return; }
+        }
+        await source.cancel();
+        controller.close();
+      },
+      async cancel() { await source.cancel(); }
+    });
+    return new Response(body, { status: range ? 206 : 200, headers });
   } catch (cause) {
     if ((cause as { name?: string }).name === 'NoSuchKey') throw error(404, 'Media unavailable');
     throw cause;
