@@ -4,7 +4,7 @@ Review Room has a separate Trigger.dev project, `proj_gtqdmodtodgdpjlpbpkr`, in 
 
 ## Deploy
 
-Deploy from VM100 Linux using the Review Room checkout and `bun run trigger:deploy`. The mode-600 `$HOME/.config/review-room/trigger-deploy.env` supplies an operator `TRIGGER_ACCESS_TOKEN`; the Trigger stack's mode-600 `.env` supplies local registry credentials. Both are private files and are never committed. Set `REVIEW_ROOM_CONVEX_URL=https://review-convex.v1su4.dev` in the dedicated project's production environment. The deployment script builds locally and pushes only this project's image to VM100's loopback registry.
+Deploy from VM100 Linux using the Review Room checkout and `bun run trigger:deploy`. The mode-600 `$HOME/.config/review-room/trigger-deploy.env` supplies an operator `TRIGGER_ACCESS_TOKEN`; the Trigger stack's mode-600 `.env` supplies local registry credentials. Both are private files and are never committed. The health task defaults to the personal Convex endpoint; set `REVIEW_ROOM_CONVEX_URL` in this project's environment if that endpoint changes. The deployment script builds locally and pushes only this project's image to VM100's loopback registry.
 
 Before deploy, confirm `https://trigger.v1su4.dev/healthcheck` and `https://review-convex.v1su4.dev/version` return success, check VM100 disk and memory, and verify other Trigger projects have healthy runs. Use `bun run trigger:deploy -- --dry-run` to test the build path. After deploy, trigger `review-room-service-health` with a canonical asset ID, then with `simulateFailure: true`; verify success and failure in this project's run history and verify the other projects remain healthy.
 
