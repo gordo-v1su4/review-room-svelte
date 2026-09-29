@@ -140,6 +140,8 @@ Dark cards on dark canvas, soft borders, subtle hover, thumbnail-first, minimal 
 
 States to specify across components: hover · selected · focus · disabled · uploading · error · reviewed · approved. Motion is smooth and quiet — panel open/close, card hover, tab switches. Optimistic UI where safe. Skeleton thumbnails on load. Persistent playback controls. Minimal blocking modals.
 
+The review toolbar groups a bookmark Shortlist control beside the rating stars. Both fill with teal when selected. Request changes, Approve, and asset navigation sit together on the right, wrapping as a group on narrow screens. Icon controls retain 44px touch targets on coarse-pointer devices.
+
 ## 15. Responsive intent
 
 Use the same routes and functionality on desktop, tablet, and phone; no separate mobile site. Preserve the calm desktop visual system while changing the arrangement to fit the available space.
@@ -151,6 +153,7 @@ The mobile project gradient continues behind the menu button, without a separate
 On phones, Review mode tucks secondary tools behind a toggle and sizes the player and primary controls to the remaining viewport. Comments and nearby media follow below. Card ratings occupy their own row to avoid overlapping thumbnail actions.
 
 - **Navigation:** below 1024px, a labelled menu opens a focus-managed drawer with Projects, Inbox, notifications, project folders, collections, and account actions. Folder management and new-project controls retain their existing role restrictions. Selecting a destination closes the drawer.
+- **Workspace switcher:** the sidebar identity uses a borderless, single-line name with a downward chevron immediately after it, matching the quiet Codex navigation reference. The wordmark, workspace name, and sidebar section headings share the same left text edge. The menu uses the same smoked panel treatment as Import options and the same restrained teal selection fill as the existing selects. It lists V1su4 as selected and shows Buzero as a disabled “Coming soon” option until its projects and access are connected. The same control appears in the mobile drawer.
 - **Project header and toolbar:** the project title keeps its own space; actions move to a separate row on phones. Below 640px, Grid / Group / Table / Review form a full-width switcher, with appearance, fields, filters, search, and sort on a second row. Controls wrap instead of clipping. Popovers scroll within the available viewport height.
 - **Media browsing:** grid tracks respond to the available pane width, including when a desktop inspector is open. Small screens use larger rating targets and expose thumbnail actions without hover. Table columns retain readable widths inside a labelled horizontal scroll region rather than squeezing into unreadable columns.
 - **Review:** desktop retains resizable panes. Below 1024px, Review mode uses a stacked player, review controls, comments/fields, and nearby-media strip. Selecting a card opens a fullscreen phone dialog or tablet side drawer, with comments below a viewport-bounded player. The dialog supports Escape, focus containment, and an explicit close button; desktop panel visibility preferences never suppress mobile review access.

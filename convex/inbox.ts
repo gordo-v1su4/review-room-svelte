@@ -93,7 +93,7 @@ export const listFeedbackDigests = query({
         folderId: video.folderId,
         assetClass: video.assetClass,
         assetCode: video.assetCode ?? video.title,
-        title: video.title,
+        title: video.assetCode ?? video.title,
         authorName: comment.authorName,
         authorRole: comment.authorRole,
         body: comment.body,

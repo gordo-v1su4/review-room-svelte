@@ -3,6 +3,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { getReviewLink, passcodeDigest, randomSecret } from "./lib/reviewAccess";
+import { reserveAssetNumber } from './lib/assetNumber';
 
 const OWNER_EMAIL = "owner@review-room.invalid";
 type Ctx = QueryCtx | MutationCtx;
@@ -202,11 +203,12 @@ export const finalizeUpload = internalMutation({
       const versions = await ctx.db.query("assetVersions").withIndex("by_asset", (q) => q.eq("assetId", assetId!)).collect();
       version = Math.max(0, ...versions.map((item) => item.version)) + 1;
     } else {
-      const number = project.nextAssetNumber ?? 1;
+      const number = await reserveAssetNumber(ctx, project.createdBy);
+      const assetCode = `VID_${new Date(now).toISOString().slice(0, 10).replaceAll("-", "")}_${String(number).padStart(5, "0")}`;
       assetId = await ctx.db.insert("videos", {
         projectId: project._id, assetClass: "VID", assetNumber: number,
-        assetCode: `VID_${new Date(now).toISOString().slice(0, 10).replaceAll("-", "")}_${String(number).padStart(5, "0")}`,
-        title: session.originalFilename, originalFilename: session.originalFilename,
+        assetCode,
+        title: assetCode, originalFilename: session.originalFilename,
         storageKey: session.objectKey, mimeType: session.mimeType, sizeBytes: session.sizeBytes,
         status: "awaiting_review", viewed: false, rating: 0, isSelect: false, commentCount: 0,
         tags: [], downloadEnabled: false, order: number, uploadedBy: profile._id,

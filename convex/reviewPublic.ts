@@ -49,7 +49,7 @@ export const listVideosByToken = query({
       .filter((video) => video.status !== "archived" && video.processingStatus === "ready")
       .sort((a, b) => a.order - b.order)
       .map((video) => ({
-        id: video._id, title: video.title, assetCode: video.assetCode,
+        id: video._id, title: video.assetCode ?? video.title, assetCode: video.assetCode,
         assetClass: video.assetClass, mimeType: video.mimeType, sizeBytes: video.sizeBytes,
         status: video.status, viewed: video.viewed, rating: video.rating,
         isSelect: video.isSelect, commentCount: video.commentCount,

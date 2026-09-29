@@ -7,7 +7,7 @@
   import type { PreviewInfo } from './accelerated/protocol';
   import { createScrubPreview } from './accelerated/preview';
   import { createGpuPreviewRenderer, type GpuPreviewRenderer } from './accelerated/gpu-renderer';
-  let { src, name, sourceBlob, mediaInfo, onready = (_: string) => {}, onended = (_: string) => {}, onfailure = (_: string) => {}, onViewed = () => {}, onmetadata = (_: PreviewInfo) => {}, ontime = (_: number) => {} }: { src: string; name: string; sourceBlob?: Blob; mediaInfo?: PreviewInfo; onready?: (source: string) => void; onended?: (source: string) => void; onfailure?: (source: string) => void; diagnostics?: boolean; onViewed?: () => void; onmetadata?: (info: PreviewInfo) => void; ontime?: (time: number) => void } = $props();
+  let { src, name, loop = false, sourceBlob, mediaInfo, onready = (_: string) => {}, onended = (_: string) => {}, onfailure = (_: string) => {}, onViewed = () => {}, onmetadata = (_: PreviewInfo) => {}, ontime = (_: number) => {} }: { src: string; name: string; loop?: boolean; sourceBlob?: Blob; mediaInfo?: PreviewInfo; onready?: (source: string) => void; onended?: (source: string) => void; onfailure?: (source: string) => void; diagnostics?: boolean; onViewed?: () => void; onmetadata?: (info: PreviewInfo) => void; ontime?: (time: number) => void } = $props();
   let video: HTMLVideoElement;
   let surface: HTMLDivElement;
   let paused = $state(true), muted = $state(false), time = $state(0), duration = $state(0);
@@ -228,7 +228,7 @@
   <div class="picture">
     <!-- The persistent media element survives layout changes. -->
     <!-- svelte-ignore a11y_media_has_caption -->
-    <video bind:this={video} use:attachMedia={src} {src} playsinline preload="metadata" aria-label={name}
+    <video bind:this={video} use:attachMedia={src} {src} {loop} playsinline preload="metadata" aria-label={name}
       onloadstart={() => { ready = false; error = ''; time = 0; duration = 0; }}
       onloadedmetadata={() => { duration = Number.isFinite(video.duration) ? video.duration : 0; mediaWidth = video.videoWidth; mediaHeight = video.videoHeight; }}
       onloadeddata={() => { ready = true; onready(video.currentSrc); }}
