@@ -119,6 +119,36 @@ const applicationTables = {
     updatedAt: v.number(),
   }).index("by_project", ["projectId"]),
 
+  automationCredentials: defineTable({
+    name: v.string(),
+    keyDigest: v.string(),
+    projectId: v.optional(v.id("projects")),
+    actions: v.array(v.string()),
+    createdBy: v.id("appUsers"),
+    createdAt: v.number(),
+    expiresAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    lastUsedAt: v.optional(v.number()),
+  }).index("by_digest", ["keyDigest"]),
+
+  automationRequests: defineTable({
+    credentialId: v.id("automationCredentials"),
+    requestKey: v.string(),
+    action: v.string(),
+    bodyDigest: v.string(),
+    result: v.string(),
+    createdAt: v.number(),
+  }).index("by_credential_key", ["credentialId", "requestKey"]),
+
+  automationAudit: defineTable({
+    credentialId: v.id("automationCredentials"),
+    action: v.string(),
+    requestKey: v.optional(v.string()),
+    targetId: v.optional(v.string()),
+    outcome: v.string(),
+    createdAt: v.number(),
+  }).index("by_credential", ["credentialId"]),
+
   videos: defineTable({
     projectId: v.id("projects"),
     folderId: v.optional(v.id("projectFolders")),
@@ -228,22 +258,43 @@ const applicationTables = {
     mimeType: v.string(),
     sizeBytes: v.number(),
     etag: v.optional(v.string()),
-    processingState: v.union(v.literal("ready"), v.literal("error")),
+    processingState: v.union(v.literal("processing"), v.literal("ready"), v.literal("error")),
     createdAt: v.number(),
   }).index("by_asset", ["assetId"]),
 
   uploadSessions: defineTable({
     projectId: v.id("projects"),
+    folderId: v.optional(v.id("projectFolders")),
+    automationCredentialId: v.optional(v.id("automationCredentials")),
     assetId: v.optional(v.id("videos")),
     completedAssetId: v.optional(v.id("videos")),
+    completedJobId: v.optional(v.id("mediaJobs")),
     objectKey: v.string(),
     originalFilename: v.string(),
     mimeType: v.string(),
     sizeBytes: v.number(),
     status: v.union(v.literal("pending"), v.literal("finalizing"), v.literal("complete"), v.literal("failed")),
+    finalizingAt: v.optional(v.number()),
     expiresAt: v.number(),
     createdAt: v.number(),
   }).index("by_project", ["projectId"]),
+
+  mediaJobs: defineTable({
+    assetId: v.id("videos"),
+    versionId: v.id("assetVersions"),
+    status: v.union(v.literal("queued"), v.literal("running"), v.literal("ready"), v.literal("error")),
+    stage: v.union(v.literal("verify"), v.literal("derivatives"), v.literal("finalize")),
+    attempt: v.number(),
+    runId: v.optional(v.string()),
+    error: v.optional(v.string()),
+    durationSec: v.optional(v.number()),
+    width: v.optional(v.number()),
+    height: v.optional(v.number()),
+    thumbnailKey: v.optional(v.string()),
+    spriteKey: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_asset", ["assetId"]).index("by_version", ["versionId"]),
 
   publications: defineTable({
     assetId: v.id("videos"),

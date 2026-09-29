@@ -1,25 +1,38 @@
-import { error, json } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 import type { Id } from '../../../../../convex/_generated/dataModel';
 import { requireOwner } from '$lib/server/owner-auth';
 import { db, personal, posterKey, removeUploadStaging, sealOriginal, sealPoster } from '$lib/server/personal';
+import { dispatchMediaJob } from '$lib/server/media-jobs';
 
 export const POST: RequestHandler = async ({ cookies, request }) => {
   requireOwner(cookies);
   const { sessionId, posterSizeBytes, durationSec, width, height } = await request.json();
   const session = await db().mutation(personal.claimUpload, { sessionId: String(sessionId) as Id<'uploadSessions'> });
+  if (session.status === 'complete' && session.completedAssetId) {
+    const dispatch = session.completedJobId
+      ? await dispatchMediaJob(session.completedJobId, 1)
+      : { dispatched: false as const, reason: 'Legacy upload has no media job' };
+    return json({ assetId: session.completedAssetId, jobId: session.completedJobId, ...dispatch },
+      { headers: { 'cache-control': 'no-store' } });
+  }
   try {
     const object = await sealOriginal(session.objectKey, session.mimeType, session.sizeBytes);
     await sealPoster(session.objectKey, Number(posterSizeBytes));
-    const assetId = await db().mutation(personal.finalizeUpload, {
+    const result = await db().mutation(personal.finalizeUpload, {
       sessionId: session._id, verifiedSizeBytes: object.sizeBytes, etag: object.etag,
-      posterKey: posterKey(session.objectKey), durationSec: Number(durationSec), width: Number(width), height: Number(height)
+      posterKey: posterKey(session.objectKey), durationSec: Number(durationSec), width: Number(width), height: Number(height),
+      processWithTrigger: !!env.REVIEW_ROOM_TRIGGER_SECRET_KEY,
     });
+    const { assetId, jobId } = typeof result === 'string' ? { assetId: result, jobId: undefined } : result;
     try { await removeUploadStaging(session.objectKey); }
     catch { console.error('Upload staging cleanup failed'); }
-    return json({ assetId }, { headers: { 'cache-control': 'no-store' } });
+    const dispatch = jobId ? await dispatchMediaJob(jobId, 1)
+      : { dispatched: false as const, reason: 'Trigger processing is not configured' };
+    return json({ assetId, jobId, ...dispatch }, { headers: { 'cache-control': 'no-store' } });
   } catch (cause) {
-    await db().mutation(personal.failUpload, { sessionId: session._id });
+    await db().mutation(personal.failUpload, { sessionId: session._id, finalizingAt: session.finalizingAt });
     throw cause;
   }
 };
