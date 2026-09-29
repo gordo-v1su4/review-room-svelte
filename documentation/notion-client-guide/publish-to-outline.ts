@@ -284,7 +284,7 @@ function buildMarkdown(ids: Record<string, string>) {
   }).join("\n\n---\n\n");
 
   return `
-This is the client / guest reviewer guide for **Review Room** (https://review-room-svelte.vercel.app).
+This is the client / guest reviewer guide for **Review Room** (https://review-room.v1su4.dev).
 
 Instructions are written as text so they stay searchable. Screenshots are tight crops of the control you need, with one teal box + arrow when a control needs pointing out.
 

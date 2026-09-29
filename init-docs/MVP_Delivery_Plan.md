@@ -37,6 +37,8 @@ isProject: false
 
 # Review Room — MVP delivery plan
 
+> Historical plan for the former app. The standalone Svelte deployment contract is in `docs/adr/001-infrastructure.md` and `docs/deploy-app-vm-and-auth.md`; the Next.js/Vercel steps below are not current instructions.
+
 **Source of truth:** [init-docs/00-Creative-Brief.md](init-docs/00-Creative-Brief.md), [init-docs/01-PRD.md](init-docs/01-PRD.md), [init-docs/02-Design-Spec.md](init-docs/02-Design-Spec.md)
 
 **Current state:** Application code is active in this repo. MVP stages are implemented on the Review Room app stack per PRD §3, with **your homelab infra overriding cloud defaults** (see Infrastructure section below). Use this plan as delivery/history guidance and keep PRD/Design Spec as the product source of truth.
@@ -483,4 +485,3 @@ From PRD §2 Phase 2 and Design Spec deferred items (~80+ SP if estimated later)
 3. Scaffold Stage 1 using **your** `CONVEX_URL` and `S3_`* from pindeck — no Convex Cloud or temp buckets.
 4. Launch **Wave 1**; run story **3.8** (CORS/TLS) before upload E2E.
 5. Do not start Phase B playback or List view until MVP acceptance 9.5 passes against homelab backends.
-

@@ -1,6 +1,6 @@
 # Review Room — Client How-To
 
-Archived draft guide. The current app is https://review-room-svelte.vercel.app. Verify each instruction against the deployed UI before sharing this guide with reviewers.
+Archived draft guide. The current app is https://review-room.v1su4.dev. Verify each instruction against the deployed UI before sharing this guide with reviewers.
 
 **How this doc is written (ftrack-style):**
 - Instructions live in this text so they stay searchable.

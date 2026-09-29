@@ -19,6 +19,6 @@ The explorer supports appearance controls, metadata fields, hover scrubbing, col
 - `convex/`, `services/media-worker/`: dedicated metadata and media-processing backends
 - `.scratch/svelte-migration/`: specification, tickets and acceptance evidence
 
-Deploy only to the dedicated App VM frontend and Review Room services. The sole Git remote is the personal `gordo-v1su4/review-room-svelte` repository. Never push or deploy to Buzero or the former React app. See [deployment guide](docs/deploy-vercel-and-auth.md).
+Deploy only to the dedicated App VM frontend and Review Room services. The sole Git remote is the personal `gordo-v1su4/review-room-svelte` repository. Never push or deploy to Buzero or the former React app. See [deployment guide](docs/deploy-app-vm-and-auth.md).
 
 The original Next.js app and its configuration have been removed. Historical feature comparisons use Git commit `301495d`; no second app or duplicate lockfile is required. See the [remaining work](.scratch/svelte-migration/remaining-work.md) for release gates.
