@@ -1,8 +1,16 @@
 # Review Room Trigger deployment
 
-Review Room has a separate Trigger.dev project, `proj_gtqdmodtodgdpjlpbpkr`, in the V1su4 organization at `https://trigger.v1su4.dev`. Its task queue is bounded to two concurrent runs. Payloads contain an asset ID and an optional smoke-test failure flag; media bytes stay outside Trigger.
+Review Room has a separate Trigger.dev project, `proj_gtqdmodtodgdpjlpbpkr`, in the V1su4 organization at `https://trigger.v1su4.dev`. Its health and ingest queues are bounded to two concurrent runs; FFmpeg derivatives are capped at one. Payloads contain job/asset IDs and stage metadata; media bytes stay in RustFS.
 
 The production application key is BWS `hermes_keys` / `REVIEW_ROOM_TRIGGER_SECRET_KEY` (expires 2026-12-28). Trigger labels it Full access within this Review Room project. Retrieve it with `agent-secrets run --secret=REVIEW_ROOM_TRIGGER_SECRET_KEY -- <command>`; do not copy its value into Git, the Hermes notebook, or command output.
+
+The Review Room production Trigger environment has seven redacted variables. Its three credential values come from existing BWS records: `REVIEW_ROOM_CONVEX_SELF_HOSTED_ADMIN_KEY` becomes `REVIEW_ROOM_CONVEX_ADMIN_KEY`, `REVIEW_ROOM_S3_ACCESS_KEY` becomes `S3_ACCESS_KEY_ID`, and `REVIEW_ROOM_S3_SECRET_KEY` becomes `S3_SECRET_ACCESS_KEY`. `REVIEW_ROOM_CONVEX_URL`, `S3_ENDPOINT`, `S3_BUCKET`, and `S3_REGION` select the personal services. The Svelte server uses `REVIEW_ROOM_TRIGGER_SECRET_KEY` to dispatch; when absent, uploads retain Stage 1 behavior.
+
+## Media ingest
+
+The canonical upload session seals the original and poster before creating one Convex `mediaJobs` record for the version. The Svelte server dispatches `review-room-ingest` with only the job ID and attempt. Trigger runs verify/inspect, derivative generation, and finalization as bounded child tasks. A deterministic version path in RustFS holds the thumbnail and sprite; Convex records their keys before the job becomes ready. The job's run ID, stage, status, and safe retry action appear in Review Room. An unavailable Trigger service leaves the sealed asset and queued job intact.
+
+Deploy Convex schema/functions before the updated Svelte app. The `processWithTrigger` finalize argument is optional so the prior frontend remains usable during rollout. Deploy Trigger tasks before adding the project key to the Svelte runtime. After all three surfaces are live, upload a small test video, confirm one asset/version/job, inspect each child run and the generated RustFS objects, then exercise failure and retry. Stage 1 publication still requires an explicit owner action and a ready version.
 
 ## Deploy
 

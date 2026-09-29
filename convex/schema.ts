@@ -228,7 +228,7 @@ const applicationTables = {
     mimeType: v.string(),
     sizeBytes: v.number(),
     etag: v.optional(v.string()),
-    processingState: v.union(v.literal("ready"), v.literal("error")),
+    processingState: v.union(v.literal("processing"), v.literal("ready"), v.literal("error")),
     createdAt: v.number(),
   }).index("by_asset", ["assetId"]),
 
@@ -236,6 +236,7 @@ const applicationTables = {
     projectId: v.id("projects"),
     assetId: v.optional(v.id("videos")),
     completedAssetId: v.optional(v.id("videos")),
+    completedJobId: v.optional(v.id("mediaJobs")),
     objectKey: v.string(),
     originalFilename: v.string(),
     mimeType: v.string(),
@@ -244,6 +245,23 @@ const applicationTables = {
     expiresAt: v.number(),
     createdAt: v.number(),
   }).index("by_project", ["projectId"]),
+
+  mediaJobs: defineTable({
+    assetId: v.id("videos"),
+    versionId: v.id("assetVersions"),
+    status: v.union(v.literal("queued"), v.literal("running"), v.literal("ready"), v.literal("error")),
+    stage: v.union(v.literal("verify"), v.literal("derivatives"), v.literal("finalize")),
+    attempt: v.number(),
+    runId: v.optional(v.string()),
+    error: v.optional(v.string()),
+    durationSec: v.optional(v.number()),
+    width: v.optional(v.number()),
+    height: v.optional(v.number()),
+    thumbnailKey: v.optional(v.string()),
+    spriteKey: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_asset", ["assetId"]).index("by_version", ["versionId"]),
 
   publications: defineTable({
     assetId: v.id("videos"),

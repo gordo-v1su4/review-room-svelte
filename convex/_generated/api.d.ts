@@ -18,6 +18,7 @@ import type * as lib_access from "../lib/access.js";
 import type * as lib_assetNumber from "../lib/assetNumber.js";
 import type * as lib_passwordReset from "../lib/passwordReset.js";
 import type * as lib_reviewAccess from "../lib/reviewAccess.js";
+import type * as mediaJobs from "../mediaJobs.js";
 import type * as personal from "../personal.js";
 import type * as projects from "../projects.js";
 import type * as reviewLinks from "../reviewLinks.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   "lib/assetNumber": typeof lib_assetNumber;
   "lib/passwordReset": typeof lib_passwordReset;
   "lib/reviewAccess": typeof lib_reviewAccess;
+  mediaJobs: typeof mediaJobs;
   personal: typeof personal;
   projects: typeof projects;
   reviewLinks: typeof reviewLinks;

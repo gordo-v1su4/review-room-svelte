@@ -43,6 +43,8 @@ export const snapshot = internalQuery({
       .withIndex("by_project", (q) => q.eq("projectId", project._id)).collect()))).flat();
     const versions = (await Promise.all(assets.map((asset) => ctx.db.query("assetVersions")
       .withIndex("by_asset", (q) => q.eq("assetId", asset._id)).collect()))).flat();
+    const mediaJobs = (await Promise.all(assets.map((asset) => ctx.db.query("mediaJobs")
+      .withIndex("by_asset", (q) => q.eq("assetId", asset._id)).collect()))).flat();
     const comments = (await Promise.all(assets.map((asset) => ctx.db.query('comments')
       .withIndex('by_video', (q) => q.eq('videoId', asset._id)).collect()))).flat();
     const publications = (await ctx.db.query("publications").collect())
@@ -53,7 +55,7 @@ export const snapshot = internalQuery({
       .map(({ _id, projectId, token, canDownload, expiresAt, revokedAt, createdAt }) => ({
         _id, projectId, token, canDownload, expiresAt, revokedAt, createdAt,
       }));
-    return { projects, assets, versions, comments, publications, showcases, links, projectIds: Array.from(projectIds) };
+    return { projects, assets, versions, mediaJobs, comments, publications, showcases, links, projectIds: Array.from(projectIds) };
   },
 });
 
@@ -84,6 +86,8 @@ export const deleteUnpublishedAsset = internalMutation({
       if (session.assetId === asset._id || session.completedAssetId === asset._id) await ctx.db.delete(session._id);
     }
     for (const version of versions) await ctx.db.delete(version._id);
+    const jobs = await ctx.db.query('mediaJobs').withIndex('by_asset', q => q.eq('assetId', asset._id)).collect();
+    for (const job of jobs) await ctx.db.delete(job._id);
     await ctx.db.delete(asset._id);
     return { deletedAssetId: asset._id, deletedVersions: versions.length };
   },
@@ -162,6 +166,7 @@ export const claimUpload = internalMutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) throw new Error('Upload session unavailable');
     await ownedProject(ctx, session.projectId);
+    if (session.status === 'complete' && session.completedAssetId) return session;
     if (session.status !== 'pending' || session.expiresAt <= Date.now()) throw new Error('Upload session unavailable');
     await ctx.db.patch(session._id, { status: 'finalizing' });
     return session;
@@ -179,12 +184,16 @@ export const failUpload = internalMutation({
 });
 
 export const finalizeUpload = internalMutation({
-  args: { sessionId: v.id("uploadSessions"), verifiedSizeBytes: v.number(), etag: v.optional(v.string()), posterKey: v.string(), durationSec: v.number(), width: v.number(), height: v.number() },
+  args: { sessionId: v.id("uploadSessions"), verifiedSizeBytes: v.number(), etag: v.optional(v.string()), posterKey: v.string(), durationSec: v.number(), width: v.number(), height: v.number(), processWithTrigger: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
     if (!session) throw new Error("Upload session unavailable");
     const { profile, project } = await ownedProject(ctx, session.projectId);
-    if (session.status === "complete" && session.completedAssetId) return session.completedAssetId;
+    if (session.status === "complete" && session.completedAssetId) {
+      return args.processWithTrigger
+        ? { assetId: session.completedAssetId, jobId: session.completedJobId }
+        : session.completedAssetId;
+    }
     if (session.status !== "finalizing" || session.expiresAt <= Date.now() || session.sizeBytes !== args.verifiedSizeBytes) {
       throw new Error("Upload verification failed");
     }
@@ -212,23 +221,27 @@ export const finalizeUpload = internalMutation({
         storageKey: session.objectKey, mimeType: session.mimeType, sizeBytes: session.sizeBytes,
         status: "awaiting_review", viewed: false, rating: 0, isSelect: false, commentCount: 0,
         tags: [], downloadEnabled: false, order: number, uploadedBy: profile._id,
-        uploadedAt: now, updatedAt: now, processingStatus: "ready",
+        uploadedAt: now, updatedAt: now, processingStatus: args.processWithTrigger ? "processing" : "ready",
       });
       await ctx.db.patch(project._id, { nextAssetNumber: number + 1, updatedAt: now });
     }
     const versionId = await ctx.db.insert("assetVersions", {
       assetId, version, originalKey: session.objectKey, posterKey: args.posterKey,
       mimeType: session.mimeType, sizeBytes: session.sizeBytes, etag: args.etag,
-      processingState: "ready", createdAt: now,
+      processingState: args.processWithTrigger ? "processing" : "ready", createdAt: now,
     });
     await ctx.db.patch(assetId, {
       currentVersionId: versionId, storageKey: session.objectKey, thumbnailKey: args.posterKey,
       originalFilename: session.originalFilename, mimeType: session.mimeType,
-        sizeBytes: session.sizeBytes, processingStatus: "ready", updatedAt: now,
+        sizeBytes: session.sizeBytes, processingStatus: args.processWithTrigger ? "processing" : "ready", updatedAt: now,
       durationSec: args.durationSec, width: args.width, height: args.height,
     });
-    await ctx.db.patch(session._id, { status: "complete", completedAssetId: assetId });
-    return assetId;
+    const jobId = args.processWithTrigger ? await ctx.db.insert('mediaJobs', {
+      assetId, versionId, status: 'queued', stage: 'verify', attempt: 1,
+      createdAt: now, updatedAt: now,
+    }) : undefined;
+    await ctx.db.patch(session._id, { status: "complete", completedAssetId: assetId, completedJobId: jobId });
+    return args.processWithTrigger ? { assetId, jobId } : assetId;
   },
 });
 
