@@ -2,7 +2,7 @@ import { convexAuth, getAuthUserId } from "@convex-dev/auth/server";
 import { Password } from "@convex-dev/auth/providers/Password";
 import Google from "@auth/core/providers/google";
 import GitHub from "@auth/core/providers/github";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import {
   isPasswordResetEnabled,
@@ -30,7 +30,8 @@ export const oauthProviders = query({
 
 function emailAllowed(email?: string) {
   const raw = process.env.AUTH_EMAIL_ALLOWLIST?.trim();
-  if (!raw) return true;
+  // An unset allowlist must never turn account creation into admin access.
+  if (!raw) return false;
   if (!email) return false;
 
   const normalizedEmail = email.toLowerCase();
@@ -70,18 +71,16 @@ export const loggedInAuthUser = query({
   },
 });
 
-export const ensureAdminProfile = mutation({
-  args: { name: v.optional(v.string()) },
+export const bootstrapOwner = internalMutation({
+  args: { authUserId: v.id("users") },
   handler: async (ctx, args) => {
-    const authUserId = await getAuthUserId(ctx);
-    if (!authUserId) throw new Error("Not authenticated");
-    const authUser = await ctx.db.get(authUserId);
-    if (!emailAllowed(authUser?.email)) {
+    const authUser = await ctx.db.get(args.authUserId);
+    if (!authUser || !emailAllowed(authUser.email)) {
       throw new Error("This email is not allowed to access Review Room");
     }
     const existing = await ctx.db
       .query("appUsers")
-      .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
+      .withIndex("by_auth_user", (q) => q.eq("authUserId", args.authUserId))
       .unique();
     if (existing) {
       if (existing.role !== "admin") {
@@ -89,15 +88,18 @@ export const ensureAdminProfile = mutation({
       }
       return existing._id;
     }
+    const users = await ctx.db.query("appUsers").collect();
+    if (users.some((user) => user.role === "admin")) {
+      throw new Error("The owner account is already initialized");
+    }
 
     const name =
-      args.name ??
-      authUser?.name ??
+      authUser.name ??
       authUser?.email?.split("@")[0] ??
       "Admin";
 
     return await ctx.db.insert("appUsers", {
-      authUserId,
+      authUserId: args.authUserId,
       name,
       role: "admin",
     });

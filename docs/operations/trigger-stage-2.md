@@ -2,7 +2,7 @@
 
 Review Room has a separate Trigger.dev project, `proj_gtqdmodtodgdpjlpbpkr`, in the V1su4 organization at `https://trigger.v1su4.dev`. Its health and ingest queues are bounded to two concurrent runs; FFmpeg derivatives are capped at one. Payloads contain job/asset IDs and stage metadata; media bytes stay in RustFS.
 
-The production application key is BWS `hermes_keys` / `REVIEW_ROOM_TRIGGER_SECRET_KEY` (expires 2026-12-28). Trigger labels it Full access within this Review Room project. Retrieve it with `agent-secrets run --secret=REVIEW_ROOM_TRIGGER_SECRET_KEY -- <command>`; do not copy its value into Git, the Hermes notebook, or command output. It is installed as a Secret in the personal Vercel project's Production environment.
+The production application key is BWS `hermes_keys` / `REVIEW_ROOM_TRIGGER_SECRET_KEY` (expires 2026-12-28). Trigger labels it Full access within this Review Room project. Retrieve it with `agent-secrets run --secret=REVIEW_ROOM_TRIGGER_SECRET_KEY -- <command>`; do not copy its value into Git, the Hermes notebook, or command output. It is installed in the App VM frontend's root-owned private environment.
 
 The Review Room production Trigger environment has seven redacted variables. Its three credential values come from existing BWS records: `REVIEW_ROOM_CONVEX_SELF_HOSTED_ADMIN_KEY` becomes `REVIEW_ROOM_CONVEX_ADMIN_KEY`, `REVIEW_ROOM_S3_ACCESS_KEY` becomes `S3_ACCESS_KEY_ID`, and `REVIEW_ROOM_S3_SECRET_KEY` becomes `S3_SECRET_ACCESS_KEY`. `REVIEW_ROOM_CONVEX_URL`, `S3_ENDPOINT`, `S3_BUCKET`, and `S3_REGION` select the personal services. The Svelte server uses `REVIEW_ROOM_TRIGGER_SECRET_KEY` to dispatch; when absent, uploads retain Stage 1 behavior.
 

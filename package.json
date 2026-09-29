@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@markerjs/markerjs3": "^3.10.0",
-    "@sveltejs/adapter-auto": "^6",
+    "@sveltejs/adapter-node": "^5.5.7",
     "@sveltejs/vite-plugin-svelte": "^6",
     "@tailwindcss/vite": "^4",
     "@trigger.dev/build": "4.6.3",

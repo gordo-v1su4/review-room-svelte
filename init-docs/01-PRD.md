@@ -41,7 +41,7 @@ type UserRole = "admin" | "client";
 
 ## 3. Stack
 
-SvelteKit · Svelte 5 · TypeScript · **Convex** for metadata and state · S3-compatible storage (**RustFS** on homelab). The grid is the primary media surface; the compact table is an operational view of the same assets. **Default infra:** personal self-hosted Convex + private RustFS (see [docs/adr/001-infrastructure.md](../docs/adr/001-infrastructure.md)). Vercel serves the frontend. Trigger.dev coordinates Stage 2 media ingest; its workers run FFmpeg on VM100, not on Vercel. Do not use `*.convex.cloud` or throwaway S3 buckets unless explicitly opted in.
+SvelteKit · Svelte 5 · TypeScript · **Convex** for metadata and state · S3-compatible storage (**RustFS** on homelab). The grid is the primary media surface; the compact table is an operational view of the same assets. **Default infra:** dedicated App VM frontend, personal self-hosted Convex, and private RustFS (see [docs/adr/001-infrastructure.md](../docs/adr/001-infrastructure.md)). Trigger.dev coordinates Stage 2 media ingest; its workers run FFmpeg on VM100. Do not use `*.convex.cloud` or throwaway S3 buckets unless explicitly opted in.
 
 ## 4. Organizing model — metadata-driven, drag optional
 

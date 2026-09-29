@@ -1,0 +1,22 @@
+name: review-room-svelte-app
+services:
+  app:
+    build:
+      context: ../..
+    restart: unless-stopped
+    env_file:
+      - path: /opt/review-room-svelte-app/private.env
+        format: raw
+    environment:
+      ORIGIN: https://review-room.v1su4.dev
+      REVIEW_ROOM_OWNER_EMAIL: gordo@v1su4.com
+      HOST: 0.0.0.0
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:18094:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/sign-in').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
