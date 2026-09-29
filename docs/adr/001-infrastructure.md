@@ -13,11 +13,11 @@ Review Room stores metadata in its dedicated self-hosted Convex deployment and m
 | Layer | Choice |
 |-------|--------|
 | **Convex** | **Personal Review Room deployment:** `https://review-convex.v1su4.dev` (client), `https://review-convex-site.v1su4.dev` (HTTP/actions). Dedicated `review-room-svelte-convex` Compose project and volume on app-vm. Deploy with the matching `CONVEX_SELF_HOSTED_URL` and `CONVEX_SELF_HOSTED_ADMIN_KEY`. |
-| **Auth** | `@convex-dev/auth` with Password + Google + GitHub (Pindeck pattern). Admin role on `appUsers`. |
+| **Auth** | `@convex-dev/auth` email/password is the working owner method. GitHub and Google providers remain unavailable in UI until their OAuth credentials and callbacks are verified. The first owner account is created through the current owner password and a private Convex bootstrap; a public account cannot promote itself to admin. |
 | **Media uploads (browser)** | SvelteKit server upload sessions → private RustFS `review-room-svelte` bucket (`S3_*` env, path-style). Files over 50 MiB need multipart upload with parts below the proxied endpoint's request limit. The server verifies the stored object before finalizing the asset. |
 | **Media processing** | Dedicated Review Room Trigger.dev project on VM100 runs bounded FFmpeg ingest stages and updates this app's Convex records. |
 | **Media access** | SvelteKit issues time-limited presigned RustFS URLs from the private Review Room bucket. |
-| **Frontend deploy** | Personal Vercel project `review-room-svelte` (or `bun dev` locally); env points only at the personal Convex instance and private bucket. |
+| **Frontend deploy** | Dedicated SvelteKit container on App VM, fronted by `https://review-room.v1su4.dev`; Compose source is `infra/app-vm/compose.yaml`. Its credentials target only the personal Convex instance and private bucket. |
 
 ## Review Room environment
 
@@ -33,6 +33,8 @@ Review Room stores metadata in its dedicated self-hosted Convex deployment and m
 | `S3_BUCKET` | `review-room-svelte` |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Scoped Review Room storage credential; secret, server-side only |
 | `REVIEW_ROOM_TRIGGER_SECRET_KEY` | Dispatch into the dedicated Review Room Trigger project; secret, server-side only |
+| `REVIEW_ROOM_OWNER_EMAIL` | Exact email permitted in the one-time owner setup form |
+| `AUTH_EMAIL_ALLOWLIST` | Convex-side owner bootstrap allowlist; must explicitly include the owner email |
 
 ## CORS / TLS
 

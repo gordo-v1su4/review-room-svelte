@@ -9,6 +9,7 @@ services:
         format: raw
     environment:
       ORIGIN: https://review-room.v1su4.dev
+      REVIEW_ROOM_OWNER_EMAIL: gordo@v1su4.com
       HOST: 0.0.0.0
       PORT: "3000"
     ports:
