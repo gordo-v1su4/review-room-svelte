@@ -19,7 +19,7 @@
     </form>
   {:else}
     <form method="POST" action="?/create" class="fields">
-      <p class="hint">Create the first owner account with the current owner password.</p>
+      <p class="hint">Create your owner account with the current owner password.</p>
       <label for="setup-email">Owner email</label><input id="setup-email" type="email" name="email" autocomplete="username" required />
       <label for="setup-password">New password</label><input id="setup-password" type="password" name="password" autocomplete="new-password" minlength="8" required />
       <label for="owner-password">Current owner password</label><input id="owner-password" type="password" name="ownerPassword" autocomplete="current-password" required />

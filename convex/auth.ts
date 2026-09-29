@@ -88,11 +88,6 @@ export const bootstrapOwner = internalMutation({
       }
       return existing._id;
     }
-    const users = await ctx.db.query("appUsers").collect();
-    if (users.some((user) => user.role === "admin")) {
-      throw new Error("The owner account is already initialized");
-    }
-
     const name =
       authUser.name ??
       authUser?.email?.split("@")[0] ??
