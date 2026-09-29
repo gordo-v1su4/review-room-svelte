@@ -15,6 +15,7 @@ import type * as folders from "../folders.js";
 import type * as http from "../http.js";
 import type * as inbox from "../inbox.js";
 import type * as lib_access from "../lib/access.js";
+import type * as lib_assetNumber from "../lib/assetNumber.js";
 import type * as lib_passwordReset from "../lib/passwordReset.js";
 import type * as lib_reviewAccess from "../lib/reviewAccess.js";
 import type * as personal from "../personal.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   inbox: typeof inbox;
   "lib/access": typeof lib_access;
+  "lib/assetNumber": typeof lib_assetNumber;
   "lib/passwordReset": typeof lib_passwordReset;
   "lib/reviewAccess": typeof lib_reviewAccess;
   personal: typeof personal;
