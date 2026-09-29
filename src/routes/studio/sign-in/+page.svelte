@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { form } = $props();
+  let { data, form } = $props();
   let setup = $state(false);
   let showSetup = $derived(setup || Boolean(form?.setupInvalid));
 </script>
@@ -28,7 +28,7 @@
     </form>
   {/if}
 
-  <button class="mode" type="button" onclick={() => showSetup ? location.assign('/studio/sign-in') : setup = true}>{showSetup ? 'Back to sign in' : 'Set up owner account'}</button>
+  {#if !data.ownerReady || showSetup}<button class="mode" type="button" onclick={() => showSetup ? location.assign('/studio/sign-in') : setup = true}>{showSetup ? 'Back to sign in' : 'Set up owner account'}</button>{/if}
   <details class="legacy"><summary>Use current owner password</summary><form method="POST" action="?/legacy" class="fields"><label for="legacy-password">Owner password</label><input id="legacy-password" type="password" name="password" autocomplete="current-password" required />{#if form?.legacyInvalid}<p class="error" role="alert">Password not accepted.</p>{/if}<button type="submit">Continue</button></form></details>
 </main>
 

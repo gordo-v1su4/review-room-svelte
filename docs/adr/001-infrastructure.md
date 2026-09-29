@@ -50,3 +50,5 @@ Review Room stores metadata in its dedicated self-hosted Convex deployment and m
 ## Personal isolation, 2026-09-28
 
 The new backend is on app-vm at `/opt/review-room-svelte-convex` with its own Docker volume, Tailscale-bound ports `13230` and `13231`, and public Caddy routes above. The private RustFS bucket is `review-room-svelte`; the scoped service account can read and write only its `assets/*` keys. Instance and storage secrets are separate BWS `REVIEW_ROOM_*` records. Provisioning source is in `infra/personal-backend/`.
+
+The backend's `owner@review-room.invalid` user is a synthetic record owner for internal project and asset operations; it has no password account or auth session. The real owner email authenticates through Convex, gains an admin profile through the private App VM bootstrap, and receives the server owner session used by the current Svelte routes. Replacing the synthetic record owner requires a separate data migration, not account setup.

@@ -18,7 +18,7 @@ function authClient() {
 export const load: PageServerLoad = async ({ cookies, setHeaders }) => {
   setHeaders({ 'cache-control': 'no-store', 'x-robots-tag': 'noindex' });
   if (ownerSignedIn(cookies)) redirect(303, '/');
-  return { providers: await authClient().query(api.auth.oauthProviders, {}) };
+  return { ownerReady: await authClient().query(api.auth.ownerReady, {}) };
 };
 
 export const actions: Actions = {

@@ -28,6 +28,19 @@ export const oauthProviders = query({
   }),
 });
 
+export const ownerReady = query({
+  args: {},
+  handler: async (ctx) => {
+    const address = process.env.AUTH_EMAIL_ALLOWLIST?.trim().toLowerCase();
+    if (!address || !address.includes("@") || address.includes(",") || address.includes("*")) return false;
+    const user = await ctx.db.query("users").withIndex("email", (q) => q.eq("email", address)).unique();
+    if (!user) return false;
+    const profile = await ctx.db.query("appUsers")
+      .withIndex("by_auth_user", (q) => q.eq("authUserId", user._id)).unique();
+    return profile?.role === "admin";
+  },
+});
+
 function emailAllowed(email?: string) {
   const raw = process.env.AUTH_EMAIL_ALLOWLIST?.trim();
   // An unset allowlist must never turn account creation into admin access.
