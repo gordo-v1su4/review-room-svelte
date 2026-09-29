@@ -40,7 +40,7 @@ bun run deploy:convex      # self-hosted: CONVEX_SELF_HOSTED_* set
 bun run worker:media       # ffmpeg thumbnail/sprite worker
 ```
 
-Homelab env: copy from pindeck with `scripts/use-homelab-env.ps1`, then add `S3_*` from `.env.example`.
+Homelab env: start from `.env.example` and populate only this app's dedicated Review Room Convex, Trigger, and scoped RustFS credentials. Never copy another project's environment or credentials.
 
 ## Deployment invariant
 
