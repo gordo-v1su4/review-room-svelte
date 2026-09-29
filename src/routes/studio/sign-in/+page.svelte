@@ -1,6 +1,7 @@
 <script lang="ts">
   let { form } = $props();
-  let setup = $state(Boolean(form?.setupInvalid));
+  let setup = $state(false);
+  let showSetup = $derived(setup || Boolean(form?.setupInvalid));
 </script>
 
 <svelte:head><title>Sign in · Review Room</title><meta name="robots" content="noindex" /></svelte:head>
@@ -8,7 +9,7 @@
   <a class="wordmark" href="/">review room.</a>
   <div class="intro"><p class="eyebrow">V1su4 workspace</p><h1>Sign in</h1><p>Continue to your projects and private reviews.</p></div>
 
-  {#if !setup}
+  {#if !showSetup}
     <form method="POST" action="?/email" class="fields">
       <label for="email">Email</label><input id="email" type="email" name="email" autocomplete="username" required />
       <label for="password">Password</label><input id="password" type="password" name="password" autocomplete="current-password" required />
@@ -27,7 +28,7 @@
     </form>
   {/if}
 
-  <button class="mode" type="button" onclick={() => setup = !setup}>{setup ? 'Back to sign in' : 'Set up owner account'}</button>
+  <button class="mode" type="button" onclick={() => showSetup ? location.assign('/studio/sign-in') : setup = true}>{showSetup ? 'Back to sign in' : 'Set up owner account'}</button>
   <details class="legacy"><summary>Use current owner password</summary><form method="POST" action="?/legacy" class="fields"><label for="legacy-password">Owner password</label><input id="legacy-password" type="password" name="password" autocomplete="current-password" required />{#if form?.legacyInvalid}<p class="error" role="alert">Password not accepted.</p>{/if}<button type="submit">Continue</button></form></details>
 </main>
 
