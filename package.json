@@ -10,6 +10,7 @@
     "test": "bun test",
     "deploy:convex": "convex deploy",
     "trigger:deploy": "bash scripts/deploy-trigger-vm100.sh",
+    "trigger:smoke": "bun scripts/trigger-smoke.ts",
     "worker:media": "bun --env-file=.env.local run services/media-worker/index.ts",
     "docs:annotate": "bun documentation/notion-client-guide/marker-editor/server.ts"
   },
