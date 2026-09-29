@@ -74,7 +74,7 @@ type VideoStatus =
 - `isSelect: boolean` — shortlist.
 - `annotationStrokes` / `annotatedAt` — optional still-image review markup, stored as normalized vector strokes so the original image blob is unchanged.
 - `assetClass: "VID" | "IMG" | "CTX" | "STB"` — video, image, contact/context sheet, storyboard.
-- `assetNumber: number` / `assetCode: string` — immutable project-wide upload identifier, e.g. `VID_20260623_00001`. Numbers are never reused, even after delete/archive. The visible asset title defaults to this upload code and should not be editable in the review UI.
+- `assetNumber: number` / `assetCode: string` — immutable workspace-wide upload identifier, e.g. `VID_20260623_00001`. Numbers are never reused across projects, even after delete/archive. The visible asset title defaults to this upload code and should not be editable in the review UI.
 - Media behavior follows `assetClass` plus `mimeType`: `VID` / `video/*` assets use video playback and scrub controls; `IMG`, `CTX`, and `STB` use still-image rendering even when they share the same card/table/panel components.
 
 ### Smart views = a query over status + facets
@@ -115,7 +115,7 @@ export default defineSchema({
     bannerKey: v.optional(v.string()),
     brandColor: v.optional(v.string()),        // BRAND ONLY — never the status palette
     downloadEnabledByDefault: v.boolean(),
-    nextAssetNumber: v.optional(v.number()),   // project-wide immutable sequence
+    nextAssetNumber: v.optional(v.number()),   // legacy project counter; workspace owner now reserves numbers
     createdBy: v.id("users"),
     createdAt: v.number(), updatedAt: v.number(),
     archived: v.optional(v.boolean()),
@@ -243,7 +243,7 @@ Keep status changes tied to *decisions*; let facets carry everything else. On re
 
 Defaults on upload: `status: "awaiting_review"`, `viewed: false`, `rating: 0`, `isSelect: false`, `commentCount: 0`, `feedbackNeedsAttention: false`, `downloadEnabled: project.downloadEnabledByDefault`.
 
-Upload naming: every admin upload first reserves the next project-wide number and writes an immutable `assetCode` using `CLASS_YYYYMMDD_00001`. Date folders stay flat: if no destination is chosen, all assets for a day live directly in the `YYYYMMDD` folder. When upload is launched from an open real folder, the upload page preselects that folder and stores new assets there, while still using the current date in the immutable asset code. `VID` / `IMG` / `CTX` / `STB` drive master collections like Videos, Images, Contact Sheets, and Storyboards.
+Upload naming: every admin upload first reserves the next workspace-wide number and writes an immutable `assetCode` using `CLASS_YYYYMMDD_00001`. Date folders stay flat: if no destination is chosen, all assets for a day live directly in the `YYYYMMDD` folder. When upload is launched from an open real folder, the upload page preselects that folder and stores new assets there, while still using the current date in the immutable asset code. `VID` / `IMG` / `CTX` / `STB` drive master collections like Videos, Images, Contact Sheets, and Storyboards.
 
 Collections / bundles: folders are not the only way to gather assets. Type collections are automatic from `assetClass`; later custom bundles/playlists can be saved metadata views based on tags, selected assets, reviewer, client cut, or delivery purpose. An asset can appear in many collections without moving out of its original date folder.
 

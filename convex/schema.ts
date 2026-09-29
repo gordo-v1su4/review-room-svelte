@@ -65,6 +65,7 @@ const applicationTables = {
     authUserId: v.id("users"),
     name: v.string(),
     role: v.union(v.literal("admin"), v.literal("client")),
+    nextAssetNumber: v.optional(v.number()),
   }).index("by_auth_user", ["authUserId"]),
 
   projects: defineTable({

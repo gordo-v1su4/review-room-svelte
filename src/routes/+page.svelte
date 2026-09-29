@@ -1,4 +1,24 @@
 <script lang="ts">
+  import ReviewPlaybackMenu from '$lib/components/ReviewPlaybackMenu.svelte';
+  import { nextReviewAsset, type ReviewPlaybackMode } from '$lib/playback/review-order';
+  let reviewPlaybackMode = $state<ReviewPlaybackMode>('once');
+  let orderedStart: { id: string; source: string } | null = null;
+  function cancelOrderedStart() {
+    if (orderedStart) { orderedStart = null; player?.pause(); }
+  }
+  function changePlaybackMode(mode: ReviewPlaybackMode) {
+    cancelOrderedStart(); reviewPlaybackMode = mode;
+  }
+  function reviewEnded(source: string) {
+    if (preview) { advancePreview(source); return; }
+    if (reviewPlaybackMode !== 'order' || active?.url !== source) return;
+    const next = nextReviewAsset(visibleIds, active.id);
+    if (!next) return;
+    select(next);
+    const asset = allAssets.find(asset => asset.id === next);
+    if (asset?.type === 'video') orderedStart = { id: next, source: asset.url };
+  }
+
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import { startShortlistPreview, advanceShortlistPreview, type ShortlistPreview } from '$lib/playback/shortlist-preview';
   import { ASSET_DRAG_TYPE, beginAssetDrag, folderDropAction, type AssetDrag } from '$lib/asset-drag';
@@ -13,6 +33,7 @@
   import ShareDialog from '$lib/components/ShareDialog.svelte';
   import ProjectAccessDialog from '$lib/components/ProjectAccessDialog.svelte';
   import AccountDialog from '$lib/components/AccountDialog.svelte';
+  import WorkspaceSwitcher from '$lib/components/WorkspaceSwitcher.svelte';
   import Stage1SharingDialog from '$lib/components/Stage1SharingDialog.svelte';
   import ArchivedProjects from '$lib/components/ArchivedProjects.svelte';
   import { updateProjectIdentity, setProjectArchived, prepareProjectBanner, type ProjectIdentity, type ProjectIdentityDraft } from '$lib/project-identity';
@@ -217,6 +238,14 @@
     if (disposed) throw new Error('The workspace is closed.');
     if (media.some(item => item.id === asset.id)) throw new Error('This import is already in the workspace.');
     if (asset.type === 'image') asset.assetClass = target.assetClass === 'VID' ? 'IMG' : target.assetClass;
+    const sequenceKey = 'review-room:v1su4:next-asset-number';
+    const previous = Number(localStorage.getItem(sequenceKey)) || 1;
+    const highest = allAssets.reduce((max, item) => Math.max(max, Number(item.assetCode.match(/_(\d+)$/)?.[1]) || 0), 0);
+    const number = Math.max(previous, highest + 1);
+    if (!Number.isSafeInteger(number)) throw new Error('Asset sequence exhausted.');
+    localStorage.setItem(sequenceKey, String(number + 1));
+    asset.assetCode = `${asset.assetClass}_${target.dateKey}_${String(number).padStart(5, '0')}`;
+    asset.name = asset.assetCode;
     const next = transitionFolderState(organization, {
       type: 'register', projectId: target.projectId, assetIds: [asset.id], folderId: target.folderId,
       dateFolder: { id: target.dateFolderId, dateKey: target.dateKey }
@@ -247,6 +276,7 @@
   }
 
   function select(id: string | null) {
+    cancelOrderedStart();
     stopPreview();
     if (id === activeId) return;
     inboxSeek = null; readySource = '';
@@ -293,10 +323,24 @@
     applyPreview(advanceShortlistPreview(preview, shortlistIds, loopPreview));
   }
   function previewFailed(source: string) {
+    if (orderedStart?.source === source) cancelOrderedStart();
     if (!preview || active?.url !== source) return;
     stopPreview(); feedback = 'Preview stopped because this media could not be loaded.';
   }
-  function mediaReady(source: string) { readySource = source; applyInboxSeek(source); }
+  function mediaReady(source: string) {
+    readySource = source; applyInboxSeek(source);
+    const request = orderedStart;
+    if (!request || request.source !== source) return;
+    if (reviewPlaybackMode !== 'order' || activeId !== request.id || !visibleIds.includes(request.id) || preview) {
+      cancelOrderedStart(); return;
+    }
+    void player?.playFromStart(source).then(started => {
+      if (orderedStart !== request) return;
+      orderedStart = null;
+      if (!visibleIds.includes(request.id)) player?.pause();
+      else if (!started) feedback = 'Playback paused. Press Play to continue.';
+    });
+  }
   $effect(() => {
     const eligible = shortlistIds;
     if (preview && !eligible.includes(preview.currentId)) {
@@ -549,7 +593,7 @@
   onMount(() => {
     if (data.snapshot) {
       const fromServer = data.snapshot.assets.map(item => ({
-        id: item._id, projectId: item.projectId, name: item.title,
+        id: item._id, projectId: item.projectId, name: item.assetCode ?? item.title,
         url: `/api/owner-media/${item._id}`, type: 'video' as const,
         poster: item.thumbnailKey ? `/api/owner-poster/${item._id}` : undefined,
         duration: item.durationSec, width: item.width, height: item.height,
@@ -637,7 +681,7 @@
 <input class="visually-hidden" tabindex="-1" aria-label="Choose local media" bind:this={picker} type="file" accept="video/*,image/*" multiple onchange={() => { importFiles(picker.files); picker.value = ''; }}/>
 {#snippet navigation()}
   <div class="brand">review room.</div>
-  <button class="workspace-name" onclick={projectOverview}>Personal workspace</button>
+  <WorkspaceSwitcher/>
   <ProjectTree onEditProject={editProject} canEditProject={id => folderAccess.isAdmin && folderAccess.editableProjectIds.includes(id)} {canDropAssets} onDropAssets={dropAssets} dragActive={!!dragged} selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={!folderOpen} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
   <ArchivedProjects projects={archivedProjects} onRestore={restoreProject} closeOnRestore={navOpen} onNavigateFocus={focusProjectHeading}/>
   {#if folderAccess.isAdmin}<FeedbackInbox groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}
@@ -645,7 +689,7 @@
   <button class:nav-active={!activeCollection && filter === 'awaiting_review'} class="nav-item" disabled={!!project.archived} onclick={() => filterBy('awaiting_review')}><span class="status-dot pending"></span> Awaiting review</button>
   <button class:nav-active={!activeCollection && filter === 'needs_changes'} class="nav-item" disabled={!!project.archived} onclick={() => filterBy('needs_changes')}><span class="status-dot changes"></span> Needs changes</button>
   <button class:nav-active={!activeCollection && filter === 'approved'} class="nav-item" disabled={!!project.archived} onclick={() => filterBy('approved')}><span class="status-dot approved"></span> Approved <span>{approved}</span></button>
-  <div class="sidebar-bottom"><span class="mode-label"><span class="status-dot"></span> {live ? 'Personal workspace' : 'Local session'}</span><p>{live ? 'Projects and videos saved privately.' : 'Stored in this tab until reload.'}</p></div>
+  <div class="sidebar-bottom"><span class="mode-label"><span class="status-dot"></span> {live ? 'V1su4 workspace' : 'Local session'}</span><p>{live ? 'Projects and videos saved privately.' : 'Stored in this tab until reload.'}</p></div>
 {/snippet}
 <div class="app-shell" class:nav-collapsed={navCollapsed} style:--project-accent={project.brandColor ?? "#14b8a6"}>
   <aside class="sidebar" inert={navCollapsed} aria-hidden={navCollapsed}>{@render navigation()}</aside>
@@ -723,11 +767,10 @@
         </section>
       {/snippet}
       {#snippet viewer()}
-        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><button class="icon-button" aria-label="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div>
-          {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={advancePreview} onfailure={previewFailed} sourceBlob={active.sourceFile instanceof File ? active.sourceFile : undefined} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
+        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><ReviewPlaybackMenu mode={reviewPlaybackMode} onChange={changePlaybackMode} disabled={!!preview}/><button class="icon-button" aria-label="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div>
+          {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={reviewEnded} loop={!preview && reviewPlaybackMode === 'loop'} onfailure={previewFailed} sourceBlob={active.sourceFile instanceof File ? active.sourceFile : undefined} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
               canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => { updateAsset(active.id, info); readySource = active.url; }}/>{/if}
-          <div class="review-actions"><button class:shortlisted={active.shortlisted} class="secondary-button" aria-pressed={active.shortlisted} onclick={() => review({ type: 'shortlist', assetId: active.id, shortlisted: !active.shortlisted })}><Bookmark size={16}/> {active.shortlisted ? 'Shortlisted' : 'Shortlist'}</button><div class="rating" aria-label="Rating">{#each [1,2,3,4,5] as rating (rating)}<button aria-label={`Rate ${rating} stars`} aria-pressed={active.rating === rating} onclick={() => review({ type: 'rate', assetId: active.id, rating: active.rating === rating ? 0 : rating })}><Star size={17} fill={active.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}</div><div class="asset-nav"><button class="icon-button" aria-label="Previous asset" aria-keyshortcuts="ArrowLeft" title="Previous asset (←)" disabled={visibleIds.indexOf(activeId ?? '') <= 0} onclick={() => navigate(-1)}><ArrowLeft size={17}/></button><button class="icon-button" aria-label="Next asset" aria-keyshortcuts="ArrowRight" title="Next asset (→)" disabled={visibleIds.indexOf(activeId ?? '') >= visibleIds.length - 1} onclick={() => navigate(1)}><ArrowRight size={17}/></button></div></div>
-          <div class="decision-bar"><button class:decision-active={active.status === 'needs_changes'} class="secondary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'needs_changes' ? 'awaiting_review' : 'needs_changes' })}>Request changes</button><button class="primary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'approved' ? 'awaiting_review' : 'approved' })}><Check size={16}/>{active.status === 'approved' ? 'Approved' : 'Approve'}</button></div>
+          <div class="review-actions"><div class="review-feedback"><button class="shortlist-toggle" class:shortlisted={active.shortlisted} aria-label={active.shortlisted ? 'Remove from shortlist' : 'Add to shortlist'} aria-pressed={active.shortlisted} title={active.shortlisted ? 'Remove from shortlist' : 'Add to shortlist'} onclick={() => review({ type: 'shortlist', assetId: active.id, shortlisted: !active.shortlisted })}><Bookmark size={17} fill={active.shortlisted ? 'currentColor' : 'none'}/></button><div class="rating" aria-label="Rating">{#each [1,2,3,4,5] as rating (rating)}<button aria-label={`Rate ${rating} stars`} aria-pressed={active.rating === rating} onclick={() => review({ type: 'rate', assetId: active.id, rating: active.rating === rating ? 0 : rating })}><Star size={17} fill={active.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}</div></div><div class="review-outcome"><button class:decision-active={active.status === 'needs_changes'} class="secondary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'needs_changes' ? 'awaiting_review' : 'needs_changes' })}>Request changes</button><button class="primary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'approved' ? 'awaiting_review' : 'approved' })}><Check size={16}/>{active.status === 'approved' ? 'Approved' : 'Approve'}</button><div class="asset-nav"><button class="icon-button" aria-label="Previous asset" aria-keyshortcuts="ArrowLeft" title="Previous asset (←)" disabled={visibleIds.indexOf(activeId ?? '') <= 0} onclick={() => navigate(-1)}><ArrowLeft size={17}/></button><button class="icon-button" aria-label="Next asset" aria-keyshortcuts="ArrowRight" title="Next asset (→)" disabled={visibleIds.indexOf(activeId ?? '') >= visibleIds.length - 1} onclick={() => navigate(1)}><ArrowRight size={17}/></button></div></div></div>
         </section>{/if}
       {/snippet}
       {#snippet inspector()}

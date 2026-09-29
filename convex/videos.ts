@@ -7,6 +7,7 @@ import {
   getProjectForEditor,
   getProjectForOwner,
 } from "./lib/access";
+import { reserveAssetNumber } from './lib/assetNumber';
 
 const statusValidator = v.union(
   v.literal("not_started"),
@@ -86,24 +87,6 @@ async function getOrCreateDateFolder(
   });
 }
 
-async function nextAssetNumber(
-  ctx: MutationCtx,
-  project: { _id: Id<"projects">; nextAssetNumber?: number },
-) {
-  if (typeof project.nextAssetNumber === "number" && project.nextAssetNumber > 0) {
-    return project.nextAssetNumber;
-  }
-  const siblings = await ctx.db
-    .query("videos")
-    .withIndex("by_project", (q) => q.eq("projectId", project._id))
-    .collect();
-  const maxExisting = siblings.reduce(
-    (max, video) => Math.max(max, video.assetNumber ?? video.order ?? 0),
-    0,
-  );
-  return maxExisting + 1;
-}
-
 export const reserveAssetUpload = mutation({
   args: {
     projectId: v.id("projects"),
@@ -116,7 +99,7 @@ export const reserveAssetUpload = mutation({
   handler: async (ctx, args) => {
     const { admin, project } = await getProjectForAdmin(ctx, args.projectId);
     const dateKey = normalizeDateKey(args.uploadDateKey);
-    const number = await nextAssetNumber(ctx, project);
+    const number = await reserveAssetNumber(ctx, project.createdBy);
     const assetCode = `${args.assetClass}_${dateKey}_${String(number).padStart(5, "0")}`;
     let folderId = args.folderId;
     if (folderId) {

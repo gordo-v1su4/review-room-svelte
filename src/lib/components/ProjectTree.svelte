@@ -149,7 +149,7 @@
 
 <style>
   .project-tree { color: #aeb7b5; font-size: 12px; }
-  .tree-heading { display: flex; align-items: center; justify-content: space-between; margin: 0 8px 9px 10px; color: #7f8987; font-size: 10px; font-weight: 650; letter-spacing: .13em; text-transform: uppercase; }
+  .tree-heading { display: flex; align-items: center; justify-content: space-between; margin: 0 8px 9px; color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: .13em; text-transform: uppercase; }
   .disclosure { display: grid; place-items: center; width: 27px; height: 27px; flex-shrink: 0; border-radius: 7px; color: #899491; }
   .add-project, .edit-project { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex-shrink: 0; min-height: 26px; padding: 0 6px; border-radius: 5px; color: var(--muted); font-size: 10px; font-weight: 500; letter-spacing: 0; text-transform: none; white-space: nowrap; }
   .edit-project { margin-right: 4px; background: transparent; }
