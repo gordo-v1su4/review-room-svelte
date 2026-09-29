@@ -36,6 +36,7 @@ printf '%s' "$DOCKER_REGISTRY_PASSWORD" |
   docker login localhost:5000 -u "$DOCKER_REGISTRY_USERNAME" --password-stdin >/dev/null
 
 bun install --frozen-lockfile
+bunx svelte-kit sync
 deploy_log="$(mktemp)"
 trap 'rm -f "$deploy_log"' EXIT
 set +e
