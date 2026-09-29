@@ -26,6 +26,16 @@ export const actions: Actions = {
       clientName: form.has('clientName') ? value(form, 'clientName') : undefined,
       brandColor: form.has('brandColor') ? value(form, 'brandColor') : undefined }); done();
   },
+  createFolder: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    await db().mutation(personal.createFolder, { projectId: value(form, 'projectId') as Id<'projects'>,
+      title: value(form, 'title') }); done();
+  },
+  renameFolder: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    await db().mutation(personal.renameFolder, { folderId: value(form, 'folderId') as Id<'projectFolders'>,
+      title: value(form, 'title') }); done();
+  },
   archiveProject: async ({ cookies, request }) => {
     requireOwner(cookies); const form = await request.formData();
     await db().mutation(personal.updateProject, { projectId: value(form, 'projectId') as Id<'projects'>,

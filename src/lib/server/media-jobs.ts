@@ -13,8 +13,8 @@ export async function dispatchMediaJob(jobId: Id<'mediaJobs'>, attempt: number) 
       { idempotencyKey: `${jobId}:${attempt}` });
     await db().mutation(internal.mediaJobs.recordDispatch, { jobId, attempt, runId: run.id });
     return { dispatched: true as const, runId: run.id };
-  } catch (cause) {
-    console.error('Review Room ingest dispatch failed', cause);
+  } catch {
+    console.error('Review Room ingest dispatch failed');
     return { dispatched: false as const, reason: 'Trigger dispatch failed' };
   }
 }

@@ -3,12 +3,12 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { getReviewLink, passcodeDigest, randomSecret } from "./lib/reviewAccess";
-import { reserveAssetNumber } from './lib/assetNumber';
+import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
 
 const OWNER_EMAIL = "owner@review-room.invalid";
 type Ctx = QueryCtx | MutationCtx;
 
-async function owner(ctx: Ctx) {
+export async function owner(ctx: Ctx) {
   const user = await ctx.db.query("users").withIndex("email", (q) => q.eq("email", OWNER_EMAIL)).unique();
   if (!user) throw new Error("Personal owner has not been provisioned");
   const profile = await ctx.db.query("appUsers").withIndex("by_auth_user", (q) => q.eq("authUserId", user._id)).unique();
@@ -39,6 +39,8 @@ export const snapshot = internalQuery({
     const profile = await owner(ctx);
     const projects = await ctx.db.query("projects").withIndex("by_creator", (q) => q.eq("createdBy", profile._id)).collect();
     const projectIds = new Set(projects.map((project) => project._id));
+    const folders = (await Promise.all(projects.map((project) => ctx.db.query('projectFolders')
+      .withIndex('by_project', q => q.eq('projectId', project._id)).collect()))).flat();
     const assets = (await Promise.all(projects.map((project) => ctx.db.query("videos")
       .withIndex("by_project", (q) => q.eq("projectId", project._id)).collect()))).flat();
     const versions = (await Promise.all(assets.map((asset) => ctx.db.query("assetVersions")
@@ -55,7 +57,7 @@ export const snapshot = internalQuery({
       .map(({ _id, projectId, token, canDownload, expiresAt, revokedAt, createdAt }) => ({
         _id, projectId, token, canDownload, expiresAt, revokedAt, createdAt,
       }));
-    return { projects, assets, versions, mediaJobs, comments, publications, showcases, links, projectIds: Array.from(projectIds) };
+    return { projects, folders, assets, versions, mediaJobs, comments, publications, showcases, links, projectIds: Array.from(projectIds) };
   },
 });
 
@@ -97,14 +99,7 @@ export const createProject = internalMutation({
   args: { title: v.string(), description: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const profile = await owner(ctx);
-    const title = args.title.trim().slice(0, 120);
-    if (!title) throw new Error("Project title required");
-    const now = Date.now();
-    return await ctx.db.insert("projects", {
-      title, slug: `personal-${randomSecret().slice(0, 16)}`, description: args.description?.trim().slice(0, 2000),
-      downloadEnabledByDefault: false, visibility: "private", nextAssetNumber: 1,
-      createdBy: profile._id, createdAt: now, updatedAt: now,
-    });
+    return await createPersonalProject(ctx, profile._id, args);
   },
 });
 
@@ -112,41 +107,32 @@ export const updateProject = internalMutation({
   args: { projectId: v.id("projects"), title: v.optional(v.string()), description: v.optional(v.string()),
     clientName: v.optional(v.string()), brandColor: v.optional(v.string()), archived: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
-    await ownedProject(ctx, args.projectId, true);
-    const title = args.title?.trim().slice(0, 120);
-    if (args.title !== undefined && !title) throw new Error("Project title required");
-    if (args.brandColor !== undefined && !/^#[0-9a-f]{6}$/i.test(args.brandColor)) throw new Error('Invalid brand color');
-    await ctx.db.patch(args.projectId, {
-      ...(title !== undefined ? { title } : {}),
-      ...(args.description !== undefined ? { description: args.description.trim().slice(0, 2000) } : {}),
-      ...(args.clientName !== undefined ? { clientName: args.clientName.trim().slice(0, 100) } : {}),
-      ...(args.brandColor !== undefined ? { brandColor: args.brandColor.toLowerCase() } : {}),
-      ...(args.archived !== undefined ? { archived: args.archived } : {}),
-      updatedAt: Date.now(),
-    });
+    const profile = await owner(ctx);
+    await updatePersonalProject(ctx, profile._id, args.projectId, args);
+  },
+});
+
+export const createFolder = internalMutation({
+  args: { projectId: v.id('projects'), title: v.string() },
+  handler: async (ctx, args) => {
+    const profile = await owner(ctx);
+    return await createPersonalFolder(ctx, profile._id, args.projectId, args.title);
+  },
+});
+
+export const renameFolder = internalMutation({
+  args: { folderId: v.id('projectFolders'), title: v.string() },
+  handler: async (ctx, args) => {
+    const profile = await owner(ctx);
+    return await renamePersonalFolder(ctx, profile._id, args.folderId, args.title);
   },
 });
 
 export const beginUpload = internalMutation({
-  args: { projectId: v.id("projects"), assetId: v.optional(v.id("videos")), originalFilename: v.string(), mimeType: v.string(), sizeBytes: v.number() },
+  args: { projectId: v.id("projects"), folderId: v.optional(v.id('projectFolders')), assetId: v.optional(v.id("videos")), originalFilename: v.string(), mimeType: v.string(), sizeBytes: v.number() },
   handler: async (ctx, args) => {
-    const { project } = await ownedProject(ctx, args.projectId);
-    if (!args.mimeType.startsWith("video/") || !Number.isSafeInteger(args.sizeBytes) || args.sizeBytes < 1 || args.sizeBytes > 90 * 1024 ** 2) {
-      throw new Error("Unsupported upload");
-    }
-    if (args.assetId) {
-      const asset = await ctx.db.get(args.assetId);
-      if (!asset || asset.projectId !== project._id || asset.status !== "approved") throw new Error("Approved asset unavailable");
-    }
-    const extension = args.originalFilename.match(/\.([a-zA-Z0-9]{1,8})$/)?.[1]?.toLowerCase() ?? "mp4";
-    const objectKey = `assets/${project._id}/${randomSecret()}/original.${extension}`;
-    const now = Date.now();
-    const sessionId = await ctx.db.insert("uploadSessions", {
-      projectId: project._id, assetId: args.assetId, objectKey,
-      originalFilename: args.originalFilename.slice(0, 240), mimeType: args.mimeType,
-      sizeBytes: args.sizeBytes, status: "pending", expiresAt: now + 60 * 60_000, createdAt: now,
-    });
-    return { sessionId, objectKey, expiresAt: now + 60 * 60_000 };
+    const profile = await owner(ctx);
+    return await beginPersonalUpload(ctx, profile._id, args);
   },
 });
 
@@ -167,81 +153,33 @@ export const claimUpload = internalMutation({
     if (!session) throw new Error('Upload session unavailable');
     await ownedProject(ctx, session.projectId);
     if (session.status === 'complete' && session.completedAssetId) return session;
-    if (session.status !== 'pending' || session.expiresAt <= Date.now()) throw new Error('Upload session unavailable');
-    await ctx.db.patch(session._id, { status: 'finalizing' });
-    return session;
+    const now = Date.now();
+    const stale = session.status === 'finalizing' &&
+      (session.finalizingAt ?? session.createdAt) <= now - 10 * 60_000;
+    if ((!stale && session.status !== 'pending') || session.expiresAt <= now) throw new Error('Upload session unavailable');
+    await ctx.db.patch(session._id, { status: 'finalizing', finalizingAt: now });
+    return { ...session, finalizingAt: now };
   },
 });
 
 export const failUpload = internalMutation({
-  args: { sessionId: v.id('uploadSessions') },
+  args: { sessionId: v.id('uploadSessions'), finalizingAt: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
     if (!session) return;
     await ownedProject(ctx, session.projectId, true);
-    if (session.status === 'finalizing') await ctx.db.patch(session._id, { status: 'failed' });
+    if (session.status === 'finalizing' &&
+      (args.finalizingAt === undefined || session.finalizingAt === args.finalizingAt)) {
+      await ctx.db.patch(session._id, { status: session.expiresAt > Date.now() ? 'pending' : 'failed' });
+    }
   },
 });
 
 export const finalizeUpload = internalMutation({
   args: { sessionId: v.id("uploadSessions"), verifiedSizeBytes: v.number(), etag: v.optional(v.string()), posterKey: v.string(), durationSec: v.number(), width: v.number(), height: v.number(), processWithTrigger: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
-    const session = await ctx.db.get(args.sessionId);
-    if (!session) throw new Error("Upload session unavailable");
-    const { profile, project } = await ownedProject(ctx, session.projectId);
-    if (session.status === "complete" && session.completedAssetId) {
-      return args.processWithTrigger
-        ? { assetId: session.completedAssetId, jobId: session.completedJobId }
-        : session.completedAssetId;
-    }
-    if (session.status !== "finalizing" || session.expiresAt <= Date.now() || session.sizeBytes !== args.verifiedSizeBytes) {
-      throw new Error("Upload verification failed");
-    }
-    if (args.posterKey !== `${session.objectKey.slice(0, session.objectKey.lastIndexOf('/'))}/poster.jpg` ||
-      !Number.isFinite(args.durationSec) || args.durationSec <= 0 || args.durationSec > 24 * 60 * 60 ||
-      !Number.isSafeInteger(args.width) || args.width < 1 || args.width > 16384 ||
-      !Number.isSafeInteger(args.height) || args.height < 1 || args.height > 16384) {
-      throw new Error('Upload metadata invalid');
-    }
-    const now = Date.now();
-    let assetId = session.assetId;
-    let version = 1;
-    if (assetId) {
-      const existing = await ctx.db.get(assetId);
-      if (!existing || existing.projectId !== project._id || existing.status !== "approved") throw new Error("Approved asset unavailable");
-      const versions = await ctx.db.query("assetVersions").withIndex("by_asset", (q) => q.eq("assetId", assetId!)).collect();
-      version = Math.max(0, ...versions.map((item) => item.version)) + 1;
-    } else {
-      const number = await reserveAssetNumber(ctx, project.createdBy);
-      const assetCode = `VID_${new Date(now).toISOString().slice(0, 10).replaceAll("-", "")}_${String(number).padStart(5, "0")}`;
-      assetId = await ctx.db.insert("videos", {
-        projectId: project._id, assetClass: "VID", assetNumber: number,
-        assetCode,
-        title: assetCode, originalFilename: session.originalFilename,
-        storageKey: session.objectKey, mimeType: session.mimeType, sizeBytes: session.sizeBytes,
-        status: "awaiting_review", viewed: false, rating: 0, isSelect: false, commentCount: 0,
-        tags: [], downloadEnabled: false, order: number, uploadedBy: profile._id,
-        uploadedAt: now, updatedAt: now, processingStatus: args.processWithTrigger ? "processing" : "ready",
-      });
-      await ctx.db.patch(project._id, { nextAssetNumber: number + 1, updatedAt: now });
-    }
-    const versionId = await ctx.db.insert("assetVersions", {
-      assetId, version, originalKey: session.objectKey, posterKey: args.posterKey,
-      mimeType: session.mimeType, sizeBytes: session.sizeBytes, etag: args.etag,
-      processingState: args.processWithTrigger ? "processing" : "ready", createdAt: now,
-    });
-    await ctx.db.patch(assetId, {
-      currentVersionId: versionId, storageKey: session.objectKey, thumbnailKey: args.posterKey,
-      originalFilename: session.originalFilename, mimeType: session.mimeType,
-        sizeBytes: session.sizeBytes, processingStatus: args.processWithTrigger ? "processing" : "ready", updatedAt: now,
-      durationSec: args.durationSec, width: args.width, height: args.height,
-    });
-    const jobId = args.processWithTrigger ? await ctx.db.insert('mediaJobs', {
-      assetId, versionId, status: 'queued', stage: 'verify', attempt: 1,
-      createdAt: now, updatedAt: now,
-    }) : undefined;
-    await ctx.db.patch(session._id, { status: "complete", completedAssetId: assetId, completedJobId: jobId });
-    return args.processWithTrigger ? { assetId, jobId } : assetId;
+    const profile = await owner(ctx);
+    return await finalizePersonalUpload(ctx, profile._id, args);
   },
 });
 

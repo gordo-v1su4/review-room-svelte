@@ -119,6 +119,36 @@ const applicationTables = {
     updatedAt: v.number(),
   }).index("by_project", ["projectId"]),
 
+  automationCredentials: defineTable({
+    name: v.string(),
+    keyDigest: v.string(),
+    projectId: v.optional(v.id("projects")),
+    actions: v.array(v.string()),
+    createdBy: v.id("appUsers"),
+    createdAt: v.number(),
+    expiresAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    lastUsedAt: v.optional(v.number()),
+  }).index("by_digest", ["keyDigest"]),
+
+  automationRequests: defineTable({
+    credentialId: v.id("automationCredentials"),
+    requestKey: v.string(),
+    action: v.string(),
+    bodyDigest: v.string(),
+    result: v.string(),
+    createdAt: v.number(),
+  }).index("by_credential_key", ["credentialId", "requestKey"]),
+
+  automationAudit: defineTable({
+    credentialId: v.id("automationCredentials"),
+    action: v.string(),
+    requestKey: v.optional(v.string()),
+    targetId: v.optional(v.string()),
+    outcome: v.string(),
+    createdAt: v.number(),
+  }).index("by_credential", ["credentialId"]),
+
   videos: defineTable({
     projectId: v.id("projects"),
     folderId: v.optional(v.id("projectFolders")),
@@ -234,6 +264,8 @@ const applicationTables = {
 
   uploadSessions: defineTable({
     projectId: v.id("projects"),
+    folderId: v.optional(v.id("projectFolders")),
+    automationCredentialId: v.optional(v.id("automationCredentials")),
     assetId: v.optional(v.id("videos")),
     completedAssetId: v.optional(v.id("videos")),
     completedJobId: v.optional(v.id("mediaJobs")),
@@ -242,6 +274,7 @@ const applicationTables = {
     mimeType: v.string(),
     sizeBytes: v.number(),
     status: v.union(v.literal("pending"), v.literal("finalizing"), v.literal("complete"), v.literal("failed")),
+    finalizingAt: v.optional(v.number()),
     expiresAt: v.number(),
     createdAt: v.number(),
   }).index("by_project", ["projectId"]),

@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as automation from "../automation.js";
 import type * as collections from "../collections.js";
 import type * as comments from "../comments.js";
 import type * as folders from "../folders.js";
@@ -17,6 +18,7 @@ import type * as inbox from "../inbox.js";
 import type * as lib_access from "../lib/access.js";
 import type * as lib_assetNumber from "../lib/assetNumber.js";
 import type * as lib_passwordReset from "../lib/passwordReset.js";
+import type * as lib_personalCommands from "../lib/personalCommands.js";
 import type * as lib_reviewAccess from "../lib/reviewAccess.js";
 import type * as mediaJobs from "../mediaJobs.js";
 import type * as personal from "../personal.js";
@@ -35,6 +37,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  automation: typeof automation;
   collections: typeof collections;
   comments: typeof comments;
   folders: typeof folders;
@@ -43,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   "lib/access": typeof lib_access;
   "lib/assetNumber": typeof lib_assetNumber;
   "lib/passwordReset": typeof lib_passwordReset;
+  "lib/personalCommands": typeof lib_personalCommands;
   "lib/reviewAccess": typeof lib_reviewAccess;
   mediaJobs: typeof mediaJobs;
   personal: typeof personal;

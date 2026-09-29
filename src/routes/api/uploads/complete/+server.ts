@@ -32,7 +32,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
       : { dispatched: false as const, reason: 'Trigger processing is not configured' };
     return json({ assetId, jobId, ...dispatch }, { headers: { 'cache-control': 'no-store' } });
   } catch (cause) {
-    await db().mutation(personal.failUpload, { sessionId: session._id });
+    await db().mutation(personal.failUpload, { sessionId: session._id, finalizingAt: session.finalizingAt });
     throw cause;
   }
 };

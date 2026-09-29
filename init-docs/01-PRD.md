@@ -41,7 +41,7 @@ type UserRole = "admin" | "client";
 
 ## 3. Stack
 
-Next.js (App Router) · React · TypeScript · Tailwind · shadcn/ui · TanStack Query if needed for client orchestration · **TanStack Table** for the operational review table · **Convex** for all metadata/state/reactivity · S3-compatible storage (**RustFS** on homelab, abstracted for later swap). The grid remains the primary media surface; TanStack Table powers the ShotGrid/FTrack-style table for sorting assets, feedback, dates, and review state. **Default infra:** self-hosted Convex + homelab RustFS (see [docs/adr/001-infrastructure.md](../docs/adr/001-infrastructure.md); [pindeck](https://github.com/gordo-v1su4/pindeck) is the reference wiring). Deploy: Vercel frontend pointing at homelab backends; any background image/ffmpeg work runs as a separate always-on worker, not on Vercel. Do not use `*.convex.cloud` or throwaway S3 buckets unless explicitly opted in.
+SvelteKit · Svelte 5 · TypeScript · **Convex** for metadata and state · S3-compatible storage (**RustFS** on homelab). The grid is the primary media surface; the compact table is an operational view of the same assets. **Default infra:** personal self-hosted Convex + private RustFS (see [docs/adr/001-infrastructure.md](../docs/adr/001-infrastructure.md)). Vercel serves the frontend. Trigger.dev coordinates Stage 2 media ingest; its workers run FFmpeg on VM100, not on Vercel. Do not use `*.convex.cloud` or throwaway S3 buckets unless explicitly opted in.
 
 ## 4. Organizing model — metadata-driven, drag optional
 
@@ -262,6 +262,25 @@ S3_SECRET_ACCESS_KEY=
 S3_FORCE_PATH_STYLE=true
 ```
 Helpers: `createPresignedUploadUrl`, `createPresignedDownloadUrl`, `getSignedUrl`, `deleteObject`.
+
+### Stage 2 automation contract
+
+The owner can issue and revoke HTTP credentials. Each credential carries an
+allowed action list and an optional project scope. Convex stores its digest,
+expiry, revocation state and per-command audit attribution; the plaintext key
+is shown only when issued. Project/folder write requests require an
+`Idempotency-Key`. Reusing a key with the same request returns the same ID;
+reusing it with different content is an error. The signed-in UI and HTTP
+commands call the same Convex project, folder and upload helpers.
+
+The HTTP client can create/edit projects and folders, start an upload session,
+PUT the original and JPEG poster directly to RustFS with short-lived URLs,
+complete the session after server verification, and read a job's status. The
+session binds a scoped credential, project and optional folder. Completion
+returns stable asset and job IDs; the asset stays private and defaults to
+`awaiting_review`. Only an explicit owner publication can expose an approved
+version. If Trigger is unavailable, completed upload state and a queued job
+remain in Convex for retry.
 
 ## 8. Media ingest, playback, and analysis
 
