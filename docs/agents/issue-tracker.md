@@ -2,6 +2,12 @@
 
 Issues and specs for this repo live as markdown files in `.scratch/`.
 
+Product milestones also have tickets in the V1su4 Linear workspace. Keep those tickets current while working: move them to In Progress when work starts, check off only verified acceptance criteria, and move them to Done after the deployed behavior is proved.
+
+## GitHub and Linear
+
+The personal GitHub repository is connected to Linear. Include each relevant Linear issue ID in the branch name, commit message, or pull request title/body so GitHub activity attaches to the ticket. Use `Part of V1S-123` for work that is still in progress; use `Fixes V1S-123` only when all acceptance criteria are verified and the merge should close the ticket. The Review Room repository has a push webhook for commit linking. Pull request status rules move linked issues through In Progress, In Review, and Done. A commit or PR with no issue ID cannot be matched automatically.
+
 ## Conventions
 
 - One feature per directory: `.scratch/<feature-slug>/`
