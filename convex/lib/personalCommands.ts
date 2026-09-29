@@ -63,12 +63,14 @@ export async function renamePersonalFolder(ctx: MutationCtx, ownerId: Id<'appUse
 export async function beginPersonalUpload(ctx: MutationCtx, ownerId: Id<'appUsers'>, input: {
   projectId: Id<'projects'>; folderId?: Id<'projectFolders'>; assetId?: Id<'videos'>;
   originalFilename: string; mimeType: string; sizeBytes: number;
+  sha256?: string;
   automationCredentialId?: Id<'automationCredentials'>;
 }) {
   const project = await ctx.db.get(input.projectId);
   if (!project || project.createdBy !== ownerId || project.archived) throw new Error('Project unavailable');
   if (!input.mimeType.startsWith('video/') || !Number.isSafeInteger(input.sizeBytes) ||
     input.sizeBytes < 1 || input.sizeBytes > 90 * 1024 ** 2) throw new Error('Unsupported upload');
+  if (input.sha256 !== undefined && !/^[a-f0-9]{64}$/.test(input.sha256)) throw new Error('Invalid upload checksum');
   if (input.assetId) {
     const asset = await ctx.db.get(input.assetId);
     if (!asset || asset.projectId !== project._id || asset.status !== 'approved') throw new Error('Approved asset unavailable');
@@ -84,7 +86,8 @@ export async function beginPersonalUpload(ctx: MutationCtx, ownerId: Id<'appUser
     projectId: project._id, folderId: input.folderId, assetId: input.assetId,
     automationCredentialId: input.automationCredentialId, objectKey,
     originalFilename: input.originalFilename.slice(0, 240), mimeType: input.mimeType,
-    sizeBytes: input.sizeBytes, status: 'pending', expiresAt: now + 60 * 60_000, createdAt: now,
+    sizeBytes: input.sizeBytes, sha256: input.sha256,
+    status: 'pending', expiresAt: now + 60 * 60_000, createdAt: now,
   });
   return { sessionId, objectKey, expiresAt: now + 60 * 60_000 };
 }

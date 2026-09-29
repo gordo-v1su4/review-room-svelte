@@ -11,9 +11,14 @@ The Review Room production Trigger environment has seven redacted variables. Its
 The canonical upload session seals the original and poster before creating one Convex `mediaJobs` record for the version. The Svelte server dispatches `review-room-ingest` with only the job ID and attempt. Trigger runs verify/inspect, derivative generation, and finalization as bounded child tasks. A deterministic version path in RustFS holds the thumbnail and sprite; Convex records their keys before the job becomes ready. The job's run ID, stage, status, and safe retry action appear in Review Room. An unavailable Trigger service leaves the sealed asset and queued job intact.
 
 The authenticated HTTP contract lives at `/api/v1`: create or edit projects and
-folders, `POST /uploads` for an idempotent presigned session, PUT the original
+folders, `POST /uploads` with `projectId`, `name`, `type`, integer `size`, and
+the original file's hexadecimal `sha256` for an idempotent presigned session.
+PUT the original
 and JPEG poster to the returned RustFS URLs, `POST /uploads/{sessionId}/complete`
-with poster bytes, duration and dimensions, then `GET /jobs/{jobId}`. Bearer
+with poster bytes, duration and dimensions, then `GET /jobs/{jobId}`. The server
+streams the staged original and compares its SHA-256 digest before sealing it;
+checksum mismatch leaves the upload session retryable and creates no asset.
+Bearer
 credentials are issued once with `POST /api/v1/credentials` from an owner
 session and revoked with `DELETE /api/v1/credentials/{credentialId}`. Write
 requests require an `Idempotency-Key` of 8–128 letters, digits, `.`, `_`, `:`

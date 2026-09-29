@@ -27,7 +27,7 @@ export const POST: RequestHandler = async (event) => {
     }
     claimed = true;
     finalizingAt = session.finalizingAt ?? 0;
-    const original = await sealOriginal(session.objectKey, session.mimeType, session.sizeBytes);
+    const original = await sealOriginal(session.objectKey, session.mimeType, session.sizeBytes, session.sha256);
     await sealPoster(session.objectKey, body.posterSizeBytes);
     const result = await db().mutation(internal.automation.finalizeUpload, {
       keyDigest, sessionId, verifiedSizeBytes: original.sizeBytes, etag: original.etag,

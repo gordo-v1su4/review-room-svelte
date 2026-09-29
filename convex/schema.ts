@@ -273,6 +273,7 @@ const applicationTables = {
     originalFilename: v.string(),
     mimeType: v.string(),
     sizeBytes: v.number(),
+    sha256: v.optional(v.string()),
     status: v.union(v.literal("pending"), v.literal("finalizing"), v.literal("complete"), v.literal("failed")),
     finalizingAt: v.optional(v.number()),
     expiresAt: v.number(),

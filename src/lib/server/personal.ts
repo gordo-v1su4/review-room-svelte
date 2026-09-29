@@ -5,6 +5,7 @@ import { S3Client, CopyObjectCommand, DeleteObjectsCommand, GetObjectCommand, Pu
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '$env/dynamic/private';
 import { error } from '@sveltejs/kit';
+import { createHash } from 'node:crypto';
 
 export function db() {
   const url = env.REVIEW_ROOM_CONVEX_URL;
@@ -51,7 +52,7 @@ export async function uploadUrl(key: string, mimeType: string) {
 export function stagingKey(key: string) { return `${key}.pending`; }
 export function posterKey(key: string) { return `${key.slice(0, key.lastIndexOf('/'))}/poster.jpg`; }
 
-export async function sealOriginal(key: string, mimeType: string, sizeBytes: number) {
+export async function sealOriginal(key: string, mimeType: string, sizeBytes: number, expectedSha256?: string) {
   const sourceKey = stagingKey(key);
   let source;
   try { source = await verifiedObject(sourceKey); }
@@ -61,6 +62,28 @@ export async function sealOriginal(key: string, mimeType: string, sizeBytes: num
   }
   if (source.ContentLength !== sizeBytes || source.ContentType !== mimeType || !source.ETag) {
     throw error(409, 'Uploaded original did not match the session');
+  }
+  if (expectedSha256) {
+    const staged = await storage().send(new GetObjectCommand({
+      Bucket: bucket(), Key: sourceKey, IfMatch: source.ETag
+    }));
+    if (!staged.Body) throw error(409, 'Uploaded original did not match the session');
+    const digest = createHash('sha256');
+    let receivedBytes = 0;
+    const reader = staged.Body.transformToWebStream().getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        receivedBytes += value.byteLength;
+        digest.update(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    if (receivedBytes !== sizeBytes || digest.digest('hex') !== expectedSha256) {
+      throw error(409, 'Uploaded original did not match the session');
+    }
   }
   await storage().send(new CopyObjectCommand({
     Bucket: bucket(), Key: key,
