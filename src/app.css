@@ -1923,6 +1923,8 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 .focused-review .picture { aspect-ratio:auto; height:clamp(180px,calc(100svh - 350px),900px); }
 .focused-review .picture .preview-canvas { height:100%; object-fit:contain; }
 @media (max-width:760px) {
-  .focused-review .picture { height:clamp(180px,calc(100svh - 390px),600px); }
+  .focused-review .picture { height:clamp(160px,calc(100svh - 480px),600px); }
   .focused-review .breadcrumb { gap:6px; font-size:11px; }
+  .focused-review .topbar > .secondary-button { display:none; }
 }
+.shortlist-icon svg { width:18px; height:23px; }
