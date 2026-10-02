@@ -1918,9 +1918,9 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 .focused-review .desktop-nav-toggle, .focused-review .mobile-menu { display:none; }
 .focused-review .breadcrumb { min-width:0; }
 .focused-review .breadcrumb strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.focused-review .project-heading { justify-content:flex-end; margin-bottom:12px; }
+.focused-review .project-heading { display:none; }
 .focused-review .project-heading-copy, .focused-review .project-tools > :not(button[aria-pressed]), .focused-review .workspace-footer { display:none; }
-.focused-review .picture { aspect-ratio:auto; height:clamp(180px,calc(100svh - 330px),900px); }
+.focused-review .picture { aspect-ratio:auto; height:clamp(180px,calc(100svh - 350px),900px); }
 .focused-review .picture .preview-canvas { height:100%; object-fit:contain; }
 @media (max-width:760px) {
   .focused-review .picture { height:clamp(180px,calc(100svh - 390px),600px); }
