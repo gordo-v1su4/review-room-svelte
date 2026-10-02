@@ -120,7 +120,7 @@
   .pane-divider { display: none; }
   .pane-divider { position:relative; }
   .pane-divider::before { content:''; position:absolute; inset:0 -3px; }
-  .pane-divider span { position:absolute; top:clamp(100px,75%,calc(100% - 60px)); display:block; width:4px; height:48px; border-radius:4px; background:var(--muted); opacity:.65; }
+  .pane-divider span { position:absolute; top:clamp(100px,90%,calc(100% - 60px)); display:block; width:4px; height:48px; border-radius:4px; background:var(--muted); opacity:.65; }
   .pane-divider:hover span, .pane-divider:focus-visible span, .dragging .pane-divider span { background:var(--selection-accent); }
   .pane-divider:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
   .dragging { user-select: none; }
