@@ -18,7 +18,7 @@
 </script>
 
 <Popover.Root bind:open>
-  <Popover.Trigger class="secondary-button playback-mode" {disabled} aria-label={`Playback mode: ${selected.label}`} title={disabled ? 'Shortlist preview controls playback' : selected.hint}>
+  <Popover.Trigger class="secondary-button playback-mode" {disabled} aria-label={`Playback mode: ${selected.label}`} title={disabled ? 'Shortlist preview controls playback' : `${selected.label}: ${selected.hint}`}>
     {#if mode === 'loop'}<Repeat size={14}/>{:else if mode === 'order'}<ListVideo size={14}/>{:else}<Play size={14}/>{/if}
     <span>{mode === 'order' ? 'Order' : mode === 'loop' ? 'Loop' : 'Once'}</span>
   </Popover.Trigger>

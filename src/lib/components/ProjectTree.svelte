@@ -99,6 +99,7 @@
               class="disclosure"
               type="button"
               aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${project.name}`}
+              title={`${isExpanded ? 'Collapse' : 'Expand'} ${project.name}`}
               aria-expanded={isExpanded}
               onclick={() => toggle(project.id)}
             >
