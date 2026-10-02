@@ -166,6 +166,8 @@ On phones, Review mode tucks secondary tools behind a toggle and sizes the playe
 
 Design these as first-class, not afterthoughts. *No media:* "Upload your first media to start a review." → Upload. *No filter results:* "No media match these filters." → Clear filters. *No comments (admin):* "No feedback yet." *(client):* "Leave a note when you're ready." *Uploading:* "Uploading 3 files..." with progress.
 
+In the signed-in workspace, processing badges and media metadata update automatically while the page stays open. A current attempt becoming ready refreshes its thumbnail and retries its unavailable playback source. Processing updates preserve the current project/folder, selected asset, comment draft and usable playback position. Transient observation failures retain usable media and recover; retry/refresh processing controls do not reload the page.
+
 ## 17. Design priorities (if time is short)
 
 1. Admin workspace → 2. Client review page → 3. Video card system → 4. Right-side viewer panel → 5. Rating/comment/approval interactions → 6. Filters + smart-view tabs → 7. Upload states → 8. Table view → 9. Grouped (stacked) view → 10. Mobile refinements.

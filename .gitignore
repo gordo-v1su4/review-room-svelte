@@ -63,3 +63,6 @@ temp/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# Generated browser verification media and screenshots.
+/output/playwright/

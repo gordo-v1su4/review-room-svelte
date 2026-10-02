@@ -67,9 +67,12 @@
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
   import { type LocalAsset, type ReviewAsset } from '$lib/review';
   import { createReviewSession, transitionReviewSession, type ReviewAction, type ReviewAccess } from '$lib/review-session';
+  import { observeProcessing, processingSource, processingPoster, type ProcessingUpdate } from '$lib/processing';
   let { data } = $props();
   const live = !!data.snapshot;
   let media = $state<ReviewAsset[]>([]);
+  let processing = $state.raw<ProcessingUpdate[]>([]);
+  let processingObserver: ReturnType<typeof observeProcessing> | undefined;
   let session = $state.raw(createReviewSession([]));
   // This owner role is for device-local review only, never live authorization.
   const localAccess: ReviewAccess = { kind: 'project', memberRole: 'owner' };
@@ -161,9 +164,7 @@
   const coverRequests = new Map<string, symbol>();
   const identityRequests = new Map<string, symbol>();
   const active = $derived(assets.find(asset => asset.id === activeId));
-  const activeMediaJob = $derived(active && data.snapshot
-    ? data.snapshot.mediaJobs.filter(job => job.assetId === active.id).sort((a, b) => b.createdAt - a.createdAt)[0]
-    : undefined);
+  const activeMediaJob = $derived(processing.find(item => item.assetId === active?.id)?.job);
   const scopedAssets = $derived(activeCollection?.sourceFolderId
     ? assets.filter(asset => asset.folderId === activeCollection.sourceFolderId)
     : activeFolderId ? assets.filter(asset => asset.folderId === activeFolderId) : assets);
@@ -204,7 +205,7 @@
   async function retryMediaJob(jobId: string) {
     const response = await fetch(`/api/media-jobs/${encodeURIComponent(jobId)}/retry`, { method: 'POST' });
     if (!response.ok) { feedback = `Could not retry processing (${response.status}).`; return; }
-    location.reload();
+    processingObserver?.refresh();
   }
   async function uploadOriginal(file: File) {
     if (!file.type.startsWith('video/')) throw new Error('Canonical upload currently accepts video files.');
@@ -605,6 +606,14 @@
   }
   onMount(() => {
     if (data.snapshot) {
+      processing = data.snapshot.assets.map(item => {
+        const job = data.snapshot.mediaJobs.find(job => job.assetId === item._id && job.versionId === item.currentVersionId);
+        const version = data.snapshot.versions.find(version => version._id === item.currentVersionId);
+        return { assetId: item._id, versionId: item.currentVersionId ?? null, versionNumber: version?.version ?? 0,
+          updatedAt: Math.max(item.updatedAt, job?.updatedAt ?? 0), job,
+          ready: item.processingStatus === 'ready' && version?.processingState === 'ready',
+          hasPoster: !!version?.posterKey, duration: item.durationSec, width: item.width, height: item.height };
+      });
       organization = {
         folders: data.snapshot.folders.map(folder => ({ id: folder._id, projectId: folder.projectId,
           title: folder.title, order: folder.order })),
@@ -613,8 +622,8 @@
       };
       const fromServer = data.snapshot.assets.map(item => ({
         id: item._id, projectId: item.projectId, name: item.assetCode ?? item.title,
-        url: `/api/owner-media/${item._id}`, type: 'video' as const,
-        poster: item.thumbnailKey ? `/api/owner-poster/${item._id}` : undefined,
+        url: processingSource(processing.find(update => update.assetId === item._id)!), type: 'video' as const,
+        poster: processingPoster(processing.find(update => update.assetId === item._id)!),
         duration: item.durationSec, width: item.width, height: item.height,
         size: item.sizeBytes ?? 0, sourceFile: { name: item.originalFilename ?? item.title, type: item.mimeType ?? 'video/mp4' },
         assetClass: 'VID' as const, importedAt: item.uploadedAt,
@@ -630,8 +639,25 @@
         }))
       })));
       media = fromServer;
+      processingObserver = observeProcessing(() => processing
+        .filter(item => !item.ready || item.assetId === activeId).map(item => item.assetId), applyProcessing);
+      return () => processingObserver?.stop();
     }
   });
+  function applyProcessing(updates: ProcessingUpdate[]) {
+    for (const update of updates) {
+      const previous = processing.find(item => item.assetId === update.assetId);
+      if (!previous || update.versionNumber < previous.versionNumber ||
+          (update.versionId !== previous.versionId && update.versionNumber <= previous.versionNumber) ||
+          (update.versionId === previous.versionId && update.updatedAt < previous.updatedAt) ||
+          (previous.job?._id === update.job?._id && (update.job?.attempt ?? 0) < (previous.job?.attempt ?? 0))) continue;
+      processing = processing.map(item => item.assetId === update.assetId ? update : item);
+      media = media.map(item => item.id === update.assetId ? { ...item,
+        url: processingSource(update), poster: processingPoster(update),
+        duration: update.duration ?? item.duration, width: update.width ?? item.width,
+        height: update.height ?? item.height } : item);
+    }
+  }
   onMount(() => {
     const query = window.matchMedia('(max-width: 760px)');
     const sync = () => { compactInspector = query.matches; };
@@ -787,7 +813,7 @@
       {/snippet}
       {#snippet viewer()}
         {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><ReviewPlaybackMenu mode={reviewPlaybackMode} onChange={changePlaybackMode} disabled={!!preview}/><button class="icon-button" aria-label="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div>
-          {#if activeMediaJob}<div class="media-job" role="status"><span>Processing: {activeMediaJob.status === 'ready' ? 'Ready' : activeMediaJob.status === 'error' ? 'Needs attention' : activeMediaJob.status === 'queued' ? 'Queued' : `${activeMediaJob.stage} in progress`}</span>{#if activeMediaJob.runId}<a href={`https://trigger.v1su4.dev/orgs/v1su4-91d9/projects/review-room-YXaz/env/prod/runs/${activeMediaJob.runId}`} target="_blank" rel="noopener noreferrer">Run {activeMediaJob.runId.slice(-8)}</a>{/if}{#if activeMediaJob.status === 'error' || (activeMediaJob.status === 'queued' && !activeMediaJob.runId)}<button onclick={() => retryMediaJob(activeMediaJob._id)}>{activeMediaJob.status === 'error' ? 'Retry' : 'Start processing'}</button>{:else if activeMediaJob.status === 'running'}<button onclick={() => location.reload()}>Refresh</button>{/if}</div>{/if}
+          {#if activeMediaJob}<div class="media-job" role="status"><span>Processing: {activeMediaJob.status === 'ready' ? 'Ready' : activeMediaJob.status === 'error' ? 'Needs attention' : activeMediaJob.status === 'queued' ? 'Queued' : `${activeMediaJob.stage} in progress`}</span>{#if activeMediaJob.runId}<a href={`https://trigger.v1su4.dev/orgs/v1su4-91d9/projects/review-room-YXaz/env/prod/runs/${activeMediaJob.runId}`} target="_blank" rel="noopener noreferrer">Run {activeMediaJob.runId.slice(-8)}</a>{/if}{#if activeMediaJob.status === 'error' || (activeMediaJob.status === 'queued' && !activeMediaJob.runId)}<button onclick={() => retryMediaJob(activeMediaJob._id)}>{activeMediaJob.status === 'error' ? 'Retry' : 'Start processing'}</button>{:else if activeMediaJob.status === 'running'}<button onclick={() => processingObserver?.refresh()}>Refresh</button>{/if}</div>{/if}
           {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={reviewEnded} loop={!preview && reviewPlaybackMode === 'loop'} onfailure={previewFailed} sourceBlob={active.sourceFile instanceof File ? active.sourceFile : undefined} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
               canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => { updateAsset(active.id, info); readySource = active.url; }}/>{/if}
           <div class="review-actions"><div class="review-feedback"><button class="shortlist-toggle" class:shortlisted={active.shortlisted} aria-label={active.shortlisted ? 'Remove from shortlist' : 'Add to shortlist'} aria-pressed={active.shortlisted} title={active.shortlisted ? 'Remove from shortlist' : 'Add to shortlist'} onclick={() => review({ type: 'shortlist', assetId: active.id, shortlisted: !active.shortlisted })}><Bookmark size={17} fill={active.shortlisted ? 'currentColor' : 'none'}/></button><div class="rating" aria-label="Rating">{#each [1,2,3,4,5] as rating (rating)}<button aria-label={`Rate ${rating} stars`} aria-pressed={active.rating === rating} onclick={() => review({ type: 'rate', assetId: active.id, rating: active.rating === rating ? 0 : rating })}><Star size={17} fill={active.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}</div></div><div class="review-outcome"><button class:decision-active={active.status === 'needs_changes'} class="secondary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'needs_changes' ? 'awaiting_review' : 'needs_changes' })}>Request changes</button><button class="primary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'approved' ? 'awaiting_review' : 'approved' })}><Check size={16}/>{active.status === 'approved' ? 'Approved' : 'Approve'}</button><div class="asset-nav"><button class="icon-button" aria-label="Previous asset" aria-keyshortcuts="ArrowLeft" title="Previous asset (←)" disabled={visibleIds.indexOf(activeId ?? '') <= 0} onclick={() => navigate(-1)}><ArrowLeft size={17}/></button><button class="icon-button" aria-label="Next asset" aria-keyshortcuts="ArrowRight" title="Next asset (→)" disabled={visibleIds.indexOf(activeId ?? '') >= visibleIds.length - 1} onclick={() => navigate(1)}><ArrowRight size={17}/></button></div></div></div>

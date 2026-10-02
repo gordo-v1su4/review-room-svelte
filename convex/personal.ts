@@ -61,6 +61,37 @@ export const snapshot = internalQuery({
   },
 });
 
+// Observation exposes no storage keys, credentials or review-link tokens.
+export const processing = internalQuery({
+  args: { assetIds: v.array(v.id('videos')) },
+  handler: async (ctx, { assetIds }) => {
+    if (assetIds.length > 50) throw new Error('Too many assets');
+    const profile = await owner(ctx);
+    const updates = await Promise.all([...new Set(assetIds)].map(async assetId => {
+      const asset = await ctx.db.get(assetId);
+      if (!asset) return null;
+      const project = await ctx.db.get(asset.projectId);
+      if (!project || project.createdBy !== profile._id) return null;
+      const currentVersion = asset.currentVersionId ? await ctx.db.get(asset.currentVersionId) : null;
+      const version = currentVersion?.assetId === assetId ? currentVersion : null;
+      const job = version
+        ? await ctx.db.query('mediaJobs').withIndex('by_version', q => q.eq('versionId', version._id)).unique()
+        : null;
+      return {
+        assetId, versionId: version?._id ?? null, versionNumber: version?.version ?? 0,
+        updatedAt: Math.max(asset.updatedAt, job?.updatedAt ?? 0),
+        ready: asset.processingStatus === 'ready' && version?.processingState === 'ready',
+        hasPoster: !!version?.posterKey,
+        duration: asset.durationSec, width: asset.width, height: asset.height,
+        job: job ? { _id: job._id, assetId: job.assetId, versionId: job.versionId,
+          attempt: job.attempt, status: job.status, stage: job.stage, runId: job.runId,
+          createdAt: job.createdAt, updatedAt: job.updatedAt } : undefined
+      };
+    }));
+    return updates.filter(update => update !== null);
+  }
+});
+
 export const deleteUnpublishedAsset = internalMutation({
   args: {
     assetId: v.id('videos'),
