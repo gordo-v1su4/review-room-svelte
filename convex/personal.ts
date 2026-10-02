@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { internal } from './_generated/api';
 import { getReviewLink, passcodeDigest, randomSecret } from "./lib/reviewAccess";
 import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
 
@@ -89,6 +90,54 @@ export const processing = internalQuery({
       };
     }));
     return updates.filter(update => update !== null);
+  }
+});
+
+export const deleteSelectedAssets = internalMutation({
+  args: {projectId:v.id('projects'),assetIds:v.array(v.id('videos'))},
+  handler: async (ctx,{projectId,assetIds}) => {
+    await ownedProject(ctx,projectId);
+    const ids=[...new Set(assetIds)];
+    if(!ids.length || ids.length>50) throw new Error('Invalid selection');
+    const assets=await Promise.all(ids.map(id=>ctx.db.get(id)));
+    if(assets.some(asset=>!asset || asset.projectId!==projectId)) throw new Error('Selection changed');
+    const sessions=await ctx.db.query('uploadSessions').withIndex('by_project',q=>q.eq('projectId',projectId)).collect();
+    if(sessions.some(session=>session.assetId && ids.includes(session.assetId) && ['pending','finalizing'].includes(session.status))) throw new Error('Replacement upload in progress');
+    const keys=new Set<string>();
+    const publicationIds=new Set<Id<'publications'>>();
+    for(const asset of assets) {
+      if(!asset) throw new Error('Asset unavailable');
+      const jobs=await ctx.db.query('mediaJobs').withIndex('by_asset',q=>q.eq('assetId',asset._id)).collect();
+      if(jobs.some(job=>job.status==='queued'||job.status==='running') || asset.processingStatus==='uploading'||asset.processingStatus==='processing') throw new Error('Processing in progress');
+      const versions=await ctx.db.query('assetVersions').withIndex('by_asset',q=>q.eq('assetId',asset._id)).collect();
+      for(const key of [asset.storageKey,asset.thumbnailKey,asset.spriteKey,...versions.flatMap(version=>[version.originalKey,version.posterKey]),...jobs.flatMap(job=>[job.thumbnailKey,job.spriteKey])]) if(key) keys.add(key);
+      const publications=await ctx.db.query('publications').withIndex('by_asset',q=>q.eq('assetId',asset._id)).collect();
+      for(const publication of publications) {publicationIds.add(publication._id); await ctx.db.delete(publication._id);}
+      const comments=await ctx.db.query('comments').withIndex('by_video',q=>q.eq('videoId',asset._id)).collect();
+      for(const comment of comments) {
+        const reactions=await ctx.db.query('commentReactions').withIndex('by_comment',q=>q.eq('commentId',comment._id)).collect();
+        for(const reaction of reactions) await ctx.db.delete(reaction._id);
+        await ctx.db.delete(comment._id);
+      }
+      for(const version of versions) await ctx.db.delete(version._id);
+      for(const job of jobs) await ctx.db.delete(job._id);
+      await ctx.db.delete(asset._id);
+    }
+    for(const session of sessions) if((session.assetId && ids.includes(session.assetId))||(session.completedAssetId && ids.includes(session.completedAssetId))) {
+      keys.add(`${session.objectKey}.pending`);
+      keys.add(`${session.objectKey.slice(0,session.objectKey.lastIndexOf('/'))}/poster.jpg.pending`);
+      await ctx.db.delete(session._id);
+    }
+    if(publicationIds.size) {
+      const showcases=await ctx.db.query('showcases').collect();
+      for(const showcase of showcases) if(showcase.publicationIds.some(id=>publicationIds.has(id))) await ctx.db.patch(showcase._id,{publicationIds:showcase.publicationIds.filter(id=>!publicationIds.has(id)),updatedAt:Date.now()});
+    }
+    if([...keys].some(key=>!key.startsWith('assets/'))) throw new Error('Unexpected storage key');
+    if(keys.size) {
+      const jobId=await ctx.db.insert('storageDeletionJobs',{keys:[...keys],attempt:0,createdAt:Date.now()});
+      await ctx.scheduler.runAfter(0,internal.storageDeletionWorker.run,{jobId});
+    }
+    return {deletedAssetIds:ids};
   }
 });
 

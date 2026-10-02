@@ -137,6 +137,27 @@
   let appearance = $state<AppearanceValue>(normalizeAppearance(null));
   let appearancePreferences: ReturnType<typeof createAppearancePreferences> | undefined;
   let checked = $state<SelectionState>({ ids: [], anchorId: null });
+  async function deleteChecked(ids: string[]) {
+    if (!projectOwnerAccess.isAdmin || !projectOwnerAccess.ownedProjectIds.includes(projectId)) throw new Error('Project owner required.');
+    if (ids.some(id => !allAssets.some(asset => asset.id === id && asset.projectId === projectId))) throw new Error('Selection changed. Select the clips again.');
+    if (live) {
+      const response = await fetch('/api/owner-assets/delete', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({projectId,assetIds:ids}) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || 'Could not delete clips. Try again.');
+    }
+    stopPreview();
+    if (activeId && ids.includes(activeId)) select(null);
+    const removed = new Set(ids);
+    for (const asset of media.filter(asset => removed.has(asset.id))) {
+      if (asset.url.startsWith('blob:')) URL.revokeObjectURL(asset.url);
+      if (asset.poster?.startsWith('blob:')) URL.revokeObjectURL(asset.poster);
+    }
+    media = media.filter(asset => !removed.has(asset.id));
+    processing = processing.filter(asset => !removed.has(asset.assetId));
+    session = { ...session, assets: Object.fromEntries(Object.entries(session.assets).filter(([id]) => !removed.has(id))) };
+    checked = transitionSelection(checked, { type:'reconcile', allIds:media.map(asset => asset.id) });
+    feedback = `${ids.length} ${ids.length === 1 ? 'clip deleted' : 'clips deleted'}.`;
+  }
   let player = $state<ReturnType<typeof Player>>();
   let preview = $state.raw<ShortlistPreview | null>(null);
   let loopPreview = $state(false), readySource = $state('');
@@ -786,6 +807,7 @@
       {/if}
       {#if checked.ids.length}
             <SelectionBar count={checked.ids.length} visibleCount={visible.length} access={localAccess} canEditMetadata={true} onTags={batchTags}
+              selectedAssets={allAssets.filter(asset => checked.ids.includes(asset.id)).map(asset => ({id:asset.id,title:asset.name}))} onDelete={deleteChecked}
               onselectvisible={() => checked = transitionSelection(checked, { type: 'select-visible', visibleIds })}
               onclear={() => checked = transitionSelection(checked, { type: 'clear' })}
               onshortlist={shortlisted => batchReview({ type: 'shortlist', shortlisted })}

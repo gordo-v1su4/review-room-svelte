@@ -17,6 +17,7 @@ Review Room stores metadata in its dedicated self-hosted Convex deployment and m
 | **Media uploads (browser)** | SvelteKit server upload sessions → private RustFS `review-room-svelte` bucket (`S3_*` env, path-style). Files over 50 MiB need multipart upload with parts below the proxied endpoint's request limit. The server verifies the stored object before finalizing the asset. |
 | **Media processing** | Dedicated Review Room Trigger.dev project on VM100 runs bounded FFmpeg ingest stages and updates this app's Convex records. |
 | **Media access** | SvelteKit issues time-limited presigned RustFS URLs from the private Review Room bucket. |
+| **Permanent deletion** | Owner-only selection deletion removes metadata transactionally. Convex schedules durable RustFS cleanup with retries, using the existing scoped Review Room `S3_*` credentials. Set these on the dedicated Convex deployment before deploying deletion functions; scope stays `review-room-svelte/assets/*`. |
 | **Frontend deploy** | Dedicated SvelteKit container on App VM, fronted by `https://review-room.v1su4.dev`; Compose source is `infra/app-vm/compose.yaml`. Its credentials target only the personal Convex instance and private bucket. |
 
 ## Review Room environment

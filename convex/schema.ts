@@ -297,6 +297,12 @@ const applicationTables = {
     updatedAt: v.number(),
   }).index("by_asset", ["assetId"]).index("by_version", ["versionId"]),
 
+  storageDeletionJobs: defineTable({
+    keys: v.array(v.string()),
+    attempt: v.number(),
+    createdAt: v.number(),
+  }),
+
   publications: defineTable({
     assetId: v.id("videos"),
     versionId: v.id("assetVersions"),

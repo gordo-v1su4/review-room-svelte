@@ -25,6 +25,8 @@ import type * as personal from "../personal.js";
 import type * as projects from "../projects.js";
 import type * as reviewLinks from "../reviewLinks.js";
 import type * as reviewPublic from "../reviewPublic.js";
+import type * as storageDeletion from "../storageDeletion.js";
+import type * as storageDeletionWorker from "../storageDeletionWorker.js";
 import type * as videos from "../videos.js";
 import type * as videosInternal from "../videosInternal.js";
 import type * as workspacePreferences from "../workspacePreferences.js";
@@ -53,6 +55,8 @@ declare const fullApi: ApiFromModules<{
   projects: typeof projects;
   reviewLinks: typeof reviewLinks;
   reviewPublic: typeof reviewPublic;
+  storageDeletion: typeof storageDeletion;
+  storageDeletionWorker: typeof storageDeletionWorker;
   videos: typeof videos;
   videosInternal: typeof videosInternal;
   workspacePreferences: typeof workspacePreferences;

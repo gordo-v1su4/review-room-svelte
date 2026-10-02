@@ -238,7 +238,7 @@ Keep status changes tied to *decisions*; let facets carry everything else. On re
 - **Approve** → `status = approved`, `approvedAt = now`. Set from the card status control.
 - **Request Changes** → `status = needs_changes`. Set from the card status control.
 - **Omit** → `status = omitted`, `markedForDeletion = true`. Admin extra; replaces a separate mark-for-delete control. Leaving Omit clears the flag.
-- **Delete selected** → owner archives checked assets from Actions. Distinct from Clear media (archive all project media).
+- **Delete selected** → owner permanently deletes checked assets from Actions after a confirmation that names the selection. Cancel retains them. Delete removes all versions, feedback and publications; published links stop working and showcase references are removed. RustFS originals and derivatives are cleaned through a durable retry queue. Processing/replacement uploads must finish before deletion; mixed-project selections are rejected atomically. Archive remains the recoverable alternative. Distinct from Clear media (archive all project media).
 - **Admin override** → may set any `status`, or drag a card into a droppable section (§4) to set the mapped field.
 
 Defaults on upload: `status: "awaiting_review"`, `viewed: false`, `rating: 0`, `isSelect: false`, `commentCount: 0`, `feedbackNeedsAttention: false`, `downloadEnabled: project.downloadEnabledByDefault`.

@@ -4,7 +4,10 @@
   import type { VideoStatus } from '$lib/types';
   import type { ReviewAccess } from '../review-session';
   import { selectionPermissions } from '../media-selection';
-  let { count, visibleCount, access = { kind: 'none' }, onselectvisible, onclear, onshortlist, onstatus, onrate, onTags, canEditMetadata = false }: {
+  import DeleteSelected from './DeleteSelected.svelte';
+  let { count, visibleCount, access = { kind: 'none' }, onselectvisible, onclear, onshortlist, onstatus, onrate, onTags, canEditMetadata = false, selectedAssets = [], onDelete }: {
+    selectedAssets?: readonly { id: string; title: string }[];
+    onDelete?: (ids: string[]) => Promise<void>;
     onTags?: (tags: string[], mode: 'add' | 'remove') => void;
     canEditMetadata?: boolean;
     count: number;
@@ -46,6 +49,7 @@
   <span class="selection-count" aria-live="polite">{count} selected</span>
   <button type="button" disabled={visibleCount === 0} onclick={onselectvisible}>Select all visible</button>
   <button type="button" disabled={count === 0} onclick={onclear}>Clear</button>
+  {#if onDelete}<DeleteSelected assets={selectedAssets} canDelete={access.kind === 'project' && access.memberRole === 'owner'} {onDelete}/>{/if}
   {#if permissions.shortlist}
     <button type="button" disabled={count === 0} onclick={() => { if (count > 0 && permissions.shortlist) onshortlist(true); }}>Shortlist</button>
     <button type="button" disabled={count === 0} onclick={() => { if (count > 0 && permissions.shortlist) onshortlist(false); }}>Unshortlist</button>
