@@ -80,6 +80,7 @@
   .shortlist-control { min-height: 30px; min-width: 30px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--muted); }
   .shortlist-control[aria-pressed='true'] { color:var(--selection-accent); background:var(--raised); }
   .note-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+  input[type='checkbox'] { accent-color:var(--teal); }
   select:focus-visible, .asset-table-region:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
   @media (pointer: coarse), (max-width: 760px) {
     select, .asset-title, .shortlist-control { min-height: 44px; }

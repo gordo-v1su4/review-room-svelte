@@ -2,11 +2,12 @@
   import { onMount, type Snippet } from 'svelte';
   import { DEFAULT_PANE_SIZES, normalizePaneSizes, paneMinimums, resizePanePair, twoPaneSizes, type PaneSizes } from '$lib/workspace-panes';
 
-  let { explorer, viewer, inspector, hasActive, showInspector = true, storageKey = 'review-room.workspace-panes' }: {
+  let { explorer, viewer, inspector, hasActive, focused = false, showInspector = true, storageKey = 'review-room.workspace-panes' }: {
     explorer: Snippet;
     viewer: Snippet;
     inspector: Snippet;
     hasActive: boolean;
+    focused?: boolean;
     showInspector?: boolean;
     storageKey?: string;
   } = $props();
@@ -18,11 +19,14 @@
   let drag: { pointer: number; divider: 0 | 1; startX: number; sizes: PaneSizes; node: HTMLElement } | undefined;
   let dragging = $state(false);
   let compactPercent = $state<number>();
-  const contentWidth = $derived(available + (showInspector ? 0 : 8));
-  const displayed = $derived(showInspector ? sizes : twoPaneSizes(compactPercent ?? sizes[0] / (sizes[0] + sizes[1]) * 100, contentWidth));
-  const minimums = $derived(showInspector ? paneMinimums(available) : [220 / Math.max(540, contentWidth) * 100, 320 / Math.max(540, contentWidth) * 100, 0]);
+  let focusPercent = $state(72);
+  let gripY = $state<(number | undefined)[]>([undefined, undefined]);
+  const contentWidth = $derived(available + (focused ? (showInspector ? 8 : 16) : showInspector ? 0 : 8));
+  const displayed = $derived(focused ? [0, focusPercent, 100 - focusPercent] as PaneSizes : showInspector ? sizes : twoPaneSizes(compactPercent ?? sizes[0] / (sizes[0] + sizes[1]) * 100, contentWidth));
+  const minimums = $derived(focused ? [0, 320 / Math.max(560, contentWidth) * 100, 240 / Math.max(560, contentWidth) * 100] : showInspector ? paneMinimums(available) : [220 / Math.max(540, contentWidth) * 100, 320 / Math.max(540, contentWidth) * 100, 0]);
   function applySize(divider: 0 | 1, target: number, source: PaneSizes = sizes) {
-    if (showInspector) sizes = resizePanePair(source, divider, target, available);
+    if (focused) focusPercent = Math.max(minimums[1], Math.min(100 - minimums[2], target));
+    else if (showInspector) sizes = resizePanePair(source, divider, target, available);
     else compactPercent = twoPaneSizes(target, contentWidth)[0];
   }
 
@@ -37,11 +41,17 @@
   function start(event: PointerEvent, divider: 0 | 1) {
     if (event.button !== 0 || !event.isPrimary || drag) return;
     const node = event.currentTarget as HTMLElement;
+    hover(event, divider);
     node.focus();
     node.setPointerCapture(event.pointerId);
     drag = { pointer: event.pointerId, divider, startX: event.clientX, sizes: [...displayed], node };
     dragging = true;
     event.preventDefault();
+  }
+  function hover(event: PointerEvent, divider: 0 | 1) {
+    if (drag) return;
+    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    gripY[divider] = Math.max(24, Math.min(bounds.height - 24, event.clientY - bounds.top));
   }
   function move(event: PointerEvent) {
     if (!drag || event.pointerId !== drag.pointer) return;
@@ -81,7 +91,7 @@
 </script>
 
 <div class="pane-host" bind:this={host}>
-  <div class="workspace-panes" class:has-active={hasActive} class:inspector-hidden={!showInspector} class:dragging style:--explorer-size={`${displayed[0]}fr`} style:--viewer-size={`${displayed[1]}fr`} style:--inspector-size={`${displayed[2]}fr`}>
+  <div class="workspace-panes" class:has-active={hasActive} class:focused class:inspector-hidden={!showInspector} class:dragging style:--explorer-size={`${displayed[0]}fr`} style:--viewer-size={`${displayed[1]}fr`} style:--inspector-size={`${displayed[2]}fr`}>
     <section class="pane explorer-pane" id={`${uid}-explorer`} aria-label="Media explorer">{@render explorer()}</section>
     {#each [0, 1] as index (index)}
       {@const divider = index as 0 | 1}
@@ -96,10 +106,10 @@
         aria-valuemax={Math.round(displayed[divider] + displayed[divider + 1] - minimums[divider + 1])}
         aria-valuenow={Math.round(displayed[divider])}
         aria-valuetext={`${Math.round(displayed[divider])} percent`}
-        onpointerdown={event => start(event, divider)} onpointermove={move}
+        onpointerdown={event => start(event, divider)} onpointermove={event => { hover(event, divider); move(event); }}
         onpointerup={finish} onpointercancel={finish} onlostpointercapture={finish}
         onkeydown={event => keyboard(event, divider)}
-      ><span></span></div>
+      ><span style:top={gripY[divider] === undefined ? undefined : `${gripY[divider]}px`} class:tracking={gripY[divider] !== undefined}></span></div>
     {/each}
     <section class="pane viewer-pane" id={`${uid}-viewer`} aria-label="Media viewer">{@render viewer()}</section>
     <section class="pane inspector-pane" id={`${uid}-inspector`} aria-label="Feedback inspector">{@render inspector()}</section>
@@ -112,6 +122,9 @@
   .workspace-panes.has-active { grid-template-areas: 'viewer' 'inspector' 'explorer'; }
   .workspace-panes.has-active.inspector-hidden { grid-template-areas: 'viewer' 'explorer'; }
   .workspace-panes.inspector-hidden .inspector-pane, .workspace-panes.inspector-hidden .second-divider { display: none; }
+  .workspace-panes.focused .explorer-pane, .workspace-panes.focused .first-divider { display:none; }
+  .workspace-panes.focused { grid-template-areas:'viewer' 'inspector'; }
+  .workspace-panes.focused.inspector-hidden { grid-template-areas:'viewer'; }
   .pane { min-width: 0; max-width: 100%; }
   .explorer-pane { grid-area: explorer; container-name:explorer; container-type:inline-size; }
   .viewer-pane { grid-area: viewer; }
@@ -121,6 +134,8 @@
   .pane-divider { position:relative; }
   .pane-divider::before { content:''; position:absolute; inset:0 -3px; }
   .pane-divider span { position:absolute; top:clamp(100px,90%,calc(100% - 60px)); display:block; width:4px; height:48px; border-radius:4px; background:var(--muted); opacity:.65; }
+  .pane-divider span.tracking { transform:translateY(-50%); }
+  .pane-divider:hover::before, .pane-divider:focus-visible::before { background:color-mix(in srgb,var(--teal) 7%,transparent); }
   .pane-divider:hover span, .pane-divider:focus-visible span, .dragging .pane-divider span { background:var(--selection-accent); }
   .pane-divider:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
   .dragging { user-select: none; }
@@ -136,7 +151,11 @@
       .second-divider { grid-area: second; }
       .pane-divider:hover span, .pane-divider:focus-visible span, .dragging .pane-divider span { background:var(--selection-accent); }
       .pane-divider:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+      .workspace-panes.has-active.focused { grid-template-columns:minmax(0,var(--viewer-size)) 8px minmax(0,var(--inspector-size)); grid-template-areas:'viewer second inspector'; }
+      .workspace-panes.has-active.focused.inspector-hidden { grid-template-columns:minmax(0,1fr); grid-template-areas:'viewer'; }
     }
   }
+  .workspace-panes.has-active.focused .explorer-pane, .workspace-panes.has-active.focused .first-divider { display:none; }
+  .workspace-panes.has-active.focused.inspector-hidden { grid-template-columns:minmax(0,1fr); grid-template-areas:'viewer'; }
   @media (prefers-reduced-motion: no-preference) { .pane-divider span { transition: background 110ms; } }
 </style>

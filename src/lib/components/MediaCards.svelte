@@ -1,6 +1,6 @@
 <script lang="ts">
   import AssetStatusMenu from './AssetStatusMenu.svelte';
-  import { Bookmark, Check, Star } from 'lucide-svelte';
+  import { Bookmark, Star } from 'lucide-svelte';
   import MediaThumbnail from './MediaThumbnail.svelte';
   import type { ReviewAsset } from '$lib/review';
   import type { AssetReview, ReviewAccess, ReviewAction } from '$lib/review-session';
@@ -47,7 +47,7 @@
         <div class="thumbnail">
           <MediaThumbnail src={asset.url} poster={asset.poster} type={asset.type} name={asset.name}/>
           <span class="asset-type">{asset.assetClass}</span>
-          {#if asset.shortlisted}<span class="shortlist-icon"><Bookmark size={13} fill="currentColor"/></span>{/if}
+          {#if asset.shortlisted}<span class="shortlist-icon"><Bookmark width={18} height={23} fill="currentColor"/></span>{/if}
         </div>
       </button>
       {#if appearance.showInfo}<div class="card-body">
@@ -61,7 +61,7 @@
         {/each}</div>{/if}
       </div>{/if}
       {#if onCheck}<button type="button" class="card-check" role="checkbox" aria-checked={checkedIds.includes(asset.id)} aria-label={`Select ${asset.name}`} onclick={event => onCheck(asset.id, event, true)}>
-        {#if checkedIds.includes(asset.id)}<Check size={12}/>{/if}
+        {#if checkedIds.includes(asset.id)}<span class="selection-dot"></span>{/if}
       </button>{/if}
     </article>
   {/each}
@@ -77,9 +77,11 @@
   .list-layout .card-rating { flex: 0 0 auto; }
   .list-layout .card-fields { column-gap: 12px; }
   @media (max-width: 480px) { .list-layout .card-open { flex-basis: 92px; width: 92px; } }
-  .card-check { position:absolute; top:7px; left:7px; display:grid; place-items:center; width:18px; height:18px; padding:0; border:1px solid #a5bab663; border-radius:4px; background:#0c1112c9; color:var(--selection-accent); opacity:0; transition:opacity 90ms; }
+  .card-check { position:absolute; top:7px; left:7px; display:grid; place-items:center; width:18px; height:18px; padding:0; border:1px solid #a5bab663; border-radius:50%; background:#0c1112c9; color:var(--selection-accent); opacity:0; transition:opacity 90ms; }
   .media-card:hover .card-check, .media-card:focus-within .card-check, .checked-card .card-check { opacity: 1; }
-  .card-check[aria-checked='true'] { background:#17344d; border-color:var(--selection-accent); }
+  .card-check[aria-checked='true'] { background:#18332e; border-color:var(--selection-accent); }
+  .selection-dot { width:8px; height:8px; border-radius:50%; background:currentColor; }
+  .card-check:focus-visible { outline:2px solid var(--teal); outline-offset:3px; }
   .card-body { min-width: 0; padding: 8px 10px; }
   .card-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 12px; font-weight: 550; text-align: left; }
   .card-name:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }

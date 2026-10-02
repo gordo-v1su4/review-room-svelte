@@ -62,7 +62,7 @@
   import type { VideoStatus } from '$lib/types';
   import { stepInList } from '$lib/mediaNavigation';
   import { Dialog, Tabs, DropdownMenu } from 'bits-ui';
-  import { Play, Square, Repeat, ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, PanelLeftClose, PanelLeftOpen, PanelRightOpen, ChevronRight } from 'lucide-svelte';
+  import { Play, Square, Repeat, ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, PanelLeftClose, PanelLeftOpen, PanelRightOpen, ChevronRight, Maximize2, Minimize2 } from 'lucide-svelte';
   import Player from '$lib/playback/Player.svelte';
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
   import { type LocalAsset, type ReviewAsset } from '$lib/review';
@@ -164,6 +164,7 @@
   const shortlistIds = $derived(allAssets.filter(asset => asset.projectId === projectId && !asset.archived && asset.shortlisted).map(asset => asset.id));
   let currentTime = $state(0), pinTime = $state(true), feedback = $state('');
   let navOpen = $state(false), showInspector = $state(false);
+  let focusedReview = $state(false);
   let inspectorTab = $state('notes');
   let compactInspector = $state(false);
   let notesTrigger = $state<HTMLButtonElement | null>(null);
@@ -304,6 +305,7 @@
   }
 
   function select(id: string | null) {
+    if (id === null) focusedReview = false;
     cancelOrderedStart();
     stopPreview();
     if (id === activeId) return;
@@ -313,11 +315,19 @@
   }
   async function openReview(id: string, event: MouseEvent) {
     select(id);
+    if (event.detail >= 2) focusedReview = true;
     // Keyboard and assistive activation enter the newly opened review; pointer browsing stays put.
-    if (event.detail === 0) {
+    if (event.detail === 0 || event.detail >= 2) {
       await tick();
       if (activeId === id) reviewHeading?.focus();
     }
+  }
+  async function returnToFolder() {
+    focusedReview = false;
+    await tick();
+    const card = activeId ? document.querySelector<HTMLButtonElement>(`button[data-asset-id="${CSS.escape(activeId)}"]`) : null;
+    if (card?.getClientRects().length) card.focus();
+    else explorerHeading?.focus();
   }
   async function closeReview() {
     const previous = activeId;
@@ -398,6 +408,10 @@
     if (next && next !== activeId) select(next);
   }
   function mediaKeydown(event: KeyboardEvent) {
+    if (focusedReview && event.key === 'Escape' && !event.defaultPrevented
+      && event.target instanceof HTMLElement && !event.target.closest('input, textarea, [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) {
+      event.preventDefault(); void returnToFolder(); return;
+    }
     if (!folderOpen || project.archived || event.defaultPrevented || event.isComposing
       || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
       || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
@@ -755,13 +769,13 @@
   <button class:nav-active={!activeCollection && filter === 'approved'} class="nav-item" disabled={!!project.archived} onclick={() => filterBy('approved')}><span class="status-dot approved"></span> Approved <span>{approved}</span></button>
   <div class="sidebar-bottom"><span class="mode-label"><span class="status-dot"></span> {live ? 'V1su4 workspace' : 'Local session'}</span><p>{live ? 'Projects and videos saved privately.' : 'Stored in this tab until reload.'}</p></div>
 {/snippet}
-<div class="app-shell" class:nav-collapsed={navCollapsed} style:--project-accent={project.brandColor ?? "#14b8a6"}>
-  <aside class="sidebar" inert={navCollapsed} aria-hidden={navCollapsed}>{@render navigation()}</aside>
+<div class="app-shell" class:nav-collapsed={navCollapsed || focusedReview} class:focused-review={focusedReview} style:--project-accent={project.brandColor ?? "#14b8a6"}>
+  <aside class="sidebar" inert={navCollapsed || focusedReview} aria-hidden={navCollapsed || focusedReview}>{@render navigation()}</aside>
   <main ondragover={dragFiles} ondrop={dropFiles}>
     <header class="topbar">
       <button class="icon-button desktop-nav-toggle" aria-label={navCollapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!navCollapsed} onclick={() => navCollapsed = !navCollapsed}>{#if navCollapsed}<PanelLeftOpen size={18}/>{:else}<PanelLeftClose size={18}/>{/if}</button>
       <Dialog.Root bind:open={navOpen}><Dialog.Trigger class="icon-button mobile-menu" aria-label="Open navigation"><Menu size={20}/></Dialog.Trigger><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="nav-drawer" onCloseAutoFocus={event => { if (restoringFromNavigation) { event.preventDefault(); restoringFromNavigation = false; void focusProjectHeading(); } }} style={`--project-accent: ${project.brandColor ?? "#14b8a6"}`}><Dialog.Title class="visually-hidden">Workspace navigation</Dialog.Title><Dialog.Description class="visually-hidden">Browse local media and review status</Dialog.Description><Dialog.Close class="icon-button drawer-close" aria-label="Close navigation"><X size={20}/></Dialog.Close>{@render navigation()}</Dialog.Content></Dialog.Portal></Dialog.Root>
-      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#if folderOpen}<ChevronRight size={13}/><strong>{locationName}</strong>{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot}/>{/if}{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if !live}<AccountDialog/>{/if}
+      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#if folderOpen}<ChevronRight size={13}/>{#if focusedReview}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/><strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot}/>{/if}{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if !live}<AccountDialog/>{/if}
     </header>
     <div class="page-content" class:folder-workspace={folderOpen}>
       <section class="project-heading" class:identity-banner={!folderOpen && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if !folderOpen && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{folderOpen ? locationName : project.name}</h1>{#if !folderOpen}<p class="subtitle" title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description || "Choose a folder to start reviewing."}</p>{/if}</div><div class="project-tools"><ImportQueue jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions folders={projectFolders} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "today’s date folder"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
@@ -832,7 +846,7 @@
         </section>
       {/snippet}
       {#snippet viewer()}
-        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><button class="icon-button" aria-label="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div>
+        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><div class="review-view-controls"><button class="icon-button" aria-label={focusedReview ? "Return to folder" : "Expand review"} title={focusedReview ? "Return to folder (Esc)" : "Expand review"} onclick={() => focusedReview ? void returnToFolder() : focusedReview = true}>{#if focusedReview}<Minimize2 size={18}/>{:else}<Maximize2 size={18}/>{/if}</button><button class="icon-button" aria-label="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div></div>
           {#if activeMediaJob}<div class="media-job" role="status"><span>Processing: {activeMediaJob.status === 'ready' ? 'Ready' : activeMediaJob.status === 'error' ? 'Needs attention' : activeMediaJob.status === 'queued' ? 'Queued' : `${activeMediaJob.stage} in progress`}</span>{#if activeMediaJob.runId}<a href={`https://trigger.v1su4.dev/orgs/v1su4-91d9/projects/review-room-YXaz/env/prod/runs/${activeMediaJob.runId}`} target="_blank" rel="noopener noreferrer">Run {activeMediaJob.runId.slice(-8)}</a>{/if}{#if activeMediaJob.status === 'error' || (activeMediaJob.status === 'queued' && !activeMediaJob.runId)}<button onclick={() => retryMediaJob(activeMediaJob._id)}>{activeMediaJob.status === 'error' ? 'Retry' : 'Start processing'}</button>{:else if activeMediaJob.status === 'running'}<button onclick={() => processingObserver?.refresh()}>Refresh</button>{/if}</div>{/if}
           {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={reviewEnded} loop={!preview && reviewPlaybackMode === 'loop'} onfailure={previewFailed} sourceBlob={active.sourceFile instanceof File ? active.sourceFile : undefined} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
               canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => { updateAsset(active.id, info); readySource = active.url; }}/>{/if}
@@ -853,7 +867,7 @@
           </Tabs.Root>
         </section>{/if}
       {/snippet}
-      <div hidden={!folderOpen || !!project.archived}><WorkspacePanes {explorer} {viewer} {inspector} hasActive={!!active} {showInspector}/></div>
+      <div hidden={!folderOpen || !!project.archived}><WorkspacePanes {explorer} {viewer} {inspector} hasActive={!!active} focused={focusedReview} {showInspector}/></div>
       <footer class="workspace-footer"><span>{live ? 'Projects and videos saved privately' : 'Local workspace · unsaved session'}</span><span>review room.</span></footer>
     </div>
   </main>
