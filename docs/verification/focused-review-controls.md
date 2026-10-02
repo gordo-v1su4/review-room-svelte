@@ -37,3 +37,17 @@ The supplied Frame.io recording informed the side-viewer / focused-review distin
 ![Phone selection toolbar](evidence/teal-controls-phone.jpg)
 
 ![Focused phone review](evidence/focused-review-phone.jpg)
+
+## Sidebar icon and compact Menu refinement
+
+Live Browser verification on 2026-10-02, frontend source `fd3a76f`:
+
+- Collapse uses the 18px sidebar icon. Idle background is transparent and border width is 0px; hover adds a 3% white fill and teal icon color.
+- The edge Menu tab measures 28×82px, with a faint outline, a 26px teal line, and an upward-reading label. It is centered vertically and successfully reopens navigation.
+- Svelte check: 0 errors, 8 existing warnings. The App VM production build passed.
+
+![Borderless sidebar icon](evidence/sidebar-icon-idle.jpg)
+
+![Slim teal Menu tab](evidence/edge-menu-teal.jpg)
+
+![Menu tab in the workspace](evidence/navigation-compact-menu.jpg)
