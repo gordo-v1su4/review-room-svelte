@@ -13,6 +13,8 @@ This standalone SvelteKit app runs on App VM at `https://review-room.v1su4.dev`.
 
 The Convex deployment is the `review-room-svelte-convex` Compose project on app-vm with its own Docker volume. RustFS uses a private bucket and a service account scoped to this app. Deployment source and recovery notes are in `infra/personal-backend/`. Never substitute another application's Convex URL, admin key, bucket, or storage credentials.
 
+Browser uploads require bucket CORS for the exact frontend origin `https://review-room.v1su4.dev`: PUT/GET/HEAD, `content-type`, exposed `ETag`, max age 3600. On October 2, 2026, this rule was added without removing existing rules. The preceding policy is backed up on RustFS VM114 at `/var/backups/review-room-svelte/cors-pre-v1s135-1790959928.json`. Do not replace unrelated origins or change bucket access policy when repairing CORS.
+
 ## Private App VM settings
 
 The root-owned mode-600 `/opt/review-room-svelte-app/private.env` contains `REVIEW_ROOM_CONVEX_ADMIN_KEY`, `REVIEW_ROOM_OWNER_PASSWORD`, `REVIEW_ROOM_SESSION_SECRET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `REVIEW_ROOM_TRIGGER_SECRET_KEY`, supplied from Review Room's BWS records. Compose sets `REVIEW_ROOM_OWNER_EMAIL=gordo@v1su4.com` and the frontend origin. The owner cookie and all Convex admin and S3 access stay server-side. Do not expose these as `PUBLIC_` variables.

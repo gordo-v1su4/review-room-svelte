@@ -1,6 +1,6 @@
 # V1S-135 — same-page processing completion
 
-Branch: `codex/v1s-135-processing-completion`. Part of V1S-135; release acceptance is pending.
+Branch: `codex/v1s-135-processing-completion`. V1S-135 deployment acceptance passed on October 2, 2026.
 
 The user agreed the test seam on October 2, 2026: the real mounted workspace with a controlled asynchronous processing transport, asserting browser-visible badge, thumbnail and native playback state. Tests do not mock the player or dispatch synthetic media events.
 
@@ -23,9 +23,19 @@ The first test failed on the original mount-only snapshot. The older-version tes
 
 ## Release acceptance
 
-Local transport fixtures do not prove live authorization, uploads, persistence or Trigger integration. V1S-135 stays In Progress until the real journey passes.
+Local transport fixtures do not prove live authorization, uploads, persistence or Trigger integration. The deployed journey below supplies that evidence.
 
-Before releasing, confirm the frontend target. V1S-134 records a reproduction on Vercel, whereas repository policy and ADR 001 designate `https://review-room.v1su4.dev` on App VM and prohibit Vercel deployment. This branch requires both the new Convex `personal.processing` query and the Svelte frontend; Trigger code is unchanged. Deploy Convex before the frontend. An old backend leaves observation in recoverable retry rather than clearing the workspace.
+### Deployed evidence — October 2, 2026
+
+The user confirmed the App VM target. Convex functions were deployed to `https://review-convex.v1su4.dev` before the frontend from commit `97404ee7208d1b487dd029af7a1273b79eb02792` ([PR #8](https://github.com/gordo-v1su4/review-room-svelte/pull/8)). Frontend container is healthy with image `sha256:cc07e9f14a73d81704290e393e3f00c9ee37a0b81226bfcc9e647b7ed5087031`. Trigger code was unchanged. Rollback image tag on App VM: `review-room-svelte-app-app:rollback-v1s135`; source backup: `/home/gordo/review-room-pre-v1s135.tgz`.
+
+Owner recovery sign-in and a real browser upload passed at `https://review-room.v1su4.dev`. Upload initially exposed missing App VM origin in the private bucket's CORS; the exact origin was added while preserving existing rules, as recorded in the deployment guide.
+
+The final upload in the private `V1S-135 verification` project is asset `m97927vtws5q60j72r6c51nf418fh25q`, job `n171sjwhp6ksvgvdz99ppteg098fhkgp`, Trigger run ending `axquz2mv`, displayed as `VID_20261002_00019`. The review was opened while queued. Actual processing responses progressed through running/verify, running/derivatives, running/finalize and ready. The badge changed to Ready, poster decoded, and the main native player reached readyState 4 at 1920×1080 and played past 1.01 seconds. Navigation count after opening was zero; the project, Videos collection and selected asset remained unchanged. The normal upload-finalization reload occurred before opening the review and is excluded from this assertion.
+
+Local ignored evidence: `output/playwright/live-proof.json`, `live-upload.png` and `live-workspace.png`. The ready screenshot was visually inspected. The private verification project retains six synthetic clips from browser verification; no publication was created. Stale results, retry attempt protection, transport recovery, draft/playhead preservation and unmount behavior are proven by the seven controlled browser regressions above.
+
+For future releases, use the confirmed `https://review-room.v1su4.dev` App VM target. V1S-134's earlier Vercel reproduction is historical; repository policy prohibits Vercel deployment. This branch requires both the new Convex `personal.processing` query and the Svelte frontend; Trigger code is unchanged. Deploy Convex before the frontend. An old backend leaves observation in recoverable retry rather than clearing the workspace.
 
 On the confirmed deployment, upload a real video, open its queued/running review and keep the page open. Confirm the ready badge, thumbnail, actual playback and unchanged project/folder/selection. Repeat while switching assets and while a job is retried. Record the deployment revisions and observed result before marking Done.
 
