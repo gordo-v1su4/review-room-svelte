@@ -51,3 +51,7 @@ Live Browser verification on 2026-10-02, frontend source `fd3a76f`:
 ![Slim teal Menu tab](evidence/edge-menu-teal.jpg)
 
 ![Menu tab in the workspace](evidence/navigation-compact-menu.jpg)
+
+Palette clarification, verified live on 2026-10-02 at frontend source `359a927`: the Menu line and workspace-switcher checkmark both use the existing `--teal` token and compute to `rgb(125, 217, 200)`. No new teal shade was introduced.
+
+![Menu line using the workspace-checkmark teal](evidence/edge-menu-shared-teal.jpg)
