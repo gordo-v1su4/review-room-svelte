@@ -772,7 +772,7 @@
 {/snippet}
 <div class="app-shell" class:nav-collapsed={navCollapsed || focusedReview} class:focused-review={focusedReview} style:--project-accent={project.brandColor ?? "#14b8a6"}>
   <aside class="sidebar" inert={navCollapsed || focusedReview} aria-hidden={navCollapsed || focusedReview}>{@render navigation()}</aside>
-  {#if navCollapsed && !focusedReview}<button class="nav-reopen" aria-label="Expand navigation" title="Expand navigation" aria-expanded="false" onclick={() => navCollapsed = false}><Menu size={16}/><span>Menu</span></button>{/if}
+  {#if navCollapsed && !focusedReview}<button class="nav-reopen" aria-label="Expand navigation" title="Expand navigation" aria-expanded="false" onclick={() => navCollapsed = false}><span class="nav-reopen-line" aria-hidden="true"></span><span class="nav-reopen-label">Menu</span></button>{/if}
   <main ondragover={dragFiles} ondrop={dropFiles}>
     <header class="topbar">
       <Dialog.Root bind:open={navOpen}><Dialog.Trigger class="icon-button mobile-menu" aria-label="Open navigation" title="Open navigation"><Menu size={20}/></Dialog.Trigger><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="nav-drawer" onCloseAutoFocus={event => { if (restoringFromNavigation) { event.preventDefault(); restoringFromNavigation = false; void focusProjectHeading(); } }} style={`--project-accent: ${project.brandColor ?? "#14b8a6"}`}><Dialog.Title class="visually-hidden">Workspace navigation</Dialog.Title><Dialog.Description class="visually-hidden">Browse local media and review status</Dialog.Description><Dialog.Close class="icon-button drawer-close" aria-label="Close navigation"><X size={20}/></Dialog.Close>{@render navigation()}</Dialog.Content></Dialog.Portal></Dialog.Root>
