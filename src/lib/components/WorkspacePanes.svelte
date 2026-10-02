@@ -83,7 +83,7 @@
 <div class="pane-host" bind:this={host}>
   <div class="workspace-panes" class:has-active={hasActive} class:inspector-hidden={!showInspector} class:dragging style:--explorer-size={`${displayed[0]}fr`} style:--viewer-size={`${displayed[1]}fr`} style:--inspector-size={`${displayed[2]}fr`}>
     <section class="pane explorer-pane" id={`${uid}-explorer`} aria-label="Media explorer">{@render explorer()}</section>
-    {#each [0, 1] as index}
+    {#each [0, 1] as index (index)}
       {@const divider = index as 0 | 1}
       <!-- WAI-ARIA window splitter: focusable separator with range values and arrow-key controls. -->
       <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -113,13 +113,15 @@
   .workspace-panes.has-active.inspector-hidden { grid-template-areas: 'viewer' 'explorer'; }
   .workspace-panes.inspector-hidden .inspector-pane, .workspace-panes.inspector-hidden .second-divider { display: none; }
   .pane { min-width: 0; max-width: 100%; }
-  .explorer-pane { grid-area: explorer; }
+  .explorer-pane { grid-area: explorer; container-name:explorer; container-type:inline-size; }
   .viewer-pane { grid-area: viewer; }
   .inspector-pane { grid-area: inspector; }
   .workspace-panes:not(.has-active) .viewer-pane, .workspace-panes:not(.has-active) .inspector-pane { display: none; }
   .pane-divider { display: none; }
-  .pane-divider span { display: block; width: 2px; height: 40px; border-radius: 2px; background: var(--border); }
-  .pane-divider:hover span, .pane-divider:focus-visible span, .dragging .pane-divider span { background: var(--teal); }
+  .pane-divider { position:relative; }
+  .pane-divider::before { content:''; position:absolute; inset:0 -3px; }
+  .pane-divider span { position:absolute; top:clamp(100px,75%,calc(100% - 60px)); display:block; width:4px; height:48px; border-radius:4px; background:var(--muted); opacity:.65; }
+  .pane-divider:hover span, .pane-divider:focus-visible span, .dragging .pane-divider span { background:var(--selection-accent); }
   .pane-divider:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
   .dragging { user-select: none; }
   @media (min-width: 1100px) {
@@ -132,8 +134,7 @@
       .has-active .pane-divider { display: flex; align-items: center; justify-content: center; align-self: stretch; min-height: 160px; cursor: col-resize; touch-action: none; }
       .first-divider { grid-area: first; }
       .second-divider { grid-area: second; }
-      .pane-divider span { display: block; width: 2px; height: 40px; border-radius: 2px; background: var(--border); }
-      .pane-divider:hover span, .pane-divider:focus-visible span, .dragging .pane-divider span { background: var(--teal); }
+      .pane-divider:hover span, .pane-divider:focus-visible span, .dragging .pane-divider span { background:var(--selection-accent); }
       .pane-divider:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
     }
   }

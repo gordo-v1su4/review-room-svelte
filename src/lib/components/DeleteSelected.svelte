@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Dialog, DropdownMenu } from 'bits-ui';
-  import { Trash2 } from 'lucide-svelte';
+  import { Trash2, Ellipsis } from 'lucide-svelte';
   let { assets, canDelete = false, onDelete }: {
     assets: readonly { id: string; title: string }[];
     canDelete?: boolean;
@@ -24,7 +24,7 @@
 
 {#if canDelete}
   <DropdownMenu.Root>
-    <DropdownMenu.Trigger disabled={!assets.length}>Actions</DropdownMenu.Trigger>
+    <DropdownMenu.Trigger title="Selected clip actions" aria-label="Actions" disabled={!assets.length}><Ellipsis size={16}/><span class="selection-label">Actions</span></DropdownMenu.Trigger>
     <DropdownMenu.Portal><DropdownMenu.Content class="delete-menu" sideOffset={6}>
       <DropdownMenu.Item class="delete-item" onSelect={requestDelete}><Trash2 size={14}/> Delete selected</DropdownMenu.Item>
     </DropdownMenu.Content></DropdownMenu.Portal>

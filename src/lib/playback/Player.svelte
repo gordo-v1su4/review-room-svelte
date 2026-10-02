@@ -1,6 +1,7 @@
 <script lang="ts">
   import { dev } from '$app/environment';
-  import { Pause, Play, Volume2, VolumeX, Maximize, RotateCcw, StepBack, StepForward } from 'lucide-svelte';
+  import { Pause, Play, Volume2, VolumeX, Maximize, RotateCcw, StepBack, StepForward, Ellipsis } from 'lucide-svelte';
+  import { DropdownMenu } from 'bits-ui';
   import { frameReadout, frameStepTarget, validFrameRate } from './time-display';
   import { createPlaybackSession } from './session';
   import { observeNativePlayback, type PlaybackMetrics } from './diagnostics';
@@ -245,12 +246,21 @@
       <div class="track"><div class="played" style:width={`${duration ? time / duration * 100 : 0}%`}></div><span class="playhead" style:left={`${duration ? time / duration * 100 : 0}%`}></span></div>
     </div>
     <div class="transport">
-      <button class="icon-button" aria-label="Previous frame" title={frameHint} disabled={!ready || !hasFrameRate} onclick={() => stepFrame(-1)}><StepBack size={15}/></button>
+      <button class="icon-button secondary-transport" aria-label="Previous frame" title={frameHint} disabled={!ready || !hasFrameRate} onclick={() => stepFrame(-1)}><StepBack size={15}/></button>
       <button class="icon-button play-button" aria-label={paused ? 'Play' : 'Pause'} onclick={toggle} disabled={!ready}>{#if paused}<Play size={18} fill="currentColor"/>{:else}<Pause size={18}/>{/if}</button>
-      <button class="icon-button" aria-label="Next frame" title={frameHint} disabled={!ready || !hasFrameRate} onclick={() => stepFrame(1)}><StepForward size={15}/></button>
-      <button class="icon-button" aria-label="Restart clip" onclick={() => seek(0)} disabled={!ready}><RotateCcw size={16}/></button>
+      <button class="icon-button secondary-transport" aria-label="Next frame" title={frameHint} disabled={!ready || !hasFrameRate} onclick={() => stepFrame(1)}><StepForward size={15}/></button>
+      <button class="icon-button secondary-transport" aria-label="Restart clip" onclick={() => seek(0)} disabled={!ready}><RotateCcw size={16}/></button>
       <button class="timecode" aria-label={showFrames && hasFrameRate ? 'Show elapsed time and duration' : 'Show frame numbers and estimated FPS'} aria-pressed={showFrames && hasFrameRate} title={hasFrameRate ? 'Toggle time / frames (estimated average FPS)' : 'Frame rate not detected'} disabled={!hasFrameRate} onclick={() => showFrames = !showFrames}>{#if showFrames && hasFrameRate}{frameReadout(time, duration, fps)}{:else}{stamp(time)} <span>/ {stamp(duration)}</span>{/if}</button>
       <span class="transport-spacer"></span>
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger class="icon-button compact-transport" aria-label="More playback controls" title="More playback controls"><Ellipsis size={16}/></DropdownMenu.Trigger>
+        <DropdownMenu.Portal><DropdownMenu.Content class="selection-menu" side="top" align="end" sideOffset={6} collisionPadding={12}>
+          <DropdownMenu.Item disabled={!ready} onSelect={() => seek(0)}><RotateCcw size={15}/>Restart clip</DropdownMenu.Item>
+          <DropdownMenu.Item disabled={!ready || !hasFrameRate} onSelect={() => stepFrame(-1)}><StepBack size={15}/>Previous frame</DropdownMenu.Item>
+          <DropdownMenu.Item disabled={!ready || !hasFrameRate} onSelect={() => stepFrame(1)}><StepForward size={15}/>Next frame</DropdownMenu.Item>
+        </DropdownMenu.Content></DropdownMenu.Portal>
+      </DropdownMenu.Root>
+
       <button class="icon-button" aria-label={muted ? 'Unmute' : 'Mute'} onclick={() => video.muted = !video.muted}>{#if muted}<VolumeX size={18}/>{:else}<Volume2 size={18}/>{/if}</button>
       <button class="icon-button" aria-label="Fullscreen" onclick={() => surface.requestFullscreen?.().catch(() => { error = 'Fullscreen is unavailable in this browser.'; })}><Maximize size={17}/></button>
     </div>
@@ -267,17 +277,24 @@
 </div>
 
 <style>
-  .transport { flex-wrap: wrap; gap: 3px; }
+  .player { container-name:player; container-type:inline-size; }
+  .transport { flex-wrap:nowrap; gap:3px; }
+  .transport :global(.compact-transport) { display:none; }
   .transport .icon-button { flex: 0 0 28px; min-width: 28px; width: 28px; min-height: 28px; height: 28px; padding: 0; border-radius: 4px; }
   .transport .play-button { flex-basis: 36px; width: 36px; min-width: 36px; background: var(--raised); color: var(--ink); }
   .transport .icon-button:disabled { opacity: .35; cursor: default; }
-  .transport .timecode { flex: 0 0 174px; width: 174px; min-height: 28px; margin: 0; padding: 0 4px; text-align: left; white-space: nowrap; border-radius: 4px; color: var(--ink); background: transparent; font-size: 10px; }
+  .transport .timecode { flex:0 1 auto; min-width:0; max-width:174px; min-height:28px; margin:0; padding:0 4px; overflow:hidden; text-overflow:ellipsis; text-align:left; white-space:nowrap; border-radius:4px; color:var(--ink); background:transparent; font-size:10px; }
   .transport .timecode:hover:not(:disabled) { background: var(--raised); }
   .transport .timecode:disabled { opacity: 1; cursor: default; }
   .transport button:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+  @container player (max-width:480px) {
+    .transport .secondary-transport { display:none; }
+    .transport :global(.compact-transport) { display:inline-flex; align-items:center; justify-content:center; flex:0 0 28px; width:28px; height:28px; padding:0; }
+  }
   @media (pointer: coarse) {
     .transport .icon-button { flex-basis: 44px; min-width: 44px; width: 44px; min-height: 44px; height: 44px; }
     .transport .play-button { flex-basis: 48px; width: 48px; }
     .transport .timecode { min-height: 44px; }
+    .transport :global(.compact-transport) { flex-basis:44px; min-width:44px; width:44px; min-height:44px; height:44px; }
   }
 </style>

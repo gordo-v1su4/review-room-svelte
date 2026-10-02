@@ -78,7 +78,7 @@
   .media-kind { font-size: 9px; color: var(--muted); margin-left: auto; }
   select { min-height: 30px; max-width: 160px; padding: 4px 22px 4px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--canvas); color: var(--ink); font: inherit; cursor: pointer; }
   .shortlist-control { min-height: 30px; min-width: 30px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--muted); }
-  .shortlist-control[aria-pressed='true'] { color: var(--teal); background: var(--raised); }
+  .shortlist-control[aria-pressed='true'] { color:var(--selection-accent); background:var(--raised); }
   .note-count { color: var(--muted); font-variant-numeric: tabular-nums; }
   select:focus-visible, .asset-table-region:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
   @media (pointer: coarse), (max-width: 760px) {
