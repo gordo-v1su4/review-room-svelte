@@ -247,9 +247,9 @@
     </div>
     <div class="transport">
       <button class="icon-button secondary-transport" aria-label="Previous frame" title={frameHint} disabled={!ready || !hasFrameRate} onclick={() => stepFrame(-1)}><StepBack size={15}/></button>
-      <button class="icon-button play-button" aria-label={paused ? 'Play' : 'Pause'} onclick={toggle} disabled={!ready}>{#if paused}<Play size={18} fill="currentColor"/>{:else}<Pause size={18}/>{/if}</button>
+      <button class="icon-button play-button" aria-label={paused ? 'Play' : 'Pause'} title={paused ? 'Play' : 'Pause'} onclick={toggle} disabled={!ready}>{#if paused}<Play size={18} fill="currentColor"/>{:else}<Pause size={18}/>{/if}</button>
       <button class="icon-button secondary-transport" aria-label="Next frame" title={frameHint} disabled={!ready || !hasFrameRate} onclick={() => stepFrame(1)}><StepForward size={15}/></button>
-      <button class="icon-button secondary-transport" aria-label="Restart clip" onclick={() => seek(0)} disabled={!ready}><RotateCcw size={16}/></button>
+      <button class="icon-button secondary-transport" aria-label="Restart clip" title="Restart clip" onclick={() => seek(0)} disabled={!ready}><RotateCcw size={16}/></button>
       <button class="timecode" aria-label={showFrames && hasFrameRate ? 'Show elapsed time and duration' : 'Show frame numbers and estimated FPS'} aria-pressed={showFrames && hasFrameRate} title={hasFrameRate ? 'Toggle time / frames (estimated average FPS)' : 'Frame rate not detected'} disabled={!hasFrameRate} onclick={() => showFrames = !showFrames}>{#if showFrames && hasFrameRate}{frameReadout(time, duration, fps)}{:else}{stamp(time)} <span>/ {stamp(duration)}</span>{/if}</button>
       <span class="transport-spacer"></span>
       <DropdownMenu.Root>
@@ -261,8 +261,8 @@
         </DropdownMenu.Content></DropdownMenu.Portal>
       </DropdownMenu.Root>
 
-      <button class="icon-button" aria-label={muted ? 'Unmute' : 'Mute'} onclick={() => video.muted = !video.muted}>{#if muted}<VolumeX size={18}/>{:else}<Volume2 size={18}/>{/if}</button>
-      <button class="icon-button" aria-label="Fullscreen" onclick={() => surface.requestFullscreen?.().catch(() => { error = 'Fullscreen is unavailable in this browser.'; })}><Maximize size={17}/></button>
+      <button class="icon-button" aria-label={muted ? 'Unmute' : 'Mute'} title={muted ? 'Unmute' : 'Mute'} onclick={() => video.muted = !video.muted}>{#if muted}<VolumeX size={18}/>{:else}<Volume2 size={18}/>{/if}</button>
+      <button class="icon-button" aria-label="Fullscreen" title="Fullscreen" onclick={() => surface.requestFullscreen?.().catch(() => { error = 'Fullscreen is unavailable in this browser.'; })}><Maximize size={17}/></button>
     </div>
   </div>
   <dl class="media-properties" aria-label="Media properties">
