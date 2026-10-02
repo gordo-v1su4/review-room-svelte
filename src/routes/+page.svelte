@@ -63,7 +63,7 @@
   import type { VideoStatus } from '$lib/types';
   import { stepInList } from '$lib/mediaNavigation';
   import { Dialog, Tabs, DropdownMenu } from 'bits-ui';
-  import { Play, Square, Repeat, ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, ChevronLeft, PanelRightOpen, ChevronRight, Maximize2, Minimize2 } from 'lucide-svelte';
+  import { Play, Square, Repeat, ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, PanelLeft, PanelRightOpen, ChevronRight, Maximize2, Minimize2 } from 'lucide-svelte';
   import Player from '$lib/playback/Player.svelte';
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
   import { type LocalAsset, type ReviewAsset } from '$lib/review';
@@ -759,7 +759,7 @@
 <svelte:head><title>Review Room — Studio</title><meta name="description" content="A focused space to watch, consider, and refine your work."/></svelte:head>
 <input class="visually-hidden" tabindex="-1" aria-label="Choose local media" bind:this={picker} type="file" accept="video/*,image/*" multiple onchange={() => { importFiles(picker.files); picker.value = ''; }}/>
 {#snippet navigation()}
-  <div class="brand"><span>review room.</span><button class="icon-button sidebar-collapse" aria-label="Collapse navigation" title="Collapse navigation" aria-expanded="true" onclick={() => navCollapsed = true}><ChevronLeft size={16}/></button></div>
+  <div class="brand"><span>review room.</span><button class="icon-button sidebar-collapse" aria-label="Collapse navigation" title="Collapse navigation" aria-expanded="true" onclick={() => navCollapsed = true}><PanelLeft size={18} strokeWidth={1.6}/></button></div>
   <WorkspaceSwitcher/>
   <ProjectTree onEditProject={editProject} canEditProject={id => folderAccess.isAdmin && folderAccess.editableProjectIds.includes(id)} {canDropAssets} onDropAssets={dropAssets} dragActive={!!dragged} selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={!folderOpen} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
   <ArchivedProjects projects={archivedProjects} onRestore={restoreProject} closeOnRestore={navOpen} onNavigateFocus={focusProjectHeading}/>
