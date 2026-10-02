@@ -204,9 +204,7 @@
   }
   function batchReview(action: { type: 'status'; status: VideoStatus } | { type: 'rate'; rating: number } | { type: 'shortlist'; shortlisted: boolean }) {
     const ids = new Set(checked.ids.filter(id => visibleIds.includes(id)));
-    let next = session;
-    for (const asset of assets) if (ids.has(asset.id)) next = transitionReviewSession(next, { ...action, assetId: asset.id }, localAccess);
-    session = next;
+    for (const asset of assets) if (ids.has(asset.id)) review({ ...action, assetId: asset.id });
   }
   function batchTags(tags: string[], mode: 'add' | 'remove') {
     const ids = new Set(checked.ids.filter(id => visibleIds.includes(id)));
