@@ -35,6 +35,12 @@ The final upload in the private `V1S-135 verification` project is asset `m97927v
 
 Local ignored evidence: `output/playwright/live-proof.json`, `live-upload.png` and `live-workspace.png`. The ready screenshot was visually inspected. The private verification project retains six synthetic clips from browser verification; no publication was created. Stale results, retry attempt protection, transport recovery, draft/playhead preservation and unmount behavior are proven by the seven controlled browser regressions above.
 
+### Codex in-app Browser proof
+
+At the user's request, repeated the real upload through the visible Codex `@Browser`, signing in with the existing owner recovery credential from live BWS. Fresh asset `VID_20261002_00020` was opened with the derivatives-in-progress badge and unavailable playback. Without refresh or navigation, its badge changed to Ready and the player became usable. Clicking Play advanced actual 1920×1080 native video to 11.406136 seconds with readyState 4 and paused=false. The CDP main-frame loader ID remained unchanged between the processing and playing states. Clicking Pause left it at 11.983322 seconds with paused=true. Project, Videos collection and selected asset remained unchanged.
+
+Ignored in-app Browser evidence: `output/playwright/iab-processing.jpg`, `iab-ready-playing.jpg`, `iab-proof.json`. The Browser tab remains open as a user-facing deliverable. The verification project now contains seven synthetic clips; none were published. The misleading codec message while processing remains V1S-136's scope.
+
 For future releases, use the confirmed `https://review-room.v1su4.dev` App VM target. V1S-134's earlier Vercel reproduction is historical; repository policy prohibits Vercel deployment. This branch requires both the new Convex `personal.processing` query and the Svelte frontend; Trigger code is unchanged. Deploy Convex before the frontend. An old backend leaves observation in recoverable retry rather than clearing the workspace.
 
 On the confirmed deployment, upload a real video, open its queued/running review and keep the page open. Confirm the ready badge, thumbnail, actual playback and unchanged project/folder/selection. Repeat while switching assets and while a job is retried. Record the deployment revisions and observed result before marking Done.
