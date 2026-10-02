@@ -1934,7 +1934,7 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 .sidebar-collapse { display:none; -webkit-text-fill-color:initial; }
 .sidebar .sidebar-collapse { display:inline-flex; flex:0 0 30px; width:30px; min-width:30px; height:30px; min-height:30px; margin-right:-4px; border:0; border-radius:5px; background:transparent; }
 .nav-reopen { position:fixed; left:0; top:50%; transform:translateY(-50%); z-index:40; display:flex; flex-direction:column; align-items:center; gap:7px; width:28px; height:82px; min-height:82px; padding:8px 5px; border:1px solid #ffffff20; border-left:0; border-radius:0 11px 11px 0; background:var(--panel); color:var(--muted); box-shadow:3px 0 14px #0004; }
-.nav-reopen-line { flex:0 0 26px; width:3px; border-radius:2px; background:var(--teal); }
+.nav-reopen-line { flex:0 0 26px; width:3px; border-radius:2px; background:linear-gradient(165deg,#347a70,#265c56); }
 .nav-reopen-label { writing-mode:vertical-rl; transform:rotate(180deg); text-transform:uppercase; font-size:9px; font-weight:600; letter-spacing:.12em; line-height:1; }
 .nav-reopen:hover, .sidebar-collapse:hover { color:var(--teal); }
 .sidebar .sidebar-collapse:hover { background:#ffffff08; }
