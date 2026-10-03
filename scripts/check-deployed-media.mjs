@@ -19,7 +19,7 @@ try {
  const path = `/api/review-media/${link.token}/${asset._id}`;
  const range = await get(path, { Range: 'bytes=0-65535' });
  assert.equal(range.status, 206); assert.equal((await range.arrayBuffer()).byteLength, 65536);
- assert.equal(range.headers.get('cache-control'), 'private, no-store');
+ assert.equal(range.headers.get('cache-control'), 'private, no-cache');
  const etag = range.headers.get('etag');
  const head = await fetch(base + path, { method: 'HEAD' });
  assert.equal(head.status, 200); assert.equal(Number(head.headers.get('content-length')), version.sizeBytes);
