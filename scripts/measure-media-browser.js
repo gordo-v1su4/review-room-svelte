@@ -13,9 +13,10 @@
     element.addEventListener(event, done, { once: true }); element.addEventListener('error', fail, { once: true }); run();
   });
   for (let index = 0; index < 5; index++) {
+    const sampledPoster = `${posterPath}&measure=${Date.now()}-${index}`;
     for (const phase of ['cold', 'warm']) {
       const poster = new Image();
-      const posterMs = await wait(poster, 'load', () => poster.src = posterPath);
+      const posterMs = await wait(poster, 'load', () => poster.src = sampledPoster);
       const video = document.createElement('video'); video.muted = true; video.preload = 'auto'; video.playsInline = true;
       video.style.cssText = 'position:fixed;width:1px;height:1px;left:-100px;pointer-events:none'; document.body.append(video);
       try {

@@ -34,7 +34,7 @@ export function createMediaDelivery(read: ReadMedia) {
       if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start) return new Response(null, { status: 416 });
     }
     const headers = new Headers({ 'content-type': mimeType, 'accept-ranges': 'bytes',
-      'cache-control': 'private, no-cache', 'x-content-type-options': 'nosniff',
+      'cache-control': mimeType.startsWith('video/') ? 'private, no-store' : 'private, no-cache', 'x-content-type-options': 'nosniff',
       'cross-origin-resource-policy': 'same-origin' });
     const condition = request.headers.get('if-none-match');
     if (fresh?.etag && condition === fresh.etag && !range) {
