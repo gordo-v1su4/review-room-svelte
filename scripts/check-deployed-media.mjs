@@ -40,3 +40,21 @@ try {
  assert.equal((await get(path, { Range: 'bytes=0-10' })).status, 404);
  console.log('PASS expired review token denied after warming media cache');
 } finally { await client.mutation('personal:revokeReviewLink', { linkId: expiring.linkId }); }
+
+const previousVersion = snapshot.versions.find(v => v.assetId === asset._id && v._id !== version._id && v.processingState === 'ready');
+if (previousVersion) {
+ await client.mutation('personal:approveAsset', { assetId: asset._id });
+ const publication = await client.mutation('personal:publishAsset', { assetId: asset._id, versionId: previousVersion._id, allowedOrigins: [base] });
+ try {
+  const path = '/api/public-media/' + publication.slug;
+  const before = await get(path, { Range: 'bytes=0-65535' });
+  assert.equal(before.status, 206); const oldEtag = before.headers.get('etag'); await before.arrayBuffer();
+  await client.mutation('personal:replacePublication', { publicationId: publication.publicationId, versionId: version._id });
+  const replaced = await get(path, { Range: 'bytes=0-65535' });
+  assert.equal(replaced.status, 206); assert.equal((await replaced.arrayBuffer()).byteLength, 65536);
+  assert.notEqual(replaced.headers.get('etag'), oldEtag);
+  await client.mutation('personal:revokePublication', { publicationId: publication.publicationId });
+  assert.equal((await get(path, { Range: 'bytes=0-65535' })).status, 404);
+  console.log('PASS publication replacement returns new ranged bytes and revocation denies warmed media');
+ } finally { await client.mutation('personal:revokePublication', { publicationId: publication.publicationId }); }
+}

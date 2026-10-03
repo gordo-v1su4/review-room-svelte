@@ -9,6 +9,7 @@ const length = broken.readUInt32BE(mdat - 4);
 broken.fill(0, mdat + 4, mdat - 4 + length);
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+let posterUnavailable = false;
 let status = 'error', updatedAt = 10, attempt = 1, delivery = 'ready';
 const updates = () => ['a', 'b'].map(id => ({ assetId: id, versionId: `version-${id}`, versionNumber: 1,
   updatedAt, ready: status === 'ready', hasPoster: true,
@@ -20,7 +21,7 @@ await page.route('**/api/media-jobs/*/retry', route => {
 await page.route('**/api/owner-media/**', route => route.fulfill(delivery === 'unavailable' ? { status: 404 }
   : delivery === 'expired' ? { status: 403 }
   : { body: delivery === 'decoder' ? broken : clip, contentType: 'video/mp4' }));
-await page.route('**/api/owner-poster/**', route => route.fulfill({ body: poster, contentType: 'image/jpeg' }));
+await page.route('**/api/owner-poster/**', route => route.fulfill(posterUnavailable ? { status: 404 } : { body: poster, contentType: 'image/jpeg' }));
 await page.route('**/api/owner-review', route => route.fulfill({ json: {} }));
 async function open() {
   await page.goto('http://127.0.0.1:5173/dev/processing-workspace');
@@ -47,4 +48,9 @@ try {
     await page.waitForFunction(() => document.querySelector('video[aria-label="VID_CHECK_a"]')?.readyState >= 2);
     console.log(`PASS: ${failure} is accurate and retry restores actual playback`);
   }
+  posterUnavailable = true;
+  await open();
+  await page.getByText('Preview unavailable', { exact: true }).first().waitFor();
+  assert.equal(await page.locator('img').evaluateAll(images => images.filter(image => image.complete && image.naturalWidth === 0).length), 0);
+  console.log('PASS: missing poster uses a deliberate placeholder without a broken image');
 } finally { await browser.close(); }

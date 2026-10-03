@@ -58,3 +58,17 @@ test('open-ended seeks return bounded contiguous ranges and malformed ranges are
     expect((await deliver(new Request('https://review.test/media', { headers: { Range: range } }), 'v1', 'video/mp4')).status).toBe(416);
   }
 });
+
+test('a cold media response streams its first bytes before the object finishes arriving', async () => {
+  let controller: ReadableStreamDefaultController<Uint8Array>;
+  const deliver = createMediaDelivery(async () => ({
+    body: new ReadableStream<Uint8Array>({ start(c) { controller = c; c.enqueue(new Uint8Array([1])); } }),
+    length: 3, etag: '"stream"'
+  }));
+  const response = await deliver(new Request('https://review.test/media'), 'stream', 'video/mp4');
+  const reader = response.body!.getReader();
+  expect((await reader.read()).value).toEqual(new Uint8Array([1]));
+  controller!.enqueue(new Uint8Array([2, 3])); controller!.close();
+  expect((await reader.read()).value).toEqual(new Uint8Array([2, 3]));
+  expect((await reader.read()).done).toBe(true);
+});
