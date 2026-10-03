@@ -1,7 +1,7 @@
 type StoredMedia = { body: ReadableStream<Uint8Array>; length: number; range?: string; etag?: string };
 type ReadMedia = (key: string, range?: string) => Promise<StoredMedia>;
-const CHUNK = 1024 * 1024;
-const BUDGET = 64 * CHUNK;
+const CHUNK = 16 * 1024 * 1024;
+const BUDGET = 64 * 1024 * 1024;
 const TTL = 5 * 60 * 1000;
 
 /** Call only after a fresh owner/token/publication readiness and access check.

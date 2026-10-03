@@ -48,12 +48,12 @@ test('open-ended seeks return bounded contiguous ranges and malformed ranges are
     const match = range!.match(/^bytes=(\d+)-(\d+)$/)!;
     const start = Number(match[1]), end = Number(match[2]);
     const data = new Uint8Array(end - start + 1).fill(7);
-    return { body: new Response(data).body!, length: data.byteLength, range: `bytes ${start}-${end}/9000000`, etag: '"v1"' };
+    return { body: new Response(data).body!, length: data.byteLength, range: `bytes ${start}-${end}/90000000`, etag: '"v1"' };
   });
   const response = await deliver(new Request('https://review.test/media', { headers: { Range: 'bytes=2000000-' } }), 'v1', 'video/mp4');
   expect(response.status).toBe(206);
-  expect(response.headers.get('content-range')).toBe('bytes 2000000-3048575/9000000');
-  expect((await response.arrayBuffer()).byteLength).toBe(1048576);
+  expect(response.headers.get('content-range')).toBe('bytes 2000000-18777215/90000000');
+  expect((await response.arrayBuffer()).byteLength).toBe(16777216);
   for (const range of ['bytes=4-2', 'bytes=0-1,3-4', 'bytes=-0']) {
     expect((await deliver(new Request('https://review.test/media', { headers: { Range: range } }), 'v1', 'video/mp4')).status).toBe(416);
   }
