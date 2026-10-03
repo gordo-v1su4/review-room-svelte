@@ -12,6 +12,8 @@ export function createMediaDelivery(read: ReadMedia) {
   const bytes = new Map<string, { data: Uint8Array; media: Omit<StoredMedia, 'body'>; until: number }>();
   const metadata = new Map<string, { total: number; etag?: string; until: number }>();
   let used = 0;
+  let buffering = 0;
+  const pending = new Map<string, Promise<void>>();
   function forget(key: string) {
     const entry = bytes.get(key);
     if (entry) { used -= entry.data.byteLength; bytes.delete(key); }
@@ -52,12 +54,18 @@ export function createMediaDelivery(read: ReadMedia) {
       ? `bytes=${start}-${Math.min(start + CHUNK - 1, prefix?.[2] ? Number(prefix[2]) : Number.MAX_SAFE_INTEGER)}`
       : range ?? undefined;
     const cacheKey = JSON.stringify([key, bounded ?? 'full']);
+    await pending.get(cacheKey);
     const cached = bytes.get(cacheKey);
     let media: Omit<StoredMedia, 'body'>;
     let body: ReadableStream<Uint8Array> | Uint8Array;
     if (cached && cached.until > now) {
       bytes.delete(cacheKey); bytes.set(cacheKey, cached);
-      media = cached.media; body = cached.data.slice();
+      media = cached.media;
+      let offset = 0;
+      body = new ReadableStream({ pull(controller) {
+        if (offset >= cached.data.length) { controller.close(); return; }
+        controller.enqueue(cached.data.slice(offset, offset + 65536)); offset += 65536;
+      } });
     } else {
       forget(cacheKey);
       try {
@@ -75,13 +83,22 @@ export function createMediaDelivery(read: ReadMedia) {
           return deliver(new Request(request.url, { method: request.method, headers }), key, mimeType);
         }
         if (request.method === 'HEAD') { await result.body.cancel(); body = new Uint8Array(); }
-        else if (result.length <= CHUNK) {
-          const data = new Uint8Array(await new Response(result.body).arrayBuffer());
-          if (data.byteLength !== result.length) throw new Error('Incomplete media response');
-          while (used + data.byteLength > BUDGET && bytes.size) forget(bytes.keys().next().value!);
-          forget(cacheKey);
-          bytes.set(cacheKey, { data, media, until: now + TTL }); used += data.byteLength;
-          body = data.slice();
+        else if (result.length <= CHUNK && buffering + result.length <= BUDGET) {
+          const [responseBody, cacheBody] = result.body.tee();
+          body = responseBody;
+          // Stream first bytes immediately; buffering must not delay playback.
+          buffering += result.length;
+          const fill = new Response(cacheBody).arrayBuffer().then(buffer => {
+            const data = new Uint8Array(buffer);
+            if (data.byteLength !== result.length) return;
+            while (used + data.byteLength > BUDGET && bytes.size) forget(bytes.keys().next().value!);
+            forget(cacheKey);
+            bytes.set(cacheKey, { data, media: { length: result.length, range: result.range, etag: result.etag }, until: now + TTL });
+            used += data.byteLength;
+          }).catch(() => { /* A failed stream is never cached. */ }).finally(() => {
+            buffering -= result.length; pending.delete(cacheKey);
+          });
+          pending.set(cacheKey, fill);
         } else body = result.body;
       } catch (cause) {
         const failure = cause as { name?: string; $metadata?: { httpStatusCode?: number } };
