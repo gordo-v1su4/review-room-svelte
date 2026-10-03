@@ -4,8 +4,8 @@
     type CanvasHoverFrame,
   } from '$lib/playback/hover-frame-cache';
 
-  let { src, poster, type, name }: {
-    src: string; poster?: string; type: 'video' | 'image'; name: string;
+  let { src, poster, type, name, availability = 'ready' }: {
+    src: string; poster?: string; type: 'video' | 'image'; name: string; availability?: 'queued' | 'running' | 'error' | 'ready';
   } = $props();
 
   let hovered = $state(false);
@@ -14,6 +14,7 @@
   let display = $state<HTMLCanvasElement>();
   let canvasReady = $state(false);
   let frameReady = $state(false);
+  let failedPoster = $state('');
   let frames: ReturnType<typeof hoverFrameCache.retain> | undefined;
   let releaseActive: (() => void) | undefined;
   let loadedSource = '';
@@ -23,7 +24,7 @@
 
   function bindSource() {
     const source = src;
-    if (type !== 'video') return;
+    if (type !== 'video' || !source) return;
     frames = hoverFrameCache.retain(source);
     duration = 0;
     return () => {
@@ -40,7 +41,7 @@
   }
 
   function beginPreview(event: PointerEvent) {
-    if (event.pointerType === 'touch' || event.pointerType === 'pen' || type !== 'video') return;
+    if (event.pointerType === 'touch' || event.pointerType === 'pen' || type !== 'video' || availability !== 'ready' || !src) return;
     releaseActive = hoverPreviewCoordinator.activate(endPreview);
     hovered = true;
     updatePointer(event);
@@ -156,10 +157,12 @@
   onpointerleave={endPreview}
   onpointercancel={endPreview}
 >
-  {#if type === 'image'}
-    <img src={poster ?? src} alt="" loading="lazy" />
+  {#if availability !== 'ready'}
+    <div class="poster-placeholder" role="status" aria-label={`${name}: ${availability === 'error' ? 'Processing failed' : availability === 'running' ? 'Processing' : 'Queued'}`}>{availability === 'error' ? 'Processing failed' : availability === 'running' ? 'Processing…' : 'Queued'}</div>
+  {:else if type === 'image'}
+    {#if failedPoster !== (poster ?? src)}<img src={poster ?? src} alt="" loading="lazy" onerror={() => failedPoster = poster ?? src} />{:else}<div class="poster-placeholder">Preview unavailable</div>{/if}
   {:else}
-    {#if poster}<img class="poster" class:hidden={hovered && (frameReady || canvasReady)} src={poster} alt="" loading="lazy" />{:else}<div class="poster-placeholder" class:hidden={hovered && (frameReady || canvasReady)}>Preview</div>{/if}
+    {#if poster && failedPoster !== poster}<img class="poster" class:hidden={hovered && (frameReady || canvasReady)} src={poster} alt="" loading="lazy" onerror={() => failedPoster = poster ?? ''} />{:else}<div class="poster-placeholder" class:hidden={hovered && (frameReady || canvasReady)}>{poster ? 'Preview unavailable' : 'Preview'}</div>{/if}
     <video
       bind:this={preview}
       class:visible={hovered && frameReady && !canvasReady}

@@ -171,6 +171,8 @@ Design these as first-class, not afterthoughts. *No media:* "Upload your first m
 
 In the signed-in workspace, processing badges and media metadata update automatically while the page stays open. A current attempt becoming ready refreshes its thumbnail and retries its unavailable playback source. Processing updates preserve the current project/folder, selected asset, comment draft and usable playback position. Transient observation failures retain usable media and recover; retry/refresh processing controls do not reload the page.
 
+Queued/running media uses a labelled thumbnail placeholder and a waiting/processing viewer state. Originals and posters are requested only after the asset and current version are ready; sealed originals are not reviewed early while derivatives run. Failed ingest points to the owner’s safe Retry control. Unavailable media, expired access, interrupted delivery, unsupported format, and actual decoder failure have distinct messages; Retry playback reloads the current authorized source. Missing posters use a deliberate placeholder instead of a broken-image icon.
+
 ## 17. Design priorities (if time is short)
 
 1. Admin workspace → 2. Client review page → 3. Video card system → 4. Right-side viewer panel → 5. Rating/comment/approval interactions → 6. Filters + smart-view tabs → 7. Upload states → 8. Table view → 9. Grouped (stacked) view → 10. Mobile refinements.

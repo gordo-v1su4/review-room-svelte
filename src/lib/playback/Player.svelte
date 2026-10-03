@@ -8,7 +8,7 @@
   import type { PreviewInfo } from './accelerated/protocol';
   import { createScrubPreview } from './accelerated/preview';
   import { createGpuPreviewRenderer, type GpuPreviewRenderer } from './accelerated/gpu-renderer';
-  let { src, name, loop = false, sourceBlob, mediaInfo, onready = (_: string) => {}, onended = (_: string) => {}, onfailure = (_: string) => {}, onViewed = () => {}, onmetadata = (_: PreviewInfo) => {}, ontime = (_: number) => {} }: { src: string; name: string; loop?: boolean; sourceBlob?: Blob; mediaInfo?: PreviewInfo; onready?: (source: string) => void; onended?: (source: string) => void; onfailure?: (source: string) => void; diagnostics?: boolean; onViewed?: () => void; onmetadata?: (info: PreviewInfo) => void; ontime?: (time: number) => void } = $props();
+  let { src, name, availability = 'ready', loop = false, sourceBlob, mediaInfo, onready = (_: string) => {}, onended = (_: string) => {}, onfailure = (_: string) => {}, onViewed = () => {}, onmetadata = (_: PreviewInfo) => {}, ontime = (_: number) => {} }: { src: string; name: string; availability?: 'queued' | 'running' | 'error' | 'ready'; loop?: boolean; sourceBlob?: Blob; mediaInfo?: PreviewInfo; onready?: (source: string) => void; onended?: (source: string) => void; onfailure?: (source: string) => void; diagnostics?: boolean; onViewed?: () => void; onmetadata?: (info: PreviewInfo) => void; ontime?: (time: number) => void } = $props();
   let video: HTMLVideoElement;
   let surface: HTMLDivElement;
   let paused = $state(true), muted = $state(false), time = $state(0), duration = $state(0);
@@ -22,6 +22,7 @@
   let error = $state(''), scrubbing = $state(false), ready = $state(false);
   let session: ReturnType<typeof createPlaybackSession> | undefined;
   let transportRequest = 0;
+  let retryTime: number | null = null;
   let monitor: ReturnType<typeof observeNativePlayback> | undefined;
   let metrics = $state<PlaybackMetrics>();
   let previewVisible = $state(false), previewBackend = $state('Native only'), previewCodec = $state('Not checked');
@@ -105,6 +106,7 @@
         transportRequest += 1;
         observer.dispose(); attached.dispose(); releasePointer();
         source = nextSource; mediaWidth = 0; mediaHeight = 0;
+        retryTime = null;
         ready = false; error = ''; time = 0; duration = 0; paused = true; muted = node.muted;
         attached = createPlaybackSession(node); session = attached;
         observer = observeNativePlayback(node, next => metrics = next); monitor = observer;
@@ -224,21 +226,49 @@
     else return;
     event.preventDefault(); seek(next);
   }
+  async function mediaFailed() {
+    if (availability !== 'ready' || !src) return;
+    const source = src, request = transportRequest;
+    const code = video.error?.code;
+    ready = false;
+    error = code === 3 ? 'This video could not be decoded. Try a browser-supported MP4 or WebM.' : 'Checking media availability…';
+    if (code !== 3) {
+      try {
+        const response = await fetch(source, { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(10000) });
+        if (src !== source || request !== transportRequest || availability !== 'ready') return;
+        error = response.redirected || response.status === 401 || response.status === 403
+          ? 'Your media access has expired. Sign in again to continue.'
+          : !response.ok ? 'Media is unavailable. Retry playback or check processing.'
+          : code === 2 ? 'The media connection was interrupted. Retry playback.'
+          : 'This video format is not supported by this browser. Try a browser-supported MP4 or WebM.';
+      } catch {
+        if (src !== source || request !== transportRequest || availability !== 'ready') return;
+        error = 'The media connection was interrupted. Retry playback.';
+      }
+    }
+    onfailure(source);
+  }
+  function retryPlayback() {
+    if (availability !== 'ready' || !src) return;
+    transportRequest++;
+    retryTime = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+    error = ''; video.load();
+  }
 </script>
 <div class="player" bind:this={surface} data-playback={dev ? JSON.stringify({ native: metrics, preview: { backend: previewBackend, codec: previewCodec, decodeMs: previewDecodeMs, requestMs: previewRequestMs, time: previewTime, visible: previewVisible }, scrubbing }) : undefined}>
   <div class="picture">
     <!-- The persistent media element survives layout changes. -->
     <!-- svelte-ignore a11y_media_has_caption -->
-    <video bind:this={video} use:attachMedia={src} {src} {loop} playsinline preload="metadata" aria-label={name}
+    <video bind:this={video} use:attachMedia={src} src={availability === 'ready' && src ? src : undefined} {loop} playsinline preload="metadata" aria-label={name}
       onloadstart={() => { ready = false; error = ''; time = 0; duration = 0; }}
       onloadedmetadata={() => { duration = Number.isFinite(video.duration) ? video.duration : 0; mediaWidth = video.videoWidth; mediaHeight = video.videoHeight; }}
-      onloadeddata={() => { ready = true; onready(video.currentSrc); }}
+      onloadeddata={() => { ready = true; if (retryTime !== null) { seek(retryTime); retryTime = null; } onready(video.currentSrc); }}
       ontimeupdate={() => { if (!scrubbing) { time = video.currentTime; ontime(time); } }}
       onplay={() => { paused = false; error = ''; onViewed(); }} onpause={() => paused = true} onended={ended}
       onvolumechange={() => muted = video.muted}
-      onerror={() => { error = 'This file could not be played. Try a browser-supported MP4 or WebM.'; onfailure(src); }}></video>
+      onerror={mediaFailed}></video>
     {#key sourceBlob}<canvas class="preview-canvas" use:attachPreview={sourceBlob} aria-hidden="true" style:visibility={previewVisible ? 'visible' : 'hidden'}></canvas>{/key}
-    {#if error}<div class="player-message" role="alert">{error}</div>{:else if !ready}<div class="player-message" role="status">Preparing playback…</div>{/if}
+    {#if availability !== 'ready'}<div class="player-message" role="status">{availability === 'error' ? 'Processing failed. Retry processing above.' : availability === 'queued' ? 'Waiting for processing…' : 'Processing video…'}</div>{:else if error}<div class="player-message" role="alert">{error}<button onclick={retryPlayback}>Retry playback</button></div>{:else if !ready}<div class="player-message" role="status">Preparing playback…</div>{/if}
   </div>
   <div class="playback-controls">
     <div class="scrubber" role="slider" tabindex={ready ? 0 : -1} aria-label="Video timeline" aria-valuemin="0" aria-valuemax={duration || 1} aria-valuenow={time} aria-valuetext={stamp(time)} aria-disabled={!ready}
