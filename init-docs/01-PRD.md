@@ -289,9 +289,9 @@ This is the strongest FreeCut influence, but only the parts that serve review. T
 ### Phase A — MVP review media path
 - Upload supports drag/drop and file picker, accepts many videos or still images at once, and runs bounded parallel uploads so a 20–30 asset batch starts populating quickly.
 - Create Convex metadata as soon as upload completes; set `processingStatus = processing`; the grid should show useful progress/processing states instead of waiting for all media work.
-- Full playback uses native HTML5 `<video>` from a signed URL.
+- Full playback uses native HTML5 `<video>` through the authorized private media proxy (delivery and revocation policy: ADR 001). Media remains gated until both asset and current version are ready.
 - Still images use the same asset card, review, rating, shortlist, comment, approval, and download paths. They render as signed `<img>` previews, have no duration/sprite/timeline, and skip ffmpeg preview refresh.
-- Hover scrub uses the ffmpeg-generated `spriteKey` sheet from `services/media-worker`, both on cards and the player scrubber. This is the default low-risk path because it has no decode cost at hover time.
+- Current card hover scrub uses the native original and a bounded browser frame cache. The visible poster uses the current version’s `posterKey`; generated sprite sheets are not consumed by the current owner UI. Sprite-based scrubbing remains future work.
 - If local object URLs are available during the upload session, use them for immediate admin-side preview while the RustFS upload/worker finishes. Persist only object keys and metadata.
 
 ### Phase B — FreeCut-style review preview engine

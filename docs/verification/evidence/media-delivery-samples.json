@@ -1,0 +1,352 @@
+{
+  "baseline": {
+    "asset": "VID_20261002_00013",
+    "samples": [
+      {
+        "canplayMs": 224.0999999940395,
+        "index": 1,
+        "phase": "cold",
+        "posterMs": 71.69999999552965,
+        "seekMs": 328.6000000014901,
+        "status": 206,
+        "ttfbMs": 52.89999999850989
+      },
+      {
+        "canplayMs": 205.79999999701977,
+        "index": 1,
+        "phase": "warm",
+        "posterMs": 53.5,
+        "seekMs": 214.10000000149012,
+        "status": 206,
+        "ttfbMs": 63.60000000149011
+      },
+      {
+        "canplayMs": 209,
+        "index": 2,
+        "phase": "cold",
+        "posterMs": 61.5,
+        "seekMs": 321.69999999552965,
+        "status": 206,
+        "ttfbMs": 70.70000000298023
+      },
+      {
+        "canplayMs": 223.39999999850988,
+        "index": 2,
+        "phase": "warm",
+        "posterMs": 64.40000000596046,
+        "seekMs": 170.10000000149012,
+        "status": 206,
+        "ttfbMs": 62.89999999850989
+      },
+      {
+        "canplayMs": 235.60000000149012,
+        "index": 3,
+        "phase": "cold",
+        "posterMs": 57,
+        "seekMs": 169.70000000298023,
+        "status": 206,
+        "ttfbMs": 55.599999994039536
+      },
+      {
+        "canplayMs": 250.89999999850988,
+        "index": 3,
+        "phase": "warm",
+        "posterMs": 66.5,
+        "seekMs": 372.3999999985099,
+        "status": 206,
+        "ttfbMs": 65.80000000447035
+      },
+      {
+        "canplayMs": 203.20000000298023,
+        "index": 4,
+        "phase": "cold",
+        "posterMs": 66.60000000149012,
+        "seekMs": 216.29999999701977,
+        "status": 206,
+        "ttfbMs": 54.60000000149011
+      },
+      {
+        "canplayMs": 197.19999999552965,
+        "index": 4,
+        "phase": "warm",
+        "posterMs": 65.10000000149012,
+        "seekMs": 359.8999999985099,
+        "status": 206,
+        "ttfbMs": 68.30000000447035
+      },
+      {
+        "canplayMs": 226.89999999850988,
+        "index": 5,
+        "phase": "cold",
+        "posterMs": 59.29999999701977,
+        "seekMs": 244.79999999701977,
+        "status": 206,
+        "ttfbMs": 57.80000000447035
+      },
+      {
+        "canplayMs": 230.20000000298023,
+        "index": 5,
+        "phase": "warm",
+        "posterMs": 57.30000000447035,
+        "seekMs": 178.29999999701977,
+        "status": 206,
+        "ttfbMs": 62.39999999850989
+      }
+    ],
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  "direct": {
+    "asset": "VID_20261002_00013",
+    "samples": [
+      {
+        "canplayMs": 138.10000000149012,
+        "index": 1,
+        "phase": "cold",
+        "posterMs": 541.2999999970198,
+        "seekMs": 163.5,
+        "status": 206,
+        "ttfbMs": 34.099999994039536
+      },
+      {
+        "canplayMs": 139.79999999701977,
+        "index": 1,
+        "phase": "warm",
+        "posterMs": 19.299999997019768,
+        "seekMs": 108.79999999701975,
+        "status": 206,
+        "ttfbMs": 21.400000005960464
+      },
+      {
+        "canplayMs": 94,
+        "index": 2,
+        "phase": "cold",
+        "posterMs": 16.400000005960464,
+        "seekMs": 107.5,
+        "status": 206,
+        "ttfbMs": 22.19999999552965
+      },
+      {
+        "canplayMs": 91.79999999701975,
+        "index": 2,
+        "phase": "warm",
+        "posterMs": 17.100000001490116,
+        "seekMs": 113.30000000447036,
+        "status": 206,
+        "ttfbMs": 27.100000001490116
+      },
+      {
+        "canplayMs": 93.80000000447036,
+        "index": 3,
+        "phase": "cold",
+        "posterMs": 15.199999995529652,
+        "seekMs": 108.19999999552964,
+        "status": 206,
+        "ttfbMs": 20.700000002980232
+      },
+      {
+        "canplayMs": 94.29999999701975,
+        "index": 3,
+        "phase": "warm",
+        "posterMs": 15.299999997019768,
+        "seekMs": 148,
+        "status": 206,
+        "ttfbMs": 22.600000001490116
+      },
+      {
+        "canplayMs": 88.69999999552965,
+        "index": 4,
+        "phase": "cold",
+        "posterMs": 17.399999998509884,
+        "seekMs": 107.10000000149012,
+        "status": 206,
+        "ttfbMs": 28.19999999552965
+      },
+      {
+        "canplayMs": 94.89999999850988,
+        "index": 4,
+        "phase": "warm",
+        "posterMs": 20.200000002980232,
+        "seekMs": 109.10000000149012,
+        "status": 206,
+        "ttfbMs": 28
+      },
+      {
+        "canplayMs": 93.89999999850988,
+        "index": 5,
+        "phase": "cold",
+        "posterMs": 15.5,
+        "seekMs": 108.60000000149012,
+        "status": 206,
+        "ttfbMs": 23.100000001490116
+      },
+      {
+        "canplayMs": 93.39999999850988,
+        "index": 5,
+        "phase": "warm",
+        "posterMs": 14.699999995529652,
+        "seekMs": 108.39999999850988,
+        "status": 206,
+        "ttfbMs": 23
+      }
+    ],
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  "final": {
+    "asset": "VID_20261002_00013",
+    "samples": [
+      {
+        "canplayMs": 233.0999999940395,
+        "index": 1,
+        "phase": "cold",
+        "posterMs": 27.099999994039536,
+        "seekMs": 188.60000000149012,
+        "status": 206,
+        "ttfbMs": 50.89999999850989
+      },
+      {
+        "canplayMs": 223.60000000149012,
+        "index": 1,
+        "phase": "warm",
+        "posterMs": 0.3999999985098839,
+        "seekMs": 192.60000000149012,
+        "status": 206,
+        "ttfbMs": 37.599999994039536
+      },
+      {
+        "canplayMs": 197.5999999940395,
+        "index": 2,
+        "phase": "cold",
+        "posterMs": 65.60000000149012,
+        "seekMs": 183.60000000149012,
+        "status": 206,
+        "ttfbMs": 27.600000001490116
+      },
+      {
+        "canplayMs": 217.29999999701977,
+        "index": 2,
+        "phase": "warm",
+        "posterMs": 0.7999999970197678,
+        "seekMs": 171.80000000447035,
+        "status": 206,
+        "ttfbMs": 29.69999999552965
+      },
+      {
+        "canplayMs": 206,
+        "index": 3,
+        "phase": "cold",
+        "posterMs": 24.200000002980232,
+        "seekMs": 196,
+        "status": 206,
+        "ttfbMs": 30
+      },
+      {
+        "canplayMs": 214.69999999552965,
+        "index": 3,
+        "phase": "warm",
+        "posterMs": 0.5,
+        "seekMs": 114.20000000298025,
+        "status": 206,
+        "ttfbMs": 26.19999999552965
+      },
+      {
+        "canplayMs": 216,
+        "index": 4,
+        "phase": "cold",
+        "posterMs": 68.80000000447035,
+        "seekMs": 138.5,
+        "status": 206,
+        "ttfbMs": 29.100000001490116
+      },
+      {
+        "canplayMs": 216.5999999940395,
+        "index": 4,
+        "phase": "warm",
+        "posterMs": 0.3999999985098839,
+        "seekMs": 114.80000000447036,
+        "status": 206,
+        "ttfbMs": 29.5
+      },
+      {
+        "canplayMs": 376.30000000447035,
+        "index": 5,
+        "phase": "cold",
+        "posterMs": 68.79999999701977,
+        "seekMs": 165.69999999552965,
+        "status": 206,
+        "ttfbMs": 30.100000001490116
+      },
+      {
+        "canplayMs": 193.10000000149012,
+        "index": 5,
+        "phase": "warm",
+        "posterMs": 0.3999999985098839,
+        "seekMs": 187,
+        "status": 206,
+        "ttfbMs": 31
+      }
+    ],
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  "uiSelections": [
+    {
+      "index": 1,
+      "phase": "cold",
+      "readyState": 4,
+      "selectionToCanplayMs": 263.3999999985099
+    },
+    {
+      "index": 1,
+      "phase": "warm",
+      "readyState": 4,
+      "selectionToCanplayMs": 214.19999999552965
+    },
+    {
+      "index": 2,
+      "phase": "cold",
+      "readyState": 4,
+      "selectionToCanplayMs": 248.39999999850988
+    },
+    {
+      "index": 2,
+      "phase": "warm",
+      "readyState": 4,
+      "selectionToCanplayMs": 241.5
+    },
+    {
+      "index": 3,
+      "phase": "cold",
+      "readyState": 4,
+      "selectionToCanplayMs": 251.39999999850988
+    },
+    {
+      "index": 3,
+      "phase": "warm",
+      "readyState": 4,
+      "selectionToCanplayMs": 206
+    },
+    {
+      "index": 4,
+      "phase": "cold",
+      "readyState": 4,
+      "selectionToCanplayMs": 254.10000000149012
+    },
+    {
+      "index": 4,
+      "phase": "warm",
+      "readyState": 4,
+      "selectionToCanplayMs": 211.80000000447035
+    },
+    {
+      "index": 5,
+      "phase": "cold",
+      "readyState": 4,
+      "selectionToCanplayMs": 244.30000000447035
+    },
+    {
+      "index": 5,
+      "phase": "warm",
+      "readyState": 4,
+      "selectionToCanplayMs": 268.3999999985099
+    }
+  ]
+}

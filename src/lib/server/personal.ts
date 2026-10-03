@@ -6,13 +6,16 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '$env/dynamic/private';
 import { error } from '@sveltejs/kit';
 import { createHash } from 'node:crypto';
+import { createMediaDelivery } from './media-delivery';
+let convexClient: ConvexHttpClient | undefined;
+let storageClient: S3Client | undefined;
 
 export function db() {
   const url = env.REVIEW_ROOM_CONVEX_URL;
   const key = env.REVIEW_ROOM_CONVEX_ADMIN_KEY;
   if (!url || !key) throw error(503, 'Personal Review Room backend is not configured');
   if (url !== 'https://review-convex.v1su4.dev') throw error(503, 'Unexpected Review Room backend target');
-  const client = new ConvexHttpClient(url);
+  const client = convexClient ??= new ConvexHttpClient(url);
   (client as ConvexHttpClient & { setAdminAuth(token: string): void }).setAdminAuth(key);
   return {
     query<T extends FunctionReference<'query', 'public' | 'internal'>>(ref: T, args: FunctionArgs<T>): Promise<FunctionReturnType<T>> {
@@ -35,7 +38,7 @@ export function storage() {
   if (env.S3_ENDPOINT !== 'https://s3.v1su4.dev' || env.S3_BUCKET !== 'review-room-svelte') {
     throw error(503, 'Unexpected Review Room storage target');
   }
-  return new S3Client({
+  return storageClient ??= new S3Client({
     endpoint: env.S3_ENDPOINT,
     region: env.S3_REGION || 'us-east-1',
     forcePathStyle: true,
@@ -119,28 +122,13 @@ export async function verifiedObject(key: string) {
   return result;
 }
 
-export async function mediaResponse(key: string, mimeType: string, range?: string) {
-  try {
-    if (range && !/^bytes=(\d+-\d*|-\d+)$/.test(range)) {
-      return new Response(null, { status: 416, headers: { 'cache-control': 'private, no-store' } });
-    }
-    const result = await storage().send(new GetObjectCommand({ Bucket: bucket(), Key: key, Range: range }));
-    if (!result.Body || result.ContentLength === undefined) throw error(404, 'Media unavailable');
-    const headers = new Headers({
-      'content-type': mimeType,
-      'accept-ranges': 'bytes',
-      'cache-control': 'private, no-store',
-      'x-content-type-options': 'nosniff',
-      'cross-origin-resource-policy': 'same-origin'
-    });
-    headers.set('content-length', String(result.ContentLength));
-    if (range && result.ContentRange) headers.set('content-range', result.ContentRange);
-    return new Response(result.Body.transformToWebStream(), { status: range ? 206 : 200, headers });
-  } catch (cause) {
-    if ((cause as { name?: string }).name === 'NoSuchKey') throw error(404, 'Media unavailable');
-    if (range && (cause as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 416) {
-      return new Response(null, { status: 416, headers: { 'cache-control': 'private, no-store' } });
-    }
-    throw cause;
-  }
+const deliverMedia = createMediaDelivery(async (key, range) => {
+  const result = await storage().send(new GetObjectCommand({ Bucket: bucket(), Key: key, Range: range }));
+  if (!result.Body || result.ContentLength === undefined) throw error(404, 'Media unavailable');
+  return { body: result.Body.transformToWebStream(), length: result.ContentLength,
+    range: result.ContentRange, etag: result.ETag };
+});
+
+export async function mediaResponse(key: string, mimeType: string, request: Request) {
+  return deliverMedia(request, key, mimeType);
 }

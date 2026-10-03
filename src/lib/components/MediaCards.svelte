@@ -45,7 +45,7 @@
       <button type="button" class="card-open" data-asset-id={asset.id} draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} aria-label={`Open ${asset.name}`} aria-current={activeId === asset.id ? 'true' : undefined}
         onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id, event)}>
         <div class="thumbnail">
-          <MediaThumbnail src={asset.url} poster={asset.poster} type={asset.type} name={asset.name}/>
+          <MediaThumbnail src={asset.url} poster={asset.poster} type={asset.type} name={asset.name} availability={asset.availability ?? 'ready'}/>
           <span class="asset-type">{asset.assetClass}</span>
           {#if asset.shortlisted}<span class="shortlist-icon" title="Shortlisted"><Bookmark size={16} fill="currentColor"/></span>{/if}
         </div>

@@ -57,6 +57,11 @@ try {
   await page.getByRole('button', { name: '20261002', exact: false }).first().click();
   await page.getByRole('button', { name: 'Open VID_CHECK_a', exact: true }).click();
   await page.getByText('Processing: Queued', { exact: true }).waitFor();
+  await page.getByText('Waiting for processing…', { exact: true }).waitFor({ timeout: 2500 });
+  assert.equal(await page.getByRole('alert').filter({ hasText: 'browser-supported' }).count(), 0);
+  assert.equal(await page.locator('video[aria-label="VID_CHECK_a"]').getAttribute('src'), null,
+    'pending media must not request an unavailable original');
+  console.log('PASS: queued media has an explicit waiting state without a codec error or premature request');
   const beforeProcessing = navigations;
   status = 'running';
   await page.getByText('Processing: derivatives in progress', { exact: true }).waitFor({ timeout: 12000 });

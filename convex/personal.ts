@@ -494,8 +494,9 @@ export const publicationMedia = internalQuery({
 });
 
 export const reviewMedia = internalQuery({
-  args: { token: v.string(), accessKey: v.optional(v.string()), assetId: v.id("videos"), poster: v.boolean() },
+  args: { token: v.string(), accessKey: v.optional(v.string()), assetId: v.id("videos"), poster: v.boolean(), checkedAt: v.optional(v.number()) },
   handler: async (ctx, args) => {
+    // Request time varies the query cache key so expiry is evaluated on each HTTP request.
     const { project } = await getReviewLink(ctx, args.token, args.accessKey);
     const asset = await ctx.db.get(args.assetId);
     if (!asset || asset.projectId !== project._id || asset.status === "archived" || asset.processingStatus !== "ready" || !asset.currentVersionId) return null;

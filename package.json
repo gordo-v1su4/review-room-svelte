@@ -9,6 +9,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "bun test",
     "test:processing": "node scripts/check-processing.mjs",
+    "test:media-states": "node scripts/check-media-states.mjs",
     "test:delete": "node scripts/check-delete-selected.mjs",
     "deploy:convex": "convex deploy",
     "trigger:deploy": "bash scripts/deploy-trigger-vm100.sh",

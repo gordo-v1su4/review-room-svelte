@@ -1,6 +1,6 @@
 # Svelte media readiness and delivery
 
-Status: needs-triage
+Status: done
 Linear: [V1S-134](https://linear.app/v1su4/issue/V1S-134)
 
 A processing upload should become reviewable in the same open workspace. Ready thumbnails and playback should respond quickly without compromising private media access.
