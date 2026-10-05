@@ -739,7 +739,7 @@ button {
 }
 .review-actions {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   padding: 10px 20px;
   flex-wrap: wrap;
@@ -752,8 +752,10 @@ button {
 .review-feedback,
 .review-outcome {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+  padding-block: 0;
+  margin-block: 0;
 }
 .review-feedback { flex: 0 0 auto; }
 .review-outcome {
@@ -780,6 +782,9 @@ button {
 }
 .rating {
   display: flex;
+  align-items: flex-start;
+  padding-block: 0;
+  margin-block: 0;
 }
 .rating button {
   display: grid;
@@ -788,9 +793,13 @@ button {
   height: 28px;
   color: #95c8ba;
   padding: 0;
+  margin-block: 0;
 }
 .asset-nav {
   display: flex;
+  align-items: flex-start;
+  padding-block: 0;
+  margin-block: 0;
   margin-left: 0;
   gap:4px;
 }

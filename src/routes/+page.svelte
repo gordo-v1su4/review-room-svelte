@@ -52,7 +52,6 @@
   import AppearanceMenu from '$lib/components/AppearanceMenu.svelte';
   import ProjectTree from '$lib/components/ProjectTree.svelte';
   import WorkspacePanes from '$lib/components/WorkspacePanes.svelte';
-  import FolderArtwork from '$lib/components/FolderArtwork.svelte';
   import FeedbackNotifications from '$lib/components/FeedbackNotifications.svelte';
   import FeedbackInbox from '$lib/components/FeedbackInbox.svelte';
   import { feedbackDigests, type FeedbackNote } from '$lib/feedback-inbox';
@@ -99,7 +98,7 @@
   const childFolders = $derived(projectFolders.filter(folder => folder.parentFolderId === (activeFolderId ?? undefined)));
   const folderDestinations = $derived(projectFolders.map(folder => ({ ...folder, title: folderPath(projectFolders, folder.id) })));
 
-  let folderOpen = $state(false);
+  let folderOpen = $state(true);
   let navCollapsed = $state(false);
   let projectDialog = $state(false), projectName = $state('');
   let identityDialogOpen = $state(false);
@@ -507,7 +506,7 @@
     if (!inbox.some(group => group.comments.some(item => item.commentId === note.commentId && item.assetId === note.assetId))) return;
     review({ type: 'toggle-comment-complete', assetId: note.assetId, commentId: note.commentId, actorId: 'local-reviewer', at: Date.now() });
   }
-  const locationName = $derived(archived ? 'Archived' : activeCollection?.title ?? (mediaType === 'video' ? 'Videos' : mediaType === 'image' ? 'Images' : filter === 'selected' ? 'Shortlist' : activeFolder?.title ?? 'All media'));
+  const locationName = $derived(archived ? 'Archived' : activeCollection?.title ?? (mediaType === 'video' ? 'Videos' : mediaType === 'image' ? 'Images' : filter === 'selected' ? 'Shortlist' : activeFolder?.title ?? project.name));
   function changeCollections(action: CollectionAction) { collections = transitionCollectionState(collections, action, collectionAccess, organization.folders); }
   function openCollection(id: string, collectionId: string) {
     const collection = collections.collections.find(item => item.id === collectionId && item.projectId === id);
@@ -538,7 +537,7 @@
     const folderId = activeFolderId; openFolder(projectId, collection);
     activeFolderId = folderId; importOptions.folderId = folderId;
   }
-  function openProject(id: string) { openFolder(id, 'all'); folderOpen = false; }
+  function openProject(id: string) { openFolder(id, 'all'); }
   async function editProject(id: string) {
     openProject(id);
     await tick();
@@ -742,7 +741,7 @@
     appearance = appearancePreferences.load(projectId);
   });
   function projectOverview() {
-    select(null); activeCollectionId = null; activeFolderId = null; archived = false; importOptions.folderId = null; folderOpen = false; mediaType = 'all'; filters = defaultFilters(); query = ''; checked = transitionSelection(checked, { type: 'clear' }); navOpen = false;
+    select(null); activeCollectionId = null; activeFolderId = null; archived = false; importOptions.folderId = null; folderOpen = true; mediaType = 'all'; filters = defaultFilters(); query = ''; checked = transitionSelection(checked, { type: 'clear' }); navOpen = false;
   }
   function createProject(event: SubmitEvent) {
     event.preventDefault();
@@ -750,7 +749,7 @@
     if (live) { void ownerAction('createProject', { title: name, description: '' }).catch(cause => feedback = String(cause)); return; }
     const id = crypto.randomUUID();
     projects = [...projects, { id, name }];
-    openFolder(id, 'all'); folderOpen = false;
+    openFolder(id, 'all');
     projectName = ''; projectDialog = false;
   }
   async function saveProjectIdentity(id: string, draft: ProjectIdentityDraft) {
@@ -812,7 +811,7 @@
   <main ondragover={dragFiles} ondrop={dropFiles}>
     <header class="topbar">
       <Dialog.Root bind:open={navOpen}><Dialog.Trigger class="icon-button mobile-menu" aria-label="Open navigation" title="Open navigation"><Menu size={20}/></Dialog.Trigger><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="nav-drawer" onCloseAutoFocus={event => { if (restoringFromNavigation) { event.preventDefault(); restoringFromNavigation = false; void focusProjectHeading(); } }} style={`--project-accent: ${project.brandColor ?? "#14b8a6"}`}><Dialog.Title class="visually-hidden">Workspace navigation</Dialog.Title><Dialog.Description class="visually-hidden">Browse local media and review status</Dialog.Description><Dialog.Close class="icon-button drawer-close" aria-label="Close navigation"><X size={20}/></Dialog.Close>{@render navigation()}</Dialog.Content></Dialog.Portal></Dialog.Root>
-      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each ancestors as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if folderOpen && (!activeFolderId || focusedReview || mediaType !== 'all')}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot}/>{/if}<div class="header-account-tools">{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
+      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each ancestors as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if folderOpen && (focusedReview || mediaType !== 'all' || filter === 'selected' || activeCollectionId || archived)}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId && locationName !== project.name}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot}/>{/if}<div class="header-account-tools">{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
     </header>
     <div class="page-content" class:folder-workspace={folderOpen}>
       <section class="project-heading" class:identity-banner={!folderOpen && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if !folderOpen && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{folderOpen ? locationName : project.name}</h1>{#if !folderOpen}<p class="subtitle" title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description || "Choose a folder to start reviewing."}</p>{/if}</div><div class="project-tools"><ImportQueue jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={folderDestinations} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
@@ -820,17 +819,16 @@
       {#if project.archived}<section class="archived-project-state" aria-label="Archived project">
         <h2>This project is archived.</h2><p>Your media, folders and feedback are retained.</p>
         <div><button class="primary-button" onclick={() => { restoreProject(project.id); void focusProjectHeading(); }}>Restore project</button><button class="secondary-button" onclick={() => projectDialog = true}>New project</button></div>
-      </section>{:else if !activeCollectionId && !archived && !focusedReview}<section class="folder-shelf" aria-label="Folders and media collections">
+      </section>{:else if !activeCollectionId && !archived && !focusedReview}<nav class="library-navigation" aria-label="Folders and media filters">
+        <button class="library-filter" class:chosen={mediaType === 'all' && filter !== 'selected'} aria-pressed={mediaType === 'all' && filter !== 'selected'} onclick={() => openScopedCollection('all')}>All media<span>{directAssets.length}</span></button>
+        <button class="library-filter" class:chosen={mediaType === 'video'} aria-pressed={mediaType === 'video'} onclick={() => openScopedCollection('video')}><Film size={14}/>Videos<span>{directAssets.filter(asset => asset.type === 'video').length}</span></button>
+        <button class="library-filter" class:chosen={mediaType === 'image'} aria-pressed={mediaType === 'image'} onclick={() => openScopedCollection('image')}><Image size={14}/>Images<span>{directAssets.filter(asset => asset.type === 'image').length}</span></button>
+        <button class="library-filter" class:chosen={filter === 'selected'} aria-pressed={filter === 'selected'} onclick={() => openScopedCollection('selected')}><Bookmark size={14}/>Shortlist<span>{directAssets.filter(asset => asset.shortlisted).length}</span></button>
+        {#if childFolders.length}<span class="library-divider" aria-hidden="true"></span>{/if}
         {#each childFolders as folder (folder.id)}
-          <button class="folder-card" onclick={() => openRealFolder(projectId, folder.id)}><FolderArtwork coverSrc={folderCoverUrl(folder, allAssets)} empty={!assets.some(asset => asset.folderId === folder.id)}/><strong>{folder.title}</strong><span>{assets.filter(asset => asset.folderId === folder.id).length} items</span></button>
+          <button class="library-folder" title={folder.title} onclick={() => openRealFolder(projectId, folder.id)}><Folder size={14}/><span class="library-folder-name">{folder.title}</span><span class="library-folder-count">{assets.filter(asset => asset.folderId === folder.id).length}</span></button>
         {/each}
-        {#each [{ type: 'video' as const, name: 'Videos' }, { type: 'image' as const, name: 'Images' }] as collection (collection.type)}
-          <button class="folder-card" class:folder-active={mediaType === collection.type} aria-pressed={mediaType === collection.type} onclick={() => openScopedCollection(collection.type)}>
-            <FolderArtwork empty={!directAssets.some(asset => asset.type === collection.type)}/><strong>{collection.name}</strong><span>{directAssets.filter(asset => asset.type === collection.type).length} items</span>
-          </button>
-        {/each}
-        <button class="folder-card" class:folder-active={filter === 'selected'} aria-pressed={filter === 'selected'} onclick={() => openScopedCollection('selected')}><FolderArtwork empty={!directAssets.some(asset => asset.shortlisted)}/><strong>Shortlist</strong><span>{directAssets.filter(asset => asset.shortlisted).length} items</span></button>
-      </section>{/if}
+      </nav>{/if}
       {#snippet explorer()}
       <div class="collection-bar"><div class="collection-title"><h2 bind:this={explorerHeading} tabindex="-1">Media</h2><span class="count">{visible.length}</span></div><CollectionActions {activeCollection} folders={projectFolders} canEdit={true} onCreate={createCollection} onRename={(collectionId, title) => changeCollections({ type: 'rename', collectionId, title })} onRemove={removeCollection} onSave={saveCollection}/></div>
       <div class="toolbar explorer-toolbar"><label class="search" class:has-query={!!query} title={query ? `Search media: ${query}` : "Search media"}><Search size={16}/><input aria-label="Search media" placeholder="Find a clip or image…" bind:value={query} onkeydown={event => { if (event.key === "Escape") { event.stopPropagation(); event.currentTarget.blur(); } }}/><kbd>⌕</kbd></label>
@@ -922,6 +920,16 @@
 </Dialog.Root>
 
 <style>
+  .library-navigation { display: flex; align-items: center; flex-wrap: nowrap; gap: 6px; min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; padding: 0 0 8px; margin: 0 0 10px; scrollbar-width: thin; }
+  .library-filter, .library-folder { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; white-space: nowrap; cursor: pointer; }
+  .library-filter.chosen { background: var(--raised); color: var(--ink); border-color: color-mix(in srgb, var(--teal) 35%, var(--border)); }
+  .library-filter:hover, .library-folder:hover { background: var(--raised); color: var(--ink); }
+  .library-filter > span, .library-folder-count { font-size: 10px; color: var(--muted); }
+  .library-folder-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+  .library-divider { flex: 0 0 1px; height: 20px; margin: 0 4px; background: var(--border); }
+  .library-filter:focus-visible, .library-folder:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }
+  @media (pointer: coarse) { .library-filter, .library-folder { height: 44px; } }
+
   .media-job { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:7px 12px; border-block:1px solid var(--border); background:color-mix(in srgb, var(--teal) 7%, var(--panel)); color:var(--muted); font-size:11px; }
   .media-job span { color:var(--ink); }
   .media-job a { color:var(--teal); }
