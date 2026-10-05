@@ -18,7 +18,7 @@ Review Room stores metadata in its dedicated self-hosted Convex deployment and m
 | **Media processing** | Dedicated Review Room Trigger.dev project on VM100 runs bounded FFmpeg ingest stages and updates this app's Convex records. |
 | **Media access** | Owner, private review, and publication routes authorize and check readiness on every request (review queries include the request timestamp to re-evaluate expiry), then proxy RustFS. Immutable-version bytes use a bounded 64 MiB process cache (up to 16 MiB entries, five-minute TTL; bounded background fills), reusable storage/Convex clients, and bounded video range responses. Browser responses are `private, no-cache` with ETag revalidation, preserving revocation at the next request. Short-lived direct signed playback was considered but would retain bearer access until expiry; uploads still use presigned URLs. |
 | **Permanent deletion** | Owner-only selection deletion removes metadata transactionally. Convex schedules durable RustFS cleanup with retries, using the existing scoped Review Room `S3_*` credentials. Set these on the dedicated Convex deployment before deploying deletion functions; scope stays `review-room-svelte/assets/*`. |
-| **Frontend deploy** | Dedicated SvelteKit container on App VM, fronted by `https://review-room.v1su4.dev`; Compose source is `infra/app-vm/compose.yaml`. Its credentials target only the personal Convex instance and private bucket. |
+| **Frontend deploy** | Dedicated SvelteKit container on App VM, fronted by `https://review.v1su4.dev`; Compose source is `infra/app-vm/compose.yaml`. Its credentials target only the personal Convex instance and private bucket. |
 
 ## Review Room environment
 

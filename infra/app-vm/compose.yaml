@@ -8,7 +8,7 @@ services:
       - path: /opt/review-room-svelte-app/private.env
         format: raw
     environment:
-      ORIGIN: https://review-room.v1su4.dev
+      ORIGIN: https://review.v1su4.dev
       REVIEW_ROOM_OWNER_EMAIL: gordo@v1su4.com
       HOST: 0.0.0.0
       PORT: "3000"

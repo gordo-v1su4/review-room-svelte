@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { ConvexHttpClient } from 'convex/browser';
 const client = new ConvexHttpClient(process.env.REVIEW_ROOM_CONVEX_URL);
 client.setAdminAuth(process.env.REVIEW_ROOM_CONVEX_ADMIN_KEY);
-const base = 'https://review-room.v1su4.dev';
+const base = 'https://review.v1su4.dev';
 const snapshot = await client.query('personal:snapshot', {});
 const project = snapshot.projects.find(p => p.title === 'V1S-136-137 verification');
 assert(project, 'Use only the named synthetic verification project');

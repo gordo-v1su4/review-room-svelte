@@ -44,7 +44,7 @@ Homelab env: start from `.env.example` and populate only this app's dedicated Re
 
 ## Deployment invariant
 
-- Personal GitHub repository `gordo-v1su4/review-room-svelte` is the source of the standalone app. The production frontend runs on App VM at `https://review-room.v1su4.dev` using `infra/app-vm/compose.yaml`; deploys are explicit until a dedicated workflow is verified.
+- Personal GitHub repository `gordo-v1su4/review-room-svelte` is the source of the standalone app. The production frontend runs on App VM at `https://review.v1su4.dev` using `infra/app-vm/compose.yaml`; deploys are explicit until a dedicated workflow is verified.
 - Never deploy to the former React app, Hostinger, Buzero, or Vercel. Frontend and Convex deployments are separate surfaces; verify each touched surface.
 
 ## Architecture
