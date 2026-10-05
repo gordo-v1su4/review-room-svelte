@@ -800,8 +800,22 @@ button {
   align-items: flex-start;
   padding-block: 0;
   margin-block: 0;
-  margin-left: 0;
-  gap:4px;
+  margin-left: 8px;
+  gap: 0;
+  border-radius: var(--control-radius);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.review-actions .asset-nav .playback-mode { height: 28px; min-height: 28px; padding: 0 8px; border: 0; background: transparent; box-shadow: none; color: var(--muted); }
+.asset-step-pair { display: flex; align-items: flex-start; gap: 0; padding: 0; margin: 0; }
+.asset-nav .playback-mode + .asset-step-pair { box-shadow: inset 1px 0 var(--border); }
+.asset-step { display: grid; place-items: center; flex: 0 0 28px; width: 28px; min-width: 28px; height: 28px; min-height: 28px; padding: 0; margin: 0; border: 0; border-radius: var(--control-radius); background: transparent; box-shadow: none; color: var(--muted); cursor: pointer; }
+.asset-step:hover:not(:disabled), .review-actions .asset-nav .playback-mode:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--ink); }
+.asset-step:disabled { opacity: .35; cursor: default; }
+.asset-step:focus-visible { outline: 1px solid var(--teal); outline-offset: -2px; }
+@media (pointer: coarse) {
+  .asset-step { flex-basis: 44px; width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
+  .review-actions .asset-nav .playback-mode { height: 44px; min-height: 44px; }
 }
 .decision-active {
   border-color: #c39c6455;
