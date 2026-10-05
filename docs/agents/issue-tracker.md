@@ -10,7 +10,7 @@ The personal GitHub repository is connected to Linear. Include each relevant Lin
 
 ## Conventions
 
-OpenCodeReview runs automatically when a PR opens. After pushing fixes, dispatch `ocr-review.yml` against the current feature branch with `pr_number` so it reviews the current PR head. If diagnostic artifacts show primary-model rate limits, `fallback_only=true` runs the existing GLM fallback directly. Failed or rate-limited reviews are not passes; inspect review results and resolve code findings before merging.
+OpenCodeReview runs automatically when a PR opens. After pushing fixes, dispatch `ocr-review.yml` against the current feature branch with `pr_number` so it reviews the current PR head. If diagnostic artifacts show primary-model rate limits, `fallback_only=true` runs the existing GLM fallback directly. The job disables the npm launcher's background updater with `OCR_NO_UPDATE=1` so the pinned CLI is not replaced during configuration/review. Failed or rate-limited reviews are not passes; inspect review results and resolve code findings before merging.
 
 - One feature per directory: `.scratch/<feature-slug>/`
 - The spec is `.scratch/<feature-slug>/spec.md`

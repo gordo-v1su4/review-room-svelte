@@ -28,6 +28,10 @@ jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # The npm launcher otherwise upgrades itself while the action uses it.
+      # Keep the explicitly pinned CLI intact throughout configuration/review.
+      OCR_NO_UPDATE: '1'
     steps:
       - name: Resolve manually selected PR
         if: github.event_name == 'workflow_dispatch'
