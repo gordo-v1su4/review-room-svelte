@@ -107,13 +107,6 @@ export const reserveAssetUpload = mutation({
       if (!folder || folder.projectId !== project._id) {
         throw new Error("Folder not found");
       }
-    } else {
-      folderId = await getOrCreateDateFolder(
-        ctx,
-        project._id,
-        admin._id,
-        dateKey,
-      );
     }
     await ctx.db.patch(project._id, {
       nextAssetNumber: number + 1,

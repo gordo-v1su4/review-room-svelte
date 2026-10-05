@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getProjectForAdmin, getProjectForEditor } from "./lib/access";
+import { validateFolderParent, requireEmptyChildFolders } from './lib/folderTree';
 
 const folderRemovalDisposition = v.union(
   v.literal("move_to_root"),
@@ -26,6 +27,7 @@ export const create = mutation({
   args: {
     projectId: v.id("projects"),
     title: v.string(),
+    parentFolderId: v.optional(v.id('projectFolders')),
   },
   handler: async (ctx, args) => {
     const { admin, project } = await getProjectForEditor(ctx, args.projectId);
@@ -37,10 +39,13 @@ export const create = mutation({
       .query("projectFolders")
       .withIndex("by_project", (q) => q.eq("projectId", project._id))
       .collect();
-    const maxOrder = siblings.reduce((max, folder) => Math.max(max, folder.order), 0);
+    await validateFolderParent(ctx, project._id, args.parentFolderId);
+    if (siblings.some(folder => folder.parentFolderId === args.parentFolderId && folder.title.trim().toLowerCase() === title.toLowerCase())) throw new Error('A folder with that name already exists');
+    const maxOrder = siblings.filter(folder => folder.parentFolderId === args.parentFolderId).reduce((max, folder) => Math.max(max, folder.order), 0);
     const now = Date.now();
     const folderId = await ctx.db.insert("projectFolders", {
       projectId: project._id,
+      parentFolderId: args.parentFolderId,
       title,
       order: maxOrder + 1,
       createdBy: admin._id,
@@ -73,6 +78,7 @@ export const rename = mutation({
     const duplicate = siblings.find(
       (item) =>
         item._id !== folder._id &&
+        item.parentFolderId === folder.parentFolderId &&
         item.title.trim().toLowerCase() === title.toLowerCase(),
     );
     if (duplicate) throw new Error("A folder with that name already exists");
@@ -114,6 +120,8 @@ export const remove = mutation({
     if (!folder) throw new Error("Folder not found");
     const { admin, project } = await getProjectForEditor(ctx, folder.projectId);
     if (admin.role !== "admin") throw new Error("Admin required");
+
+    await requireEmptyChildFolders(ctx, folder._id, project._id);
 
     const now = Date.now();
     const assets = await ctx.db

@@ -45,8 +45,7 @@ test('permissions, names, IDs and registration are validated before any bulk mut
   expect(() => transitionFolderState(populated, { type: 'register', projectId: 'p', assetIds: ['new', 'a'] }, admin)).toThrow();
   expect(Object.hasOwn(populated.placements, 'new')).toBe(false);
   expect(() => transitionFolderState(populated, { type: 'move', projectId: 'p', assetIds: ['a'], folderId: 'missing' }, admin)).toThrow();
-  const duplicate = transitionFolderState(populated, { type: 'create', id: 'new', projectId: 'p', title: 'Rushes' }, admin);
-  expect(duplicate.folders[2]?.order).toBe(3); // Backend create permits duplicate titles.
+  expect(() => transitionFolderState(populated, { type: 'create', id: 'new', projectId: 'p', title: 'Rushes' }, admin)).toThrow('A folder with that name already exists');
   const covered = transitionFolderState(populated, { type: 'cover', folderId: 'g', assetId: 'a' }, admin);
   expect(transitionFolderState(covered, { type: 'remove', folderId: 'f', disposition: 'archive_assets' }, admin).folders[0]?.coverAssetId).toBeUndefined();
 });

@@ -2,10 +2,11 @@
   import { Dialog, DropdownMenu } from 'bits-ui';
   import { FolderInput, FolderPlus, Image, MoreHorizontal, Pencil, Trash2, X } from 'lucide-svelte';
 
-  let { folders, activeFolderId, canManage = false, selectedCount = 0, coverUrl, hasCustomCover = false, onCreate, onRename, onRemove, onMove, onCover }: {
+  let { folders, activeFolderId, canManage = false, selectedCount = 0, coverUrl, hasCustomCover = false, persistent = false, onCreate, onRename, onRemove, onMove, onCover }: {
     folders: readonly { id: string; title: string }[];
     activeFolderId: string | null;
     canManage?: boolean;
+    persistent?: boolean;
     selectedCount?: number;
     coverUrl?: string;
     hasCustomCover?: boolean;
@@ -112,7 +113,7 @@
     <Dialog.Overlay class="folder-overlay"/>
     <Dialog.Content class="folder-dialog" onCloseAutoFocus={event => { event.preventDefault(); if (returnFocus?.isConnected) returnFocus.focus(); }}>
       <div class="dialog-heading"><Dialog.Title class="folder-dialog-title">{title}</Dialog.Title><Dialog.Close class="folder-close" aria-label="Close folder dialog"><X size={17}/></Dialog.Close></div>
-      <Dialog.Description class="folder-description">{#if operation === 'create'}Create a folder in this project for the current session.{:else if operation === 'rename'}Update “{folderTitle}” in this session.{:else if operation === 'remove'}Choose what happens to the assets in “{folderTitle}”. This changes the current session only.{:else if operation === 'cover'}Uses the newest image in this folder unless you choose a cover. Stored in this tab only.{:else}Choose a destination in this project. Your media files stay on this device.{/if}</Dialog.Description>
+      <Dialog.Description class="folder-description">{#if operation === 'create'}Create a folder {activeFolder ? `inside “${activeFolder.title}”` : 'at the project root'}. {persistent ? 'Saved to your workspace.' : 'Stored in this session.'}{:else if operation === 'rename'}Update “{folderTitle}”.{:else if operation === 'remove'}Choose what happens to the assets in “{folderTitle}”. Subfolders must be moved or removed first.{:else if operation === 'cover'}Uses the newest image in this folder unless you choose a cover. Stored in this tab only.{:else}Choose a destination in this project. {persistent ? 'The new location is saved to your workspace.' : 'Your media files stay on this device.'}{/if}</Dialog.Description>
       {#if operation === 'cover'}
         <div class="cover-preview">
           {#if coverUrl && folderId === activeFolderId}<img src={coverUrl} alt={`Cover for ${folderTitle}`}/>{:else}<Image size={26}/><span>No cover image</span>{/if}

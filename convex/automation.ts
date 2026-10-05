@@ -116,12 +116,27 @@ export const editProject = internalMutation({
   },
 });
 
+export const catalog = internalMutation({
+  args: { keyDigest: v.string(), projectId: v.optional(v.id('projects')) },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.query('automationCredentials').withIndex('by_digest', q => q.eq('keyDigest', args.keyDigest)).unique();
+    if (!record) throw new Error('Automation credential unavailable');
+    const action = ['folders:write', 'media:read', 'projects:edit'].find(scope => record.actions.includes(scope));
+    if (!action) throw new Error('Automation scope denied');
+    const projectId = args.projectId ?? record.projectId;
+    const credential = await authorize(ctx, args.keyDigest, action, projectId);
+    const projects = (await ctx.db.query('projects').withIndex('by_creator', q => q.eq('createdBy', credential.createdBy)).collect()).filter(project => !project.archived && (!projectId || project._id === projectId));
+    const folders = (await Promise.all(projects.map(project => ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', project._id)).collect()))).flat();
+    return { projects: projects.map(project => ({ id: project._id, title: project.title })), folders: folders.map(folder => ({ id: folder._id, projectId: folder.projectId, parentFolderId: folder.parentFolderId, title: folder.title })) };
+  },
+});
+
 export const createFolder = internalMutation({
-  args: { ...request, projectId: v.id('projects'), title: v.string() },
+  args: { ...request, projectId: v.id('projects'), title: v.string(), parentFolderId: v.optional(v.id('projectFolders')) },
   handler: async (ctx, args) => {
     const credential = await authorize(ctx, args.keyDigest, 'folders:write', args.projectId);
     return await idempotent(ctx, credential, args, 'folders:create',
-      () => createPersonalFolder(ctx, credential.createdBy, args.projectId, args.title));
+      () => createPersonalFolder(ctx, credential.createdBy, args.projectId, args.title, args.parentFolderId));
   },
 });
 

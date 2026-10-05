@@ -60,7 +60,7 @@ Homelab env: start from `.env.example` and populate only this app's dedicated Re
 - Metadata in Convex only; blobs in RustFS (keys on `videos`)
 - Smart views = queries over `status` + facets (see PRD §4–5)
 - Asset class drives media behavior: only `VID` / `video/*` assets get video playback controls; `IMG`, `CTX`, and `STB` render as still-image review assets.
-- Project folders are one-level real folders; date folders stay flat. Videos/Images/Contact Sheets/Storyboards are smart metadata collections, not nested folders.
+- Project folders support nested real folders with stable parent IDs; uploads use the current folder or project root. Date folders are explicit user choices. Videos/Images/Contact Sheets/Storyboards are smart metadata collections, not nested folders.
 - Folder create/rename/move/cover, archive, and destructive production controls are admin-only in UI and Convex mutations. Media upload is available to signed-in project members (admin and client).
 - Brand color on banner/CTA only; status pills use semantic tokens
 - Self-hosted Convex/RustFS per `docs/adr/001-infrastructure.md` (pindeck reference)

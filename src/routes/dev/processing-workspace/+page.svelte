@@ -28,7 +28,7 @@
       versionId: `version-${id}` as Id<'assetVersions'>, attempt: 1,
       status: 'queued', stage: 'verify', createdAt: 1, updatedAt: 1
     })),
-    comments: [], publications: [], showcases: [], links: [], projectIds: [projectId]
+    comments: [], publications: [], showcases: [], links: [], importedMetadata: [], projectIds: [projectId]
   };
 </script>
 

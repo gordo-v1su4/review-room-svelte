@@ -31,6 +31,8 @@ export function automationError(cause: unknown) {
     ['Poster size is invalid', 400],
     ['title must', 400],
     ['Folder already exists', 409],
+    ['Parent folder belongs', 400],
+    ['Folder cycle', 400],
     ['unavailable', 404],
     ['Invalid brand color', 400],
     ['ArgumentValidationError', 400],

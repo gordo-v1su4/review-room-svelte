@@ -1,4 +1,17 @@
-export type ProjectFolder = Readonly<{ id: string; projectId: string; title: string; order: number; coverAssetId?: string; coverImageUrl?: string }>;
+export type ProjectFolder = Readonly<{ id: string; projectId: string; title: string; order: number; parentFolderId?: string; coverAssetId?: string; coverImageUrl?: string }>;
+export function folderAncestors(folders: readonly ProjectFolder[], folderId?: string | null): ProjectFolder[] {
+  const result: ProjectFolder[] = [];
+  const seen = new Set<string>();
+  let folder = folders.find(item => item.id === folderId);
+  while (folder && !seen.has(folder.id)) {
+    seen.add(folder.id); result.unshift(folder);
+    folder = folders.find(item => item.id === folder!.parentFolderId && item.projectId === folder!.projectId);
+  }
+  return result;
+}
+export function folderPath(folders: readonly ProjectFolder[], folderId: string): string {
+  return folderAncestors(folders, folderId).map(folder => folder.title).join(' / ');
+}
 export type AssetPlacement = Readonly<{ projectId: string; folderId?: string; archived?: boolean }>;
 export type FolderState = Readonly<{ folders: readonly ProjectFolder[]; placements: Readonly<Record<string, AssetPlacement>> }>;
 export type FolderAccess = Readonly<{ isAdmin: boolean; editableProjectIds: readonly string[]; memberProjectIds?: readonly string[] }>;
@@ -14,7 +27,8 @@ export function folderCoverUrl(folder: ProjectFolder, assets: readonly CoverAsse
   return image?.url ?? newest.find(asset => asset.poster)?.poster;
 }
 export type FolderAction =
-  | { type: 'create'; id: string; projectId: string; title: string }
+  | { type: 'create'; id: string; projectId: string; title: string; parentFolderId?: string }
+  | { type: 'reparent'; folderId: string; parentFolderId?: string }
   | { type: 'rename'; folderId: string; title: string }
   | { type: 'move'; assetIds: readonly string[]; projectId: string; folderId?: string }
   | { type: 'register'; assetIds: readonly string[]; projectId: string; folderId?: string; dateFolder?: { id: string; dateKey: string } }
@@ -35,12 +49,24 @@ export function transitionFolderState(state: FolderState, action: FolderAction, 
     : access.isAdmin && access.editableProjectIds.includes(projectId);
   if (!allowed) throw new Error('Project access required');
   if (folder && folder.projectId !== projectId) throw new Error('Folder belongs to another project');
+  const parentId = 'parentFolderId' in action ? action.parentFolderId : undefined;
+  if (parentId !== undefined) {
+    const parent = state.folders.find(item => item.id === validId(parentId));
+    if (!parent || parent.projectId !== projectId) throw new Error('Parent folder not found in project');
+    if (folder && folderAncestors(state.folders, parentId).some(item => item.id === folder.id)) throw new Error('A folder cannot contain itself');
+  }
+  const duplicateSibling = (title: string, parentFolderId?: string) => state.folders.some(item => item.id !== folder?.id && item.projectId === projectId && item.parentFolderId === parentFolderId && item.title.trim().toLowerCase() === title.toLowerCase());
   if (action.type === 'create') {
     validId(action.id);
     if (state.folders.some(folder => folder.id === action.id)) throw new Error('Folder ID already exists');
     const title = titleOf(action.title);
+    if (duplicateSibling(title, action.parentFolderId)) throw new Error('A folder with that name already exists');
     const order = state.folders.filter(folder => folder.projectId === projectId).reduce((max, folder) => Math.max(max, folder.order), 0) + 1;
-    return { ...state, folders: [...state.folders, { id: action.id, projectId, title, order }] };
+    return { ...state, folders: [...state.folders, { id: action.id, projectId, title, order, ...(action.parentFolderId ? { parentFolderId: action.parentFolderId } : {}) }] };
+  }
+  if (action.type === 'reparent') {
+    if (duplicateSibling(folder!.title, action.parentFolderId)) throw new Error('A folder with that name already exists');
+    return { ...state, folders: state.folders.map(item => { if (item.id !== folder!.id) return item; const { parentFolderId: _old, ...rest } = item; return { ...rest, ...(action.parentFolderId ? { parentFolderId: action.parentFolderId } : {}) }; }) };
   }
   if (action.type === 'register') {
     const ids = [...new Set(action.assetIds.map(validId))];
@@ -51,7 +77,7 @@ export function transitionFolderState(state: FolderState, action: FolderAction, 
     if (action.dateFolder && !/^\d{8}$/.test(action.dateFolder.dateKey)) throw new Error('Upload date must be YYYYMMDD');
     if (folderId === undefined && action.dateFolder) {
       const { id, dateKey } = action.dateFolder;
-      folderId = folders.find(item => item.projectId === projectId && item.title === dateKey)?.id;
+      folderId = folders.find(item => item.projectId === projectId && !item.parentFolderId && item.title === dateKey)?.id;
       if (!folderId) {
         validId(id);
         if (folders.some(item => item.id === id)) throw new Error('Folder ID already exists');
@@ -84,7 +110,7 @@ export function transitionFolderState(state: FolderState, action: FolderAction, 
   }
   if (action.type === 'rename') {
     const title = titleOf(action.title);
-    if (state.folders.some(item => item.id !== folder!.id && item.projectId === projectId && item.title.trim().toLowerCase() === title.toLowerCase())) throw new Error('A folder with that name already exists');
+    if (duplicateSibling(title, folder!.parentFolderId)) throw new Error('A folder with that name already exists');
     return { ...state, folders: state.folders.map(item => item.id === folder!.id ? { ...item, title } : item) };
   }
   if (action.type === 'cover-image') {
@@ -104,6 +130,7 @@ export function transitionFolderState(state: FolderState, action: FolderAction, 
     }) };
   }
   if (action.type === 'remove') {
+    if (state.folders.some(item => item.parentFolderId === folder!.id)) throw new Error('Move or delete this folder’s subfolders first');
     const placements = Object.fromEntries(Object.entries(state.placements).map(([id, placement]) => {
       if (placement.projectId !== projectId || placement.folderId !== folder!.id) return [id, placement];
       const { folderId: _oldFolder, ...rest } = placement;

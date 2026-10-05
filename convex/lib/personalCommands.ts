@@ -2,6 +2,7 @@ import type { MutationCtx } from '../_generated/server';
 import type { Id } from '../_generated/dataModel';
 import { randomSecret } from './reviewAccess';
 import { reserveAssetNumber } from './assetNumber';
+import { validateFolderParent } from './folderTree';
 
 function title(value: string, kind: string) {
   const normalized = value.trim();
@@ -35,15 +36,16 @@ export async function updatePersonalProject(ctx: MutationCtx, ownerId: Id<'appUs
   return projectId;
 }
 
-export async function createPersonalFolder(ctx: MutationCtx, ownerId: Id<'appUsers'>, projectId: Id<'projects'>, name: string) {
+export async function createPersonalFolder(ctx: MutationCtx, ownerId: Id<'appUsers'>, projectId: Id<'projects'>, name: string, parentFolderId?: Id<'projectFolders'>) {
   const project = await ctx.db.get(projectId);
   if (!project || project.createdBy !== ownerId || project.archived) throw new Error('Project unavailable');
   const normalized = title(name, 'Folder');
   const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', projectId)).collect();
-  if (folders.some(folder => folder.title.toLowerCase() === normalized.toLowerCase())) throw new Error('Folder already exists');
+  await validateFolderParent(ctx, projectId, parentFolderId);
+  if (folders.some(folder => folder.parentFolderId === parentFolderId && folder.title.toLowerCase() === normalized.toLowerCase())) throw new Error('Folder already exists');
   const now = Date.now();
   return await ctx.db.insert('projectFolders', {
-    projectId, title: normalized, order: Math.max(0, ...folders.map(folder => folder.order)) + 1,
+    projectId, parentFolderId, title: normalized, order: Math.max(0, ...folders.filter(folder => folder.parentFolderId === parentFolderId).map(folder => folder.order)) + 1,
     createdBy: ownerId, createdAt: now, updatedAt: now,
   });
 }
@@ -55,7 +57,7 @@ export async function renamePersonalFolder(ctx: MutationCtx, ownerId: Id<'appUse
   if (!project || project.createdBy !== ownerId || project.archived) throw new Error('Project unavailable');
   const normalized = title(name, 'Folder');
   const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', folder.projectId)).collect();
-  if (folders.some(item => item._id !== folderId && item.title.toLowerCase() === normalized.toLowerCase())) throw new Error('Folder already exists');
+  if (folders.some(item => item._id !== folderId && item.parentFolderId === folder.parentFolderId && item.title.toLowerCase() === normalized.toLowerCase())) throw new Error('Folder already exists');
   await ctx.db.patch(folderId, { title: normalized, updatedAt: Date.now() });
   return folderId;
 }
@@ -68,7 +70,7 @@ export async function beginPersonalUpload(ctx: MutationCtx, ownerId: Id<'appUser
 }) {
   const project = await ctx.db.get(input.projectId);
   if (!project || project.createdBy !== ownerId || project.archived) throw new Error('Project unavailable');
-  if (!input.mimeType.startsWith('video/') || !Number.isSafeInteger(input.sizeBytes) ||
+  if (!(input.mimeType.startsWith('video/') || ['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(input.mimeType)) || !Number.isSafeInteger(input.sizeBytes) ||
     input.sizeBytes < 1 || input.sizeBytes > 90 * 1024 ** 2) throw new Error('Unsupported upload');
   if (input.sha256 !== undefined && !/^[a-f0-9]{64}$/.test(input.sha256)) throw new Error('Invalid upload checksum');
   if (input.assetId) {
@@ -80,7 +82,7 @@ export async function beginPersonalUpload(ctx: MutationCtx, ownerId: Id<'appUser
     if (!folder || folder.projectId !== project._id) throw new Error('Folder unavailable');
   }
   const extension = input.originalFilename.match(/\.([a-zA-Z0-9]{1,8})$/)?.[1]?.toLowerCase() ?? 'mp4';
-  const objectKey = `assets/${project._id}/${randomSecret()}/original.${extension}`;
+  const objectKey = `assets/${project._id}/${input.mimeType.startsWith('image/') ? 'images' : 'videos'}/${randomSecret()}/original.${extension}`;
   const now = Date.now();
   const sessionId = await ctx.db.insert('uploadSessions', {
     projectId: project._id, folderId: input.folderId, assetId: input.assetId,
@@ -110,8 +112,10 @@ export async function finalizePersonalUpload(ctx: MutationCtx, ownerId: Id<'appU
   }
   if (session.status !== 'finalizing' || session.expiresAt <= Date.now() ||
     session.sizeBytes !== args.verifiedSizeBytes) throw new Error('Upload verification failed');
+  const isImage = session.mimeType.startsWith('image/');
+  const processing = !!args.processWithTrigger && !isImage;
   if (args.posterKey !== `${session.objectKey.slice(0, session.objectKey.lastIndexOf('/'))}/poster.jpg` ||
-    !Number.isFinite(args.durationSec) || args.durationSec <= 0 || args.durationSec > 24 * 60 * 60 ||
+    !Number.isFinite(args.durationSec) || (!isImage && args.durationSec <= 0) || args.durationSec < 0 || args.durationSec > 24 * 60 * 60 ||
     !Number.isSafeInteger(args.width) || args.width < 1 || args.width > 16384 ||
     !Number.isSafeInteger(args.height) || args.height < 1 || args.height > 16384) {
     throw new Error('Upload metadata invalid');
@@ -126,29 +130,30 @@ export async function finalizePersonalUpload(ctx: MutationCtx, ownerId: Id<'appU
     version = Math.max(0, ...versions.map(item => item.version)) + 1;
   } else {
     const number = await reserveAssetNumber(ctx, project.createdBy);
-    const assetCode = `VID_${new Date(now).toISOString().slice(0, 10).replaceAll('-', '')}_${String(number).padStart(5, '0')}`;
+    const assetClass = isImage ? 'IMG' : 'VID';
+    const assetCode = `${assetClass}_${new Date(now).toISOString().slice(0, 10).replaceAll('-', '')}_${String(number).padStart(5, '0')}`;
     assetId = await ctx.db.insert('videos', {
-      projectId: project._id, folderId: session.folderId, assetClass: 'VID', assetNumber: number,
+      projectId: project._id, folderId: session.folderId, assetClass, assetNumber: number,
       assetCode, title: assetCode, originalFilename: session.originalFilename,
       storageKey: session.objectKey, mimeType: session.mimeType, sizeBytes: session.sizeBytes,
       status: 'awaiting_review', viewed: false, rating: 0, isSelect: false, commentCount: 0,
       tags: [], downloadEnabled: false, order: number, uploadedBy: ownerId,
-      uploadedAt: now, updatedAt: now, processingStatus: args.processWithTrigger ? 'processing' : 'ready',
+      uploadedAt: now, updatedAt: now, processingStatus: processing ? 'processing' : 'ready',
     });
     await ctx.db.patch(project._id, { nextAssetNumber: number + 1, updatedAt: now });
   }
   const versionId = await ctx.db.insert('assetVersions', {
     assetId, version, originalKey: session.objectKey, posterKey: args.posterKey,
     mimeType: session.mimeType, sizeBytes: session.sizeBytes, etag: args.etag,
-    processingState: args.processWithTrigger ? 'processing' : 'ready', createdAt: now,
+    processingState: processing ? 'processing' : 'ready', createdAt: now,
   });
   await ctx.db.patch(assetId, {
     currentVersionId: versionId, storageKey: session.objectKey, thumbnailKey: args.posterKey,
     originalFilename: session.originalFilename, mimeType: session.mimeType,
-    sizeBytes: session.sizeBytes, processingStatus: args.processWithTrigger ? 'processing' : 'ready',
-    updatedAt: now, durationSec: args.durationSec, width: args.width, height: args.height,
+    sizeBytes: session.sizeBytes, processingStatus: processing ? 'processing' : 'ready',
+    updatedAt: now, durationSec: isImage ? undefined : args.durationSec, width: args.width, height: args.height,
   });
-  const jobId = args.processWithTrigger ? await ctx.db.insert('mediaJobs', {
+  const jobId = processing ? await ctx.db.insert('mediaJobs', {
     assetId, versionId, status: 'queued', stage: 'verify', attempt: 1,
     createdAt: now, updatedAt: now,
   }) : undefined;
