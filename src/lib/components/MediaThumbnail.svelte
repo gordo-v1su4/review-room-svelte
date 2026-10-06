@@ -4,8 +4,8 @@
     type CanvasHoverFrame,
   } from '$lib/playback/hover-frame-cache';
 
-  let { src, poster, type, name, availability = 'ready' }: {
-    src: string; poster?: string; type: 'video' | 'image'; name: string; availability?: 'queued' | 'running' | 'error' | 'ready';
+  let { src, poster, sprite, type, name, availability = 'ready' }: {
+    src: string; poster?: string; sprite?: string; type: 'video' | 'image'; name: string; availability?: 'queued' | 'running' | 'error' | 'ready';
   } = $props();
 
   let hovered = $state(false);
@@ -14,6 +14,9 @@
   let display = $state<HTMLCanvasElement>();
   let canvasReady = $state(false);
   let frameReady = $state(false);
+  let spriteImage = $state<HTMLImageElement>();
+  let readySprite = $state('');
+  let failedSprite = $state('');
   let failedPoster = $state('');
   let frames: ReturnType<typeof hoverFrameCache.retain> | undefined;
   let releaseActive: (() => void) | undefined;
@@ -65,7 +68,19 @@
   }
 
   function requestPreview() {
-    if (!hovered || !preview || desiredPosition === undefined) return;
+    if (!hovered || desiredPosition === undefined) return;
+    if (sprite && failedSprite !== sprite) {
+      if (readySprite !== sprite || !spriteImage || !display || !spriteImage.naturalWidth || !spriteImage.naturalHeight) return;
+      const width = Math.round(spriteImage.naturalWidth / 10);
+      const height = spriteImage.naturalHeight;
+      const position = Math.min(9, Math.floor((pointerPct ?? 0) * 10));
+      if (display.width !== width) display.width = width;
+      if (display.height !== height) display.height = height;
+      const context = display.getContext('2d');
+      if (context) { context.drawImage(spriteImage, position * width, 0, width, height, 0, 0, width, height); canvasReady = true; }
+      return;
+    }
+    if (!preview) return;
     const cached = frames?.get(desiredPosition);
     if (cached) {
       showFrame(cached);
@@ -151,6 +166,7 @@
 <div
   class="media-thumbnail"
   role="presentation"
+  data-preview-mode={sprite && failedSprite !== sprite ? "sprite" : "video"}
   {@attach bindSource}
   onpointerenter={beginPreview}
   onpointermove={seekPreview}
@@ -163,6 +179,7 @@
     {#if failedPoster !== (poster ?? src)}<img src={poster ?? src} alt="" loading="lazy" onerror={() => failedPoster = poster ?? src} />{:else}<div class="poster-placeholder">Preview unavailable</div>{/if}
   {:else}
     {#if poster && failedPoster !== poster}<img class="poster" class:hidden={hovered && (frameReady || canvasReady)} src={poster} alt="" loading="lazy" onerror={() => failedPoster = poster ?? ''} />{:else}<div class="poster-placeholder" class:hidden={hovered && (frameReady || canvasReady)}>{poster ? 'Preview unavailable' : 'Preview'}</div>{/if}
+    {#if sprite}<img class="sprite-source" bind:this={spriteImage} src={sprite} alt="" loading="lazy" aria-hidden="true" onload={() => { readySprite = sprite ?? ''; requestPreview(); }} onerror={() => { failedSprite = sprite ?? ''; requestPreview(); }}/>{/if}
     <video
       bind:this={preview}
       class:visible={hovered && frameReady && !canvasReady}
@@ -190,6 +207,7 @@
   .media-thumbnail img.hidden { opacity: 0; }
   .media-thumbnail video, .media-thumbnail canvas { opacity: 0; pointer-events: none; }
   .media-thumbnail video.visible, .media-thumbnail canvas.visible { opacity: 1; }
+  .media-thumbnail .sprite-source { width:1px;height:1px;opacity:0;pointer-events:none; }
   .scrub-line { position: absolute; inset-block: 0; width: 2px; transform: translateX(-1px); background: #79d7c5; box-shadow: 0 0 9px #79d7c599; pointer-events: none; }
   @media (prefers-reduced-motion: reduce) { .media-thumbnail img { transition: none; } }
 </style>

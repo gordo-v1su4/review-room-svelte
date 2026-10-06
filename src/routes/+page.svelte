@@ -69,7 +69,7 @@
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
   import { type LocalAsset, type ReviewAsset } from '$lib/review';
   import { createReviewSession, transitionReviewSession, type ReviewAction, type ReviewAccess } from '$lib/review-session';
-  import { observeProcessing, processingSource, processingPoster, processingAvailability, type ProcessingUpdate } from '$lib/processing';
+  import { observeProcessing, processingSource, processingPoster, processingSprite, processingAvailability, type ProcessingUpdate } from '$lib/processing';
   let { data } = $props();
   const live = !!data.snapshot;
   let media = $state<ReviewAsset[]>([]);
@@ -244,7 +244,7 @@
     }
     media = media.map(asset => asset.id === id ? { ...asset, ...fields } : asset);
   }
-  type VersionDetails = { id: string; assetId: string; version: number; processingState: string; hasPoster: boolean; sizeBytes: number; mimeType: string; metadata: unknown; metadataUpdatedAt: number | null };
+  type VersionDetails = { id: string; assetId: string; version: number; processingState: string; hasPoster: boolean; hasSprite?: boolean; sizeBytes: number; mimeType: string; metadata: unknown; metadataUpdatedAt: number | null };
   let knownVersions = $state.raw<VersionDetails[]>([]);
   let selectedVersions = $state<Record<string, string>>({});
   const versionDrafts = new Map<string, { assetId: string; metadata: ReviewAsset['metadata']; metadataUpdatedAt: number | null }>();
@@ -276,6 +276,7 @@
         type: version.mimeType.startsWith('image/') ? 'image' : 'video',
         url: version.processingState === 'ready' ? item.url || '/api/owner-media/' + item.id + '?versionId=' + versionId : '',
         poster: version.hasPoster && version.processingState === 'ready' ? item.poster || '/api/owner-poster/' + item.id + '?versionId=' + versionId : undefined,
+        sprite: version.hasSprite && version.processingState === 'ready' ? item.sprite || '/api/owner-poster/' + item.id + '?variant=sprite&versionId=' + versionId : undefined,
         availability: version.processingState === 'ready' ? 'ready' : version.processingState === 'error' ? 'error' : 'running',
         ...(update?.ready ? { duration: update.duration, width: update.width, height: update.height } : {}),
       } : item);
@@ -303,6 +304,7 @@
       metadata: draft ? draft.metadata : normalizeCreativeMetadata(version.metadata),
       url: version.processingState === 'ready' ? '/api/owner-media/' + id + '?versionId=' + versionId : '',
       poster: version.hasPoster && version.processingState === 'ready' ? '/api/owner-poster/' + id + '?versionId=' + versionId : undefined,
+      sprite: version.hasSprite && version.processingState === 'ready' ? '/api/owner-poster/' + id + '?variant=sprite&versionId=' + versionId : undefined,
       availability: version.processingState === 'ready' ? 'ready' : version.processingState === 'error' ? 'error' : 'running',
       size: version.sizeBytes, sourceFile: { name: '', type: version.mimeType },
       type: version.mimeType.startsWith('image/') ? 'image' : 'video',
@@ -825,7 +827,7 @@
   onMount(() => {
     if (data.snapshot) {
       knownVersions = data.snapshot.versions.map(version => ({ id: version._id, assetId: version.assetId, version: version.version,
-        processingState: version.processingState, hasPoster: !!version.posterKey, sizeBytes: version.sizeBytes,
+        processingState: version.processingState, hasPoster: !!version.posterKey, hasSprite: data.snapshot?.mediaJobs.some(job => job.versionId === version._id && job.status === "ready" && !!job.spriteKey), sizeBytes: version.sizeBytes,
         mimeType: version.mimeType, metadata: version.creativeMetadata ?? null, metadataUpdatedAt: version.metadataUpdatedAt ?? null }));
       processing = data.snapshot.assets.map(item => {
         const job = data.snapshot.mediaJobs.find(job => job.assetId === item._id && job.versionId === item.currentVersionId);
@@ -833,7 +835,7 @@
         return { assetId: item._id, versionId: item.currentVersionId ?? null, versionNumber: version?.version ?? 0,
           updatedAt: Math.max(item.updatedAt, job?.updatedAt ?? 0), job,
           ready: item.processingStatus === 'ready' && version?.processingState === 'ready',
-          hasPoster: !!version?.posterKey, duration: item.durationSec, width: item.width, height: item.height };
+          hasPoster: !!version?.posterKey, hasSprite: !!(job?.status === "ready" && job.spriteKey), duration: item.durationSec, width: item.width, height: item.height };
       });
       organization = {
         folders: data.snapshot.folders.map(folder => ({ id: folder._id, projectId: folder.projectId,
@@ -846,7 +848,7 @@
       const fromServer = data.snapshot.assets.map(item => ({
         id: item._id, projectId: item.projectId, name: item.assetCode ?? item.title,
         url: processingSource(processingByAsset.get(item._id)!), type: item.mimeType?.startsWith('image/') ? 'image' as const : 'video' as const,
-        poster: processingPoster(processingByAsset.get(item._id)!),
+        poster: processingPoster(processingByAsset.get(item._id)!), sprite: processingSprite(processingByAsset.get(item._id)!),
         availability: processingAvailability(processingByAsset.get(item._id)!),
         ...(processingByAsset.get(item._id)?.ready ? { duration: item.durationSec, width: item.width, height: item.height } : {}),
         size: item.sizeBytes ?? 0, sourceFile: { name: item.originalFilename ?? item.title, type: item.mimeType ?? 'video/mp4' },
@@ -890,7 +892,7 @@
       }
       media = media.map(item => item.id === update.assetId ? { ...item,
         ...((item.versionId ?? null) === update.versionId ? {
-          url: processingSource(update), poster: processingPoster(update), availability: processingAvailability(update),
+          url: processingSource(update), poster: processingPoster(update), sprite: processingSprite(update), availability: processingAvailability(update),
           ...(update.ready ? { duration: update.duration ?? item.duration, width: update.width ?? item.width,
             height: update.height ?? item.height } : {})
         } : {}) } : item);

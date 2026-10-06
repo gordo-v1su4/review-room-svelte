@@ -94,7 +94,7 @@ export const processing = internalQuery({
         assetId, versionId: version?._id ?? null, versionNumber: version?.version ?? 0,
         updatedAt: Math.max(asset.updatedAt, job?.updatedAt ?? 0),
         ready: asset.processingStatus === 'ready' && version?.processingState === 'ready',
-        hasPoster: !!version?.posterKey,
+        hasPoster: !!version?.posterKey, hasSprite: !!(job?.status === "ready" && job.spriteKey),
         duration: asset.durationSec, width: asset.width, height: asset.height,
         job: job ? { _id: job._id, assetId: job.assetId, versionId: job.versionId,
           attempt: job.attempt, status: job.status, stage: job.stage, runId: job.runId,
@@ -396,8 +396,9 @@ export const versionDetails = internalQuery({
     const asset = version && await ctx.db.get(version.assetId);
     if (!version || !asset) return null;
     await ownedProject(ctx, asset.projectId, true);
+    const job = await ctx.db.query("mediaJobs").withIndex("by_version", q => q.eq("versionId", version._id)).unique();
     return { id: version._id, assetId: asset._id, version: version.version,
-      processingState: version.processingState, hasPoster: !!version.posterKey,
+      processingState: version.processingState, hasPoster: !!version.posterKey, hasSprite: !!(job?.status === "ready" && job.spriteKey),
       sizeBytes: version.sizeBytes, mimeType: version.mimeType,
       metadata: version.creativeMetadata ?? null, metadataUpdatedAt: version.metadataUpdatedAt ?? null };
   },
@@ -636,7 +637,7 @@ export const reviewMedia = internalQuery({
 });
 
 export const ownerMedia = internalQuery({
-  args: { assetId: v.string(), poster: v.boolean(), versionId: v.optional(v.string()) },
+  args: { assetId: v.string(), poster: v.boolean(), versionId: v.optional(v.string()), sprite: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     const assetId = ctx.db.normalizeId('videos', args.assetId);
     const requestedVersionId = args.versionId === undefined ? undefined : ctx.db.normalizeId('assetVersions', args.versionId);
@@ -648,6 +649,12 @@ export const ownerMedia = internalQuery({
     if (!versionId || (!args.versionId && asset.processingStatus !== 'ready')) return null;
     const version = await ctx.db.get(versionId);
     if (!version || version.assetId !== asset._id || version.processingState !== "ready") return null;
+    if (args.sprite) {
+      if (!args.poster || !version.mimeType.startsWith('video/')) return null;
+      const job = await ctx.db.query('mediaJobs').withIndex('by_version', q => q.eq('versionId', version._id)).unique();
+      if (!job || job.assetId !== asset._id || job.status !== 'ready' || !job.spriteKey) return null;
+      return { key: job.spriteKey, mimeType: 'image/jpeg' };
+    }
     return { key: args.poster ? version.posterKey : version.originalKey,
       mimeType: args.poster ? "image/jpeg" : version.mimeType };
   },

@@ -5,7 +5,7 @@ export type ProcessingJob = {
 };
 export type ProcessingUpdate = {
   assetId: string; versionId: string | null; versionNumber: number; updatedAt: number;
-  ready: boolean; hasPoster: boolean;
+  ready: boolean; hasPoster: boolean; hasSprite?: boolean;
   duration?: number; width?: number; height?: number; job?: ProcessingJob;
 };
 
@@ -57,4 +57,8 @@ export function processingPoster(update: ProcessingUpdate) {
   return update.ready && update.hasPoster
     ? `/api/owner-poster/${update.assetId}?versionId=${encodeURIComponent(update.versionId ?? '')}&attempt=${update.job?.attempt ?? 0}`
     : undefined;
+}
+
+export function processingSprite(update: ProcessingUpdate) {
+  return update.ready && update.hasSprite ? `/api/owner-poster/${update.assetId}?variant=sprite&versionId=${encodeURIComponent(update.versionId ?? '')}&attempt=${update.job?.attempt ?? 0}` : undefined;
 }

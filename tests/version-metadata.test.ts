@@ -178,3 +178,34 @@ test('an ambiguous legacy import mapping reports its identity while valid mappin
   expect(view.versions.find(version => version._id === versions[0])!.creativeMetadata).toBeUndefined();
   expect(view.versions.find(version => version._id === versions[1])!.creativeMetadata?.model).toBe('Ready model');
 });
+
+test('owner scrub sprites resolve the requested ready version rather than the current asset sprite', async () => {
+  const { t, asset, versions } = await fixture();
+  await t.run(async ctx => {
+    await ctx.db.patch(asset, { processingStatus: 'ready', spriteKey: 'private/current-only.jpg' });
+    for (const [index, versionId] of versions.entries()) await ctx.db.insert('mediaJobs', {
+      assetId: asset, versionId, status: 'ready', stage: 'finalize', attempt: 1,
+      spriteKey: `private/sprite-v${index + 1}.jpg`, createdAt: 1, updatedAt: 1,
+    });
+  });
+  expect(await t.query(internal.personal.ownerMedia, { assetId: asset, versionId: versions[0], poster: true, sprite: true })).toEqual({ key: 'private/sprite-v1.jpg', mimeType: 'image/jpeg' });
+  expect(await t.query(internal.personal.ownerMedia, { assetId: asset, versionId: versions[1], poster: true, sprite: true })).toEqual({ key: 'private/sprite-v2.jpg', mimeType: 'image/jpeg' });
+});
+
+test('owner processing and version details advertise only ready exact-version scrub sprites', async () => {
+  const { t, asset, versions } = await fixture();
+  await t.run(async ctx => {
+    await ctx.db.patch(asset, { processingStatus: 'ready', spriteKey: 'private/unrelated-current.jpg' });
+    await ctx.db.insert('mediaJobs', { assetId: asset, versionId: versions[1], status: 'running', stage: 'derivatives', attempt: 1, spriteKey: 'private/pending.jpg', createdAt: 1, updatedAt: 1 });
+  });
+  expect((await t.query(internal.personal.processing, { assetIds: [asset] }))[0].hasSprite).toBe(false);
+  expect((await t.query(internal.personal.versionDetails, { versionId: versions[0] }))?.hasSprite).toBe(false);
+  expect(await t.query(internal.personal.ownerMedia, { assetId: asset, versionId: versions[0], poster: true, sprite: true })).toBeNull();
+  expect(await t.query(internal.personal.ownerMedia, { assetId: asset, versionId: versions[1], poster: true, sprite: true })).toBeNull();
+  await t.run(async ctx => {
+    const job = await ctx.db.query('mediaJobs').withIndex('by_version', q => q.eq('versionId', versions[1])).unique();
+    await ctx.db.patch(job!._id, { status: 'ready', spriteKey: 'private/completed-v2.jpg' });
+  });
+  expect((await t.query(internal.personal.processing, { assetIds: [asset] }))[0].hasSprite).toBe(true);
+  expect((await t.query(internal.personal.versionDetails, { versionId: versions[1] }))?.hasSprite).toBe(true);
+});
