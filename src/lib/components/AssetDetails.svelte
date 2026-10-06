@@ -113,8 +113,10 @@
     <div class="reference-fields">
       <label for={`grid-${uid}`}>Image grid</label>
       <select id={`grid-${uid}`} disabled={!canEdit || saveState?.busy} value={metadata.gridImageVersionId ?? ''} onchange={event => changeCreative({ gridImageVersionId: event.currentTarget.value || undefined })}><option value="">—</option>{#each referenceImages as image (image.versionId)}<option value={image.versionId}>{image.label}</option>{/each}</select>
+      {#if metadata.gridImageVersionId}<button type="button" disabled={!canEdit || saveState?.busy} onclick={() => changeCreative({ gridImageVersionId: undefined })}>Remove image grid{referenceImages.some(image => image.versionId === metadata.gridImageVersionId) ? '' : ' (unavailable)'}</button>{/if}
       <label for={`refs-${uid}`}>Reference images</label>
       <select id={`refs-${uid}`} multiple disabled={!canEdit || saveState?.busy} value={metadata.referenceImageVersionIds ?? []} onchange={event => changeCreative({ referenceImageVersionIds: Array.from(event.currentTarget.selectedOptions, option => option.value) })}>{#each referenceImages as image (image.versionId)}<option value={image.versionId}>{image.label}</option>{/each}</select>
+      {#each metadata.referenceImageVersionIds ?? [] as versionId (versionId)}<button type="button" disabled={!canEdit || saveState?.busy} onclick={() => changeCreative({ referenceImageVersionIds: metadata.referenceImageVersionIds?.filter(id => id !== versionId) })}>Remove {referenceImages.find(image => image.versionId === versionId)?.label ?? 'unavailable reference'}</button>{/each}
       <div class="reference-previews">{#each referenceImages.filter(image => image.versionId === metadata.gridImageVersionId || metadata.referenceImageVersionIds?.includes(image.versionId)) as image (image.versionId)}<a href={image.url} target="_blank" rel="noreferrer"><img src={image.url} alt={image.label} loading="lazy"/></a>{/each}</div>
     </div>
   {/if}
