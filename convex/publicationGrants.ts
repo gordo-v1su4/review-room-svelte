@@ -47,9 +47,7 @@ function validateExpiry(expiresAt?: number) {
   if (expiresAt !== undefined && (!Number.isSafeInteger(expiresAt) || expiresAt <= Date.now())) throw new ConvexError({ code: 'GRANT_INVALID_EXPIRY' });
 }
 
-export const issue = internalMutation({
-  args: selectionFields,
-  handler: async (ctx, args) => {
+export async function issueGrant(ctx: MutationCtx, args: Selection) {
     const selection = await prepareSelection(ctx, args);
     const { profile, version, asset, project, allowedOrigins, referenceVersionIds } = selection;
     const existing = await ctx.db.query('publicationGrants').withIndex('by_destination_version', q => q.eq('destinationKey', args.destinationKey).eq('versionId', version._id)).unique();
@@ -65,8 +63,9 @@ export const issue = internalMutation({
       projectId: project._id, assetId: asset._id, versionId: version._id, createdBy: profile._id,
       slug: randomSecret(), allowedOrigins, referenceVersionIds, expiresAt: args.expiresAt, consentGeneration: 1, createdAt: Date.now() });
     return publicGrant((await ctx.db.get(grantId))!);
-  },
-});
+}
+
+export const issue = internalMutation({ args: selectionFields, handler: issueGrant });
 
 export const confirmAgain = internalMutation({
   args: { ...selectionFields, expectedGeneration: v.number(), nextGeneration: v.optional(v.number()), confirmationId: v.string() },

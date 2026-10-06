@@ -12,6 +12,8 @@ import type * as auth from "../auth.js";
 import type * as automation from "../automation.js";
 import type * as collections from "../collections.js";
 import type * as comments from "../comments.js";
+import type * as destinationSync from "../destinationSync.js";
+import type * as destinationDelivery from "../destinationDelivery.js";
 import type * as folders from "../folders.js";
 import type * as http from "../http.js";
 import type * as inbox from "../inbox.js";
@@ -48,6 +50,8 @@ declare const fullApi: ApiFromModules<{
   automation: typeof automation;
   collections: typeof collections;
   comments: typeof comments;
+  destinationSync: typeof destinationSync;
+  destinationDelivery: typeof destinationDelivery;
   folders: typeof folders;
   http: typeof http;
   inbox: typeof inbox;

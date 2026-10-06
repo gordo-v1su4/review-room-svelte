@@ -31,6 +31,7 @@
   import FolderActions from '$lib/components/FolderActions.svelte';
   import ProjectIdentityDialog from '$lib/components/ProjectIdentityDialog.svelte';
   import ShareDialog from '$lib/components/ShareDialog.svelte';
+  import DestinationSyncDialog from '$lib/components/DestinationSyncDialog.svelte';
   import ProjectAccessDialog from '$lib/components/ProjectAccessDialog.svelte';
   import AccountDialog from '$lib/components/AccountDialog.svelte';
   import OwnerAccountMenu from '$lib/components/OwnerAccountMenu.svelte';
@@ -104,6 +105,12 @@
   let navCollapsed = $state(false);
   let projectDialog = $state(false), projectName = $state('');
   let identityDialogOpen = $state(false);
+  let destinationDialogOpen = $state(false);
+  let destinationSelection = $state<string[]>([]);
+  function openDestinations() {
+    destinationSelection = (checked.ids.length ? checked.ids : active ? [active.id] : []).map(id => selectedVersions[id] && selectedVersions[id] !== "__current__" ? selectedVersions[id] : allAssets.find(asset => asset.id === id)?.versionId).filter((id):id is string => !!id);
+    navOpen = false; destinationDialogOpen = true;
+  }
   const allAssets = $derived(media.map(asset => ({ ...asset, ...session.assets[asset.id], ...organization.placements[asset.id], status: organization.placements[asset.id]?.archived ? 'archived' as VideoStatus : session.assets[asset.id].status, folderName: organization.folders.find(folder => folder.id === organization.placements[asset.id]?.folderId)?.title, commentsCount: session.assets[asset.id]?.comments.length ?? 0 })));
   const assets = $derived(projects.find(item => item.id === projectId)?.archived ? [] : allAssets.filter(asset => asset.projectId === projectId && (Boolean(asset.archived) === archived || (!archived && filters.statuses.includes('archived')))));
   const project = $derived(projects.find(item => item.id === projectId)!);
@@ -964,6 +971,7 @@
   <ProjectTree onEditProject={editProject} canEditProject={id => folderAccess.isAdmin && folderAccess.editableProjectIds.includes(id)} {canDropAssets} onDropAssets={dropAssets} dragActive={!!dragged} selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={isProjectRoot} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
   <ArchivedProjects projects={archivedProjects} onRestore={restoreProject} closeOnRestore={navOpen} onNavigateFocus={focusProjectHeading}/>
   {#if folderAccess.isAdmin}<FeedbackInbox groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}
+  {#if live && !project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId)}<div class="nav-divider"></div><span class="nav-heading">DESTINATIONS</span><button class="nav-item" onclick={openDestinations}><ArrowUpRight size={16}/> Trailer Feed</button>{/if}
   <div class="nav-divider"></div><span class="nav-heading">REVIEW STATUS</span>
   <button class:nav-active={!activeCollection && filter === 'awaiting_review'} class="nav-item" disabled={!!project.archived} onclick={() => filterBy('awaiting_review')}><span class="status-dot pending"></span> Awaiting review</button>
   <button class:nav-active={!activeCollection && filter === 'needs_changes'} class="nav-item" disabled={!!project.archived} onclick={() => filterBy('needs_changes')}><span class="status-dot changes"></span> Needs changes</button>
@@ -1073,6 +1081,7 @@
   </main>
 </div>
 
+{#if live && projectId !== "__empty__"}<DestinationSyncDialog bind:open={destinationDialogOpen} {projectId} folderId={activeFolderId} selectedVersionIds={destinationSelection}/>{/if}
 <Dialog.Root bind:open={projectDialog}>
   <Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="filter-sheet">
     <Dialog.Title class="dialog-title">New project</Dialog.Title>

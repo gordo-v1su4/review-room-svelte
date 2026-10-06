@@ -319,6 +319,29 @@ const applicationTables = {
     createdAt: v.number(),
   }),
 
+  destinationConnections: defineTable({
+    destinationKey: v.string(), projectId: v.id('projects'), folderId: v.optional(v.id('projectFolders')),
+    targetRunId: v.string(), createdBy: v.id('appUsers'), createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_source_folder', ['destinationKey', 'projectId', 'folderId']).index('by_project', ['projectId']),
+
+  syncBatches: defineTable({
+    confirmationId: v.string(), connectionId: v.id('destinationConnections'), projectId: v.id('projects'),
+    requestFingerprint: v.string(), reservationJson: v.string(), orderedVersionIds: v.array(v.id('assetVersions')),
+    state: v.union(v.literal('queued'), v.literal('reserved'), v.literal('failed'), v.literal('complete')),
+    attempts: v.number(), leaseUntil: v.optional(v.number()), attemptToken: v.optional(v.string()), lastError: v.optional(v.string()),
+    createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_confirmation', ['confirmationId']).index('by_project', ['projectId']),
+
+  syncOutbox: defineTable({
+    batchId: v.id('syncBatches'), connectionId: v.id('destinationConnections'), projectId: v.id('projects'),
+    versionId: v.id('assetVersions'), assetId: v.id('videos'), consentGeneration: v.number(), payloadJson: v.string(),
+    state: v.union(v.literal('queued'), v.literal('sending'), v.literal('synced'), v.literal('failed'), v.literal('disconnected'), v.literal('source_deleted')),
+    attempts: v.number(), leaseUntil: v.optional(v.number()), attemptToken: v.optional(v.string()), lastError: v.optional(v.string()),
+    targetArtifactId: v.optional(v.string()), targetVersionNumber: v.optional(v.number()),
+    createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_batch', ['batchId']).index('by_connection', ['connectionId'])
+    .index('by_source_version', ['connectionId', 'versionId']).index('by_project', ['projectId']),
+
   publicationGrants: defineTable({
     destinationKey: v.literal('trailer-feed'),
     projectId: v.id('projects'),

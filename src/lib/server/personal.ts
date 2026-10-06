@@ -23,6 +23,9 @@ export function db() {
     },
     mutation<T extends FunctionReference<'mutation', 'public' | 'internal'>>(ref: T, args: FunctionArgs<T>): Promise<FunctionReturnType<T>> {
       return client.mutation(ref as never, args as never) as Promise<FunctionReturnType<T>>;
+    },
+    action<T extends FunctionReference<'action', 'public' | 'internal'>>(ref: T, args: FunctionArgs<T>): Promise<FunctionReturnType<T>> {
+      return client.action(ref as never, args as never) as Promise<FunctionReturnType<T>>;
     }
   };
 }
