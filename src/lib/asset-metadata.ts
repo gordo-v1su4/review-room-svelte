@@ -23,7 +23,7 @@ export type AssetMetadataPatch = {
   metadata?: CreativeMetadata;
 };
 export type VersionImageOption = { versionId: string; label: string; url: string };
-export type MetadataSaveState = { busy: boolean; message: string };
+export type MetadataSaveState = { busy: boolean; message: string; conflict?: boolean };
 export const CREATIVE_MODEL_PRESETS = ['Seedance 2.0', 'Seedance 2.5', 'Sora 2', 'MiniMax H3', 'Kling', 'Veo 3'] as const;
 export type NormalizedCreativeMetadata = CreativeMetadata & { sourceLabel: string; referenceImageVersionIds: string[] };
 export type MetadataGroup = 'essentials' | 'review' | 'file' | 'tags' | 'creative';

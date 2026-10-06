@@ -6,8 +6,9 @@
   import type { AssetReview } from '$lib/review-session';
   import type { AssetMetadataPatch, MetadataSaveState, VersionImageOption } from '$lib/asset-metadata';
 
-  let { asset, review, knownTags, canEdit, onChange, onOpen, onDesktopClose, onSave, saveState, referenceImages = [] }: {
+  let { asset, review, knownTags, canEdit, onChange, onOpen, onDesktopClose, onSave, onReload, saveState, referenceImages = [] }: {
     onSave?: (id: string) => Promise<void>;
+    onReload?: (id: string) => Promise<void>;
     referenceImages?: VersionImageOption[];
     saveState?: MetadataSaveState;
     asset: ReviewAsset;
@@ -38,7 +39,7 @@
         <div><Dialog.Title class="dialog-title">Asset fields</Dialog.Title><Dialog.Description class="metadata-sheet-description">{asset.sourceFile.name}</Dialog.Description></div>
         <Dialog.Close class="metadata-sheet-close" aria-label="Close asset fields"><X size={17}/></Dialog.Close>
       </div>
-      <div class="metadata-sheet-body"><AssetDetails {asset} {review} {knownTags} {canEdit} {onChange} {onSave} {saveState} {referenceImages}/></div>
+      <div class="metadata-sheet-body"><AssetDetails {asset} {review} {knownTags} {canEdit} {onChange} {onSave} {onReload} {saveState} {referenceImages}/></div>
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
