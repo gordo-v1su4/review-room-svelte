@@ -1,8 +1,12 @@
-FROM node:22-bookworm-slim AS build
-COPY --from=oven/bun:1.3.14 /usr/local/bin/bun /usr/local/bin/bun
+FROM oven/bun:1.3.14 AS dependencies
 WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
+
+FROM node:22-bookworm-slim AS build
+COPY --from=dependencies /usr/local/bin/bun /usr/local/bin/bun
+WORKDIR /app
+COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 RUN bun run build && bun install --production --frozen-lockfile
 
