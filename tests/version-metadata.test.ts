@@ -30,6 +30,11 @@ test('creative metadata persists on the exact version without changing another v
   expect(first.creativeMetadata).toEqual({ model: 'sora-2', prompt: 'Neon rain', sourceLabel: 'Original V1', sourceCreatedAt: 1234, referenceImageVersionIds: [] });
   expect(first.originalKey).toBe('private/clip-1.mp4');
   expect(second.creativeMetadata).toBeUndefined();
+  const details = await t.query(internal.personal.versionDetails, { versionId: versions[0] });
+  expect(details?.metadata).toEqual(first.creativeMetadata);
+  expect(details?.metadataUpdatedAt).toBe(first.metadataUpdatedAt);
+  expect(JSON.stringify(details)).not.toContain('private/');
+  expect(await t.query(internal.personal.versionDetails, { versionId: 'invalid' })).toBeNull();
 });
 
 test('metadata read through a scoped agent credential includes exact version data without storage keys', async () => {
@@ -56,6 +61,11 @@ test('metadata rejects invalid dates and duplicate custom field identities witho
   const metadata = { model: '', prompt: '', sourceLabel: '', referenceImageVersionIds: [], notes: 'Retained' };
   await t.mutation(internal.personal.updateVersionMetadata, { versionId: versions[0], metadata });
   for (const invalid of [
+    {},
+    { ...metadata, prompt: 42 },
+    { ...metadata, referenceImageVersionIds: ['invalid'] },
+    { ...metadata, customFields: [{ id: 'bad', label: 'Bad', kind: 'number', value: 'wrong type' }] },
+    { ...metadata, unrecognized: 'field' },
     { ...metadata, releaseDate: '2026-02-30' },
     { ...metadata, customFields: [{ id: 'same', label: 'First', kind: 'text' as const, value: '' }, { id: 'same', label: 'Second', kind: 'text' as const, value: '' }] },
   ]) await expect(t.mutation(internal.personal.updateVersionMetadata, { versionId: versions[0], metadata: invalid })).rejects.toThrow('Invalid creative metadata');
@@ -68,6 +78,8 @@ test('stale session saves cannot overwrite newer version metadata', async () => 
   const metadata = { model: '', prompt: '', sourceLabel: '', referenceImageVersionIds: [] };
   await t.mutation(internal.personal.updateVersionMetadata, { versionId: versions[0], metadata, expectedUpdatedAt: null });
   await expect(t.mutation(internal.personal.updateVersionMetadata, { versionId: versions[0], metadata: { ...metadata, prompt: 'Stale' }, expectedUpdatedAt: null })).rejects.toThrow('Metadata changed');
+  await expect(t.mutation(internal.personal.updateVersionMetadata, { versionId: versions[0], metadata, expectedUpdatedAt: null })).rejects.toMatchObject({ data: { code: 'METADATA_CONFLICT' } });
+  await expect(t.mutation(internal.personal.updateVersionMetadata, { versionId: 'invalid', metadata })).rejects.toMatchObject({ data: { code: 'VERSION_UNAVAILABLE' } });
   const view = await t.query(internal.personal.snapshot, {});
   expect(view.versions.find(version => version._id === versions[0])!.creativeMetadata?.prompt).toBe('');
 });
@@ -91,19 +103,21 @@ test('image references stay pinned to an authorized exact version and reject ano
   expect((await t.query(internal.personal.ownerMedia, { assetId: images[0].image, versionId: images[0].version, poster: false }))?.key).toBe('private/image.png');
   await expect(t.mutation(internal.personal.updateVersionMetadata, { versionId: versions[0], metadata: { ...metadata, referenceImageVersionIds: [images[1].version] } })).rejects.toThrow('Image reference unavailable');
   expect(await t.query(internal.personal.ownerMedia, { assetId: images[0].image, versionId: images[1].version, poster: false })).toBeNull();
+  expect(await t.query(internal.personal.ownerMedia, { assetId: images[0].image, versionId: 'invalid', poster: false })).toBeNull();
+  expect(await t.query(internal.personal.ownerMedia, { assetId: 'invalid', poster: true })).toBeNull();
 });
 
 test('import backfill targets mapped versions and preserves deliberate empty edits and the raw archive', async () => {
   const { t, project, asset, versions } = await fixture();
   const folderId = await t.mutation(internal.personal.createFolder, { projectId: project, title: 'Import' });
   const sourceDocumentsJson = JSON.stringify({ artifacts: [{ artifact_id: 'clip', title: 'Source title', video_model: 'Imported model', version_prompt: 'Imported prompt', created_at: '2026-10-01T00:00:00Z' }] });
-  await t.mutation(internal.sourceImports.save, { sourceProjectId: 'source', projectId: project, folderId, sourceDocumentsJson, mediaMappingsJson: JSON.stringify([{ assetId: asset, versionId: versions[0], sourceArtifactId: 'clip', kind: 'video' }]) });
-  await t.mutation(internal.sourceImports.backfillVersionMetadata, {});
+  const importId = await t.mutation(internal.sourceImports.save, { sourceProjectId: 'source', projectId: project, folderId, sourceDocumentsJson, mediaMappingsJson: JSON.stringify([{ assetId: asset, versionId: versions[0], sourceArtifactId: 'clip', kind: 'video' }]) });
+  await t.mutation(internal.sourceImports.backfillVersionMetadata, { importId });
   let view = await t.query(internal.personal.snapshot, {});
   expect(view.versions.find(v => v._id === versions[0])!.creativeMetadata?.model).toBe('Imported model');
   expect(view.versions.find(v => v._id === versions[1])!.creativeMetadata).toBeUndefined();
   await t.mutation(internal.personal.updateVersionMetadata, { versionId: versions[0], metadata: { model: '', prompt: '', sourceLabel: '', referenceImageVersionIds: [] } });
-  await t.mutation(internal.sourceImports.backfillVersionMetadata, {});
+  await t.mutation(internal.sourceImports.backfillVersionMetadata, { importId });
   view = await t.query(internal.personal.snapshot, {});
   expect(view.versions.find(v => v._id === versions[0])!.creativeMetadata?.model).toBe('');
   expect((await t.query(internal.sourceImports.list, {}))[0].sourceDocumentsJson).toBe(sourceDocumentsJson);
@@ -128,12 +142,27 @@ test('scoped metadata reads reject upload-only, foreign-project and revoked cred
 test('importing multiple source artifacts into one asset preserves each mapped version metadata', async () => {
   const { t, project, asset, versions } = await fixture();
   const folderId = await t.mutation(internal.personal.createFolder, { projectId: project, title: 'Versions' });
-  await t.mutation(internal.sourceImports.save, { sourceProjectId: 'multi', projectId: project, folderId,
+  const importId = await t.mutation(internal.sourceImports.save, { sourceProjectId: 'multi', projectId: project, folderId,
     sourceDocumentsJson: JSON.stringify({ artifacts: [{ artifact_id: 'first', video_model: 'First model', version_prompt: 'First prompt' }, { artifact_id: 'second', video_model: 'Second model', version_prompt: 'Second prompt' }] }),
     mediaMappingsJson: JSON.stringify([{ assetId: asset, versionId: versions[0], sourceArtifactId: 'first', kind: 'video' }, { assetId: asset, versionId: versions[1], sourceArtifactId: 'second', kind: 'video' }]),
   });
-  await t.mutation(internal.sourceImports.backfillVersionMetadata, {});
+  await t.mutation(internal.sourceImports.backfillVersionMetadata, { importId });
   const view = await t.query(internal.personal.snapshot, {});
   expect(view.versions.find(v => v._id === versions[0])!.creativeMetadata?.prompt).toBe('First prompt');
   expect(view.versions.find(v => v._id === versions[1])!.creativeMetadata?.model).toBe('Second model');
+});
+
+test('an ambiguous legacy import mapping reports its identity while valid mappings still migrate', async () => {
+  const { t, project, asset, versions } = await fixture();
+  const folderId = await t.mutation(internal.personal.createFolder, { projectId: project, title: 'Mixed import' });
+  const importId = await t.mutation(internal.sourceImports.save, { sourceProjectId: 'mixed', projectId: project, folderId,
+    sourceDocumentsJson: JSON.stringify({ artifacts: [{ artifact_id: 'ambiguous', video_model: 'Unknown version' }, { artifact_id: 'valid', video_model: 'Ready model' }] }),
+    mediaMappingsJson: JSON.stringify([{ assetId: asset, sourceArtifactId: 'ambiguous', kind: 'video' }, { assetId: asset, versionId: versions[1], sourceArtifactId: 'valid', kind: 'video' }]),
+  });
+  const result = await t.mutation(internal.sourceImports.backfillVersionMetadata, { importId });
+  expect(result.migrated).toBe(1);
+  expect(result.failures).toEqual([{ sourceArtifactId: 'ambiguous', code: 'VERSION_MAPPING_UNAVAILABLE' }]);
+  const view = await t.query(internal.personal.snapshot, {});
+  expect(view.versions.find(version => version._id === versions[0])!.creativeMetadata).toBeUndefined();
+  expect(view.versions.find(version => version._id === versions[1])!.creativeMetadata?.model).toBe('Ready model');
 });

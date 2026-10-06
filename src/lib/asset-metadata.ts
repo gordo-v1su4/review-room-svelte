@@ -24,6 +24,8 @@ export type AssetMetadataPatch = {
 };
 export type VersionImageOption = { versionId: string; label: string; url: string };
 export type MetadataSaveState = { busy: boolean; message: string };
+export const CREATIVE_MODEL_PRESETS = ['Seedance 2.0', 'Seedance 2.5', 'Sora 2', 'MiniMax H3', 'Kling', 'Veo 3'] as const;
+export type NormalizedCreativeMetadata = CreativeMetadata & { sourceLabel: string; referenceImageVersionIds: string[] };
 export type MetadataGroup = 'essentials' | 'review' | 'file' | 'tags' | 'creative';
 export type MetadataField = { id: string; label: string; group: MetadataGroup; value: string | number | boolean | null | undefined; filled?: boolean };
 export type MetadataFilter = { group: 'all' | MetadataGroup; presence: 'all' | 'empty' | 'filled'; search: string };
@@ -44,7 +46,7 @@ function dateValue(value: unknown): string {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? value : '';
 }
 
-export function normalizeCreativeMetadata(value: unknown): CreativeMetadata {
+export function normalizeCreativeMetadata(value: unknown): NormalizedCreativeMetadata {
   const input = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
   const text = (key: string) => typeof input[key] === 'string' ? input[key] as string : '';
   const ids = new Set<string>();

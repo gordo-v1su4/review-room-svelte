@@ -1,7 +1,7 @@
 import { purgeDependencyBatch } from './lib/archivePurge';
-import { creativeMetadata, writeVersionMetadata } from './lib/versionMetadata';
+import { parseVersionMetadata, writeVersionMetadata } from './lib/versionMetadata';
 import { importedMediaMetadata } from './lib/sourceImport';
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -377,10 +377,27 @@ export const approveAsset = internalMutation({
 });
 
 export const updateVersionMetadata = internalMutation({
-  args: { versionId: v.id('assetVersions'), metadata: creativeMetadata, expectedUpdatedAt: v.optional(v.union(v.number(), v.null())) },
+  args: { versionId: v.string(), metadata: v.any(), expectedUpdatedAt: v.optional(v.union(v.number(), v.null())) },
   handler: async (ctx, { versionId, metadata, expectedUpdatedAt }) => {
     const profile = await owner(ctx);
-    return await writeVersionMetadata(ctx, profile._id, versionId, metadata, expectedUpdatedAt);
+    const normalizedId = ctx.db.normalizeId('assetVersions', versionId);
+    if (!normalizedId) throw new ConvexError({ code: 'VERSION_UNAVAILABLE', message: 'Version unavailable' });
+    return await writeVersionMetadata(ctx, profile._id, normalizedId, parseVersionMetadata(ctx, metadata), expectedUpdatedAt);
+  },
+});
+
+export const versionDetails = internalQuery({
+  args: { versionId: v.string() },
+  handler: async (ctx, { versionId }) => {
+    const id = ctx.db.normalizeId('assetVersions', versionId);
+    const version = id && await ctx.db.get(id);
+    const asset = version && await ctx.db.get(version.assetId);
+    if (!version || !asset) return null;
+    await ownedProject(ctx, asset.projectId, true);
+    return { id: version._id, assetId: asset._id, version: version.version,
+      processingState: version.processingState, hasPoster: !!version.posterKey,
+      sizeBytes: version.sizeBytes, mimeType: version.mimeType,
+      metadata: version.creativeMetadata ?? null, metadataUpdatedAt: version.metadataUpdatedAt ?? null };
   },
 });
 
@@ -617,12 +634,15 @@ export const reviewMedia = internalQuery({
 });
 
 export const ownerMedia = internalQuery({
-  args: { assetId: v.id("videos"), poster: v.boolean(), versionId: v.optional(v.id('assetVersions')) },
+  args: { assetId: v.string(), poster: v.boolean(), versionId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const asset = await ctx.db.get(args.assetId);
+    const assetId = ctx.db.normalizeId('videos', args.assetId);
+    const requestedVersionId = args.versionId === undefined ? undefined : ctx.db.normalizeId('assetVersions', args.versionId);
+    if (!assetId || requestedVersionId === null) return null;
+    const asset = await ctx.db.get(assetId);
     if (!asset) return null;
     await ownedProject(ctx, asset.projectId, true);
-    const versionId = args.versionId ?? asset.currentVersionId;
+    const versionId = requestedVersionId ?? asset.currentVersionId;
     if (!versionId || (!args.versionId && asset.processingStatus !== 'ready')) return null;
     const version = await ctx.db.get(versionId);
     if (!version || version.assetId !== asset._id || version.processingState !== "ready") return null;

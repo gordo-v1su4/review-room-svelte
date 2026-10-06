@@ -48,13 +48,13 @@ export function observeProcessing(assetIds: () => readonly string[], apply: (upd
 }
 
 export function processingSource(update: ProcessingUpdate) {
-  return update.ready ? `/api/owner-media/${update.assetId}?version=${encodeURIComponent(update.versionId ?? '')}&attempt=${update.job?.attempt ?? 0}` : '';
+  return update.ready ? `/api/owner-media/${update.assetId}?versionId=${encodeURIComponent(update.versionId ?? '')}&attempt=${update.job?.attempt ?? 0}` : '';
 }
 export function processingAvailability(update: ProcessingUpdate): 'queued' | 'running' | 'error' | 'ready' {
   return update.ready ? 'ready' : update.job?.status === 'error' ? 'error' : update.job?.status === 'running' ? 'running' : 'queued';
 }
 export function processingPoster(update: ProcessingUpdate) {
   return update.ready && update.hasPoster
-    ? `/api/owner-poster/${update.assetId}?version=${encodeURIComponent(update.versionId ?? '')}&attempt=${update.job?.attempt ?? 0}`
+    ? `/api/owner-poster/${update.assetId}?versionId=${encodeURIComponent(update.versionId ?? '')}&attempt=${update.job?.attempt ?? 0}`
     : undefined;
 }
