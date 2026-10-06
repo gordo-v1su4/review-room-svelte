@@ -67,9 +67,7 @@ export async function issueGrant(ctx: MutationCtx, args: Selection) {
 
 export const issue = internalMutation({ args: selectionFields, handler: issueGrant });
 
-export const confirmAgain = internalMutation({
-  args: { ...selectionFields, expectedGeneration: v.number(), nextGeneration: v.optional(v.number()), confirmationId: v.string() },
-  handler: async (ctx, args) => {
+export async function confirmGrantAgain(ctx: MutationCtx, args: Selection & { expectedGeneration: number; nextGeneration?: number; confirmationId: string }) {
     const selection = await prepareSelection(ctx, args);
     const grant = await ctx.db.query('publicationGrants').withIndex('by_destination_version', q => q.eq('destinationKey', args.destinationKey).eq('versionId', selection.version._id)).unique();
     if (!grant || grant.createdBy !== selection.profile._id) throw new ConvexError({ code: 'GRANT_UNAVAILABLE' });
@@ -87,7 +85,11 @@ export const confirmAgain = internalMutation({
       referenceVersionIds: selection.referenceVersionIds, expiresAt: args.expiresAt, revokedAt: undefined,
       consentGeneration: nextGeneration, lastConfirmationId: args.confirmationId });
     return publicGrant((await ctx.db.get(grant._id))!);
-  },
+}
+
+export const confirmAgain = internalMutation({
+  args: { ...selectionFields, expectedGeneration: v.number(), nextGeneration: v.optional(v.number()), confirmationId: v.string() },
+  handler: confirmGrantAgain,
 });
 
 export const revoke = internalMutation({

@@ -326,7 +326,7 @@ const applicationTables = {
 
   syncBatches: defineTable({
     confirmationId: v.string(), connectionId: v.id('destinationConnections'), projectId: v.id('projects'),
-    requestFingerprint: v.string(), reservationJson: v.string(), orderedVersionIds: v.array(v.id('assetVersions')),
+    requestFingerprint: v.string(), reservationJson: v.string(), reactivationJson: v.optional(v.string()), orderedVersionIds: v.array(v.id('assetVersions')),
     state: v.union(v.literal('queued'), v.literal('reserved'), v.literal('failed'), v.literal('complete')),
     attempts: v.number(), leaseUntil: v.optional(v.number()), attemptToken: v.optional(v.string()), lastError: v.optional(v.string()),
     createdAt: v.number(), updatedAt: v.number(),
@@ -338,6 +338,7 @@ const applicationTables = {
     state: v.union(v.literal('queued'), v.literal('sending'), v.literal('synced'), v.literal('failed'), v.literal('disconnected'), v.literal('source_deleted')),
     attempts: v.number(), leaseUntil: v.optional(v.number()), attemptToken: v.optional(v.string()), lastError: v.optional(v.string()),
     targetArtifactId: v.optional(v.string()), targetVersionNumber: v.optional(v.number()),
+    targetState: v.optional(v.string()), targetConsentGeneration: v.optional(v.number()),
     createdAt: v.number(), updatedAt: v.number(),
   }).index('by_batch', ['batchId']).index('by_connection', ['connectionId'])
     .index('by_source_version', ['connectionId', 'versionId']).index('by_project', ['projectId']),

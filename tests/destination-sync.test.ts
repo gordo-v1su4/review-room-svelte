@@ -181,3 +181,88 @@ test('workspace reconciliation persists target removal and retry never republish
     if (oldKey === undefined) delete process.env.TRAILER_FEED_REVIEW_INGEST_KEY; else process.env.TRAILER_FEED_REVIEW_INGEST_KEY = oldKey;
   }
 });
+
+test('explicit Sync again rotates exact-version consent once and safely retries a lost reactivation response', async () => {
+  const { t, project, asset, first, second } = await fixture();
+  const connectionId = await t.mutation(internal.destinationSync.saveConnection, { projectId: project, destinationKey: 'trailer-feed', targetRunId: 'connected-target' });
+  const oldFetch = globalThis.fetch;
+  const oldKey = process.env.TRAILER_FEED_REVIEW_INGEST_KEY;
+  process.env.TRAILER_FEED_REVIEW_INGEST_KEY = 'fixture-ingest-only';
+  let lostResponse = true;
+  let generation = 1;
+  let state = 'registered';
+  const deliveries: { versionId:string; generation:number; url:string }[] = [];
+  const reactivationIds: string[] = [];
+  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const payload = JSON.parse(String(init?.body));
+    if (String(input).endsWith('/status')) return Response.json({ versions: [{ source_asset_id: asset, source_version_id: first, state, consent_generation: generation, run_id: 'connected-target', artifact_id: 'review-target-1', version_number: 1 }] });
+    if (String(input).endsWith('/reactivations')) {
+      expect(payload.intent).toBe('sync-again');
+      expect(payload.expected_generation).toBe(1);
+      expect(payload.consent_generation).toBe(2);
+      expect(payload.source_version_id).toBe(first);
+      reactivationIds.push(payload.batch_id);
+      generation = 2; state = 'reserved';
+      if (lostResponse) { lostResponse = false; throw new TypeError('Lost external response'); }
+      return Response.json({ batch_id: payload.batch_id, consent_generation: 2, version_number: 1 });
+    }
+    if (String(input).endsWith('/batches')) {
+      expect(payload.versions.map((item: { source_version_id:string }) => item.source_version_id)).toEqual([first]);
+      expect(payload.versions[0].consent_generation).toBe(generation);
+      expect(reactivationIds).not.toContain(payload.batch_id);
+      return Response.json({ batch_id: payload.batch_id, versions: payload.versions.map((item: Record<string, unknown>) => ({ ...item, version_number: 1, artifact_id: 'review-target-1', state: 'reserved' })) });
+    }
+    deliveries.push({ versionId: payload.source_version_id, generation: payload.consent_generation, url: payload.media_url });
+    state = 'registered';
+    return Response.json({ artifact: { artifact_id: 'review-target-1', version_number: 1, source_app: 'review-room', source_asset_id: asset, source_version_id: first, consent_generation: generation } });
+  }) as unknown as typeof fetch;
+  try {
+    await t.mutation(internal.destinationSync.confirm, { connectionId, confirmationId: 'original-publication', versions: [{ versionId: first, expectedMetadataUpdatedAt: 11 }] });
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers());
+    state = 'target_suppressed';
+    await t.action(internal.destinationDelivery.reconcile, { projectId: project });
+    const consent = { connectionId, confirmationId: 'deliberate-republication', versionId: first, expectedGeneration: 1, expectedMetadataUpdatedAt: 11 };
+    const confirmed = await t.mutation(internal.destinationSync.syncAgain, consent);
+    expect((await t.mutation(internal.destinationSync.syncAgain, consent)).batchId).toBe(confirmed.batchId);
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers());
+    expect((await t.query(internal.destinationSync.snapshot, { projectId: project })).items.find(item => item.consentGeneration === 2)?.state).toBe('failed');
+    await t.mutation(internal.destinationSync.retry, { batchId: confirmed.batchId });
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers());
+    expect(reactivationIds).toHaveLength(2);
+    expect(reactivationIds[0]).toBe(reactivationIds[1]);
+    expect(deliveries.map(item => [item.versionId, item.generation])).toEqual([[first, 1], [first, 2]]);
+    expect(deliveries[1].url).not.toBe(deliveries[0].url);
+    expect(deliveries.some(item => item.versionId === second)).toBe(false);
+    const snapshot = await t.query(internal.destinationSync.snapshot, { projectId: project });
+    expect(snapshot.items).toHaveLength(2);
+    expect(snapshot.items.find(item => item.consentGeneration === 2)?.state).toBe('synced');
+    expect(snapshot.items.find(item => item.consentGeneration === 2)?.targetVersionNumber).toBe(1);
+  } finally {
+    globalThis.fetch = oldFetch;
+    if (oldKey === undefined) delete process.env.TRAILER_FEED_REVIEW_INGEST_KEY; else process.env.TRAILER_FEED_REVIEW_INGEST_KEY = oldKey;
+  }
+});
+
+test('removal before initial delivery can be reconciled for explicit exact-version reactivation', async () => {
+  const { t, project, asset, first } = await fixture();
+  const connectionId = await t.mutation(internal.destinationSync.saveConnection, { projectId: project, destinationKey: 'trailer-feed', targetRunId: 'connected-target' });
+  const oldFetch = globalThis.fetch;
+  const oldKey = process.env.TRAILER_FEED_REVIEW_INGEST_KEY;
+  process.env.TRAILER_FEED_REVIEW_INGEST_KEY = 'fixture-ingest-only';
+  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const payload = JSON.parse(String(init?.body));
+    if (String(input).endsWith('/batches')) return Response.json({ batch_id: payload.batch_id, versions: payload.versions.map((item: Record<string, unknown>) => ({ ...item, version_number: 1, artifact_id: 'review-target-1', state: 'reserved' })) });
+    if (String(input).endsWith('/status')) return Response.json({ versions: [{ source_asset_id: asset, source_version_id: first, state: 'target_suppressed', consent_generation: 1, run_id: 'connected-target', artifact_id: 'review-target-1', version_number: 1 }] });
+    return Response.json({ error: 'Suppressed after reservation' }, { status: 409 });
+  }) as unknown as typeof fetch;
+  try {
+    await t.mutation(internal.destinationSync.confirm, { connectionId, confirmationId: 'removed-before-delivery', versions: [{ versionId: first, expectedMetadataUpdatedAt: 11 }] });
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers());
+    expect((await t.query(internal.destinationSync.snapshot, { projectId: project })).items[0].state).toBe('disconnected');
+    await t.action(internal.destinationDelivery.reconcile, { projectId: project });
+    expect((await t.query(internal.destinationSync.snapshot, { projectId: project })).items[0].canSyncAgain).toBe(true);
+  } finally {
+    globalThis.fetch = oldFetch;
+    if (oldKey === undefined) delete process.env.TRAILER_FEED_REVIEW_INGEST_KEY; else process.env.TRAILER_FEED_REVIEW_INGEST_KEY = oldKey;
+  }
+});

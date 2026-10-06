@@ -11,7 +11,7 @@ function syncError(cause: unknown): Response | never {
   const code = data && typeof data === 'object' && 'code' in data ? data.code : null;
   if (code === 'SYNC_TARGET_CONFLICT') return json({ message: 'A target with this name already exists. Choose it or change the name.', existingRunId: data && typeof data === 'object' && 'existingRunId' in data ? data.existingRunId : undefined }, { status: 409, headers: { 'cache-control': 'private, no-store' } });
   if (code === 'SYNC_PROJECT_UNAVAILABLE' || code === 'SYNC_FOLDER_UNAVAILABLE' || code === 'SYNC_CONNECTION_UNAVAILABLE' || code === 'SYNC_BATCH_UNAVAILABLE' || code === 'SYNC_VERSION_UNAVAILABLE') throw error(404, 'Selected source or connection is unavailable');
-  if (code === 'SYNC_SELECTION_CHANGED' || code === 'SYNC_CONFIRMATION_CHANGED' || code === 'SYNC_CONNECTION_CHANGED') throw error(409, 'Selection changed. Reload and confirm the exact versions again.');
+  if (code === 'SYNC_SELECTION_CHANGED' || code === 'SYNC_CONFIRMATION_CHANGED' || code === 'SYNC_CONNECTION_CHANGED' || code === 'SYNC_REACTIVATION_UNAVAILABLE') throw error(409, 'Selection or destination consent changed. Reload and confirm the exact version again.');
   if (code === 'SYNC_VERSION_ALREADY_SELECTED') throw error(409, 'This version already has a saved sync operation. Retry its failed delivery or use Sync again after disconnection.');
   if (code === 'GRANT_MEDIA_NOT_READY' || code === 'GRANT_REFERENCE_UNAVAILABLE') throw error(409, 'Wait for selected media and images to finish processing; check missing references.');
   if (code === 'SYNC_CONNECTION_FAILED') throw error(502, data && typeof data === 'object' && 'message' in data && typeof data.message === 'string' ? data.message : 'Destination connection failed');
@@ -49,6 +49,10 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
     if (body.action === 'retry' && typeof body.batchId === 'string') {
       await db().mutation(internal.destinationSync.retry, { batchId: body.batchId });
       return json({ ok: true }, { headers: { 'cache-control': 'private, no-store' } });
+    }
+    if (body.action === 'sync-again') {
+      if (typeof body.connectionId !== 'string' || typeof body.confirmationId !== 'string' || typeof body.versionId !== 'string' || !Number.isSafeInteger(body.expectedGeneration) || body.expectedGeneration < 1 || (body.expectedMetadataUpdatedAt !== null && (!Number.isSafeInteger(body.expectedMetadataUpdatedAt) || body.expectedMetadataUpdatedAt < 0))) throw error(400, 'Exact version, current consent and metadata revision required');
+      return json(await db().mutation(internal.destinationSync.syncAgain, { connectionId: body.connectionId, confirmationId: body.confirmationId, versionId: body.versionId, expectedGeneration: body.expectedGeneration, expectedMetadataUpdatedAt: body.expectedMetadataUpdatedAt }), { headers: { 'cache-control': 'private, no-store' } });
     }
     throw error(400, 'Supported sync operation required');
   } catch (cause) { return syncError(cause); }

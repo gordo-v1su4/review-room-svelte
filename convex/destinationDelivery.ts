@@ -8,7 +8,7 @@ class DestinationFailure extends Error {
   constructor(message: string, readonly disconnected = false) { super(message); }
 }
 
-async function post(path: 'batches' | 'versions' | 'connections' | 'status', payload: Record<string, unknown>) {
+async function post(path: 'batches' | 'versions' | 'connections' | 'status' | 'reactivations', payload: Record<string, unknown>) {
   const key = process.env.TRAILER_FEED_REVIEW_INGEST_KEY;
   if (!key) throw new DestinationFailure('Destination delivery is not configured');
   const response = await fetch(`https://media.v1su4.dev/trailer-feed/external/review/${path}`, {
@@ -57,6 +57,11 @@ export const reserve = internalAction({
     const claim = await ctx.runMutation(internal.destinationSync.claimBatch, args);
     if (!claim) return;
     try {
+      if (claim.reactivationJson) {
+        const consent = JSON.parse(claim.reactivationJson);
+        const acknowledgement = await post('reactivations', consent);
+        if (acknowledgement.batch_id !== consent.batch_id || acknowledgement.consent_generation !== consent.consent_generation || !Number.isSafeInteger(acknowledgement.version_number) || acknowledgement.version_number < 1) throw new DestinationFailure('Destination did not acknowledge the exact reactivation consent');
+      }
       const payload = JSON.parse(claim.reservationJson);
       const result = await post('batches', payload);
       if (result.batch_id !== payload.batch_id || !Array.isArray(result.versions) || result.versions.length !== payload.versions.length || payload.versions.some((item: Record<string, unknown>) => result.versions.filter((target: Record<string, unknown>) => target.source_asset_id === item.source_asset_id && target.source_version_id === item.source_version_id && target.consent_generation === item.consent_generation).length !== 1)) throw new DestinationFailure('Destination reservation response did not match the selected batch');
