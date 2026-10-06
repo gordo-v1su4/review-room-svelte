@@ -45,6 +45,7 @@
   import { annotationsEqual } from '$lib/annotations';
   import MediaCards from '$lib/components/MediaCards.svelte';
   import { normalizeCreativeMetadata, type MetadataSaveState } from '$lib/asset-metadata';
+  import { displayVersionMetadata, versionedSourceFile, type ImportedVersionMetadata } from '$lib/version-metadata-display';
   import MetadataSheet from '$lib/components/MetadataSheet.svelte';
   import AssetDetails from '$lib/components/AssetDetails.svelte';
   import SelectionBar from '$lib/components/SelectionBar.svelte';
@@ -74,6 +75,7 @@
   const live = !!data.snapshot;
   let media = $state<ReviewAsset[]>([]);
   let processing = $state.raw<ProcessingUpdate[]>([]);
+  let importedMetadata = $state.raw<ImportedVersionMetadata[]>([]);
   let processingObserver: ReturnType<typeof observeProcessing> | undefined;
   let session = $state.raw(createReviewSession([]));
   // This owner role is for device-local review only, never live authorization.
@@ -245,11 +247,14 @@
     media = media.map(asset => asset.id === id ? { ...asset, ...fields } : asset);
   }
   type VersionDetails = { id: string; assetId: string; version: number; processingState: string; hasPoster: boolean; hasSprite?: boolean; sizeBytes: number; mimeType: string; metadata: unknown; metadataUpdatedAt: number | null };
+  function metadataForVersion(version: Pick<VersionDetails, 'id' | 'assetId' | 'metadata'>) {
+    return displayVersionMetadata(version.metadata, importedMetadata, version.assetId, version.id, knownVersions);
+  }
   let knownVersions = $state.raw<VersionDetails[]>([]);
   let selectedVersions = $state<Record<string, string>>({});
   const versionDrafts = new Map<string, { assetId: string; metadata: ReviewAsset['metadata']; metadataUpdatedAt: number | null }>();
   const versionReads = new Map<string, AbortController>();
-  async function refreshVersion(versionId: string, refreshMetadata = false) {
+  async function refreshVersion(versionId: string, refreshMetadata = false, discardDraft = false) {
     if (metadataSaves[versionId]?.busy) return;
     if (versionReads.has(versionId)) {
       if (!refreshMetadata) return;
@@ -257,6 +262,8 @@
     }
     const controller = new AbortController();
     versionReads.set(versionId, controller);
+    const previousSaveState = metadataSaves[versionId];
+    if (discardDraft) metadataSaves[versionId] = { busy: true, conflict: true, message: 'Reloading latest metadata…' };
     const timeout = setTimeout(() => controller.abort(), 10000);
     try {
       const response = await fetch('/api/owner-version-metadata?versionId=' + encodeURIComponent(versionId), { signal: controller.signal });
@@ -267,12 +274,16 @@
       const version: VersionDetails = await response.json();
       if (controller.signal.aborted || version.id !== versionId || !media.some(item => item.id === version.assetId)) return;
       knownVersions = [...knownVersions.filter(item => item.id !== versionId), version];
+      if (discardDraft) {
+        versionDrafts.delete(versionId);
+        metadataSaves[versionId] = { busy: false, message: 'Reloaded latest metadata' };
+      }
       const draft = versionDrafts.get(versionId);
       const update = processing.find(item => item.assetId === version.assetId && item.versionId === versionId);
       media = media.map(item => item.id === version.assetId && item.versionId === versionId ? { ...item,
-        metadata: draft ? draft.metadata : refreshMetadata || item.metadata === undefined ? normalizeCreativeMetadata(version.metadata) : item.metadata,
+        metadata: draft ? draft.metadata : refreshMetadata || item.metadata === undefined ? metadataForVersion(version) : item.metadata,
         metadataUpdatedAt: draft ? draft.metadataUpdatedAt : refreshMetadata || item.metadata === undefined ? version.metadataUpdatedAt : item.metadataUpdatedAt,
-        size: version.sizeBytes, sourceFile: { ...item.sourceFile, type: version.mimeType },
+        size: version.sizeBytes, sourceFile: versionedSourceFile(item.sourceFile, version.mimeType),
         type: version.mimeType.startsWith('image/') ? 'image' : 'video',
         url: version.processingState === 'ready' ? item.url || '/api/owner-media/' + item.id + '?versionId=' + versionId : '',
         poster: version.hasPoster && version.processingState === 'ready' ? item.poster || '/api/owner-poster/' + item.id + '?versionId=' + versionId : undefined,
@@ -285,6 +296,7 @@
     } finally {
       clearTimeout(timeout);
       if (versionReads.get(versionId) === controller) versionReads.delete(versionId);
+      if (discardDraft && metadataSaves[versionId]?.busy) metadataSaves[versionId] = previousSaveState ?? { busy: false, message: '' };
     }
   }
   function selectAssetVersion(id: string, versionId: string) {
@@ -301,12 +313,12 @@
     const draft = versionDrafts.get(versionId);
     media = media.map(item => item.id === id ? { ...item,
       versionId, metadataUpdatedAt: draft ? draft.metadataUpdatedAt : version.metadataUpdatedAt ?? null,
-      metadata: draft ? draft.metadata : normalizeCreativeMetadata(version.metadata),
+      metadata: draft ? draft.metadata : metadataForVersion(version),
       url: version.processingState === 'ready' ? '/api/owner-media/' + id + '?versionId=' + versionId : '',
       poster: version.hasPoster && version.processingState === 'ready' ? '/api/owner-poster/' + id + '?versionId=' + versionId : undefined,
       sprite: version.hasSprite && version.processingState === 'ready' ? '/api/owner-poster/' + id + '?variant=sprite&versionId=' + versionId : undefined,
       availability: version.processingState === 'ready' ? 'ready' : version.processingState === 'error' ? 'error' : 'running',
-      size: version.sizeBytes, sourceFile: { name: '', type: version.mimeType },
+      size: version.sizeBytes, sourceFile: versionedSourceFile(item.sourceFile, version.mimeType),
       type: version.mimeType.startsWith('image/') ? 'image' : 'video',
       duration: undefined, width: undefined, height: undefined, fps: undefined, codec: undefined,
     } : item);
@@ -320,6 +332,7 @@
     versionReads.get(versionId)?.abort(); versionReads.delete(versionId);
     versionDrafts.set(versionId, { assetId: id, metadata: asset.metadata, metadataUpdatedAt: asset.metadataUpdatedAt ?? null });
     metadataSaves[versionId] = { busy: true, message: '' };
+    let conflict = false;
     try {
       const metadata = normalizeCreativeMetadata(asset.metadata);
       const response = await fetch('/api/owner-version-metadata', {
@@ -328,6 +341,7 @@
           metadata }),
       });
       const result = await response.json();
+      conflict = response.status === 409;
       if (!response.ok) throw new Error(result.message ?? 'Could not save version metadata. Your draft is retained.');
       versionReads.get(versionId)?.abort(); versionReads.delete(versionId);
       versionDrafts.delete(versionId);
@@ -335,9 +349,13 @@
       media = media.map(item => item.id === id && item.versionId === versionId ? { ...item, metadataUpdatedAt: result.updatedAt } : item);
       metadataSaves[versionId] = { busy: false, message: 'Saved' };
     } catch (cause) {
-      metadataSaves[versionId] = { busy: false, message: cause instanceof Error ? cause.message : 'Could not save. Your draft is retained.' };
+      metadataSaves[versionId] = { busy: false, conflict, message: cause instanceof Error ? cause.message : 'Could not save. Your draft is retained.' };
       throw cause;
     }
+  }
+  async function reloadVersionMetadata(id: string) {
+    const versionId = media.find(item => item.id === id)?.versionId;
+    if (versionId) await refreshVersion(versionId, true, true);
   }
   const referenceImages = $derived.by(() => {
     const projectImages = new Map((data.snapshot?.assets ?? []).filter(item => item.projectId === projectId).map(item => [item._id, item]));
@@ -843,7 +861,7 @@
         placements: Object.fromEntries(data.snapshot.assets.map(asset => [asset._id,
           { projectId: asset.projectId, ...(asset.folderId ? { folderId: asset.folderId } : {}) }]))
       };
-      const importedByAsset = new Map(data.snapshot.importedMetadata.map(item => [item.assetId, item]));
+      importedMetadata = data.snapshot.importedMetadata;
       const processingByAsset = new Map(processing.map(item => [item.assetId, item]));
       const fromServer = data.snapshot.assets.map(item => ({
         id: item._id, projectId: item.projectId, name: item.assetCode ?? item.title,
@@ -855,12 +873,13 @@
         assetClass: item.mimeType?.startsWith('image/') ? 'IMG' as const : 'VID' as const, importedAt: item.uploadedAt,
         tags: item.tags, assetCode: item.assetCode ?? '',
         versionId: item.currentVersionId, metadataUpdatedAt: data.snapshot.versions.find(version => version._id === item.currentVersionId)?.metadataUpdatedAt ?? null,
-        metadata: (() => {
-          const durable = data.snapshot.versions.find(version => version._id === item.currentVersionId)?.creativeMetadata;
-          if (durable) return normalizeCreativeMetadata(durable);
-          const imported = importedByAsset.get(item._id);
-          return imported ? { notes: imported.label ? `Original title: ${imported.label}` : '', prompt: imported.prompt ?? '', model: imported.model ?? '', releaseDate: '', releasePlatforms: [], customFields: [] } : undefined;
-        })()
+        metadata: displayVersionMetadata(
+          data.snapshot.versions.find(version => version._id === item.currentVersionId)?.creativeMetadata ?? null,
+          importedMetadata,
+          item._id,
+          item.currentVersionId,
+          knownVersions,
+        )
       }));
       session = createReviewSession(data.snapshot.assets.map(item => ({
         id: item._id, status: item.status as VideoStatus,
@@ -1068,12 +1087,12 @@
           <Tabs.Root value={compactInspector ? 'notes' : inspectorTab} onValueChange={value => { if (!compactInspector) inspectorTab = value; }}>
             <div class="inspector-heading">
               <Tabs.List class="inspector-tabs" aria-label="Asset inspector panels"><Tabs.Trigger value="notes" bind:ref={notesTrigger}>Notes <span>{active.comments.length}</span></Tabs.Trigger>{#if !compactInspector}<Tabs.Trigger value="fields">Fields</Tabs.Trigger>{/if}</Tabs.List>
-              <MetadataSheet asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onSave={live ? saveVersionMetadata : undefined} saveState={metadataSaves[active.versionId ?? active.id]} {referenceImages} onOpen={stopPreview} onDesktopClose={() => notesTrigger?.focus()}/>
+              <MetadataSheet asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onSave={live ? saveVersionMetadata : undefined} onReload={live ? reloadVersionMetadata : undefined} saveState={metadataSaves[active.versionId ?? active.id]} {referenceImages} onOpen={stopPreview} onDesktopClose={() => notesTrigger?.focus()}/>
             </div>
             <Tabs.Content value="notes">
           <ReviewNotes showHeader={false} comments={active.comments} draft={active.draft.body} time={active.draft.body && active.draft.timecodeSec !== null ? active.draft.timecodeSec : currentTime} isVideo={active.type === 'video'} pinTime={active.draft.body ? active.draft.timecodeSec !== null : pinTime} onPinTime={value => { pinTime = value; review({type:'draft',assetId:active.id,body:active.draft.body,timecodeSec:value && active.type === 'video' ? currentTime : null}); }} onDraft={updateDraft} onPublish={comment} onSeek={time => player?.seek(time)} onComplete={commentId => review({type:'toggle-comment-complete',assetId:active.id,commentId,actorId:'local-reviewer',at:Date.now()})} onReact={(commentId,emoji) => review({type:'toggle-comment-reaction',assetId:active.id,commentId,actorId:'local-reviewer',emoji})}/>
           </Tabs.Content>
-            <Tabs.Content value="fields"><AssetDetails asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onSave={live ? saveVersionMetadata : undefined} saveState={metadataSaves[active.versionId ?? active.id]} {referenceImages}/></Tabs.Content>
+            <Tabs.Content value="fields"><AssetDetails asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onSave={live ? saveVersionMetadata : undefined} onReload={live ? reloadVersionMetadata : undefined} saveState={metadataSaves[active.versionId ?? active.id]} {referenceImages}/></Tabs.Content>
           </Tabs.Root>
         </section>{/if}
       {/snippet}

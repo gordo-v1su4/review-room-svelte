@@ -3,7 +3,7 @@
   import type { ReviewAsset } from '$lib/review';
   import type { AssetReview } from '$lib/review-session';
   import { CREATIVE_MODEL_PRESETS, filterMetadataFields, normalizeCreativeMetadata, normalizeTags, type MetadataSaveState, type VersionImageOption, type AssetMetadataPatch, type CreativeMetadata, type CustomMetadataField, type MetadataField, type MetadataFilter } from '$lib/asset-metadata';
-  let { asset, review, knownTags = [], canEdit = false, onChange, onSave, saveState, referenceImages = [] }: { asset: ReviewAsset; review?: AssetReview; knownTags?: readonly string[]; canEdit?: boolean; onChange: (id: string, patch: AssetMetadataPatch) => void; onSave?: (id: string) => Promise<void>; saveState?: MetadataSaveState; referenceImages?: VersionImageOption[] } = $props();
+  let { asset, review, knownTags = [], canEdit = false, onChange, onSave, onReload, saveState, referenceImages = [] }: { asset: ReviewAsset; review?: AssetReview; knownTags?: readonly string[]; canEdit?: boolean; onChange: (id: string, patch: AssetMetadataPatch) => void; onSave?: (id: string) => Promise<void>; onReload?: (id: string) => Promise<void>; saveState?: MetadataSaveState; referenceImages?: VersionImageOption[] } = $props();
   let customModel = $state({ version: '', enabled: false });
   const modelKey = $derived(asset.versionId ?? asset.id);
   const customModelEnabled = $derived(customModel.version === modelKey && customModel.enabled);
@@ -122,7 +122,7 @@
       <div class="reference-previews">{#each referenceImages.filter(image => image.versionId === metadata.gridImageVersionId || metadata.referenceImageVersionIds?.includes(image.versionId)) as image (image.versionId)}<a href={image.url} target="_blank" rel="noreferrer"><img src={image.url} alt={image.label} loading="lazy"/></a>{/each}</div>
     </div>
   {/if}
-  {#if canEdit && onSave}<div class="save-fields"><button type="button" class="chosen" disabled={!asset.versionId || saveState?.busy} onclick={save}>{saveState?.busy ? 'Saving…' : 'Save version metadata'}</button><p role="status">{saveState?.message ?? ''}</p></div>{/if}
+  {#if canEdit && onSave}<div class="save-fields"><button type="button" class="chosen" disabled={!asset.versionId || saveState?.busy} onclick={save}>{saveState?.busy ? 'Saving…' : 'Save version metadata'}</button><p role="status">{saveState?.message ?? ''}</p>{#if saveState?.conflict && onReload}<button type="button" disabled={saveState.busy} onclick={() => onReload?.(asset.id)}>Discard draft and reload latest metadata</button>{/if}</div>{/if}
 </section>
 <style>
   .asset-fields { min-width: 0; font-size: 11px; color: var(--ink); }

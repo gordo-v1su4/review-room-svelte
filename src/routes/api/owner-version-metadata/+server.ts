@@ -21,7 +21,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
   if (!body || typeof body !== 'object' || Array.isArray(body) ||
     typeof body.versionId !== 'string' || !body.versionId ||
     !body.metadata || typeof body.metadata !== 'object' || Array.isArray(body.metadata) ||
-    (body.expectedUpdatedAt !== undefined && body.expectedUpdatedAt !== null &&
+    (body.expectedUpdatedAt !== null &&
       (!Number.isSafeInteger(body.expectedUpdatedAt) || body.expectedUpdatedAt < 0))) throw error(400, 'Version metadata required');
   try {
     const result = await db().mutation(personal.updateVersionMetadata, { versionId: body.versionId, metadata: body.metadata, expectedUpdatedAt: body.expectedUpdatedAt });
