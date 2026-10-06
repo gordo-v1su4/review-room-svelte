@@ -2,16 +2,12 @@
   import { Plus, Search, X } from 'lucide-svelte';
   import type { ReviewAsset } from '$lib/review';
   import type { AssetReview } from '$lib/review-session';
-  import { filterMetadataFields, normalizeCreativeMetadata, normalizeTags, type AssetMetadataPatch, type CreativeMetadata, type CustomMetadataField, type MetadataField, type MetadataFilter } from '$lib/asset-metadata';
-  let { asset, review, knownTags = [], canEdit = false, onChange, onSave, referenceImages = [] }: { asset: ReviewAsset; review?: AssetReview; knownTags?: readonly string[]; canEdit?: boolean; onChange: (id: string, patch: AssetMetadataPatch) => void; onSave?: (id: string) => Promise<void>; referenceImages?: { versionId: string; label: string; url: string }[] } = $props();
-  let saves = $state<Record<string, { busy: boolean; message: string }>>({});
+  import { filterMetadataFields, normalizeCreativeMetadata, normalizeTags, type MetadataSaveState, type VersionImageOption, type AssetMetadataPatch, type CreativeMetadata, type CustomMetadataField, type MetadataField, type MetadataFilter } from '$lib/asset-metadata';
+  let { asset, review, knownTags = [], canEdit = false, onChange, onSave, saveState, referenceImages = [] }: { asset: ReviewAsset; review?: AssetReview; knownTags?: readonly string[]; canEdit?: boolean; onChange: (id: string, patch: AssetMetadataPatch) => void; onSave?: (id: string) => Promise<void>; saveState?: MetadataSaveState; referenceImages?: VersionImageOption[] } = $props();
   let customModels = $state<Record<string, boolean>>({});
   async function save() {
-    const id = asset.id;
-    if (!onSave || saves[id]?.busy) return;
-    saves[id] = { busy: true, message: '' };
-    try { await onSave(id); saves[id] = { busy: false, message: 'Saved' }; }
-    catch (cause) { saves[id] = { busy: false, message: cause instanceof Error ? cause.message : 'Could not save. Your draft is retained.' }; }
+    if (!onSave || saveState?.busy) return;
+    try { await onSave(asset.id); } catch { /* The shared version save state retains the safe error and draft. */ }
   }
   const uid = $props.id();
   let group = $state<MetadataFilter['group']>('all');
@@ -56,7 +52,7 @@
     ...metadata.customFields.map(field => ({ id: `custom:${field.id}`, label: field.label, group: 'creative' as const, value: field.value }))
   ]);
   let visible = $derived(filterMetadataFields(rows, { group, presence, search }));
-  function change(patch: AssetMetadataPatch) { if (canEdit && !saves[asset.id]?.busy) { onChange(asset.id, patch); saves[asset.id] = { busy: false, message: 'Unsaved changes' }; } }
+  function change(patch: AssetMetadataPatch) { if (canEdit && !saveState?.busy) { onChange(asset.id, patch); } }
   function changeCreative(patch: Partial<CreativeMetadata>) { change({ metadata: normalizeCreativeMetadata({ ...metadata, ...patch }) }); }
   function addTags(value: string) { if (canEdit) { change({ tags: normalizeTags([...asset.tags, ...value.split(',')]) }); tagDrafts[asset.id] = ''; } }
   function editCustom(field: CustomMetadataField, raw: string) {
@@ -83,7 +79,7 @@
     <div class="group-options" aria-label="Field groups">{#each groups as item (item)}<button type="button" class:chosen={group === item} aria-pressed={group === item} onclick={() => group = item}>{item}</button>{/each}</div>
     <div class="field-search"><Search size={13} aria-hidden="true"/><input aria-label="Search metadata fields" placeholder="Search fields" bind:value={search}/><select aria-label="Field completeness" bind:value={presence}>{#each states as item (item)}<option value={item}>{item === 'all' ? 'All fields' : item === 'empty' ? 'Empty' : 'Filled'}</option>{/each}</select></div>
   </div>
-  <fieldset class="field-list" disabled={saves[asset.id]?.busy}>
+  <fieldset class="field-list" disabled={saveState?.busy}>
     {#each visible as row (row.id)}
       {@const custom = row.id.startsWith('custom:') ? metadata.customFields.find(field => `custom:${field.id}` === row.id) : undefined}
       <div class:wide={['tags', 'notes', 'prompt', 'releasePlatforms'].includes(row.id)} class="field-row">
@@ -116,13 +112,13 @@
   {#if asset.versionId && (group === 'all' || group === 'creative')}
     <div class="reference-fields">
       <label for={`grid-${uid}`}>Image grid</label>
-      <select id={`grid-${uid}`} disabled={!canEdit || saves[asset.id]?.busy} value={metadata.gridImageVersionId ?? ''} onchange={event => changeCreative({ gridImageVersionId: event.currentTarget.value || undefined })}><option value="">—</option>{#each referenceImages as image (image.versionId)}<option value={image.versionId}>{image.label}</option>{/each}</select>
+      <select id={`grid-${uid}`} disabled={!canEdit || saveState?.busy} value={metadata.gridImageVersionId ?? ''} onchange={event => changeCreative({ gridImageVersionId: event.currentTarget.value || undefined })}><option value="">—</option>{#each referenceImages as image (image.versionId)}<option value={image.versionId}>{image.label}</option>{/each}</select>
       <label for={`refs-${uid}`}>Reference images</label>
-      <select id={`refs-${uid}`} multiple disabled={!canEdit || saves[asset.id]?.busy} value={metadata.referenceImageVersionIds ?? []} onchange={event => changeCreative({ referenceImageVersionIds: Array.from(event.currentTarget.selectedOptions, option => option.value) })}>{#each referenceImages as image (image.versionId)}<option value={image.versionId}>{image.label}</option>{/each}</select>
+      <select id={`refs-${uid}`} multiple disabled={!canEdit || saveState?.busy} value={metadata.referenceImageVersionIds ?? []} onchange={event => changeCreative({ referenceImageVersionIds: Array.from(event.currentTarget.selectedOptions, option => option.value) })}>{#each referenceImages as image (image.versionId)}<option value={image.versionId}>{image.label}</option>{/each}</select>
       <div class="reference-previews">{#each referenceImages.filter(image => image.versionId === metadata.gridImageVersionId || metadata.referenceImageVersionIds?.includes(image.versionId)) as image (image.versionId)}<a href={image.url} target="_blank" rel="noreferrer"><img src={image.url} alt={image.label} loading="lazy"/></a>{/each}</div>
     </div>
   {/if}
-  {#if canEdit && onSave}<div class="save-fields"><button type="button" class="chosen" disabled={!asset.versionId || saves[asset.id]?.busy} onclick={save}>{saves[asset.id]?.busy ? 'Saving…' : 'Save version metadata'}</button><p role="status">{saves[asset.id]?.message ?? ''}</p></div>{/if}
+  {#if canEdit && onSave}<div class="save-fields"><button type="button" class="chosen" disabled={!asset.versionId || saveState?.busy} onclick={save}>{saveState?.busy ? 'Saving…' : 'Save version metadata'}</button><p role="status">{saveState?.message ?? ''}</p></div>{/if}
 </section>
 <style>
   .asset-fields { min-width: 0; font-size: 11px; color: var(--ink); }

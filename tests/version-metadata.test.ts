@@ -124,3 +124,16 @@ test('scoped metadata reads reject upload-only, foreign-project and revoked cred
   await t.mutation(internal.automation.revoke, { credentialId });
   await expect(t.mutation(internal.automation.versionMetadata, { keyDigest, versionId: versions[0] })).rejects.toThrow('Automation credential unavailable');
 });
+
+test('importing multiple source artifacts into one asset preserves each mapped version metadata', async () => {
+  const { t, project, asset, versions } = await fixture();
+  const folderId = await t.mutation(internal.personal.createFolder, { projectId: project, title: 'Versions' });
+  await t.mutation(internal.sourceImports.save, { sourceProjectId: 'multi', projectId: project, folderId,
+    sourceDocumentsJson: JSON.stringify({ artifacts: [{ artifact_id: 'first', video_model: 'First model', version_prompt: 'First prompt' }, { artifact_id: 'second', video_model: 'Second model', version_prompt: 'Second prompt' }] }),
+    mediaMappingsJson: JSON.stringify([{ assetId: asset, versionId: versions[0], sourceArtifactId: 'first', kind: 'video' }, { assetId: asset, versionId: versions[1], sourceArtifactId: 'second', kind: 'video' }]),
+  });
+  await t.mutation(internal.sourceImports.backfillVersionMetadata, {});
+  const view = await t.query(internal.personal.snapshot, {});
+  expect(view.versions.find(v => v._id === versions[0])!.creativeMetadata?.prompt).toBe('First prompt');
+  expect(view.versions.find(v => v._id === versions[1])!.creativeMetadata?.model).toBe('Second model');
+});

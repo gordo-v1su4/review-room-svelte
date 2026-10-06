@@ -4,11 +4,12 @@
   import AssetDetails from './AssetDetails.svelte';
   import type { ReviewAsset } from '$lib/review';
   import type { AssetReview } from '$lib/review-session';
-  import type { AssetMetadataPatch } from '$lib/asset-metadata';
+  import type { AssetMetadataPatch, MetadataSaveState, VersionImageOption } from '$lib/asset-metadata';
 
-  let { asset, review, knownTags, canEdit, onChange, onOpen, onDesktopClose, onSave, referenceImages = [] }: {
+  let { asset, review, knownTags, canEdit, onChange, onOpen, onDesktopClose, onSave, saveState, referenceImages = [] }: {
     onSave?: (id: string) => Promise<void>;
-    referenceImages?: { versionId: string; label: string; url: string }[];
+    referenceImages?: VersionImageOption[];
+    saveState?: MetadataSaveState;
     asset: ReviewAsset;
     review: AssetReview;
     knownTags: readonly string[];
@@ -37,7 +38,7 @@
         <div><Dialog.Title class="dialog-title">Asset fields</Dialog.Title><Dialog.Description class="metadata-sheet-description">{asset.sourceFile.name}</Dialog.Description></div>
         <Dialog.Close class="metadata-sheet-close" aria-label="Close asset fields"><X size={17}/></Dialog.Close>
       </div>
-      <div class="metadata-sheet-body"><AssetDetails {asset} {review} {knownTags} {canEdit} {onChange} {onSave} {referenceImages}/></div>
+      <div class="metadata-sheet-body"><AssetDetails {asset} {review} {knownTags} {canEdit} {onChange} {onSave} {saveState} {referenceImages}/></div>
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>

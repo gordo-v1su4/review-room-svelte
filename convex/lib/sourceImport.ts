@@ -21,7 +21,7 @@ export function importedMediaMetadata(sourceJson: string, mappingsJson: string) 
       const artifact = byId.get(mapping.sourceArtifactId);
       if (!artifact) return [];
       const model = text(artifact.video_model, artifact.model, artifact.target_model);
-      return [{ assetId: mapping.assetId, label: text(artifact.title), prompt: text(artifact.version_prompt, artifact.prompt_text), model: model.toLowerCase() === 'manual' ? '' : model, sourceCreatedAt: text(artifact.created_at), sourceVersionNumber: typeof artifact.version_number === 'number' && Number.isSafeInteger(artifact.version_number) && artifact.version_number > 0 ? artifact.version_number : mapping.displayedVersionNumber }];
+      return [{ assetId: mapping.assetId, sourceArtifactId: mapping.sourceArtifactId, versionId: mapping.versionId, label: text(artifact.title), prompt: text(artifact.version_prompt, artifact.prompt_text), model: model.toLowerCase() === 'manual' ? '' : model, sourceCreatedAt: text(artifact.created_at), sourceVersionNumber: typeof artifact.version_number === 'number' && Number.isSafeInteger(artifact.version_number) && artifact.version_number > 0 ? artifact.version_number : mapping.displayedVersionNumber }];
     });
   } catch { return []; }
 }

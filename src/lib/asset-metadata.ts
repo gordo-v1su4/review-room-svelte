@@ -22,6 +22,8 @@ export type AssetMetadataPatch = {
   tags?: string[];
   metadata?: CreativeMetadata;
 };
+export type VersionImageOption = { versionId: string; label: string; url: string };
+export type MetadataSaveState = { busy: boolean; message: string };
 export type MetadataGroup = 'essentials' | 'review' | 'file' | 'tags' | 'creative';
 export type MetadataField = { id: string; label: string; group: MetadataGroup; value: string | number | boolean | null | undefined; filled?: boolean };
 export type MetadataFilter = { group: 'all' | MetadataGroup; presence: 'all' | 'empty' | 'filled'; search: string };

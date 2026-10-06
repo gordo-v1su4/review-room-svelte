@@ -56,7 +56,7 @@ export const backfillVersionMetadata = internalMutation({ args: {}, handler: asy
         const versionId = resolved.get(mapping)!;
         const version = (await ctx.db.get(versionId))!;
         if (version.creativeMetadata !== undefined) continue;
-        const values = imported.find(item => item.assetId === mapping.assetId);
+        const values = imported.find(item => item.assetId === mapping.assetId && item.sourceArtifactId === mapping.sourceArtifactId && item.versionId === mapping.versionId);
         if (!values) continue;
         const sourceCreatedAt = Date.parse(values.sourceCreatedAt);
         const grid = mediaMappings.find(item => item.sourceArtifactId === mapping.sourceArtifactId && item.kind === 'shot_grid');
