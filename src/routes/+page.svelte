@@ -38,7 +38,7 @@
   import Stage1SharingDialog from '$lib/components/Stage1SharingDialog.svelte';
   import ArchivedProjects from '$lib/components/ArchivedProjects.svelte';
   import { updateProjectIdentity, setProjectArchived, prepareProjectBanner, type ProjectIdentity, type ProjectIdentityDraft } from '$lib/project-identity';
-  import { transitionFolderState, folderCoverUrl, type FolderState, type FolderAction } from '$lib/project-folders';
+  import { transitionFolderState, folderCoverUrl, folderAncestors, folderPath, type FolderState, type FolderAction } from '$lib/project-folders';
   import { updateTags } from '$lib/bulk-tags';
   import StillViewer from '$lib/components/StillViewer.svelte';
   import { annotationsEqual } from '$lib/annotations';
@@ -52,7 +52,6 @@
   import AppearanceMenu from '$lib/components/AppearanceMenu.svelte';
   import ProjectTree from '$lib/components/ProjectTree.svelte';
   import WorkspacePanes from '$lib/components/WorkspacePanes.svelte';
-  import FolderArtwork from '$lib/components/FolderArtwork.svelte';
   import FeedbackNotifications from '$lib/components/FeedbackNotifications.svelte';
   import FeedbackInbox from '$lib/components/FeedbackInbox.svelte';
   import { feedbackDigests, type FeedbackNote } from '$lib/feedback-inbox';
@@ -95,7 +94,12 @@
   const folderAccess = $derived({ isAdmin: true, editableProjectIds: activeProjects.map(project => project.id) });
   const projectFolders = $derived(organization.folders.filter(folder => folder.projectId === projectId));
   const activeFolder = $derived(projectFolders.find(folder => folder.id === activeFolderId));
-  let folderOpen = $state(false);
+  const ancestors = $derived(folderAncestors(projectFolders, activeFolderId));
+  const childFolders = $derived(projectFolders.filter(folder => folder.parentFolderId === (activeFolderId ?? undefined)));
+  const folderDestinations = $derived(projectFolders.map(folder => ({ ...folder, title: folderPath(projectFolders, folder.id) })));
+
+  let navigationRevision = 0;
+  const importOrigins = new WeakMap<ImportTarget, number>();
   let navCollapsed = $state(false);
   let projectDialog = $state(false), projectName = $state('');
   let identityDialogOpen = $state(false);
@@ -134,6 +138,7 @@
   let mediaType = $state<WorkspaceMediaType | 'all'>('all');
   const defaultFilters = (): WorkspaceFilterState => ({ search: '', statuses: [], assetClasses: [], tags: [], selectedOnly: false, minRating: 0, hasComments: false, sort: 'newest', groupBy: 'none' });
   let filters = $state<WorkspaceFilterState>(defaultFilters());
+  const isProjectRoot = $derived(!activeFolderId && !activeCollectionId && !archived && mediaType === 'all' && !filters.selectedOnly && !filters.statuses.length);
   const filter = $derived<FilterId>(filters.selectedOnly ? 'selected' : filters.statuses.length === 1 ? filters.statuses[0] : 'all');
   let appearance = $state<AppearanceValue>(normalizeAppearance(null));
   let appearancePreferences: ReturnType<typeof createAppearancePreferences> | undefined;
@@ -188,6 +193,7 @@
   const identityRequests = new Map<string, symbol>();
   const active = $derived(assets.find(asset => asset.id === activeId));
   const activeMediaJob = $derived(processing.find(item => item.assetId === active?.id)?.job);
+  const directAssets = $derived(activeFolderId ? assets.filter(asset => asset.folderId === activeFolderId) : assets);
   const scopedAssets = $derived(activeCollection?.sourceFolderId
     ? assets.filter(asset => asset.folderId === activeCollection.sourceFolderId)
     : activeFolderId ? assets.filter(asset => asset.folderId === activeFolderId) : assets);
@@ -216,12 +222,12 @@
     media = media.map(asset => asset.id === id ? { ...asset, ...fields } : asset);
   }
   const approved = $derived(assets.filter(a => a.status === 'approved').length);
-  async function ownerAction(action: string, fields: Record<string, string>) {
+  async function ownerAction(action: string, fields: Record<string, string | readonly string[]>, reload = true) {
     const form = new FormData();
-    for (const [key, value] of Object.entries(fields)) form.set(key, value);
+    for (const [key, value] of Object.entries(fields)) { if (typeof value === 'string') form.set(key, value); else for (const item of value) form.append(key, item); }
     const response = await fetch(`/studio?/${action}`, { method: 'POST', body: form });
     if (!response.ok) throw new Error(`Could not save ${action} (${response.status}).`);
-    location.reload();
+    if (reload) location.reload();
   }
   async function retryMediaJob(jobId: string) {
     const response = await fetch(`/api/media-jobs/${encodeURIComponent(jobId)}/retry`, { method: 'POST' });
@@ -229,9 +235,10 @@
     processingObserver?.refresh();
   }
   async function uploadOriginal(file: File) {
-    if (!file.type.startsWith('video/')) throw new Error('Canonical upload currently accepts video files.');
+    const isImage = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type);
+    if (!file.type.startsWith('video/') && !isImage) throw new Error('Choose a video or a JPEG, PNG, WebP or AVIF image.');
     feedback = `Preparing preview for ${file.name}…`;
-    const preview = await thumbnails.extract(file);
+    const preview = isImage ? await imageUploadPreview(file) : await thumbnails.extract(file);
     feedback = `Uploading ${file.name}…`;
     const begin = await fetch('/api/uploads/begin', { method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ projectId, folderId: importOptions.folderId, name: file.name, type: file.type, size: file.size }) });
@@ -247,6 +254,24 @@
         durationSec: preview.duration, width: preview.sourceWidth, height: preview.sourceHeight }) });
     if (!finish.ok) throw new Error(await finish.text());
   }
+  async function imageUploadPreview(file: File) {
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new window.Image();
+      image.src = url;
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, 1280 / Math.max(image.naturalWidth, image.naturalHeight));
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Could not prepare the image preview.');
+      context.fillStyle = '#090b0c'; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not prepare the image preview.')), 'image/jpeg', .86));
+      return { blob, duration: 0, sourceWidth: image.naturalWidth, sourceHeight: image.naturalHeight };
+    } finally { URL.revokeObjectURL(url); }
+  }
   function importFiles(files: FileList | readonly File[] | null) {
     if (!files?.length) return;
     if (project.archived) { feedback = 'Restore this project before adding media.'; return; }
@@ -260,8 +285,9 @@
     }
     const today = new Date();
     const dateKey = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-    const target: ImportTarget = { projectId, folderId: importOptions.folderId ?? undefined, dateKey, dateFolderId: crypto.randomUUID(), assetClass: importOptions.assetClass };
-    const destinationLabel = `${project.name} / ${projectFolders.find(folder => folder.id === target.folderId)?.title ?? dateKey}`;
+    const target: ImportTarget = { projectId, folderId: importOptions.folderId ?? undefined, dateKey, assetClass: importOptions.assetClass };
+    const destinationLabel = target.folderId ? `${project.name} / ${folderPath(projectFolders, target.folderId)}` : project.name;
+    importOrigins.set(target, navigationRevision);
     importQueue.enqueue(Array.from(files, file => ({ file, target, destinationLabel })));
   }
   function commitImport(asset: LocalAsset, target: ImportTarget) {
@@ -277,17 +303,16 @@
     asset.assetCode = `${asset.assetClass}_${target.dateKey}_${String(number).padStart(5, '0')}`;
     asset.name = asset.assetCode;
     const next = transitionFolderState(organization, {
-      type: 'register', projectId: target.projectId, assetIds: [asset.id], folderId: target.folderId,
-      dateFolder: { id: target.dateFolderId, dateKey: target.dateKey }
+      type: 'register', projectId: target.projectId, assetIds: [asset.id], folderId: target.folderId
     }, folderAccess);
     const previousActive = activeId;
-    const enterImportedFolder = projectId === target.projectId && !folderOpen && !previousActive;
+    const enterImportedFolder = projectId === target.projectId && importOrigins.get(target) === navigationRevision && !previousActive;
     organization = next;
     media = [...media, asset];
     review({ type: 'add-assets', assets: [asset] });
     review({ type: 'select', assetId: previousActive });
     // An import must not move someone who has since navigated to another project or review.
-    if (enterImportedFolder) openRealFolder(target.projectId, next.placements[asset.id].folderId!);
+    if (enterImportedFolder) { const folderId = next.placements[asset.id].folderId; if (folderId) openRealFolder(target.projectId, folderId); else openFolder(target.projectId, 'all'); }
     if (asset.type === 'video') {
       void thumbnails.extract(asset.sourceFile).then(({ blob, duration, sourceWidth, sourceHeight }) => {
         if (disposed) return;
@@ -310,6 +335,7 @@
     cancelOrderedStart();
     stopPreview();
     if (id === activeId) return;
+    navigationRevision += 1;
     inboxSeek = null; readySource = '';
     review({ type: 'select', assetId: id });
     currentTime = 0;
@@ -334,7 +360,7 @@
     const previous = activeId;
     select(null);
     await tick();
-    if (activeId !== null || !folderOpen) return;
+    if (activeId !== null) return;
     const card = previous ? document.querySelector<HTMLButtonElement>(`button[data-asset-id="${CSS.escape(previous)}"]`) : null;
     if (card?.getClientRects().length) card.focus();
     else explorerHeading?.focus();
@@ -413,7 +439,7 @@
       && event.target instanceof HTMLElement && !event.target.closest('input, textarea, [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) {
       event.preventDefault(); void returnToFolder(); return;
     }
-    if (!folderOpen || project.archived || event.defaultPrevented || event.isComposing
+    if (project.archived || event.defaultPrevented || event.isComposing
       || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
       || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
     const target = event.target;
@@ -456,7 +482,7 @@
     mediaType = collection === 'video' || collection === 'image' ? collection : 'all';
     filters = { ...defaultFilters(), selectedOnly: collection === 'selected' };
     query = ''; checked = transitionSelection(checked, { type: 'clear' });
-    folderOpen = true; navOpen = false; feedback = '';
+    navigationRevision += 1; navOpen = false; feedback = '';
   }
   function focusInboxDestination() {
     if (!notesTrigger?.getClientRects().length) return false;
@@ -484,7 +510,7 @@
     if (!inbox.some(group => group.comments.some(item => item.commentId === note.commentId && item.assetId === note.assetId))) return;
     review({ type: 'toggle-comment-complete', assetId: note.assetId, commentId: note.commentId, actorId: 'local-reviewer', at: Date.now() });
   }
-  const locationName = $derived(archived ? 'Archived' : activeCollection?.title ?? activeFolder?.title ?? (mediaType === 'video' ? 'Videos' : mediaType === 'image' ? 'Images' : filter === 'selected' ? 'Shortlist' : 'All media'));
+  const locationName = $derived(archived ? 'Archived' : activeCollection?.title ?? (mediaType === 'video' ? 'Videos' : mediaType === 'image' ? 'Images' : filter === 'selected' ? 'Shortlist' : activeFolder?.title ?? project.name));
   function changeCollections(action: CollectionAction) { collections = transitionCollectionState(collections, action, collectionAccess, organization.folders); }
   function openCollection(id: string, collectionId: string) {
     const collection = collections.collections.find(item => item.id === collectionId && item.projectId === id);
@@ -511,21 +537,25 @@
   }
   function organize(action: FolderAction) { organization = transitionFolderState(organization, action, folderAccess); }
   function openRealFolder(id: string, folderId: string) { openFolder(id, 'all'); activeFolderId = folderId; importOptions.folderId = folderId; }
-  function openProject(id: string) { openFolder(id, 'all'); folderOpen = false; }
+  function openScopedCollection(collection: 'all' | 'video' | 'image' | 'selected') {
+    const folderId = activeFolderId; openFolder(projectId, collection);
+    activeFolderId = folderId; importOptions.folderId = folderId;
+  }
+  function openProject(id: string) { openFolder(id, 'all'); }
   async function editProject(id: string) {
     openProject(id);
     await tick();
     identityDialogOpen = true;
   }
   function openArchived(id: string) { openFolder(id, 'all'); archived = true; }
-  function createFolder(title: string) {
-    if (live) { void ownerAction('createFolder', { projectId, title }).catch(cause => feedback = String(cause)); return; }
+  async function createFolder(title: string) {
+    if (live) { await ownerAction('createFolder', { projectId, title, ...(activeFolderId ? { parentFolderId: activeFolderId } : {}) }); return; }
     const id = crypto.randomUUID();
-    organize({ type: 'create', id, projectId, title });
+    organize({ type: 'create', id, projectId, title, parentFolderId: activeFolderId ?? undefined });
     openRealFolder(projectId, id);
   }
-  function renameFolder(folderId: string, title: string) {
-    if (live) { void ownerAction('renameFolder', { folderId, title }).catch(cause => feedback = String(cause)); return; }
+  async function renameFolder(folderId: string, title: string) {
+    if (live) { await ownerAction('renameFolder', { folderId, title }); return; }
     organize({ type: 'rename', folderId, title });
   }
   async function setFolderCover(folderId: string, file: File | null) {
@@ -564,20 +594,51 @@
       if (coverRequests.get(folderId) === request) coverRequests.delete(folderId);
     }
   }
-  function removeFolder(folderId: string, disposition: 'move_to_root' | 'archive_assets') {
+  async function removeFolder(folderId: string, disposition: 'move_to_root' | 'archive_assets') {
+    if (live) { await ownerAction('removeFolder', { folderId, assetDisposition: disposition }); return; }
     const previous = organization.folders.find(folder => folder.id === folderId)?.coverImageUrl;
     organize({ type: 'remove', folderId, disposition });
     coverRequests.delete(folderId);
     if (previous) URL.revokeObjectURL(previous);
     if (activeFolderId === folderId) openFolder(projectId, 'all');
   }
-  function moveAssets(assetIds: readonly string[], folderId: string | null) {
+  let moveBusy = $state(false);
+  async function moveFolder(folderId: string, parentFolderId: string | null) {
+    if (live) { await ownerAction('moveFolder', { folderId, parentFolderId: parentFolderId ?? '' }); return; }
+    organize({ type: 'reparent', folderId, parentFolderId: parentFolderId ?? undefined });
+  }
+  async function moveAssets(assetIds: readonly string[], folderId: string | null) {
+    if (!assetIds.length) return;
+    if (moveBusy) throw new Error('A media move is already in progress.');
+    if (live) {
+      moveBusy = true;
+      const sourceProjectId = projectId;
+      const sourceAccess = folderAccess;
+      const ids = [...new Set(assetIds)];
+      let moved = 0;
+      try {
+        for (let offset = 0; offset < ids.length; offset += 50) {
+          const batch = ids.slice(offset, offset + 50);
+          await ownerAction('moveAssets', { projectId: sourceProjectId, folderId: folderId ?? '', assetIds: batch }, false);
+          organization = transitionFolderState(organization, { type: 'move', projectId: sourceProjectId, folderId: folderId ?? undefined, assetIds: batch }, sourceAccess);
+          const confirmed = new Set(batch);
+          checked = { ...checked, ids: checked.ids.filter(id => !confirmed.has(id)) };
+          moved += batch.length;
+        }
+        feedback = `Moved ${moved} assets.`;
+      } catch (cause) {
+        if (projectId === sourceProjectId) checked = { ...checked, ids: [...new Set([...checked.ids, ...ids.slice(moved)])] };
+        feedback = `Moved ${moved} of ${ids.length} assets. Remaining assets stay selected. ${cause instanceof Error ? cause.message : String(cause)}`;
+        throw new Error(feedback);
+      } finally { moveBusy = false; }
+      return;
+    }
     organize({ type: 'move', projectId, folderId: folderId ?? undefined, assetIds });
     checked = transitionSelection(checked, { type: 'clear' });
     feedback = `Moved ${assetIds.length} ${assetIds.length === 1 ? 'asset' : 'assets'} to ${projectFolders.find(folder => folder.id === folderId)?.title ?? 'Project root'}.`;
   }
   function moveChecked(folderId: string | null) {
-    moveAssets(checked.ids.filter(id => visibleIds.includes(id)), folderId);
+    return moveAssets(checked.ids.filter(id => visibleIds.includes(id)), folderId);
   }
   let dragged = $state<AssetDrag | null>(null);
   let dragToken = '';
@@ -599,8 +660,7 @@
     const ownDrag = !!dragToken && event.dataTransfer?.getData(ASSET_DRAG_TYPE) === dragToken;
     endAssetDrag();
     if (!action || !ownDrag) return;
-    try { moveAssets(action.assetIds, folderId); }
-    catch (cause) { feedback = cause instanceof Error ? cause.message : 'Could not move media.'; }
+    void moveAssets(action.assetIds, folderId).catch(cause => { feedback = cause instanceof Error ? cause.message : 'Could not move media.'; });
   }
   function restoreChecked() {
     const assetIds = checked.ids.filter(id => visibleIds.includes(id));
@@ -650,19 +710,25 @@
       });
       organization = {
         folders: data.snapshot.folders.map(folder => ({ id: folder._id, projectId: folder.projectId,
-          title: folder.title, order: folder.order })),
+          title: folder.title, order: folder.order, parentFolderId: folder.parentFolderId })),
         placements: Object.fromEntries(data.snapshot.assets.map(asset => [asset._id,
           { projectId: asset.projectId, ...(asset.folderId ? { folderId: asset.folderId } : {}) }]))
       };
+      const importedByAsset = new Map(data.snapshot.importedMetadata.map(item => [item.assetId, item]));
+      const processingByAsset = new Map(processing.map(item => [item.assetId, item]));
       const fromServer = data.snapshot.assets.map(item => ({
         id: item._id, projectId: item.projectId, name: item.assetCode ?? item.title,
-        url: processingSource(processing.find(update => update.assetId === item._id)!), type: 'video' as const,
-        poster: processingPoster(processing.find(update => update.assetId === item._id)!),
-        availability: processingAvailability(processing.find(update => update.assetId === item._id)!),
+        url: processingSource(processingByAsset.get(item._id)!), type: item.mimeType?.startsWith('image/') ? 'image' as const : 'video' as const,
+        poster: processingPoster(processingByAsset.get(item._id)!),
+        availability: processingAvailability(processingByAsset.get(item._id)!),
         duration: item.durationSec, width: item.width, height: item.height,
         size: item.sizeBytes ?? 0, sourceFile: { name: item.originalFilename ?? item.title, type: item.mimeType ?? 'video/mp4' },
-        assetClass: 'VID' as const, importedAt: item.uploadedAt,
-        tags: item.tags, assetCode: item.assetCode ?? ''
+        assetClass: item.mimeType?.startsWith('image/') ? 'IMG' as const : 'VID' as const, importedAt: item.uploadedAt,
+        tags: item.tags, assetCode: item.assetCode ?? '',
+        metadata: (() => {
+          const imported = importedByAsset.get(item._id);
+          return imported ? { notes: imported.label ? `Original title: ${imported.label}` : '', prompt: imported.prompt ?? '', model: imported.model ?? '', releaseDate: '', releasePlatforms: [], customFields: [] } : undefined;
+        })()
       }));
       session = createReviewSession(data.snapshot.assets.map(item => ({
         id: item._id, status: item.status as VideoStatus,
@@ -708,7 +774,7 @@
     appearance = appearancePreferences.load(projectId);
   });
   function projectOverview() {
-    select(null); activeCollectionId = null; activeFolderId = null; archived = false; importOptions.folderId = null; folderOpen = false; mediaType = 'all'; filters = defaultFilters(); query = ''; checked = transitionSelection(checked, { type: 'clear' }); navOpen = false;
+    select(null); activeCollectionId = null; activeFolderId = null; archived = false; importOptions.folderId = null; navigationRevision += 1; mediaType = 'all'; filters = defaultFilters(); query = ''; checked = transitionSelection(checked, { type: 'clear' }); navOpen = false;
   }
   function createProject(event: SubmitEvent) {
     event.preventDefault();
@@ -716,7 +782,7 @@
     if (live) { void ownerAction('createProject', { title: name, description: '' }).catch(cause => feedback = String(cause)); return; }
     const id = crypto.randomUUID();
     projects = [...projects, { id, name }];
-    openFolder(id, 'all'); folderOpen = false;
+    openFolder(id, 'all');
     projectName = ''; projectDialog = false;
   }
   async function saveProjectIdentity(id: string, draft: ProjectIdentityDraft) {
@@ -742,7 +808,7 @@
       if (identityRequests.get(id) === request) identityRequests.delete(id);
     }
   }
-  function filterBy(value: FilterId) { stopPreview(); if (project.archived) return; activeCollectionId = null; importOptions.folderId = null; activeFolderId = null; archived = false; filters = { ...defaultFilters(), statuses: value === 'all' || value === 'selected' ? [] : [value], selectedOnly: value === 'selected' }; query = ''; mediaType = 'all'; folderOpen = true; navOpen = false; }
+  function filterBy(value: FilterId) { stopPreview(); if (project.archived) return; activeCollectionId = null; importOptions.folderId = null; activeFolderId = null; archived = false; filters = { ...defaultFilters(), statuses: value === 'all' || value === 'selected' ? [] : [value], selectedOnly: value === 'selected' }; query = ''; mediaType = 'all'; navigationRevision += 1; navOpen = false; }
   onDestroy(() => {
     disposed = true;
     coverRequests.clear();
@@ -763,7 +829,7 @@
 {#snippet navigation()}
   <div class="brand"><span>review room.</span><button class="icon-button sidebar-collapse" aria-label="Collapse navigation" title="Collapse navigation" aria-expanded="true" onclick={() => navCollapsed = true}><PanelLeft size={18} strokeWidth={1.6}/></button></div>
   <WorkspaceSwitcher/>
-  <ProjectTree onEditProject={editProject} canEditProject={id => folderAccess.isAdmin && folderAccess.editableProjectIds.includes(id)} {canDropAssets} onDropAssets={dropAssets} dragActive={!!dragged} selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={!folderOpen} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
+  <ProjectTree onEditProject={editProject} canEditProject={id => folderAccess.isAdmin && folderAccess.editableProjectIds.includes(id)} {canDropAssets} onDropAssets={dropAssets} dragActive={!!dragged} selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={isProjectRoot} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
   <ArchivedProjects projects={archivedProjects} onRestore={restoreProject} closeOnRestore={navOpen} onNavigateFocus={focusProjectHeading}/>
   {#if folderAccess.isAdmin}<FeedbackInbox groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}
   <div class="nav-divider"></div><span class="nav-heading">REVIEW STATUS</span>
@@ -778,25 +844,24 @@
   <main ondragover={dragFiles} ondrop={dropFiles}>
     <header class="topbar">
       <Dialog.Root bind:open={navOpen}><Dialog.Trigger class="icon-button mobile-menu" aria-label="Open navigation" title="Open navigation"><Menu size={20}/></Dialog.Trigger><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="nav-drawer" onCloseAutoFocus={event => { if (restoringFromNavigation) { event.preventDefault(); restoringFromNavigation = false; void focusProjectHeading(); } }} style={`--project-accent: ${project.brandColor ?? "#14b8a6"}`}><Dialog.Title class="visually-hidden">Workspace navigation</Dialog.Title><Dialog.Description class="visually-hidden">Browse local media and review status</Dialog.Description><Dialog.Close class="icon-button drawer-close" aria-label="Close navigation"><X size={20}/></Dialog.Close>{@render navigation()}</Dialog.Content></Dialog.Portal></Dialog.Root>
-      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#if folderOpen}<ChevronRight size={13}/>{#if focusedReview}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/><strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot}/>{/if}<div class="header-account-tools">{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
+      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each ancestors as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if (focusedReview || mediaType !== 'all' || filter === 'selected' || activeCollectionId || archived)}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId && locationName !== project.name}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot}/>{/if}<div class="header-account-tools">{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
     </header>
-    <div class="page-content" class:folder-workspace={folderOpen}>
-      <section class="project-heading" class:identity-banner={!folderOpen && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if !folderOpen && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{folderOpen ? locationName : project.name}</h1>{#if !folderOpen}<p class="subtitle" title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description || "Choose a folder to start reviewing."}</p>{/if}</div><div class="project-tools"><ImportQueue jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions folders={projectFolders} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "today’s date folder"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
+    <div class="page-content folder-workspace">
+      <section class="project-heading" class:identity-banner={isProjectRoot && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if isProjectRoot && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{locationName}</h1>{#if isProjectRoot}<p class="subtitle" title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description || "Choose a folder to start reviewing."}</p>{/if}</div><div class="project-tools"><ImportQueue jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} folderLabels={folderDestinations} onMoveFolder={moveFolder} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
       {#if feedback}<div class="notice" role="status">{feedback}<button class="icon-button" aria-label="Dismiss message" onclick={() => feedback = ''}><X size={16}/></button></div>{/if}
       {#if project.archived}<section class="archived-project-state" aria-label="Archived project">
         <h2>This project is archived.</h2><p>Your media, folders and feedback are retained.</p>
         <div><button class="primary-button" onclick={() => { restoreProject(project.id); void focusProjectHeading(); }}>Restore project</button><button class="secondary-button" onclick={() => projectDialog = true}>New project</button></div>
-      </section>{:else if !folderOpen}<section class="folder-shelf" aria-label="Media collections">
-        {#each projectFolders as folder (folder.id)}
-          <button class="folder-card" onclick={() => openRealFolder(projectId, folder.id)}><FolderArtwork coverSrc={folderCoverUrl(folder, allAssets)} empty={!assets.some(asset => asset.folderId === folder.id)}/><strong>{folder.title}</strong><span>{assets.filter(asset => asset.folderId === folder.id).length} items</span></button>
+      </section>{:else if !activeCollectionId && !archived && !focusedReview}<nav class="library-navigation" aria-label="Folders and media filters">
+        <button class="library-filter" class:chosen={mediaType === 'all' && !filters.statuses.length && !filters.selectedOnly} aria-pressed={mediaType === 'all' && !filters.statuses.length && !filters.selectedOnly} onclick={() => openScopedCollection('all')}>All media<span>{directAssets.length}</span></button>
+        <button class="library-filter" class:chosen={mediaType === 'video'} aria-pressed={mediaType === 'video'} onclick={() => openScopedCollection('video')}><Film size={14}/>Videos<span>{directAssets.filter(asset => asset.type === 'video').length}</span></button>
+        <button class="library-filter" class:chosen={mediaType === 'image'} aria-pressed={mediaType === 'image'} onclick={() => openScopedCollection('image')}><Image size={14}/>Images<span>{directAssets.filter(asset => asset.type === 'image').length}</span></button>
+        <button class="library-filter" class:chosen={filter === 'selected'} aria-pressed={filter === 'selected'} onclick={() => openScopedCollection('selected')}><Bookmark size={14}/>Shortlist<span>{directAssets.filter(asset => asset.shortlisted).length}</span></button>
+        {#if childFolders.length}<span class="library-divider" aria-hidden="true"></span>{/if}
+        {#each childFolders as folder (folder.id)}
+          <button class="library-folder" title={folder.title} onclick={() => openRealFolder(projectId, folder.id)}><Folder size={14}/><span class="library-folder-name">{folder.title}</span><span class="library-folder-count">{assets.filter(asset => asset.folderId === folder.id).length}</span></button>
         {/each}
-        {#each [{ type: 'video' as const, name: 'Videos' }, { type: 'image' as const, name: 'Images' }] as collection (collection.type)}
-          <button class="folder-card" class:folder-active={mediaType === collection.type} aria-pressed={mediaType === collection.type} onclick={() => openFolder(projectId, collection.type)}>
-            <FolderArtwork empty={!assets.some(asset => asset.type === collection.type)}/><strong>{collection.name}</strong><span>{assets.filter(asset => asset.type === collection.type).length} items</span>
-          </button>
-        {/each}
-        <button class="folder-card" class:folder-active={filter === 'selected'} aria-pressed={filter === 'selected'} onclick={() => openFolder(projectId, 'selected')}><FolderArtwork empty={!assets.some(asset => asset.shortlisted)}/><strong>Shortlist</strong><span>{assets.filter(asset => asset.shortlisted).length} items</span></button>
-      </section>{/if}
+      </nav>{/if}
       {#snippet explorer()}
       <div class="collection-bar"><div class="collection-title"><h2 bind:this={explorerHeading} tabindex="-1">Media</h2><span class="count">{visible.length}</span></div><CollectionActions {activeCollection} folders={projectFolders} canEdit={true} onCreate={createCollection} onRename={(collectionId, title) => changeCollections({ type: 'rename', collectionId, title })} onRemove={removeCollection} onSave={saveCollection}/></div>
       <div class="toolbar explorer-toolbar"><label class="search" class:has-query={!!query} title={query ? `Search media: ${query}` : "Search media"}><Search size={16}/><input aria-label="Search media" placeholder="Find a clip or image…" bind:value={query} onkeydown={event => { if (event.key === "Escape") { event.stopPropagation(); event.currentTarget.blur(); } }}/><kbd>⌕</kbd></label>
@@ -853,7 +918,7 @@
           {#if activeMediaJob}<div class="media-job" role="status"><span>Processing: {activeMediaJob.status === 'ready' ? 'Ready' : activeMediaJob.status === 'error' ? 'Needs attention' : activeMediaJob.status === 'queued' ? 'Queued' : `${activeMediaJob.stage} in progress`}</span>{#if activeMediaJob.runId}<a href={`https://trigger.v1su4.dev/orgs/v1su4-91d9/projects/review-room-YXaz/env/prod/runs/${activeMediaJob.runId}`} target="_blank" rel="noopener noreferrer">Run {activeMediaJob.runId.slice(-8)}</a>{/if}{#if activeMediaJob.status === 'error' || (activeMediaJob.status === 'queued' && !activeMediaJob.runId)}<button onclick={() => retryMediaJob(activeMediaJob._id)}>{activeMediaJob.status === 'error' ? 'Retry' : 'Start processing'}</button>{:else if activeMediaJob.status === 'running'}<button onclick={() => processingObserver?.refresh()}>Refresh</button>{/if}</div>{/if}
           {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={reviewEnded} loop={!preview && reviewPlaybackMode === 'loop'} onfailure={previewFailed} sourceBlob={active.sourceFile instanceof File ? active.sourceFile : undefined} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} availability={active.availability ?? 'ready'} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
               canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => { updateAsset(active.id, info); readySource = active.url; }}/>{/if}
-          <div class="review-actions"><div class="review-feedback"><button class="shortlist-toggle" class:shortlisted={active.shortlisted} aria-label={active.shortlisted ? 'Remove from shortlist' : 'Add to shortlist'} aria-pressed={active.shortlisted} title={active.shortlisted ? 'Remove from shortlist' : 'Add to shortlist'} onclick={() => review({ type: 'shortlist', assetId: active.id, shortlisted: !active.shortlisted })}><Bookmark size={17} fill={active.shortlisted ? 'currentColor' : 'none'}/></button><div class="rating" aria-label="Rating">{#each [1,2,3,4,5] as rating (rating)}<button aria-label={`Rate ${rating} stars`} title={active.rating === rating ? "Clear rating" : `Rate ${rating} stars`} aria-pressed={active.rating === rating} onclick={() => review({ type: 'rate', assetId: active.id, rating: active.rating === rating ? 0 : rating })}><Star size={17} fill={active.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}</div></div><div class="review-outcome"><button class:decision-active={active.status === 'needs_changes'} class="secondary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'needs_changes' ? 'awaiting_review' : 'needs_changes' })}>Request changes</button><button class="primary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'approved' ? 'awaiting_review' : 'approved' })}><Check size={16}/>{active.status === 'approved' ? 'Approved' : 'Approve'}</button><div class="asset-nav">{#if active.type === 'video'}<ReviewPlaybackMenu mode={reviewPlaybackMode} onChange={changePlaybackMode} disabled={!!preview}/>{/if}<button class="icon-button" aria-label="Previous asset" aria-keyshortcuts="ArrowLeft" title="Previous asset (←)" disabled={visibleIds.indexOf(activeId ?? '') <= 0} onclick={() => navigate(-1)}><ArrowLeft size={17}/></button><button class="icon-button" aria-label="Next asset" aria-keyshortcuts="ArrowRight" title="Next asset (→)" disabled={visibleIds.indexOf(activeId ?? '') >= visibleIds.length - 1} onclick={() => navigate(1)}><ArrowRight size={17}/></button></div></div></div>
+          <div class="review-actions"><div class="review-feedback"><button class="shortlist-toggle" class:shortlisted={active.shortlisted} aria-label={active.shortlisted ? 'Remove from shortlist' : 'Add to shortlist'} aria-pressed={active.shortlisted} title={active.shortlisted ? 'Remove from shortlist' : 'Add to shortlist'} onclick={() => review({ type: 'shortlist', assetId: active.id, shortlisted: !active.shortlisted })}><Bookmark size={17} fill={active.shortlisted ? 'currentColor' : 'none'}/></button><div class="rating" aria-label="Rating">{#each [1,2,3,4,5] as rating (rating)}<button aria-label={`Rate ${rating} stars`} title={active.rating === rating ? "Clear rating" : `Rate ${rating} stars`} aria-pressed={active.rating === rating} onclick={() => review({ type: 'rate', assetId: active.id, rating: active.rating === rating ? 0 : rating })}><Star size={17} fill={active.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}</div></div><div class="review-outcome"><button class:decision-active={active.status === 'needs_changes'} class="secondary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'needs_changes' ? 'awaiting_review' : 'needs_changes' })}>Request changes</button><button class="primary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'approved' ? 'awaiting_review' : 'approved' })}><Check size={16}/>{active.status === 'approved' ? 'Approved' : 'Approve'}</button><div class="asset-nav" role="group" aria-label="Playback and asset navigation">{#if active.type === 'video'}<ReviewPlaybackMenu mode={reviewPlaybackMode} onChange={changePlaybackMode} disabled={!!preview}/>{/if}<div class="asset-step-pair"><button class="asset-step" aria-label="Previous asset" aria-keyshortcuts="ArrowLeft" title="Previous asset (←)" disabled={visibleIds.indexOf(activeId ?? '') <= 0} onclick={() => navigate(-1)}><ArrowLeft size={14}/></button><button class="asset-step" aria-label="Next asset" aria-keyshortcuts="ArrowRight" title="Next asset (→)" disabled={visibleIds.indexOf(activeId ?? '') >= visibleIds.length - 1} onclick={() => navigate(1)}><ArrowRight size={14}/></button></div></div></div></div>
         </section>{/if}
       {/snippet}
       {#snippet inspector()}
@@ -870,7 +935,7 @@
           </Tabs.Root>
         </section>{/if}
       {/snippet}
-      <div hidden={!folderOpen || !!project.archived}><WorkspacePanes {explorer} {viewer} {inspector} hasActive={!!active} focused={focusedReview} {showInspector}/></div>
+      <div hidden={!!project.archived}><WorkspacePanes {explorer} {viewer} {inspector} hasActive={!!active} focused={focusedReview} {showInspector}/></div>
       <footer class="workspace-footer"><span>{live ? 'Projects and videos saved privately' : 'Local workspace · unsaved session'}</span><span>review room.</span></footer>
     </div>
   </main>
@@ -888,6 +953,16 @@
 </Dialog.Root>
 
 <style>
+  .library-navigation { display: flex; align-items: center; flex-wrap: nowrap; gap: 6px; min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; padding: 0 0 8px; margin: 0 0 10px; scrollbar-width: thin; }
+  .library-filter, .library-folder { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; white-space: nowrap; cursor: pointer; }
+  .library-filter.chosen { background: var(--raised); color: var(--ink); border-color: color-mix(in srgb, var(--teal) 35%, var(--border)); }
+  .library-filter:hover, .library-folder:hover { background: var(--raised); color: var(--ink); }
+  .library-filter > span, .library-folder-count { font-size: 10px; color: var(--muted); }
+  .library-folder-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+  .library-divider { flex: 0 0 1px; height: 20px; margin: 0 4px; background: var(--border); }
+  .library-filter:focus-visible, .library-folder:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }
+  @media (pointer: coarse) { .library-filter, .library-folder { height: 44px; } }
+
   .media-job { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:7px 12px; border-block:1px solid var(--border); background:color-mix(in srgb, var(--teal) 7%, var(--panel)); color:var(--muted); font-size:11px; }
   .media-job span { color:var(--ink); }
   .media-job a { color:var(--teal); }

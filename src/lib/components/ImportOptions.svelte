@@ -3,10 +3,11 @@
   import { SlidersHorizontal, X } from 'lucide-svelte';
 
   type AssetClass = 'VID' | 'IMG' | 'CTX' | 'STB';
-  let { folders, folderId, assetClass, onChange }: {
+  let { folders, folderId, assetClass, persistent = false, onChange }: {
     folders: readonly { id: string; title: string }[];
     folderId: string | null;
     assetClass: AssetClass;
+    persistent?: boolean;
     onChange: (value: { folderId: string | null; assetClass: AssetClass }) => void;
   } = $props();
 
@@ -32,7 +33,7 @@
       <label class="import-options-field">
         Destination
         <select value={folderId ?? ''} onchange={event => onChange({ folderId: event.currentTarget.value || null, assetClass })}>
-          <option value="">Today’s date folder</option>
+          <option value="">Project root</option>
           {#each folders as folder (folder.id)}
             <option value={folder.id}>{folder.title}</option>
           {/each}
@@ -47,7 +48,7 @@
         </select>
       </label>
       <p>Videos keep their video type.</p>
-      <p class="import-options-local">Files stay on this device.</p>
+      <p class="import-options-local">{persistent ? 'Files are saved privately to your workspace.' : 'Files stay on this device.'}</p>
     </Popover.Content>
   </Popover.Portal>
 </Popover.Root>

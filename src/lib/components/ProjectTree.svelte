@@ -10,7 +10,7 @@
     shortlistCount: number;
     archivedCount?: number;
     collections?: readonly { id: string; title: string; count: number }[];
-    folders?: readonly { id: string; title: string; count: number }[];
+    folders?: readonly { id: string; title: string; count: number; parentFolderId?: string }[];
   }>;
 
   let {
@@ -55,6 +55,27 @@
 
   let collapsed = $state<Set<string>>(new Set());
 
+  function folderRows(project: ProjectTreeProject) {
+    type FolderRow = NonNullable<ProjectTreeProject['folders']>[number];
+    const rows: { folder: FolderRow; depth: number; hasChildren: boolean }[] = [];
+    const children = new Map<string | undefined, FolderRow[]>();
+    for (const folder of project.folders ?? []) {
+      const siblings = children.get(folder.parentFolderId) ?? [];
+      siblings.push(folder); children.set(folder.parentFolderId, siblings);
+    }
+    const seen = new Set<string>();
+    function visit(folder: FolderRow, depth: number, visible: boolean) {
+      if (seen.has(folder.id)) return;
+      seen.add(folder.id);
+      const descendants = children.get(folder.id) ?? [];
+      if (visible) rows.push({ folder, depth, hasChildren: !!descendants.length });
+      for (const child of descendants) visit(child, depth + 1, visible && !collapsed.has(folder.id));
+    }
+    for (const root of children.get(undefined) ?? []) visit(root, 0, true);
+    // Keep legacy orphan/cyclic folders reachable without revealing collapsed descendants.
+    for (const folder of project.folders ?? []) if (!seen.has(folder.id)) visit(folder, 0, true);
+    return rows;
+  }
   let dropHover = $state<string | null>(null);
   $effect(() => { if (!dragActive) dropHover = null; });
   function dragOver(event: DragEvent, projectId: string, folderId: string | null) {
@@ -116,8 +137,12 @@
           {#if isExpanded}
             <ul class="collection-list" aria-label={`${project.name} collections`}>
               <li><button class="collection-link" class:drop-hover={dropHover === project.id} ondragover={event => dragOver(event, project.id, null)} ondragleave={dragLeave} ondrop={event => drop(event, project.id, null)} class:selected={isSelected && !selectedCustomCollectionId && !overview && !selectedFolderId && !archived && selectedCollection === 'all'} type="button" onclick={() => onOpen(project.id, 'all')}><Layers size={14}/><span>All media</span></button></li>
-              {#each project.folders ?? [] as folder (folder.id)}
-                <li><button class="collection-link" class:drop-hover={dropHover === folder.id} ondragover={event => dragOver(event, project.id, folder.id)} ondragleave={dragLeave} ondrop={event => drop(event, project.id, folder.id)} class:selected={isSelected && selectedFolderId === folder.id} type="button" onclick={() => onFolder?.(project.id, folder.id)}><Folder size={14}/><span>{folder.title}</span><span class="count">{folder.count}</span></button></li>
+              {#each folderRows(project) as row (row.folder.id)}
+                {@const folder = row.folder}
+                <li><div class="folder-tree-row" style:padding-left={row.depth * 15 + 'px'}>
+                  {#if row.hasChildren}<button class="disclosure" type="button" aria-label={`${collapsed.has(folder.id) ? 'Expand' : 'Collapse'} ${folder.title}`} aria-expanded={!collapsed.has(folder.id)} onclick={() => toggle(folder.id)}>{#if collapsed.has(folder.id)}<ChevronRight size={12}/>{:else}<ChevronDown size={12}/>{/if}</button>{:else}<span class="folder-disclosure-spacer"></span>{/if}
+                  <button class="collection-link" class:drop-hover={dropHover === folder.id} ondragover={event => dragOver(event, project.id, folder.id)} ondragleave={dragLeave} ondrop={event => drop(event, project.id, folder.id)} class:selected={isSelected && selectedFolderId === folder.id} type="button" onclick={() => onFolder?.(project.id, folder.id)}><Folder size={14}/><span>{folder.title}</span><span class="count">{folder.count}</span></button>
+                </div></li>
               {/each}
               <li>
                 <button class:selected={isSelected && !selectedCustomCollectionId && !selectedFolderId && !archived && selectedCollection === 'video'} class="collection-link" type="button" onclick={() => onOpen(project.id, 'video')}>
@@ -172,6 +197,9 @@
   .collection-link { min-height: 31px; padding-left: 6px; color: #899491; border-radius: 4px; }
   .collection-link.selected { background: #ffffff0a; color: #a8ded2; }
   .project-link.drop-hover, .collection-link.drop-hover { background: #15362e; box-shadow: inset 0 0 0 1px var(--teal); color: var(--ink); border-radius: 6px; }
+  .folder-tree-row { display: flex; align-items: center; }
+  .folder-tree-row .collection-link { padding-left: 0; }
+  .folder-disclosure-spacer { width: 27px; flex-shrink: 0; }
   .empty { margin: 0 10px; color: var(--muted); font-size: 11px; }
-  @media (pointer: coarse) { .project-link, .collection-link, .add-project, .edit-project, .disclosure { min-height: 44px; } .add-project, .edit-project, .disclosure { min-width: 44px; } }
+  @media (pointer: coarse) { .folder-disclosure-spacer { width: 44px; } .project-link, .collection-link, .add-project, .edit-project, .disclosure { min-height: 44px; } .add-project, .edit-project, .disclosure { min-width: 44px; } }
 </style>

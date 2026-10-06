@@ -25,12 +25,15 @@ export function automationError(cause: unknown) {
     ['Invalid idempotency key', 400],
     ['Unsupported upload', 400],
     ['Upload metadata invalid', 400],
+    ['Upload class does not match', 400],
     ['Upload verification failed', 409],
     ['Uploaded original did not match', 409],
     ['Upload has not reached storage', 409],
     ['Poster size is invalid', 400],
     ['title must', 400],
     ['Folder already exists', 409],
+    ['Parent folder belongs', 400],
+    ['Folder cycle', 400],
     ['unavailable', 404],
     ['Invalid brand color', 400],
     ['ArgumentValidationError', 400],
@@ -38,6 +41,7 @@ export function automationError(cause: unknown) {
     ['Unexpected end of JSON input', 400],
   ] as const;
   const result = known.find(([fragment]) => message.includes(fragment));
-  return json({ error: result?.[0] ?? 'Automation request failed' },
+  const publicMessage = result?.[0] === 'ArgumentValidationError' || result?.[0] === 'InvalidId' ? 'Request contains an invalid ID or argument' : result?.[0] ?? 'Automation request failed';
+  return json({ error: publicMessage },
     { status: result?.[1] ?? 500, headers: { 'cache-control': 'no-store' } });
 }

@@ -246,6 +246,7 @@ export const unarchive = mutation({
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error("Project not found");
     if (project.createdBy !== admin._id) throw new Error("Project owner required");
+    if (project.purgeStartedAt) throw new Error('Project deletion is in progress');
     await ctx.db.patch(project._id, {
       archived: undefined,
       updatedAt: Date.now(),

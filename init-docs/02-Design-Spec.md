@@ -17,8 +17,8 @@ Sidebar Inbox shows a simple in-app digest of review notes grouped by project an
 - **Project header / banner** — banner image, title, client name/description, "Access," "Share review link," "Upload." Makes the page feel like a portal. Owners use Access to choose Private, Shared, or Workspace visibility and to add exact email or domain rules; non-owners see view/edit affordances based on role.
 - **Smart-view tab bar** (§4) directly under the header, with live counts.
 - **Toolbar** — search, filter, sort, thumbnail-size toggle, optional "Selected only." Light, never cluttered. Do not put destructive or bulk status-reset actions in this toolbar.
-- **Content** — the media grid (default), with project folders shown as first-class items above loose assets.
-- **Folder navigation** — the existing app sidebar shows the project root plus one level of project folders.
+- **Content** — opening a project or folder shows its scoped media grid directly. Immediate subfolders and media-type choices occupy at most one compact, horizontally scrolling navigation row above the media; do not render a wrapping grid of oversized folder artwork.
+- **Folder navigation** — the existing app sidebar shows the project root plus expandable nested project folders.
 - **Right-side viewer/details panel** (§5) — opens on card select.
 
 ### C. Client review page (`/review/[token]`)
@@ -90,7 +90,7 @@ Simple and fast: a box, an "Add comment" button, and an optional "use current ti
 
 ## 9. Upload
 
-Sleek, no per-asset form. Drag-drop area, multi-file video and image uploads, bounded parallel uploads, per-file progress; states for success / failed / processing-thumbnail / ready. The upload page shows the destination folder before files are chosen: opening upload from inside a real folder preselects that folder, while the default remains today's flat date folder. Admins can change the destination before dropping or choosing files through a restrained dark destination menu whose selected and hover states use the teal accent, not the browser/OS default blue. Assets appear in the grid quickly after upload, and admin-side local previews may appear before remote derivatives finish when the browser still has the dropped files.
+Sleek, no per-asset form. Drag-drop area, multi-file video and image uploads, bounded parallel uploads, per-file progress; states for success / failed / processing-thumbnail / ready. The upload page shows the destination folder before files are chosen: opening upload from inside a real folder preselects that folder, while project-root uploads remain at the project root. Admins can change the destination before dropping or choosing files through a restrained dark destination menu whose selected and hover states use the teal accent, not the browser/OS default blue. Assets appear in the grid quickly after upload, and admin-side local previews may appear before remote derivatives finish when the browser still has the dropped files.
 
 ## 10. Scenes / Analyze (Phase 2)
 
@@ -102,7 +102,7 @@ Available but visually light — file-type toggles in the main toolbar, a filter
 
 ## 11a. Folders
 
-Folders are lightweight one-level project organization, not a replacement for smart views. Uploads default into a flat `YYYYMMDD` date folder unless the admin opens upload from inside a real folder or chooses a folder in the upload destination control. Do not create nested Videos/Images/Contact Sheets folders inside a date folder; use `VID`, `IMG`, `CTX`, and `STB` asset-class filters instead. The sidebar can show master collections such as Videos, Images, Contact Sheets, and Storyboards as automatic metadata views. These smart folders must look distinct from real folders, auto-count their contents, and not accept drag/drop, rename, delete, or manual placement. Later client bundles/playlists can use the same pattern for saved groupings without moving files. The project root shows folder tiles above loose assets; opening a folder scopes the grid and smart-view counts to that folder. Admins can create and rename root-level date/manual folders, upload/reset a folder cover image from the folder edit control, and drag media cards onto folder tiles or the existing app sidebar folder entries to move assets. Folder covers fall back to the newest image asset inside the folder when no custom cover is set. The sidebar root entry accepts drops to move assets back out of a folder. Clients see folder names/covers but do not get folder edit or drag/drop management controls. Client review links can remain grid-first unless folder navigation is explicitly enabled later.
+Folders are nested project organization, not a replacement for smart views. Uploads use the current real folder or project root. Dailies/date folders are created explicitly, and dates remain filter/sort metadata. Do not create nested Videos/Images/Contact Sheets folders inside a date folder; use `VID`, `IMG`, `CTX`, and `STB` asset-class filters instead. The sidebar can show master collections such as Videos, Images, Contact Sheets, and Storyboards as automatic metadata views. These smart folders must look distinct from real folders, auto-count their contents, and not accept drag/drop, rename, delete, or manual placement. Later client bundles/playlists can use the same pattern for saved groupings without moving files. Real subfolders use compact labelled navigation controls, never the same oversized artwork cards as smart views. Opening a folder scopes the grid and smart-view counts to that folder; All media at project level includes only the current project. Admins can create and rename root folders and subfolders, upload/reset a folder cover image from the folder edit control, and drag media cards onto the existing app sidebar folder entries to move assets. Folder covers fall back to the newest image asset inside the folder when no custom cover is set. The sidebar root entry accepts drops to move assets back out of a folder. Clients see folder names but do not get folder edit or drag/drop management controls. Client review links can remain grid-first unless folder navigation is explicitly enabled later.
 
 ## 12. Visual direction & token system
 
@@ -143,7 +143,7 @@ Dark cards on dark canvas, soft borders, subtle hover, thumbnail-first, minimal 
 
 States to specify across components: hover · selected · focus · disabled · uploading · error · reviewed · approved. Motion is smooth and quiet — panel open/close, card hover, tab switches. Optimistic UI where safe. Skeleton thumbnails on load. Persistent playback controls. Minimal blocking modals.
 
-The review toolbar groups a bookmark Shortlist control beside the rating stars. Both fill with teal when selected. Request changes, Approve, and asset navigation sit together on the right, wrapping as a group on narrow screens. Icon controls retain 44px touch targets on coarse-pointer devices.
+The review toolbar groups a bookmark Shortlist control beside the rating stars. Both fill with teal when selected. Request changes, Approve, playback mode, and asset navigation sit together on the right, wrapping as a group on narrow screens. All controls and their wrappers align to the same top edge, including the stars and shortlist; different heights are allowed. Icon controls retain 44px touch targets on coarse-pointer devices.
 
 ## 15. Responsive intent
 

@@ -10,7 +10,7 @@ function deferred<T>() {
 }
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 function request(name: string): ImportRequest {
-  return { file: new File(['video'], name, { type: 'video/mp4' }), destinationLabel: 'Studio / Rushes', target: { projectId: 'studio', folderId: 'rushes', dateKey: '20260922', dateFolderId: 'day', assetClass: 'VID' } };
+  return { file: new File(['video'], name, { type: 'video/mp4' }), destinationLabel: 'Studio / Rushes', target: { projectId: 'studio', folderId: 'rushes', dateKey: '20260922', assetClass: 'VID' } };
 }
 function asset(file: File): LocalAsset {
   return { id: 'temporary', name: file.name, sourceFile: file, url: 'blob:test', type: 'video', size: file.size, assetClass: 'VID', importedAt: 1, tags: [], assetCode: '' };

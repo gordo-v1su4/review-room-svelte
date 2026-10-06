@@ -29,12 +29,29 @@ export const actions: Actions = {
   createFolder: async ({ cookies, request }) => {
     requireOwner(cookies); const form = await request.formData();
     await db().mutation(personal.createFolder, { projectId: value(form, 'projectId') as Id<'projects'>,
-      title: value(form, 'title') }); done();
+      title: value(form, 'title'), parentFolderId: value(form, 'parentFolderId') ? value(form, 'parentFolderId') as Id<'projectFolders'> : undefined }); done();
   },
   renameFolder: async ({ cookies, request }) => {
     requireOwner(cookies); const form = await request.formData();
     await db().mutation(personal.renameFolder, { folderId: value(form, 'folderId') as Id<'projectFolders'>,
       title: value(form, 'title') }); done();
+  },
+  moveFolder: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    await db().mutation(personal.moveFolder, { folderId: value(form, 'folderId') as Id<'projectFolders'>,
+      parentFolderId: value(form, 'parentFolderId') ? value(form, 'parentFolderId') as Id<'projectFolders'> : undefined }); done();
+  },
+  moveAssets: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    await db().mutation(personal.moveAssets, { projectId: value(form, 'projectId') as Id<'projects'>,
+      folderId: value(form, 'folderId') ? value(form, 'folderId') as Id<'projectFolders'> : undefined,
+      assetIds: form.getAll('assetIds').map(String) as Id<'videos'>[] }); done();
+  },
+  removeFolder: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    const assetDisposition = value(form, 'assetDisposition');
+    if (assetDisposition !== 'move_to_root' && assetDisposition !== 'archive_assets') throw new Error('Invalid folder disposition');
+    await db().mutation(personal.removeFolder, { folderId: value(form, 'folderId') as Id<'projectFolders'>, assetDisposition }); done();
   },
   archiveProject: async ({ cookies, request }) => {
     requireOwner(cookies); const form = await request.formData();

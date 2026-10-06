@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getProjectForAdmin, getProjectForEditor } from "./lib/access";
+import { validateFolderParent, disposeFolder, folderNameKey } from './lib/folderTree';
 
 const folderRemovalDisposition = v.union(
   v.literal("move_to_root"),
@@ -26,6 +27,7 @@ export const create = mutation({
   args: {
     projectId: v.id("projects"),
     title: v.string(),
+    parentFolderId: v.optional(v.id('projectFolders')),
   },
   handler: async (ctx, args) => {
     const { admin, project } = await getProjectForEditor(ctx, args.projectId);
@@ -37,10 +39,13 @@ export const create = mutation({
       .query("projectFolders")
       .withIndex("by_project", (q) => q.eq("projectId", project._id))
       .collect();
-    const maxOrder = siblings.reduce((max, folder) => Math.max(max, folder.order), 0);
+    await validateFolderParent(ctx, project._id, args.parentFolderId);
+    if (siblings.some(folder => folder.parentFolderId === args.parentFolderId && folderNameKey(folder.title) === folderNameKey(title))) throw new Error('A folder with that name already exists');
+    const maxOrder = siblings.filter(folder => folder.parentFolderId === args.parentFolderId).reduce((max, folder) => Math.max(max, folder.order), 0);
     const now = Date.now();
     const folderId = await ctx.db.insert("projectFolders", {
       projectId: project._id,
+      parentFolderId: args.parentFolderId,
       title,
       order: maxOrder + 1,
       createdBy: admin._id,
@@ -73,7 +78,8 @@ export const rename = mutation({
     const duplicate = siblings.find(
       (item) =>
         item._id !== folder._id &&
-        item.title.trim().toLowerCase() === title.toLowerCase(),
+        item.parentFolderId === folder.parentFolderId &&
+        folderNameKey(item.title) === folderNameKey(title),
     );
     if (duplicate) throw new Error("A folder with that name already exists");
 
@@ -115,30 +121,6 @@ export const remove = mutation({
     const { admin, project } = await getProjectForEditor(ctx, folder.projectId);
     if (admin.role !== "admin") throw new Error("Admin required");
 
-    const now = Date.now();
-    const assets = await ctx.db
-      .query("videos")
-      .withIndex("by_project_folder", (q) =>
-        q.eq("projectId", project._id).eq("folderId", folder._id),
-      )
-      .collect();
-
-    for (const asset of assets) {
-      await ctx.db.patch(asset._id, {
-        folderId: undefined,
-        ...(args.assetDisposition === "archive_assets"
-          ? { status: "archived" as const }
-          : {}),
-        updatedAt: now,
-      });
-    }
-
-    await ctx.db.delete(folder._id);
-    await ctx.db.patch(project._id, { updatedAt: now });
-
-    return {
-      moved: args.assetDisposition === "move_to_root" ? assets.length : 0,
-      archived: args.assetDisposition === "archive_assets" ? assets.length : 0,
-    };
+    return await disposeFolder(ctx, folder, args.assetDisposition);
   },
 });

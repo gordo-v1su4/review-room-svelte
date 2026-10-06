@@ -81,6 +81,7 @@ const applicationTables = {
     ),
     nextAssetNumber: v.optional(v.number()),
     createdBy: v.id("appUsers"),
+    purgeStartedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
     archived: v.optional(v.boolean()),
@@ -111,6 +112,7 @@ const applicationTables = {
 
   projectFolders: defineTable({
     projectId: v.id("projects"),
+    parentFolderId: v.optional(v.id("projectFolders")),
     title: v.string(),
     coverImageKey: v.optional(v.string()),
     order: v.number(),
@@ -118,6 +120,17 @@ const applicationTables = {
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_project", ["projectId"]),
+
+  sourceImports: defineTable({
+    sourceApp: v.literal('trailer-feed'),
+    sourceProjectId: v.string(),
+    projectId: v.id('projects'),
+    folderId: v.id('projectFolders'),
+    sourceDocumentsJson: v.string(),
+    mediaMappingsJson: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index('by_source', ['sourceApp', 'sourceProjectId']).index('by_project', ['projectId']),
 
   automationCredentials: defineTable({
     name: v.string(),
@@ -129,7 +142,7 @@ const applicationTables = {
     expiresAt: v.optional(v.number()),
     revokedAt: v.optional(v.number()),
     lastUsedAt: v.optional(v.number()),
-  }).index("by_digest", ["keyDigest"]),
+  }).index("by_digest", ["keyDigest"]).index("by_project", ["projectId"]),
 
   automationRequests: defineTable({
     credentialId: v.id("automationCredentials"),
