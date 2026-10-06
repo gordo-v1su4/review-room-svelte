@@ -55,7 +55,7 @@ export function transitionFolderState(state: FolderState, action: FolderAction, 
     if (!parent || parent.projectId !== projectId) throw new Error('Parent folder not found in project');
     if (folder && folderAncestors(state.folders, parentId).some(item => item.id === folder.id)) throw new Error('A folder cannot contain itself');
   }
-  const duplicateSibling = (title: string, parentFolderId?: string) => state.folders.some(item => item.id !== folder?.id && item.projectId === projectId && item.parentFolderId === parentFolderId && item.title.trim().toLowerCase() === title.toLowerCase());
+  const duplicateSibling = (title: string, parentFolderId?: string) => state.folders.some(item => item.id !== folder?.id && item.projectId === projectId && item.parentFolderId === parentFolderId && item.title.trim().toLowerCase() === title.trim().toLowerCase());
   if (action.type === 'create') {
     validId(action.id);
     if (state.folders.some(folder => folder.id === action.id)) throw new Error('Folder ID already exists');
@@ -66,7 +66,8 @@ export function transitionFolderState(state: FolderState, action: FolderAction, 
   }
   if (action.type === 'reparent') {
     if (duplicateSibling(folder!.title, action.parentFolderId)) throw new Error('A folder with that name already exists');
-    return { ...state, folders: state.folders.map(item => { if (item.id !== folder!.id) return item; const { parentFolderId: _old, ...rest } = item; return { ...rest, ...(action.parentFolderId ? { parentFolderId: action.parentFolderId } : {}) }; }) };
+    const order = state.folders.filter(item => item.id !== folder!.id && item.projectId === projectId && item.parentFolderId === action.parentFolderId).reduce((max, item) => Math.max(max, item.order), 0) + 1;
+    return { ...state, folders: state.folders.map(item => { if (item.id !== folder!.id) return item; const { parentFolderId: _old, ...rest } = item; return { ...rest, order, ...(action.parentFolderId ? { parentFolderId: action.parentFolderId } : {}) }; }) };
   }
   if (action.type === 'register') {
     const ids = [...new Set(action.assetIds.map(validId))];
