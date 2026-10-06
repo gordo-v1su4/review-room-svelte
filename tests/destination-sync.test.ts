@@ -1,4 +1,5 @@
-import { test, expect, mock, jest, beforeEach, afterEach } from 'bun:test';
+import { test, expect, mock, jest, beforeEach, afterEach, spyOn } from 'bun:test';
+import { S3Client } from '@aws-sdk/client-s3';
 import { convexTest } from 'convex-test';
 import schema from '../convex/schema';
 import { internal } from '../convex/_generated/api';
@@ -264,5 +265,86 @@ test('removal before initial delivery can be reconciled for explicit exact-versi
   } finally {
     globalThis.fetch = oldFetch;
     if (oldKey === undefined) delete process.env.TRAILER_FEED_REVIEW_INGEST_KEY; else process.env.TRAILER_FEED_REVIEW_INGEST_KEY = oldKey;
+  }
+});
+
+test('owner source deletion revokes immediately and durably retries exact target removal after an outage', async () => {
+  const { t, project, asset, first } = await fixture();
+  const connectionId = await t.mutation(internal.destinationSync.saveConnection, { projectId: project, destinationKey: 'trailer-feed', targetRunId: 'connected-target' });
+  const oldFetch = globalThis.fetch;
+  const keys = ['TRAILER_FEED_REVIEW_INGEST_KEY', 'S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const;
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  Object.assign(process.env, { TRAILER_FEED_REVIEW_INGEST_KEY:'fixture-ingest-only', S3_ENDPOINT:'https://s3.v1su4.dev', S3_BUCKET:'review-room-svelte', S3_ACCESS_KEY_ID:'fixture-storage-only', S3_SECRET_ACCESS_KEY:'fixture-storage-only' });
+  const storage = spyOn(S3Client.prototype, 'send').mockResolvedValue({} as never);
+  const removals: unknown[] = [];
+  let deliveredUrl = '';
+  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const payload = JSON.parse(String(init?.body));
+    if (String(input).endsWith('/batches')) return Response.json({ batch_id: payload.batch_id, versions: payload.versions.map((item: Record<string, unknown>) => ({ ...item, version_number: 1, artifact_id: 'review-target-1', state: 'reserved' })) });
+    if (String(input).endsWith('/source-deletions')) {
+      removals.push(payload);
+      if (removals.length === 1) return Response.json({error:'Target temporarily unavailable'}, {status:503});
+      return Response.json({...payload,state:'source_deleted'});
+    }
+    deliveredUrl = payload.media_url;
+    return Response.json({ artifact: { artifact_id: 'review-target-1', version_number: 1, source_app: 'review-room', source_asset_id: asset, source_version_id: first, consent_generation: 1 } });
+  }) as unknown as typeof fetch;
+  try {
+    await t.mutation(internal.destinationSync.confirm, { connectionId, confirmationId: 'delete-after-publication', versions: [{versionId:first,expectedMetadataUpdatedAt:11}] });
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers());
+    const slug = new URL(deliveredUrl).pathname.split('/')[3];
+    await t.mutation(internal.personal.deleteSelectedAssets, {projectId:project,assetIds:[asset]});
+    expect(await t.query(internal.publicationGrants.resolve,{slug,versionId:first,variant:'original'})).toBeNull();
+    expect((await t.query(internal.destinationSync.snapshot,{projectId:project})).items[0].state).toBe('source_deleted');
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers());
+    expect(removals).toEqual([{source_asset_id:asset,source_version_id:first,consent_generation:1},{source_asset_id:asset,source_version_id:first,consent_generation:1}]);
+    const snapshot = await t.query(internal.destinationSync.snapshot,{projectId:project});
+    expect(snapshot.removals[0].state).toBe('complete');
+    expect(snapshot.removals[0].attempts).toBe(2);
+  } finally {
+    globalThis.fetch = oldFetch; storage.mockRestore();
+    for (const key of keys) if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key];
+  }
+});
+
+test('deleting a published reference removes its consent and metadata link while keeping the video published', async () => {
+  const {t,project,asset,first} = await fixture();
+  const image = await t.run(async ctx => {
+    const original = await ctx.db.get(asset);
+    const assetId = await ctx.db.insert('videos', {...Object.fromEntries(Object.entries(original!).filter(([key]) => !['_id','_creationTime','currentVersionId'].includes(key))) as Omit<NonNullable<typeof original>,'_id'|'_creationTime'>,title:'Grid',mimeType:'image/png',storageKey:'assets/private/grid.png'});
+    const versionId = await ctx.db.insert('assetVersions',{assetId,version:1,originalKey:'assets/private/grid.png',mimeType:'image/png',sizeBytes:100,processingState:'ready',createdAt:50});
+    await ctx.db.patch(first,{creativeMetadata:{model:'Sora 2',prompt:'Original first take',sourceLabel:'Original V1',referenceImageVersionIds:[],gridImageVersionId:versionId}});
+    return {assetId,versionId};
+  });
+  const connectionId = await t.mutation(internal.destinationSync.saveConnection,{projectId:project,destinationKey:'trailer-feed',targetRunId:'connected-target'});
+  const oldFetch = globalThis.fetch;
+  const keys = ['TRAILER_FEED_REVIEW_INGEST_KEY','S3_ENDPOINT','S3_BUCKET','S3_ACCESS_KEY_ID','S3_SECRET_ACCESS_KEY'] as const;
+  const previous = Object.fromEntries(keys.map(key => [key,process.env[key]]));
+  Object.assign(process.env,{TRAILER_FEED_REVIEW_INGEST_KEY:'fixture-ingest-only',S3_ENDPOINT:'https://s3.v1su4.dev',S3_BUCKET:'review-room-svelte',S3_ACCESS_KEY_ID:'fixture-storage-only',S3_SECRET_ACCESS_KEY:'fixture-storage-only'});
+  const storage = spyOn(S3Client.prototype,'send').mockResolvedValue({} as never);
+  const removals:unknown[] = [];
+  let url = '';
+  globalThis.fetch = mock(async (input:RequestInfo|URL,init?:RequestInit) => {
+    const payload = JSON.parse(String(init?.body));
+    if (String(input).endsWith('/batches')) return Response.json({batch_id:payload.batch_id,versions:payload.versions.map((item:Record<string,unknown>)=>({...item,version_number:1,artifact_id:'review-target-1',state:'reserved'}))});
+    if (String(input).endsWith('/source-deletions')) {removals.push(payload);return Response.json({...payload,state:'source_deleted'});}
+    url = payload.media_url;
+    return Response.json({artifact:{artifact_id:'review-target-1',version_number:1,source_app:'review-room',source_asset_id:asset,source_version_id:first,consent_generation:1}});
+  }) as unknown as typeof fetch;
+  try {
+    await t.mutation(internal.destinationSync.confirm,{connectionId,confirmationId:'publish-with-grid',versions:[{versionId:first,expectedMetadataUpdatedAt:11}]});
+    await t.finishAllScheduledFunctions(()=>jest.runAllTimers());
+    await t.mutation(internal.personal.deleteSelectedAssets,{projectId:project,assetIds:[image.assetId]});
+    const workspace = await t.query(internal.destinationSync.workspace,{projectId:project});
+    expect(workspace.versions.find(version=>version.versionId===first)?.images).toEqual([]);
+    const slug = new URL(url).pathname.split('/')[3];
+    expect(await t.query(internal.publicationGrants.resolve,{slug,versionId:first,variant:'original'})).not.toBeNull();
+    expect(await t.query(internal.publicationGrants.resolve,{slug,versionId:image.versionId,variant:'original'})).toBeNull();
+    await t.finishAllScheduledFunctions(()=>jest.runAllTimers());
+    expect(removals).toEqual([{source_asset_id:image.assetId,source_version_id:image.versionId,consent_generation:1}]);
+    expect((await t.query(internal.destinationSync.snapshot,{projectId:project})).items[0].state).toBe('synced');
+  } finally {
+    globalThis.fetch=oldFetch;storage.mockRestore();
+    for(const key of keys) if(previous[key]===undefined) delete process.env[key];else process.env[key]=previous[key];
   }
 });

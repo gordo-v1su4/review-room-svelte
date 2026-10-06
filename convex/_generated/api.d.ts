@@ -14,6 +14,7 @@ import type * as collections from "../collections.js";
 import type * as comments from "../comments.js";
 import type * as destinationSync from "../destinationSync.js";
 import type * as destinationDelivery from "../destinationDelivery.js";
+import type * as destinationRemovals from "../destinationRemovals.js";
 import type * as folders from "../folders.js";
 import type * as http from "../http.js";
 import type * as inbox from "../inbox.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   comments: typeof comments;
   destinationSync: typeof destinationSync;
   destinationDelivery: typeof destinationDelivery;
+  destinationRemovals: typeof destinationRemovals;
   folders: typeof folders;
   http: typeof http;
   inbox: typeof inbox;

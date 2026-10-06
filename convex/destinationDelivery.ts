@@ -8,7 +8,7 @@ class DestinationFailure extends Error {
   constructor(message: string, readonly disconnected = false) { super(message); }
 }
 
-async function post(path: 'batches' | 'versions' | 'connections' | 'status' | 'reactivations', payload: Record<string, unknown>) {
+async function post(path: 'batches' | 'versions' | 'connections' | 'status' | 'reactivations' | 'source-deletions', payload: Record<string, unknown>) {
   const key = process.env.TRAILER_FEED_REVIEW_INGEST_KEY;
   if (!key) throw new DestinationFailure('Destination delivery is not configured');
   const response = await fetch(`https://media.v1su4.dev/trailer-feed/external/review/${path}`, {
@@ -109,5 +109,20 @@ export const reconcile = internalAction({
       }
       return { ok: true };
     } catch (cause) { return { ok: false, error: failure(cause).error }; }
+  },
+});
+
+export const removeSource = internalAction({
+  args: {jobId:v.id('destinationRemovals')},
+  handler: async (ctx,args):Promise<void> => {
+    const claim = await ctx.runMutation(internal.destinationRemovals.claim,args);
+    if (!claim) return;
+    try {
+      const result = await post('source-deletions',claim.payload);
+      if (result.state !== 'source_deleted' || result.source_asset_id !== claim.payload.source_asset_id || result.source_version_id !== claim.payload.source_version_id || !Number.isSafeInteger(result.consent_generation) || result.consent_generation < claim.payload.consent_generation) throw new DestinationFailure('Destination did not acknowledge terminal removal of this source version');
+      await ctx.runMutation(internal.destinationRemovals.finish,{...args,token:claim.token,ok:true});
+    } catch (cause) {
+      await ctx.runMutation(internal.destinationRemovals.finish,{...args,token:claim.token,ok:false,error:failure(cause).error});
+    }
   },
 });

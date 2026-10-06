@@ -86,12 +86,13 @@ export const snapshot = internalQuery({
     const connections = await ctx.db.query('destinationConnections').withIndex('by_project', q => q.eq('projectId', args.projectId)).collect();
     const batches = await ctx.db.query('syncBatches').withIndex('by_project', q => q.eq('projectId', args.projectId)).collect();
     const jobs = await ctx.db.query('syncOutbox').withIndex('by_project', q => q.eq('projectId', args.projectId)).collect();
+    const removals = await ctx.db.query('destinationRemovals').withIndex('by_project', q => q.eq('projectId', args.projectId)).collect();
     const latestGenerations = new Map<string, number>();
     for (const job of jobs) {
       const key = `${job.connectionId}/${job.versionId}`;
       latestGenerations.set(key, Math.max(latestGenerations.get(key) ?? 0, job.consentGeneration));
     }
-    return { connections, batches: batches.map(({ reservationJson: _reservation, reactivationJson: _reactivation, requestFingerprint: _fingerprint, attemptToken: _token, leaseUntil: _lease, ...batch }) => batch), items: jobs.map(job => {
+    return { connections, removals:removals.map(job => ({versionId:job.sourceVersionId,state:job.state,attempts:job.attempts,lastError:job.lastError})), batches: batches.map(({ reservationJson: _reservation, reactivationJson: _reactivation, requestFingerprint: _fingerprint, attemptToken: _token, leaseUntil: _lease, ...batch }) => batch), items: jobs.map(job => {
       const payload = JSON.parse(job.payloadJson);
       return { id: job._id, batchId: job.batchId, connectionId: job.connectionId, versionId: job.versionId,
         state: job.state, consentGeneration: job.consentGeneration, attempts: job.attempts, lastError: job.lastError,

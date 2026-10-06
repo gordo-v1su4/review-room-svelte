@@ -319,6 +319,13 @@ const applicationTables = {
     createdAt: v.number(),
   }),
 
+  destinationRemovals: defineTable({
+    projectId: v.string(), sourceAssetId: v.string(), sourceVersionId: v.string(), consentGeneration: v.number(),
+    state: v.union(v.literal('queued'), v.literal('sending'), v.literal('complete')),
+    attempts: v.number(), nextAttemptAt: v.number(), leaseUntil: v.optional(v.number()), attemptToken: v.optional(v.string()), lastError: v.optional(v.string()),
+    createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_source_version', ['sourceVersionId']).index('by_project', ['projectId']),
+
   destinationConnections: defineTable({
     destinationKey: v.string(), projectId: v.id('projects'), folderId: v.optional(v.id('projectFolders')),
     targetRunId: v.string(), createdBy: v.id('appUsers'), createdAt: v.number(), updatedAt: v.number(),
@@ -341,7 +348,7 @@ const applicationTables = {
     targetState: v.optional(v.string()), targetConsentGeneration: v.optional(v.number()),
     createdAt: v.number(), updatedAt: v.number(),
   }).index('by_batch', ['batchId']).index('by_connection', ['connectionId'])
-    .index('by_source_version', ['connectionId', 'versionId']).index('by_project', ['projectId']),
+    .index('by_source_version', ['connectionId', 'versionId']).index('by_project', ['projectId']).index('by_version', ['versionId']),
 
   publicationGrants: defineTable({
     destinationKey: v.literal('trailer-feed'),

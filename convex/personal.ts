@@ -1,4 +1,5 @@
 import { purgeDependencyBatch } from './lib/archivePurge';
+import { sourceDeleted } from './destinationRemovals';
 import { parseVersionMetadata, writeVersionMetadata } from './lib/versionMetadata';
 import { importedMediaMetadata } from './lib/sourceImport';
 import { v, ConvexError } from "convex/values";
@@ -122,6 +123,7 @@ async function deleteOwnedAssets(ctx: MutationCtx, projectId: Id<'projects'>, as
       const jobs=await ctx.db.query('mediaJobs').withIndex('by_asset',q=>q.eq('assetId',asset._id)).collect();
       if(!allowArchived && (jobs.some(job=>job.status==='queued'||job.status==='running') || asset.processingStatus==='uploading'||asset.processingStatus==='processing')) throw new Error('Processing in progress');
       const versions=await ctx.db.query('assetVersions').withIndex('by_asset',q=>q.eq('assetId',asset._id)).collect();
+      await sourceDeleted(ctx, asset, versions);
       for(const key of [asset.storageKey,asset.thumbnailKey,asset.spriteKey,...versions.flatMap(version=>[version.originalKey,version.posterKey]),...jobs.flatMap(job=>[job.thumbnailKey,job.spriteKey])]) if(key) keys.add(key);
       const publications=await ctx.db.query('publications').withIndex('by_asset',q=>q.eq('assetId',asset._id)).collect();
       for(const publication of publications) {publicationIds.add(publication._id); await ctx.db.delete(publication._id);}
