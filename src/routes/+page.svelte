@@ -222,6 +222,7 @@
   let metadataSaves = $state<Record<string, MetadataSaveState>>({});
   function updateAsset(id: string, fields: Partial<Pick<LocalAsset, 'assetClass' | 'assetCode' | 'tags' | 'duration' | 'width' | 'height' | 'fps' | 'codec' | 'metadata'>>) {
     const asset = media.find(item => item.id === id);
+    if (fields.metadata && asset?.versionId && metadataSaves[asset.versionId]?.busy) return;
     if (fields.metadata && asset?.versionId) metadataSaves[asset.versionId] = { busy: false, message: 'Unsaved changes' };
     media = media.map(asset => asset.id === id ? { ...asset, ...fields } : asset);
   }
@@ -982,7 +983,7 @@
             <Tabs.Content value="notes">
           <ReviewNotes showHeader={false} comments={active.comments} draft={active.draft.body} time={active.draft.body && active.draft.timecodeSec !== null ? active.draft.timecodeSec : currentTime} isVideo={active.type === 'video'} pinTime={active.draft.body ? active.draft.timecodeSec !== null : pinTime} onPinTime={value => { pinTime = value; review({type:'draft',assetId:active.id,body:active.draft.body,timecodeSec:value && active.type === 'video' ? currentTime : null}); }} onDraft={updateDraft} onPublish={comment} onSeek={time => player?.seek(time)} onComplete={commentId => review({type:'toggle-comment-complete',assetId:active.id,commentId,actorId:'local-reviewer',at:Date.now()})} onReact={(commentId,emoji) => review({type:'toggle-comment-reaction',assetId:active.id,commentId,actorId:'local-reviewer',emoji})}/>
           </Tabs.Content>
-            <Tabs.Content value="fields"><AssetDetails asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onSave={live ? saveVersionMetadata : undefined} {referenceImages}/></Tabs.Content>
+            <Tabs.Content value="fields"><AssetDetails asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onSave={live ? saveVersionMetadata : undefined} saveState={metadataSaves[active.versionId ?? active.id]} {referenceImages}/></Tabs.Content>
           </Tabs.Root>
         </section>{/if}
       {/snippet}
