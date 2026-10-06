@@ -56,6 +56,18 @@ test('production notes and custom creative fields survive a version metadata sav
   expect(view.versions.find(version => version._id === versions[1])!.creativeMetadata).toEqual(metadata);
 });
 
+test('custom field identities use the same trimmed form for persistence and duplicate detection', async () => {
+  const { t, versions } = await fixture();
+  await t.mutation(internal.personal.updateVersionMetadata, { versionId: versions[0], metadata: {
+    model: '', prompt: '', sourceLabel: '', referenceImageVersionIds: [], releaseDate: '',
+    customFields: [{ id: ' seed ', label: 'Seed', kind: 'number', value: 7 }, { id: 'date', label: 'Date', kind: 'date', value: '' }],
+  } });
+  const view = await t.query(internal.personal.versionDetails, { versionId: versions[0] });
+  expect(view?.metadata?.customFields?.[0].id).toBe('seed');
+  expect(view?.metadata?.releaseDate).toBe('');
+  expect(view?.metadata?.customFields?.[1].value).toBe('');
+});
+
 test('metadata rejects invalid dates and duplicate custom field identities without replacing saved notes', async () => {
   const { t, versions } = await fixture();
   const metadata = { model: '', prompt: '', sourceLabel: '', referenceImageVersionIds: [], notes: 'Retained' };

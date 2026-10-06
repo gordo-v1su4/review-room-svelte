@@ -31,7 +31,8 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
     const code = data && typeof data === 'object' && 'code' in data ? data.code : null;
     if (code === 'METADATA_CONFLICT') throw error(409, 'Metadata changed in another session. Reload before saving; your draft has been retained.');
     if (code === 'VERSION_UNAVAILABLE') throw error(404, 'Version unavailable');
-    if (code === 'INVALID_VERSION_METADATA' || code === 'IMAGE_REFERENCE_UNAVAILABLE') throw error(400, 'Could not save version metadata. Check the fields and image references.');
+    if (code === 'INVALID_VERSION_METADATA') throw error(400, data && typeof data === 'object' && 'message' in data && typeof data.message === 'string' ? data.message : 'Invalid creative metadata');
+    if (code === 'IMAGE_REFERENCE_UNAVAILABLE') throw error(400, 'Could not save version metadata. Check the image references.');
     throw cause;
   }
 };
