@@ -23,6 +23,7 @@ import type * as lib_passwordReset from "../lib/passwordReset.js";
 import type * as lib_personalCommands from "../lib/personalCommands.js";
 import type * as lib_reviewAccess from "../lib/reviewAccess.js";
 import type * as lib_sourceImport from "../lib/sourceImport.js";
+import type * as lib_versionMetadata from "../lib/versionMetadata.js";
 import type * as mediaJobs from "../mediaJobs.js";
 import type * as personal from "../personal.js";
 import type * as projects from "../projects.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   "lib/personalCommands": typeof lib_personalCommands;
   "lib/reviewAccess": typeof lib_reviewAccess;
   "lib/sourceImport": typeof lib_sourceImport;
+  "lib/versionMetadata": typeof lib_versionMetadata;
   mediaJobs: typeof mediaJobs;
   personal: typeof personal;
   projects: typeof projects;

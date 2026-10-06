@@ -43,6 +43,8 @@
   import StillViewer from '$lib/components/StillViewer.svelte';
   import { annotationsEqual } from '$lib/annotations';
   import MediaCards from '$lib/components/MediaCards.svelte';
+  import { normalizeCreativeMetadata, type MetadataSaveState } from '$lib/asset-metadata';
+  import { displayVersionMetadata, versionedSourceFile, type ImportedVersionMetadata } from '$lib/version-metadata-display';
   import MetadataSheet from '$lib/components/MetadataSheet.svelte';
   import AssetDetails from '$lib/components/AssetDetails.svelte';
   import SelectionBar from '$lib/components/SelectionBar.svelte';
@@ -72,6 +74,7 @@
   const live = !!data.snapshot;
   let media = $state<ReviewAsset[]>([]);
   let processing = $state.raw<ProcessingUpdate[]>([]);
+  let importedMetadata = $state.raw<ImportedVersionMetadata[]>([]);
   let processingObserver: ReturnType<typeof observeProcessing> | undefined;
   let session = $state.raw(createReviewSession([]));
   // This owner role is for device-local review only, never live authorization.
@@ -139,6 +142,7 @@
   const defaultFilters = (): WorkspaceFilterState => ({ search: '', statuses: [], assetClasses: [], tags: [], selectedOnly: false, minRating: 0, hasComments: false, sort: 'newest', groupBy: 'none' });
   let filters = $state<WorkspaceFilterState>(defaultFilters());
   const isProjectRoot = $derived(!activeFolderId && !activeCollectionId && !archived && mediaType === 'all' && !filters.selectedOnly && !filters.statuses.length);
+  const showsProjectIdentity = $derived(!activeFolderId && !activeCollectionId && !archived);
   const filter = $derived<FilterId>(filters.selectedOnly ? 'selected' : filters.statuses.length === 1 ? filters.statuses[0] : 'all');
   let appearance = $state<AppearanceValue>(normalizeAppearance(null));
   let appearancePreferences: ReturnType<typeof createAppearancePreferences> | undefined;
@@ -159,6 +163,12 @@
       if (asset.poster?.startsWith('blob:')) URL.revokeObjectURL(asset.poster);
     }
     media = media.filter(asset => !removed.has(asset.id));
+    for (const [versionId, draft] of versionDrafts) if (removed.has(draft.assetId)) versionDrafts.delete(versionId);
+    for (const version of knownVersions) if (removed.has(version.assetId)) {
+      versionReads.get(version.id)?.abort(); versionReads.delete(version.id); delete metadataSaves[version.id];
+    }
+    knownVersions = knownVersions.filter(version => !removed.has(version.assetId));
+    for (const id of removed) delete selectedVersions[id];
     processing = processing.filter(asset => !removed.has(asset.assetId));
     session = { ...session, assets: Object.fromEntries(Object.entries(session.assets).filter(([id]) => !removed.has(id))) };
     checked = transitionSelection(checked, { type:'reconcile', allIds:media.map(asset => asset.id) });
@@ -218,9 +228,134 @@
     const ids = new Set(checked.ids.filter(id => visibleIds.includes(id)));
     media = media.map(asset => ids.has(asset.id) ? { ...asset, tags: updateTags(asset.tags, tags, mode) } : asset);
   }
+  let metadataSaves = $state<Record<string, MetadataSaveState>>({});
   function updateAsset(id: string, fields: Partial<Pick<LocalAsset, 'assetClass' | 'assetCode' | 'tags' | 'duration' | 'width' | 'height' | 'fps' | 'codec' | 'metadata'>>) {
+    const asset = media.find(item => item.id === id);
+    if (fields.metadata && asset?.versionId && metadataSaves[asset.versionId]?.busy) return;
+    if (fields.metadata && asset?.versionId) {
+      metadataSaves[asset.versionId] = { busy: false, message: 'Unsaved changes' };
+      selectedVersions[id] = asset.versionId;
+      versionDrafts.set(asset.versionId, { assetId: id, metadata: fields.metadata, metadataUpdatedAt: asset.metadataUpdatedAt ?? null });
+    }
     media = media.map(asset => asset.id === id ? { ...asset, ...fields } : asset);
   }
+  type VersionDetails = { id: string; assetId: string; version: number; processingState: string; hasPoster: boolean; sizeBytes: number; mimeType: string; metadata: unknown; metadataUpdatedAt: number | null };
+  function metadataForVersion(version: Pick<VersionDetails, 'id' | 'assetId' | 'metadata'>) {
+    return displayVersionMetadata(version.metadata, importedMetadata, version.assetId, version.id, knownVersions);
+  }
+  let knownVersions = $state.raw<VersionDetails[]>([]);
+  let selectedVersions = $state<Record<string, string>>({});
+  const versionDrafts = new Map<string, { assetId: string; metadata: ReviewAsset['metadata']; metadataUpdatedAt: number | null }>();
+  const versionReads = new Map<string, AbortController>();
+  async function refreshVersion(versionId: string, refreshMetadata = false, discardDraft = false) {
+    if (metadataSaves[versionId]?.busy) return;
+    if (versionReads.has(versionId)) {
+      if (!refreshMetadata) return;
+      versionReads.get(versionId)?.abort(); versionReads.delete(versionId);
+    }
+    const controller = new AbortController();
+    versionReads.set(versionId, controller);
+    const previousSaveState = metadataSaves[versionId];
+    if (discardDraft) metadataSaves[versionId] = { busy: true, conflict: true, message: 'Reloading latest metadata…' };
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch('/api/owner-version-metadata?versionId=' + encodeURIComponent(versionId), { signal: controller.signal });
+      if (response.status === 404 && !controller.signal.aborted) {
+        media = media.map(item => item.versionId === versionId ? { ...item, url: '', poster: undefined, availability: 'error' } : item);
+      }
+      if (!response.ok) throw new Error('Could not refresh this version.');
+      const version: VersionDetails = await response.json();
+      if (controller.signal.aborted || version.id !== versionId || !media.some(item => item.id === version.assetId)) return;
+      knownVersions = [...knownVersions.filter(item => item.id !== versionId), version];
+      if (discardDraft) {
+        versionDrafts.delete(versionId);
+        metadataSaves[versionId] = { busy: false, message: 'Reloaded latest metadata' };
+      }
+      const draft = versionDrafts.get(versionId);
+      const update = processing.find(item => item.assetId === version.assetId && item.versionId === versionId);
+      media = media.map(item => item.id === version.assetId && item.versionId === versionId ? { ...item,
+        metadata: draft ? draft.metadata : refreshMetadata || item.metadata === undefined ? metadataForVersion(version) : item.metadata,
+        metadataUpdatedAt: draft ? draft.metadataUpdatedAt : refreshMetadata || item.metadata === undefined ? version.metadataUpdatedAt : item.metadataUpdatedAt,
+        size: version.sizeBytes, sourceFile: versionedSourceFile(item.sourceFile, version.mimeType),
+        type: version.mimeType.startsWith('image/') ? 'image' : 'video',
+        url: version.processingState === 'ready' ? item.url || '/api/owner-media/' + item.id + '?versionId=' + versionId : '',
+        poster: version.hasPoster && version.processingState === 'ready' ? item.poster || '/api/owner-poster/' + item.id + '?versionId=' + versionId : undefined,
+        availability: version.processingState === 'ready' ? 'ready' : version.processingState === 'error' ? 'error' : 'running',
+        ...(update?.ready ? { duration: update.duration, width: update.width, height: update.height } : {}),
+      } : item);
+    } catch (cause) {
+      if (!controller.signal.aborted && media.some(item => item.versionId === versionId)) feedback = cause instanceof Error ? cause.message : 'Could not refresh this version.';
+    } finally {
+      clearTimeout(timeout);
+      if (versionReads.get(versionId) === controller) versionReads.delete(versionId);
+      if (discardDraft && metadataSaves[versionId]?.busy) metadataSaves[versionId] = previousSaveState ?? { busy: false, message: '' };
+    }
+  }
+  function selectAssetVersion(id: string, versionId: string) {
+    selectedVersions[id] = versionId;
+    if (versionId === '__current__') {
+      const current = processing.find(item => item.assetId === id)?.versionId;
+      if (!current) return;
+      versionId = current;
+    }
+    const asset = media.find(item => item.id === id);
+    const version = knownVersions.find(item => item.id === versionId && item.assetId === id);
+    if (!asset || !version) return;
+    player?.pause();
+    const draft = versionDrafts.get(versionId);
+    media = media.map(item => item.id === id ? { ...item,
+      versionId, metadataUpdatedAt: draft ? draft.metadataUpdatedAt : version.metadataUpdatedAt ?? null,
+      metadata: draft ? draft.metadata : metadataForVersion(version),
+      url: version.processingState === 'ready' ? '/api/owner-media/' + id + '?versionId=' + versionId : '',
+      poster: version.hasPoster && version.processingState === 'ready' ? '/api/owner-poster/' + id + '?versionId=' + versionId : undefined,
+      availability: version.processingState === 'ready' ? 'ready' : version.processingState === 'error' ? 'error' : 'running',
+      size: version.sizeBytes, sourceFile: versionedSourceFile(item.sourceFile, version.mimeType),
+      type: version.mimeType.startsWith('image/') ? 'image' : 'video',
+      duration: undefined, width: undefined, height: undefined, fps: undefined, codec: undefined,
+    } : item);
+    void refreshVersion(versionId, true);
+  }
+  async function saveVersionMetadata(id: string) {
+    const asset = media.find(item => item.id === id);
+    if (!asset?.versionId) throw new Error('Select a persisted version before saving.');
+    const versionId = asset.versionId;
+    if (metadataSaves[versionId]?.busy) return;
+    versionReads.get(versionId)?.abort(); versionReads.delete(versionId);
+    versionDrafts.set(versionId, { assetId: id, metadata: asset.metadata, metadataUpdatedAt: asset.metadataUpdatedAt ?? null });
+    metadataSaves[versionId] = { busy: true, message: '' };
+    let conflict = false;
+    try {
+      const metadata = normalizeCreativeMetadata(asset.metadata);
+      const response = await fetch('/api/owner-version-metadata', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ versionId, expectedUpdatedAt: asset.metadataUpdatedAt ?? null,
+          metadata }),
+      });
+      const result = await response.json();
+      conflict = response.status === 409;
+      if (!response.ok) throw new Error(result.message ?? 'Could not save version metadata. Your draft is retained.');
+      versionReads.get(versionId)?.abort(); versionReads.delete(versionId);
+      versionDrafts.delete(versionId);
+      knownVersions = knownVersions.map(item => item.id === versionId ? { ...item, metadata, metadataUpdatedAt: result.updatedAt } : item);
+      media = media.map(item => item.id === id && item.versionId === versionId ? { ...item, metadataUpdatedAt: result.updatedAt } : item);
+      metadataSaves[versionId] = { busy: false, message: 'Saved' };
+    } catch (cause) {
+      metadataSaves[versionId] = { busy: false, conflict, message: cause instanceof Error ? cause.message : 'Could not save. Your draft is retained.' };
+      throw cause;
+    }
+  }
+  async function reloadVersionMetadata(id: string) {
+    const versionId = media.find(item => item.id === id)?.versionId;
+    if (versionId) await refreshVersion(versionId, true, true);
+  }
+  const referenceImages = $derived.by(() => {
+    const projectImages = new Map((data.snapshot?.assets ?? []).filter(item => item.projectId === projectId).map(item => [item._id, item]));
+    return (data.snapshot?.versions ?? []).flatMap(version => {
+      const image = projectImages.get(version.assetId);
+      if (!image || version.processingState !== 'ready' || !version.mimeType.startsWith('image/')) return [];
+      return [{ versionId: version._id, label: (image.assetCode ?? image.title) + ' · V' + version.version, url: '/api/owner-media/' + image._id + '?versionId=' + version._id }];
+    });
+  });
   const approved = $derived(assets.filter(a => a.status === 'approved').length);
   async function ownerAction(action: string, fields: Record<string, string | readonly string[]>, reload = true) {
     const form = new FormData();
@@ -700,6 +835,9 @@
   }
   onMount(() => {
     if (data.snapshot) {
+      knownVersions = data.snapshot.versions.map(version => ({ id: version._id, assetId: version.assetId, version: version.version,
+        processingState: version.processingState, hasPoster: !!version.posterKey, sizeBytes: version.sizeBytes,
+        mimeType: version.mimeType, metadata: version.creativeMetadata ?? null, metadataUpdatedAt: version.metadataUpdatedAt ?? null }));
       processing = data.snapshot.assets.map(item => {
         const job = data.snapshot.mediaJobs.find(job => job.assetId === item._id && job.versionId === item.currentVersionId);
         const version = data.snapshot.versions.find(version => version._id === item.currentVersionId);
@@ -714,21 +852,25 @@
         placements: Object.fromEntries(data.snapshot.assets.map(asset => [asset._id,
           { projectId: asset.projectId, ...(asset.folderId ? { folderId: asset.folderId } : {}) }]))
       };
-      const importedByAsset = new Map(data.snapshot.importedMetadata.map(item => [item.assetId, item]));
+      importedMetadata = data.snapshot.importedMetadata;
       const processingByAsset = new Map(processing.map(item => [item.assetId, item]));
       const fromServer = data.snapshot.assets.map(item => ({
         id: item._id, projectId: item.projectId, name: item.assetCode ?? item.title,
         url: processingSource(processingByAsset.get(item._id)!), type: item.mimeType?.startsWith('image/') ? 'image' as const : 'video' as const,
         poster: processingPoster(processingByAsset.get(item._id)!),
         availability: processingAvailability(processingByAsset.get(item._id)!),
-        duration: item.durationSec, width: item.width, height: item.height,
+        ...(processingByAsset.get(item._id)?.ready ? { duration: item.durationSec, width: item.width, height: item.height } : {}),
         size: item.sizeBytes ?? 0, sourceFile: { name: item.originalFilename ?? item.title, type: item.mimeType ?? 'video/mp4' },
         assetClass: item.mimeType?.startsWith('image/') ? 'IMG' as const : 'VID' as const, importedAt: item.uploadedAt,
         tags: item.tags, assetCode: item.assetCode ?? '',
-        metadata: (() => {
-          const imported = importedByAsset.get(item._id);
-          return imported ? { notes: imported.label ? `Original title: ${imported.label}` : '', prompt: imported.prompt ?? '', model: imported.model ?? '', releaseDate: '', releasePlatforms: [], customFields: [] } : undefined;
-        })()
+        versionId: item.currentVersionId, metadataUpdatedAt: data.snapshot.versions.find(version => version._id === item.currentVersionId)?.metadataUpdatedAt ?? null,
+        metadata: displayVersionMetadata(
+          data.snapshot.versions.find(version => version._id === item.currentVersionId)?.creativeMetadata ?? null,
+          importedMetadata,
+          item._id,
+          item.currentVersionId,
+          knownVersions,
+        )
       }));
       session = createReviewSession(data.snapshot.assets.map(item => ({
         id: item._id, status: item.status as VideoStatus,
@@ -742,7 +884,7 @@
       media = fromServer;
       processingObserver = observeProcessing(() => processing
         .filter(item => !item.ready || item.assetId === activeId).map(item => item.assetId), applyProcessing);
-      return () => processingObserver?.stop();
+      return () => { processingObserver?.stop(); for (const controller of versionReads.values()) controller.abort(); };
     }
   });
   function applyProcessing(updates: ProcessingUpdate[]) {
@@ -753,11 +895,20 @@
           (update.versionId === previous.versionId && update.updatedAt < previous.updatedAt) ||
           (previous.job?._id === update.job?._id && (update.job?.attempt ?? 0) < (previous.job?.attempt ?? 0))) continue;
       processing = processing.map(item => item.assetId === update.assetId ? update : item);
+      const displayed = media.find(item => item.id === update.assetId);
+      if ((!selectedVersions[update.assetId] || selectedVersions[update.assetId] === '__current__') && (displayed?.versionId ?? null) !== update.versionId) {
+        media = media.map(item => item.id === update.assetId ? { ...item, versionId: update.versionId ?? undefined, metadata: undefined,
+          metadataUpdatedAt: null, duration: undefined, width: undefined, height: undefined, fps: undefined, codec: undefined } : item);
+      }
       media = media.map(item => item.id === update.assetId ? { ...item,
-        url: processingSource(update), poster: processingPoster(update),
-        availability: processingAvailability(update),
-        duration: update.duration ?? item.duration, width: update.width ?? item.width,
-        height: update.height ?? item.height } : item);
+        ...((item.versionId ?? null) === update.versionId ? {
+          url: processingSource(update), poster: processingPoster(update), availability: processingAvailability(update),
+          ...(update.ready ? { duration: update.duration ?? item.duration, width: update.width ?? item.width,
+            height: update.height ?? item.height } : {})
+        } : {}) } : item);
+      if (update.versionId && !knownVersions.some(version => version.id === update.versionId)) void refreshVersion(update.versionId);
+      const selected = media.find(item => item.id === activeId && item.id === update.assetId);
+      if (selected?.versionId) void refreshVersion(selected.versionId);
     }
   }
   onMount(() => {
@@ -847,7 +998,7 @@
       <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each ancestors as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if (focusedReview || mediaType !== 'all' || filter === 'selected' || activeCollectionId || archived)}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId && locationName !== project.name}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot}/>{/if}<div class="header-account-tools">{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
     </header>
     <div class="page-content folder-workspace">
-      <section class="project-heading" class:identity-banner={isProjectRoot && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if isProjectRoot && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{locationName}</h1>{#if isProjectRoot}<p class="subtitle" title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description || "Choose a folder to start reviewing."}</p>{/if}</div><div class="project-tools"><ImportQueue jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} folderLabels={folderDestinations} onMoveFolder={moveFolder} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
+      <section class="project-heading" class:identity-banner={showsProjectIdentity && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if showsProjectIdentity && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{locationName}</h1>{#if project.archived || project.clientName || project.description}<p class="subtitle" class:subtitle-placeholder={!isProjectRoot} aria-hidden={!isProjectRoot} title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description}</p>{/if}</div><div class="project-tools"><ImportQueue jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} folderLabels={folderDestinations} onMoveFolder={moveFolder} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
       {#if feedback}<div class="notice" role="status">{feedback}<button class="icon-button" aria-label="Dismiss message" onclick={() => feedback = ''}><X size={16}/></button></div>{/if}
       {#if project.archived}<section class="archived-project-state" aria-label="Archived project">
         <h2>This project is archived.</h2><p>Your media, folders and feedback are retained.</p>
@@ -914,7 +1065,7 @@
         </section>
       {/snippet}
       {#snippet viewer()}
-        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><div class="review-view-controls">{#if focusedReview}<button class="icon-button" aria-label="Notes & info" title="Notes & info" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={18}/></button>{/if}<button class="icon-button" aria-label={focusedReview ? "Return to folder" : "Expand review"} title={focusedReview ? "Return to folder (Esc)" : "Expand review"} onclick={() => focusedReview ? void returnToFolder() : focusedReview = true}>{#if focusedReview}<Minimize2 size={18}/>{:else}<Maximize2 size={18}/>{/if}</button><button class="icon-button" aria-label="Close review" title="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div></div>
+        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><div class="review-view-controls">{#if live && active.versionId}<select aria-label="Asset version" value={selectedVersions[active.id] ?? "__current__"} onchange={event => selectAssetVersion(active.id, event.currentTarget.value)}><option value="__current__">Latest version</option>{#each knownVersions.filter(version => version.assetId === active.id).sort((a, b) => a.version - b.version) as version (version.id)}<option value={version.id}>V{version.version}</option>{/each}</select>{/if}{#if focusedReview}<button class="icon-button" aria-label="Notes & info" title="Notes & info" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={18}/></button>{/if}<button class="icon-button" aria-label={focusedReview ? "Return to folder" : "Expand review"} title={focusedReview ? "Return to folder (Esc)" : "Expand review"} onclick={() => focusedReview ? void returnToFolder() : focusedReview = true}>{#if focusedReview}<Minimize2 size={18}/>{:else}<Maximize2 size={18}/>{/if}</button><button class="icon-button" aria-label="Close review" title="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div></div>
           {#if activeMediaJob}<div class="media-job" role="status"><span>Processing: {activeMediaJob.status === 'ready' ? 'Ready' : activeMediaJob.status === 'error' ? 'Needs attention' : activeMediaJob.status === 'queued' ? 'Queued' : `${activeMediaJob.stage} in progress`}</span>{#if activeMediaJob.runId}<a href={`https://trigger.v1su4.dev/orgs/v1su4-91d9/projects/review-room-YXaz/env/prod/runs/${activeMediaJob.runId}`} target="_blank" rel="noopener noreferrer">Run {activeMediaJob.runId.slice(-8)}</a>{/if}{#if activeMediaJob.status === 'error' || (activeMediaJob.status === 'queued' && !activeMediaJob.runId)}<button onclick={() => retryMediaJob(activeMediaJob._id)}>{activeMediaJob.status === 'error' ? 'Retry' : 'Start processing'}</button>{:else if activeMediaJob.status === 'running'}<button onclick={() => processingObserver?.refresh()}>Refresh</button>{/if}</div>{/if}
           {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={reviewEnded} loop={!preview && reviewPlaybackMode === 'loop'} onfailure={previewFailed} sourceBlob={active.sourceFile instanceof File ? active.sourceFile : undefined} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} availability={active.availability ?? 'ready'} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
               canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => { updateAsset(active.id, info); readySource = active.url; }}/>{/if}
@@ -926,12 +1077,12 @@
           <Tabs.Root value={compactInspector ? 'notes' : inspectorTab} onValueChange={value => { if (!compactInspector) inspectorTab = value; }}>
             <div class="inspector-heading">
               <Tabs.List class="inspector-tabs" aria-label="Asset inspector panels"><Tabs.Trigger value="notes" bind:ref={notesTrigger}>Notes <span>{active.comments.length}</span></Tabs.Trigger>{#if !compactInspector}<Tabs.Trigger value="fields">Fields</Tabs.Trigger>{/if}</Tabs.List>
-              <MetadataSheet asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onOpen={stopPreview} onDesktopClose={() => notesTrigger?.focus()}/>
+              <MetadataSheet asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onSave={live ? saveVersionMetadata : undefined} onReload={live ? reloadVersionMetadata : undefined} saveState={metadataSaves[active.versionId ?? active.id]} {referenceImages} onOpen={stopPreview} onDesktopClose={() => notesTrigger?.focus()}/>
             </div>
             <Tabs.Content value="notes">
           <ReviewNotes showHeader={false} comments={active.comments} draft={active.draft.body} time={active.draft.body && active.draft.timecodeSec !== null ? active.draft.timecodeSec : currentTime} isVideo={active.type === 'video'} pinTime={active.draft.body ? active.draft.timecodeSec !== null : pinTime} onPinTime={value => { pinTime = value; review({type:'draft',assetId:active.id,body:active.draft.body,timecodeSec:value && active.type === 'video' ? currentTime : null}); }} onDraft={updateDraft} onPublish={comment} onSeek={time => player?.seek(time)} onComplete={commentId => review({type:'toggle-comment-complete',assetId:active.id,commentId,actorId:'local-reviewer',at:Date.now()})} onReact={(commentId,emoji) => review({type:'toggle-comment-reaction',assetId:active.id,commentId,actorId:'local-reviewer',emoji})}/>
           </Tabs.Content>
-            <Tabs.Content value="fields"><AssetDetails asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset}/></Tabs.Content>
+            <Tabs.Content value="fields"><AssetDetails asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onSave={live ? saveVersionMetadata : undefined} onReload={live ? reloadVersionMetadata : undefined} saveState={metadataSaves[active.versionId ?? active.id]} {referenceImages}/></Tabs.Content>
           </Tabs.Root>
         </section>{/if}
       {/snippet}
@@ -982,6 +1133,7 @@
   .project-heading { position: relative; isolation: isolate; }
   .project-heading-copy { min-width: 0; }
   .project-heading-copy .subtitle { max-width: 52ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .project-heading-copy .subtitle-placeholder { visibility: hidden; }
   .identity-banner { padding: 16px; border-radius: 8px; background: color-mix(in srgb, var(--project-accent) 18%, #030605); }
   .project-banner { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; opacity: .2; border-radius: inherit; pointer-events: none; }
 </style>

@@ -1,14 +1,8 @@
-import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import type { Id } from '../../../../../convex/_generated/dataModel';
 import { requireOwner } from '$lib/server/owner-auth';
-import { db, mediaResponse, personal } from '$lib/server/personal';
+import { ownerMediaResponse } from '$lib/server/owner-media';
 
-export const GET: RequestHandler = async ({ params, cookies, request }) => {
+export const GET: RequestHandler = async ({ params, cookies, request, url }) => {
   requireOwner(cookies);
-  const media = await db().query(personal.ownerMedia, {
-    assetId: params.assetId as Id<'videos'>, poster: true
-  });
-  if (!media?.key) throw error(404, 'Poster unavailable');
-  return await mediaResponse(media.key, 'image/jpeg', request);
+  return ownerMediaResponse(params.assetId, true, url, request);
 };

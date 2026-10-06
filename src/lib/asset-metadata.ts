@@ -1,10 +1,14 @@
-/** Device-local production metadata. Live adapters must validate authorization and persist separately. */
+/** Creative fields are version-scoped in live workspaces; fixture adapters remain local. */
 export type CustomMetadataField = { id: string; label: string } & (
   | { kind: 'text' | 'date'; value: string }
   | { kind: 'number'; value: number | null }
   | { kind: 'boolean'; value: boolean | null }
 );
 export type CreativeMetadata = {
+  sourceLabel?: string;
+  sourceCreatedAt?: number;
+  gridImageVersionId?: string;
+  referenceImageVersionIds?: string[];
   notes: string;
   prompt: string;
   model: string;
@@ -18,6 +22,10 @@ export type AssetMetadataPatch = {
   tags?: string[];
   metadata?: CreativeMetadata;
 };
+export type VersionImageOption = { versionId: string; label: string; url: string };
+export type MetadataSaveState = { busy: boolean; message: string; conflict?: boolean };
+export const CREATIVE_MODEL_PRESETS = ['Seedance 2.0', 'Seedance 2.5', 'Sora 2', 'MiniMax H3', 'Kling', 'Veo 3'] as const;
+export type NormalizedCreativeMetadata = CreativeMetadata & { sourceLabel: string; referenceImageVersionIds: string[] };
 export type MetadataGroup = 'essentials' | 'review' | 'file' | 'tags' | 'creative';
 export type MetadataField = { id: string; label: string; group: MetadataGroup; value: string | number | boolean | null | undefined; filled?: boolean };
 export type MetadataFilter = { group: 'all' | MetadataGroup; presence: 'all' | 'empty' | 'filled'; search: string };
@@ -38,7 +46,7 @@ function dateValue(value: unknown): string {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? value : '';
 }
 
-export function normalizeCreativeMetadata(value: unknown): CreativeMetadata {
+export function normalizeCreativeMetadata(value: unknown): NormalizedCreativeMetadata {
   const input = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
   const text = (key: string) => typeof input[key] === 'string' ? input[key] as string : '';
   const ids = new Set<string>();
@@ -54,6 +62,10 @@ export function normalizeCreativeMetadata(value: unknown): CreativeMetadata {
     ids.add(field.id);
   }
   return {
+    sourceLabel: text('sourceLabel'),
+    sourceCreatedAt: typeof input.sourceCreatedAt === 'number' && Number.isFinite(input.sourceCreatedAt) ? input.sourceCreatedAt : undefined,
+    gridImageVersionId: typeof input.gridImageVersionId === 'string' && input.gridImageVersionId ? input.gridImageVersionId : undefined,
+    referenceImageVersionIds: Array.isArray(input.referenceImageVersionIds) ? [...new Set(input.referenceImageVersionIds.filter((id): id is string => typeof id === 'string' && !!id))] : [],
     notes: text('notes'), prompt: text('prompt'), model: text('model'), releaseDate: dateValue(input.releaseDate),
     releasePlatforms: normalizeTags(Array.isArray(input.releasePlatforms) ? input.releasePlatforms.filter((item): item is string => typeof item === 'string') : []),
     customFields
