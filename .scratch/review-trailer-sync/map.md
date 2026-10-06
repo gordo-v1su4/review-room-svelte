@@ -8,7 +8,7 @@ Work in the verified personal repositories. Complete each coherent chunk through
 
 ## Decisions so far
 
-- [01 — V1S-162](issues/01-v1s-162.md): library foundation deployed; originals and import metadata preserved. Authorized source reset is complete; PR review and edge-cache cleanup remain open. Project/folder media opens directly with one compact horizontal row, as clarified by the owner.
+- [01 — V1S-162](issues/01-v1s-162.md): PR #13 merged by the owner; main snapshot 8bb5154 deployed to frontend and dedicated Convex. Nested folder CRUD and compact aligned layout verified live; originals and import metadata preserved. Authorized source reset is complete. Scheduled-purge runtime verification and edge-cache cleanup remain open.
 - [02 — V1S-163](issues/02-v1s-163.md): basic agent API and portable skill verified live.
 - V1S-164 through V1S-169 implement the selected-version integration in the specification's work order. Their numbered tickets describe acceptance criteria and test seams.
 - [09 — V1S-170](issues/09-v1s-170.md): playback investigation is active. Native readiness checks passed, and a visible frame was captured for the reported clip, but the intermittent failure has not been reproduced or fixed.
