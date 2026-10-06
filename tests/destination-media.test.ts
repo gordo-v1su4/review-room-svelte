@@ -1,4 +1,4 @@
-import { test, expect } from 'bun:test';
+import { test, expect, spyOn } from 'bun:test';
 import { convexTest } from 'convex-test';
 import schema from '../convex/schema';
 import { internal } from '../convex/_generated/api';
@@ -43,4 +43,18 @@ test('destination HTTP delivery supports CORS ranges and checks revocation befor
   await t.mutation(internal.publicationGrants.revoke, { grantId: grant.grantId });
   expect((await handle(request('GET', { Range: 'bytes=2-4' }), params)).status).toBe(404);
   expect((await handle(request('GET', { 'If-None-Match': '"clip-v1"' }), params)).status).toBe(404);
+});
+
+test('HTTP expiry denies a still-cached positive database lookup before serving media', async () => {
+  // Convex may reuse a lookup whose database dependencies have not changed as time advances.
+  const handle = createDestinationMediaHandler(async () => ({ key: 'private/clip.mp4', mimeType: 'video/mp4', expiresAt: 2000 }), async () => new Response('original bytes'));
+  const now = spyOn(Date, 'now').mockReturnValue(1999);
+  const params = { slug: 'grant', versionId: 'version', variant: 'original' };
+  try {
+    expect((await handle(new Request('https://review.test/media'), params)).status).toBe(200);
+    now.mockReturnValue(2000);
+    const response = await handle(new Request('https://review.test/media', { headers: { Range: 'bytes=0-1', 'If-None-Match': '"original"' } }), params);
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe('');
+  } finally { now.mockRestore(); }
 });

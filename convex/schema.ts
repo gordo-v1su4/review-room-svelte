@@ -328,6 +328,8 @@ const applicationTables = {
     slug: v.string(),
     allowedOrigins: v.array(v.string()),
     referenceVersionIds: v.array(v.id('assetVersions')),
+    consentGeneration: v.number(),
+    lastConfirmationId: v.optional(v.string()),
     revokedAt: v.optional(v.number()),
     expiresAt: v.optional(v.number()),
     createdAt: v.number(),

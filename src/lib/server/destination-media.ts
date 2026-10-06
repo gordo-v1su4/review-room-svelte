@@ -1,5 +1,5 @@
 type ResolveArgs = { slug: string; versionId: string; variant: 'original' | 'poster'; origin?: string };
-type Lookup = (args: ResolveArgs) => Promise<{ key: string; mimeType: string } | null>;
+type Lookup = (args: ResolveArgs) => Promise<{ key: string; mimeType: string; expiresAt?: number } | null>;
 type Deliver = (request: Request, key: string, mimeType: string) => Promise<Response>;
 
 /** Authorization is deliberately outside the byte cache, including conditional responses. */
@@ -9,7 +9,7 @@ export function createDestinationMediaHandler(lookup: Lookup, deliver: Deliver) 
     if (params.variant !== 'original' && params.variant !== 'poster') return new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } });
     const origin = request.headers.get('origin') ?? undefined;
     const media = await lookup({ slug: params.slug, versionId: params.versionId, variant: params.variant, origin });
-    if (!media) return new Response(null, { status: 404, headers: { 'cache-control': 'no-store', Vary: 'Origin' } });
+    if (!media || (media.expiresAt !== undefined && media.expiresAt <= Date.now())) return new Response(null, { status: 404, headers: { 'cache-control': 'no-store', Vary: 'Origin' } });
     if (request.method === 'OPTIONS') {
       const method = request.headers.get('access-control-request-method');
       const requestedHeaders = (request.headers.get('access-control-request-headers') ?? '').toLowerCase().split(',').map(header => header.trim()).filter(Boolean);

@@ -44,6 +44,24 @@ test('owner revocation immediately denies delivery and issuance retries cannot r
   await expect(t.mutation(internal.publicationGrants.issue, consent)).rejects.toThrow('GRANT_REVOKED');
 });
 
+test('a new exact-version sync confirmation rotates consent once and stale revocation cannot disable it', async () => {
+  const { t, first } = await videoFixture();
+  const selection = { destinationKey: 'trailer-feed' as const, versionId: first, allowedOrigins: ['https://portfolio.example'] };
+  const old = await t.mutation(internal.publicationGrants.issue, selection);
+  const confirmation = { ...selection, expectedGeneration: 1, confirmationId: 'deliberate-sync-again-1' };
+  const fresh = await t.mutation(internal.publicationGrants.confirmAgain, confirmation);
+  expect(fresh.consentGeneration).toBe(2);
+  expect(fresh.slug).not.toBe(old.slug);
+  expect((await t.mutation(internal.publicationGrants.confirmAgain, confirmation)).slug).toBe(fresh.slug);
+  expect(await t.query(internal.publicationGrants.resolve, { slug: old.slug, versionId: first, variant: 'original' })).toBeNull();
+  expect((await t.query(internal.publicationGrants.resolve, { slug: fresh.slug, versionId: first, variant: 'original' }))?.key).toBe('assets/private/first.mp4');
+  await expect(t.mutation(internal.publicationGrants.revoke, { grantId: old.grantId, expectedGeneration: 1 })).rejects.toThrow('GRANT_GENERATION_CHANGED');
+  await expect(t.mutation(internal.publicationGrants.issue, selection)).rejects.toThrow('GRANT_CONSENT_CHANGED');
+  const newer = await t.mutation(internal.publicationGrants.confirmAgain, { ...confirmation, expectedGeneration: 2, confirmationId: 'deliberate-sync-again-2' });
+  expect(newer.consentGeneration).toBe(3);
+  await expect(t.mutation(internal.publicationGrants.confirmAgain, confirmation)).rejects.toThrow('GRANT_GENERATION_CHANGED');
+});
+
 test('source deletion denies a grant immediately through the normal owner deletion operation', async () => {
   const { t, project, asset, first } = await videoFixture();
   const grant = await t.mutation(internal.publicationGrants.issue, { destinationKey: 'trailer-feed', versionId: first, allowedOrigins: ['https://portfolio.example'] });
