@@ -67,7 +67,7 @@ The second-most-important component after the card. Collapsible, integrated into
 
 **Shows:** thumbnail or scrub frame; optional duration/type label; title; a Status footer with the current review state as a colored badge (Needs review / In progress / Needs changes / Approved); tags; rating; comment count; selected indicator; optional download icon. Clicking Status on the card changes the decision in place. Approved is a status, not a second control.
 
-**Hover scrub:** when a scrub sprite or preview cache exists, horizontal pointer movement over the thumbnail should seek the visible frame immediately. It should feel like FreeCut's media grid: no popover, no heavy player chrome, just quick visual inspection. Still images do not show a scrub cursor. If the preview is still processing, keep the thumbnail/processing state stable.
+**Hover scrub:** horizontal pointer movement uses the prepared ten-frame thumbnail sprite immediately. Hover never loads or seeks the original video; missing or failed sprites retain the poster until the prepared preview is available. It should feel like FreeCut's media grid: no popover, no heavy player chrome, just quick visual inspection. Still images do not show a scrub cursor. If the preview is still processing, keep the thumbnail/processing state stable.
 
 **Image markup:** still-image cards render saved drawing strokes over the thumbnail and show a small red pen indicator when markup exists. The pen opens the fullscreen markup view; the original image remains unchanged.
 
