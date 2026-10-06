@@ -1966,7 +1966,7 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 @media (max-width:760px) { .nav-reopen { display:none; } .header-account-tools { gap:4px; } }
 
 /* Shared Publish & share treatment for publishing and upload tools. */
-.publishing-sheet { width:min(480px,calc(100vw - 28px));height:min(650px,calc(100dvh - 28px));overflow:auto;padding:18px;background:color-mix(in srgb,var(--raised) 68%,transparent);backdrop-filter:blur(18px);border-color:var(--border);border-radius:10px;box-shadow:inset 0 1px #d3eee609,0 16px 50px #0006; }
+ .publishing-sheet { width:min(480px,calc(100vw - 28px));height:min(650px,calc(100dvh - 28px));overflow:auto;padding:18px;background:color-mix(in srgb,var(--raised) 68%,transparent);backdrop-filter:blur(18px);border-color:var(--border);border-radius:10px;box-shadow:inset 0 1px #d3eee609,0 16px 50px #0006; }
 .publishing-close { display:inline-flex;align-items:center;justify-content:center;flex:none;width:28px;height:28px;min-height:28px;padding:0;border:0;border-radius:5px;color:var(--muted);background:transparent;cursor:pointer; }
 .publishing-close:hover { color:var(--ink);background:var(--raised); }
 .publishing-close:focus-visible { outline:1px solid var(--accent);outline-offset:2px; }

@@ -27,7 +27,13 @@
 </Dialog.Root>
 
 <style>
+  :global(.stage-one-sheet) { width:min(480px,calc(100vw - 28px));height:min(650px,calc(100dvh - 28px));overflow:auto;padding:18px;background:color-mix(in srgb,var(--raised) 68%,transparent);backdrop-filter:blur(18px);border-color:var(--border);border-radius:10px;box-shadow:inset 0 1px #d3eee609,0 16px 50px #0006; }
   .stage-one-heading { display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:8px; }
   .stage-one-heading :global(.dialog-title) { margin:0;font-size:15px;font-weight:550; }
   .stage-one-heading :global([data-dialog-description]) { font-size:11px; }
+  :global(.publishing-close) { display:inline-flex;align-items:center;justify-content:center;flex:none;width:28px;height:28px;padding:0;border:0;border-radius:5px;color:var(--muted);background:transparent;cursor:pointer; }
+  :global(.publishing-close:hover) { color:var(--ink);background:var(--raised); }
+  :global(.publishing-close:focus-visible) { outline:1px solid var(--accent);outline-offset:2px; }
+  @media(max-width:760px) { :global(.stage-one-sheet) { width:100%;border-radius:12px 12px 0 0;padding-bottom:max(18px,env(safe-area-inset-bottom)); } }
+  @media(pointer:coarse) { :global(.publishing-close) { min-width:44px;min-height:44px; } }
 </style>

@@ -13,12 +13,14 @@
   let showcaseOrder = $state<string[]>([]);
   let showcasePick = $state('');
   let sharingTab = $state('reviews');
+  let destinationProject = $state('');
+  const destinationProjectId = $derived(destinationProject || destinationContext?.projectId || '');
   let tabReady = $state(false);
   let uploadMessage = $state('');
   let uploading = $state(false);
   const thumbnails = createThumbnailExtractor({ concurrency: 1 });
 
-  onMount(() => { sharingTab = sessionStorage.getItem('review-room.sharing-tab') ?? 'reviews'; tabReady = true; });
+  onMount(() => { const saved = sessionStorage.getItem('review-room.sharing-tab'); sharingTab = saved === 'trailer' ? 'destinations' : saved ?? 'reviews'; tabReady = true; });
   $effect(() => { if (tabReady) sessionStorage.setItem('review-room.sharing-tab', sharingTab); });
   onDestroy(() => thumbnails.dispose());
 
@@ -68,10 +70,10 @@
     <Tabs.Trigger value="reviews">Private review</Tabs.Trigger>
     <Tabs.Trigger value="embeds">Video embeds</Tabs.Trigger>
     <Tabs.Trigger value="showcase">Showcase</Tabs.Trigger>
-    {#if destinationContext}<Tabs.Trigger value="trailer">Trailer Feed</Tabs.Trigger>{/if}
+    {#if destinationContext}<Tabs.Trigger value="destinations">Destinations</Tabs.Trigger>{/if}
   </Tabs.List>
 
-  {#if destinationContext}<Tabs.Content value="trailer" class="panel"><DestinationSyncDialog embedded open={sharingTab === "trailer"} {...destinationContext}/></Tabs.Content>{/if}
+  {#if destinationContext}<Tabs.Content value="destinations" class="panel"><h2>Destinations</h2><div class="stack"><div class="field">Destination<Stage1Select label="Destination app" value="trailer-feed" items={[{value:'trailer-feed',label:'Trailer Feed'}]}/></div><div class="field">Project<Stage1Select label="Destination source project" value={destinationProjectId} items={activeProjects.map(project => ({value:project._id,label:project.title}))} onValueChange={value => destinationProject = value}/></div></div>{#key destinationProjectId}<DestinationSyncDialog embedded open={sharingTab === "destinations"} projectId={destinationProjectId} folderId={destinationProjectId === destinationContext.projectId ? destinationContext.folderId : null} selectedVersionIds={destinationProjectId === destinationContext.projectId ? destinationContext.selectedVersionIds : []}/>{/key}</Tabs.Content>{/if}
 
   {#if uploadContext}<Tabs.Content value="upload" class="panel"><h2>Upload media</h2><p class="muted">Add videos and images to this project.</p><div class="stack"><div class="field">Destination<Stage1Select label="Upload destination" value={uploadContext.folderId ?? '__root__'} items={[{value:'__root__',label:'Project root'},...uploadContext.folders.map(folder => ({value:folder.id,label:folder.title}))]} onValueChange={value => uploadContext?.onChange({folderId:value === '__root__' ? null : value,assetClass:uploadContext.assetClass})}/></div><div class="field">Image classification<Stage1Select label="Image classification" value={uploadContext.assetClass === 'VID' ? 'IMG' : uploadContext.assetClass} items={[{value:'IMG',label:'Images'},{value:'CTX',label:'Contact sheets'},{value:'STB',label:'Storyboards'}]} onValueChange={value => { if(value === 'IMG' || value === 'CTX' || value === 'STB') uploadContext?.onChange({folderId:uploadContext.folderId,assetClass:value}); }}/></div><p class="muted">Videos keep their video type. Files are saved privately to your workspace.</p><button class="primary" onclick={() => uploadContext?.onChoose()}>Choose videos and images</button></div></Tabs.Content>{/if}
 
@@ -123,7 +125,7 @@
   .row > button { justify-self:start; }
   .row.compact { padding:12px 0;border-top:1px solid var(--border); }
   label,.field { display:grid;gap:6px;min-width:0;color:var(--muted);font-size:11px; }
-  input { width:100%;min-width:0;height:34px;padding:0 9px;border:1px solid var(--border);border-radius:5px;background:var(--canvas);color:var(--ink);color-scheme:dark;font:inherit;font-size:12px; }
+  input { width:100%;min-width:0;height:28px;padding:0 9px;border:1px solid var(--border);border-radius:5px;background:var(--canvas);color:var(--ink);color-scheme:dark;font:inherit;font-size:12px; }
   button { display:inline-flex;align-items:center;justify-content:center;min-height:28px;padding:0 10px;border:1px solid var(--border);border-radius:5px;background:var(--raised);color:var(--ink);font:inherit;font-size:11px;cursor:pointer; }
   button.primary { justify-self:start;background:color-mix(in srgb,var(--accent) 22%,var(--panel)); }
   button.danger { color:var(--status-needs-changes,#e6a2a2); }
