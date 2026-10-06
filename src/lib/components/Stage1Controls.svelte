@@ -8,7 +8,7 @@
   import type { FunctionReturnType } from 'convex/server';
   import { internal } from '../../../convex/_generated/api';
   type Snapshot = FunctionReturnType<typeof internal.personal.snapshot>;
-  let { snapshot }: { snapshot: Snapshot } = $props();
+  let { snapshot, onDestination }: { snapshot: Snapshot; onDestination?: () => void } = $props();
   let showcaseOrder = $state<string[]>([]);
   let showcasePick = $state('');
   let sharingTab = $state('reviews');
@@ -66,6 +66,7 @@
     <Tabs.Trigger value="reviews">Private review</Tabs.Trigger>
     <Tabs.Trigger value="embeds">Video embeds</Tabs.Trigger>
     <Tabs.Trigger value="showcase">Showcase</Tabs.Trigger>
+    {#if onDestination}<button type="button" onclick={onDestination}>Trailer Feed</button>{/if}
   </Tabs.List>
 
   <Tabs.Content value="reviews" class="panel"><h2>Private review links</h2>
