@@ -10,7 +10,7 @@ The personal GitHub repository is connected to Linear. Include each relevant Lin
 
 ## Conventions
 
-OpenCodeReview runs automatically when a PR opens. After pushing fixes, dispatch `ocr-review.yml` against the current feature branch with `pr_number` so it reviews the current PR head. If diagnostic artifacts show primary-model rate limits, `fallback_only=true` runs the existing GLM fallback directly. The job disables the npm launcher's background updater with `OCR_NO_UPDATE=1` so the pinned CLI is not replaced during configuration/review. Failed or rate-limited reviews are not passes; inspect review results and resolve code findings before merging.
+Alibaba OpenCodeReview runs when a PR opens. The entry point calls gordo-v1su4/proxmox-home/.github/workflows/ocr-review-reusable.yml@main with the named KIMI_API_KEY secret. Dispatch ocr-review.yml with pr_number for an explicit rerun against the current open PR. The shared implementation runs a checksum-verified native CLI, streams progress, retains result artifacts, and rejects stale heads before posting. Failed or incomplete reviews are not passes. The owner merged PR #13 directly while its second run was cancelled; that run is not a review pass.
 
 - One feature per directory: `.scratch/<feature-slug>/`
 - The spec is `.scratch/<feature-slug>/spec.md`
