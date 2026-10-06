@@ -7,7 +7,7 @@
   import Stage1Controls from './Stage1Controls.svelte';
 
   type Snapshot = FunctionReturnType<typeof internal.personal.snapshot>;
-  let { snapshot, destinationContext }: { snapshot: Snapshot; destinationContext?: {projectId:string;folderId:string|null;selectedVersionIds:string[]} } = $props();
+  let { snapshot, destinationContext, uploadContext }: { snapshot: Snapshot; destinationContext?: {projectId:string;folderId:string|null;selectedVersionIds:string[]}; uploadContext?: {folders:readonly {id:string;title:string}[];folderId:string|null;assetClass:'VID'|'IMG'|'CTX'|'STB';onChange:(value:{folderId:string|null;assetClass:'VID'|'IMG'|'CTX'|'STB'})=>void;onChoose:()=>void} } = $props();
   let open = $state(false);
   onMount(() => { open = new URLSearchParams(location.search).get('sharing') === '1'; });
 </script>
@@ -21,7 +21,7 @@
         <div><Dialog.Title class="dialog-title">Publish &amp; share</Dialog.Title><Dialog.Description>Private reviews and optional published embeds</Dialog.Description></div>
         <Dialog.Close class="publishing-close" aria-label="Close publishing tools"><X size={17} /></Dialog.Close>
       </div>
-      <Stage1Controls {snapshot} destinationContext={open ? destinationContext : undefined} />
+      <Stage1Controls {snapshot} destinationContext={open ? destinationContext : undefined} uploadContext={uploadContext ? {...uploadContext,onChoose:() => { open = false; uploadContext?.onChoose(); }} : undefined} />
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>

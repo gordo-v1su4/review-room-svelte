@@ -9,7 +9,7 @@
   import type { FunctionReturnType } from 'convex/server';
   import { internal } from '../../../convex/_generated/api';
   type Snapshot = FunctionReturnType<typeof internal.personal.snapshot>;
-  let { snapshot, destinationContext }: { snapshot: Snapshot; destinationContext?: {projectId:string;folderId:string|null;selectedVersionIds:string[]} } = $props();
+  let { snapshot, destinationContext, uploadContext }: { snapshot: Snapshot; destinationContext?: {projectId:string;folderId:string|null;selectedVersionIds:string[]}; uploadContext?: {folders:readonly {id:string;title:string}[];folderId:string|null;assetClass:'VID'|'IMG'|'CTX'|'STB';onChange:(value:{folderId:string|null;assetClass:'VID'|'IMG'|'CTX'|'STB'})=>void;onChoose:()=>void} } = $props();
   let showcaseOrder = $state<string[]>([]);
   let showcasePick = $state('');
   let sharingTab = $state('reviews');
@@ -64,6 +64,7 @@
 
 <Tabs.Root bind:value={sharingTab} class="shell">
   <Tabs.List class="sharing-tabs" aria-label="Sharing options">
+    {#if uploadContext}<Tabs.Trigger value="upload">Upload</Tabs.Trigger>{/if}
     <Tabs.Trigger value="reviews">Private review</Tabs.Trigger>
     <Tabs.Trigger value="embeds">Video embeds</Tabs.Trigger>
     <Tabs.Trigger value="showcase">Showcase</Tabs.Trigger>
@@ -71,6 +72,8 @@
   </Tabs.List>
 
   {#if destinationContext}<Tabs.Content value="trailer" class="panel"><DestinationSyncDialog embedded open={sharingTab === "trailer"} {...destinationContext}/></Tabs.Content>{/if}
+
+  {#if uploadContext}<Tabs.Content value="upload" class="panel"><h2>Upload media</h2><p class="muted">Add videos and images to this project.</p><div class="stack"><div class="field">Destination<Stage1Select label="Upload destination" value={uploadContext.folderId ?? '__root__'} items={[{value:'__root__',label:'Project root'},...uploadContext.folders.map(folder => ({value:folder.id,label:folder.title}))]} onValueChange={value => uploadContext?.onChange({folderId:value === '__root__' ? null : value,assetClass:uploadContext.assetClass})}/></div><div class="field">Image classification<Stage1Select label="Image classification" value={uploadContext.assetClass === 'VID' ? 'IMG' : uploadContext.assetClass} items={[{value:'IMG',label:'Images'},{value:'CTX',label:'Contact sheets'},{value:'STB',label:'Storyboards'}]} onValueChange={value => { if(value === 'IMG' || value === 'CTX' || value === 'STB') uploadContext?.onChange({folderId:uploadContext.folderId,assetClass:value}); }}/></div><p class="muted">Videos keep their video type. Files are saved privately to your workspace.</p><button class="primary" onclick={() => uploadContext?.onChoose()}>Choose videos and images</button></div></Tabs.Content>{/if}
 
   <Tabs.Content value="reviews" class="panel"><h2>Private review links</h2>
     <form method="POST" action="/studio?/createLink" class="row"><div class="field"><span>Project</span><Stage1Select name="projectId" label="Project" items={activeProjects.map((project) => ({ value: project._id, label: project.title }))} placeholder="Choose project" required /></div><label>Passcode <input name="passcode" autocomplete="off" placeholder="Optional" /></label><div class="field"><span>Expires</span><Stage1ExpiryPicker /></div><button class="primary">Create private link</button></form>
@@ -108,7 +111,7 @@
 </Tabs.Root>
 <style>
   :global(.shell) { display:grid;gap:12px;min-width:0; }
-  :global(.sharing-tabs) { display:flex;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--border); }
+  :global(.sharing-tabs) { display:flex;flex-wrap:wrap;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--border); }
   :global(.sharing-tabs button) { display:inline-flex;align-items:center;min-height:28px;padding:0 9px;border:1px solid transparent;border-radius:4px;color:var(--muted);background:transparent;font-size:11px;white-space:nowrap; }
   :global(.sharing-tabs button[data-state='active']) { color:var(--ink);border-color:color-mix(in srgb,var(--accent) 24%,var(--border));background:color-mix(in srgb,var(--canvas) 85%,transparent); }
   :global(.panel) { min-width:0; }
