@@ -27,6 +27,7 @@ import type * as lib_versionMetadata from "../lib/versionMetadata.js";
 import type * as mediaJobs from "../mediaJobs.js";
 import type * as personal from "../personal.js";
 import type * as projects from "../projects.js";
+import type * as publicationGrants from "../publicationGrants.js";
 import type * as reviewLinks from "../reviewLinks.js";
 import type * as reviewPublic from "../reviewPublic.js";
 import type * as sourceImports from "../sourceImports.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   mediaJobs: typeof mediaJobs;
   personal: typeof personal;
   projects: typeof projects;
+  publicationGrants: typeof publicationGrants;
   reviewLinks: typeof reviewLinks;
   reviewPublic: typeof reviewPublic;
   sourceImports: typeof sourceImports;

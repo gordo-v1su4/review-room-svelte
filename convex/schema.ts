@@ -319,6 +319,18 @@ const applicationTables = {
     createdAt: v.number(),
   }),
 
+  publicationGrants: defineTable({
+    destinationKey: v.literal('trailer-feed'),
+    projectId: v.id('projects'),
+    assetId: v.id('videos'),
+    versionId: v.id('assetVersions'),
+    createdBy: v.id('appUsers'),
+    slug: v.string(),
+    allowedOrigins: v.array(v.string()),
+    createdAt: v.number(),
+  }).index('by_destination_version', ['destinationKey', 'versionId'])
+    .index('by_slug', ['slug']).index('by_project', ['projectId']),
+
   publications: defineTable({
     assetId: v.id("videos"),
     versionId: v.id("assetVersions"),

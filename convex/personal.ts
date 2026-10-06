@@ -486,7 +486,7 @@ export const revokeReviewLink = internalMutation({
   },
 });
 
-function normalizeOrigins(origins: string[]) {
+export function normalizeOrigins(origins: string[]) {
   const normalized = origins.map((value) => {
     const url = new URL(value);
     if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "localhost")) throw new Error("HTTPS origin required");
