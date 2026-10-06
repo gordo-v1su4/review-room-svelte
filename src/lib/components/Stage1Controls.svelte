@@ -3,12 +3,13 @@
   import { Tabs } from 'bits-ui';
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
   import ShowcaseEditor from '$lib/components/ShowcaseEditor.svelte';
+  import DestinationSyncDialog from './DestinationSyncDialog.svelte';
   import Stage1Select from '$lib/components/Stage1Select.svelte';
   import Stage1ExpiryPicker from '$lib/components/Stage1ExpiryPicker.svelte';
   import type { FunctionReturnType } from 'convex/server';
   import { internal } from '../../../convex/_generated/api';
   type Snapshot = FunctionReturnType<typeof internal.personal.snapshot>;
-  let { snapshot, onDestination }: { snapshot: Snapshot; onDestination?: () => void } = $props();
+  let { snapshot, destinationContext }: { snapshot: Snapshot; destinationContext?: {projectId:string;folderId:string|null;selectedVersionIds:string[]} } = $props();
   let showcaseOrder = $state<string[]>([]);
   let showcasePick = $state('');
   let sharingTab = $state('reviews');
@@ -66,8 +67,10 @@
     <Tabs.Trigger value="reviews">Private review</Tabs.Trigger>
     <Tabs.Trigger value="embeds">Video embeds</Tabs.Trigger>
     <Tabs.Trigger value="showcase">Showcase</Tabs.Trigger>
-    {#if onDestination}<button type="button" onclick={onDestination}>Trailer Feed</button>{/if}
+    {#if destinationContext}<Tabs.Trigger value="trailer">Trailer Feed</Tabs.Trigger>{/if}
   </Tabs.List>
+
+  {#if destinationContext}<Tabs.Content value="trailer" class="panel"><DestinationSyncDialog embedded open={sharingTab === "trailer"} {...destinationContext}/></Tabs.Content>{/if}
 
   <Tabs.Content value="reviews" class="panel"><h2>Private review links</h2>
     <form method="POST" action="/studio?/createLink" class="row"><div class="field"><span>Project</span><Stage1Select name="projectId" label="Project" items={activeProjects.map((project) => ({ value: project._id, label: project.title }))} placeholder="Choose project" required /></div><label>Passcode <input name="passcode" autocomplete="off" placeholder="Optional" /></label><div class="field"><span>Expires</span><Stage1ExpiryPicker /></div><button class="primary">Create private link</button></form>
