@@ -1,3 +1,4 @@
+import { parseSourceImport } from './lib/sourceImport';
 import { v } from 'convex/values';
 import { internalMutation, internalQuery } from './_generated/server';
 import { owner } from './personal';
@@ -10,11 +11,11 @@ export const save = internalMutation({
     const folder = await ctx.db.get(args.folderId);
     if (!project || project.createdBy !== profile._id || !folder || folder.projectId !== project._id) throw new Error('Import destination unavailable');
     if (args.sourceDocumentsJson.length + args.mediaMappingsJson.length > 700000) throw new Error('Import metadata too large');
-    JSON.parse(args.sourceDocumentsJson);
-    const mappings = JSON.parse(args.mediaMappingsJson);
-    if (!Array.isArray(mappings)) throw new Error('Invalid import mappings');
+    const { mediaMappings: mappings } = parseSourceImport(args.sourceDocumentsJson, args.mediaMappingsJson);
     for (const mapping of mappings) {
-      const asset = await ctx.db.get(mapping.assetId);
+      const assetId = ctx.db.normalizeId('videos', mapping.assetId);
+      if (!assetId) throw new Error('Invalid import mapping asset ID');
+      const asset = await ctx.db.get(assetId);
       if (!asset || !('projectId' in asset) || asset.projectId !== project._id) throw new Error('Imported asset belongs to another project');
     }
     const existing = await ctx.db.query('sourceImports').withIndex('by_source', q => q.eq('sourceApp', 'trailer-feed').eq('sourceProjectId', args.sourceProjectId)).unique();

@@ -56,18 +56,25 @@
   let collapsed = $state<Set<string>>(new Set());
 
   function folderRows(project: ProjectTreeProject) {
-    const rows: { folder: NonNullable<ProjectTreeProject['folders']>[number]; depth: number; hasChildren: boolean }[] = [];
-    const seen = new Set<string>();
-    function visit(parentId: string | undefined, depth: number) {
-      for (const folder of project.folders ?? []) {
-        if (folder.parentFolderId !== parentId || seen.has(folder.id)) continue;
-        seen.add(folder.id);
-        const hasChildren = !!project.folders?.some(item => item.parentFolderId === folder.id);
-        rows.push({ folder, depth, hasChildren });
-        if (!collapsed.has(folder.id)) visit(folder.id, depth + 1);
-      }
+    type FolderRow = NonNullable<ProjectTreeProject['folders']>[number];
+    const rows: { folder: FolderRow; depth: number; hasChildren: boolean }[] = [];
+    const children = new Map<string | undefined, FolderRow[]>();
+    for (const folder of project.folders ?? []) {
+      const siblings = children.get(folder.parentFolderId) ?? [];
+      siblings.push(folder); children.set(folder.parentFolderId, siblings);
     }
-    visit(undefined, 0); return rows;
+    const seen = new Set<string>();
+    function visit(folder: FolderRow, depth: number, visible: boolean) {
+      if (seen.has(folder.id)) return;
+      seen.add(folder.id);
+      const descendants = children.get(folder.id) ?? [];
+      if (visible) rows.push({ folder, depth, hasChildren: !!descendants.length });
+      for (const child of descendants) visit(child, depth + 1, visible && !collapsed.has(folder.id));
+    }
+    for (const root of children.get(undefined) ?? []) visit(root, 0, true);
+    // Keep legacy orphan/cyclic folders reachable without revealing collapsed descendants.
+    for (const folder of project.folders ?? []) if (!seen.has(folder.id)) visit(folder, 0, true);
+    return rows;
   }
   let dropHover = $state<string | null>(null);
   $effect(() => { if (!dragActive) dropHover = null; });
@@ -194,5 +201,5 @@
   .folder-tree-row .collection-link { padding-left: 0; }
   .folder-disclosure-spacer { width: 27px; flex-shrink: 0; }
   .empty { margin: 0 10px; color: var(--muted); font-size: 11px; }
-  @media (pointer: coarse) { .project-link, .collection-link, .add-project, .edit-project, .disclosure { min-height: 44px; } .add-project, .edit-project, .disclosure { min-width: 44px; } }
+  @media (pointer: coarse) { .folder-disclosure-spacer { width: 44px; } .project-link, .collection-link, .add-project, .edit-project, .disclosure { min-height: 44px; } .add-project, .edit-project, .disclosure { min-width: 44px; } }
 </style>

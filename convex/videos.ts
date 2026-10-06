@@ -59,34 +59,6 @@ function originalExtension(filename: string) {
   return match ? `.${match[1].toLowerCase()}` : "";
 }
 
-async function getOrCreateDateFolder(
-  ctx: MutationCtx,
-  projectId: Id<"projects">,
-  adminId: Id<"appUsers">,
-  dateKey: string,
-) {
-  const folders = await ctx.db
-    .query("projectFolders")
-    .withIndex("by_project", (q) => q.eq("projectId", projectId))
-    .collect();
-  const existing = folders.find((folder) => folder.title === dateKey);
-  if (existing) return existing._id;
-
-  const maxOrder = folders.reduce(
-    (max, folder) => Math.max(max, folder.order),
-    0,
-  );
-  const now = Date.now();
-  return await ctx.db.insert("projectFolders", {
-    projectId,
-    title: dateKey,
-    order: maxOrder + 1,
-    createdBy: adminId,
-    createdAt: now,
-    updatedAt: now,
-  });
-}
-
 export const reserveAssetUpload = mutation({
   args: {
     projectId: v.id("projects"),

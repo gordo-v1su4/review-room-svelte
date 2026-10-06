@@ -2,21 +2,23 @@
   import { Dialog, DropdownMenu } from 'bits-ui';
   import { FolderInput, FolderPlus, Image, MoreHorizontal, Pencil, Trash2, X } from 'lucide-svelte';
 
-  let { folders, activeFolderId, canManage = false, selectedCount = 0, coverUrl, hasCustomCover = false, persistent = false, onCreate, onRename, onRemove, onMove, onCover }: {
-    folders: readonly { id: string; title: string }[];
+  let { folders, folderLabels, onMoveFolder, activeFolderId, canManage = false, selectedCount = 0, coverUrl, hasCustomCover = false, persistent = false, onCreate, onRename, onRemove, onMove, onCover }: {
+    folders: readonly { id: string; title: string; parentFolderId?: string }[];
+    folderLabels?: readonly { id: string; title: string }[];
+    onMoveFolder?: (folderId: string, parentFolderId: string | null) => void | Promise<void>;
     activeFolderId: string | null;
     canManage?: boolean;
     persistent?: boolean;
     selectedCount?: number;
     coverUrl?: string;
     hasCustomCover?: boolean;
-    onCreate: (title: string) => void;
-    onRename: (folderId: string, title: string) => void;
-    onRemove: (folderId: string, disposition: 'move_to_root' | 'archive_assets') => void;
-    onMove: (folderId: string | null) => void;
+    onCreate: (title: string) => void | Promise<void>;
+    onRename: (folderId: string, title: string) => void | Promise<void>;
+    onRemove: (folderId: string, disposition: 'move_to_root' | 'archive_assets') => void | Promise<void>;
+    onMove: (folderId: string | null) => void | Promise<void>;
     onCover?: (folderId: string, file: File | null) => Promise<void>;
   } = $props();
-  type Operation = 'create' | 'rename' | 'remove' | 'move' | 'cover';
+  type Operation = 'create' | 'rename' | 'remove' | 'move' | 'move-folder' | 'cover';
   let open = $state(false);
   let menuOpen = $state(false);
   let operation = $state<Operation>('create');
@@ -27,15 +29,26 @@
   let disposition = $state<'move_to_root' | 'archive_assets'>('move_to_root');
   let error = $state('');
   let coverBusy = $state(false);
+  let submitBusy = $state(false);
+  function isDescendant(candidateId: string, ancestorId: string) {
+    const seen = new Set<string>();
+    let current = folders.find(folder => folder.id === candidateId);
+    while (current && !seen.has(current.id)) {
+      if (current.id === ancestorId) return true;
+      seen.add(current.id); current = folders.find(folder => folder.id === current!.parentFolderId);
+    }
+    return false;
+  }
+  const destinations = $derived((folderLabels ?? folders).filter(folder => operation !== 'move-folder' || !folderId || !isDescendant(folder.id, folderId)));
   let coverInput = $state<HTMLInputElement>();
   let dialogSession = 0;
   let returnFocus: HTMLElement | undefined;
   let menuTrigger = $state<HTMLButtonElement | null>(null);
   let activeFolder = $derived(folders.find(folder => folder.id === activeFolderId));
-  let title = $derived(operation === 'create' ? 'New folder' : operation === 'rename' ? 'Rename folder' : operation === 'remove' ? 'Delete folder' : operation === 'cover' ? 'Folder cover' : `Move ${selectedCount} ${selectedCount === 1 ? 'asset' : 'assets'}`);
+  let title = $derived(operation === 'create' ? 'New folder' : operation === 'rename' ? 'Rename folder' : operation === 'remove' ? 'Delete folder' : operation === 'cover' ? 'Folder cover' : operation === 'move-folder' ? 'Move folder' : `Move ${selectedCount} ${selectedCount === 1 ? 'asset' : 'assets'}`);
 
   function begin(next: Operation, trigger?: HTMLElement) {
-    if (!canManage || ((next === 'rename' || next === 'remove' || next === 'cover') && !activeFolder) || (next === 'cover' && !onCover)) return;
+    if (submitBusy || !canManage || ((next === 'rename' || next === 'remove' || next === 'cover' || next === 'move-folder') && !activeFolder) || (next === 'cover' && !onCover)) return;
     dialogSession += 1;
     coverBusy = false;
     returnFocus = trigger ?? menuTrigger ?? undefined;
@@ -43,7 +56,7 @@
     folderId = activeFolder?.id ?? null;
     folderTitle = activeFolder?.title ?? '';
     name = next === 'rename' ? folderTitle : '';
-    destination = ''; disposition = 'move_to_root'; error = ''; menuOpen = false; open = true;
+    destination = next === 'move-folder' ? activeFolder?.parentFolderId ?? '' : ''; disposition = 'move_to_root'; error = ''; menuOpen = false; open = true;
   }
   async function updateCover(file: File | null) {
     if (coverBusy) return;
@@ -67,27 +80,32 @@
     input.value = '';
     if (file) void updateCover(file);
   }
-  function submit(event: SubmitEvent) {
+  async function submit(event: SubmitEvent) {
     event.preventDefault();
-    if (operation === 'cover') return;
+    if (operation === 'cover' || submitBusy) return;
     if (!canManage) { error = 'Folder management is unavailable.'; return; }
-    error = '';
+    error = ''; submitBusy = true;
+    const session = dialogSession;
     try {
       if (operation === 'create' || operation === 'rename') {
         const value = name.trim();
         if (!value) { error = 'Enter a folder name.'; return; }
-        if (operation === 'create') onCreate(value);
-        else if (folderId) onRename(folderId, value);
+        if (operation === 'create') await onCreate(value);
+        else if (folderId) await onRename(folderId, value);
         else throw new Error('This folder is no longer available.');
       } else if (operation === 'remove') {
         if (!folderId) throw new Error('This folder is no longer available.');
-        onRemove(folderId, disposition);
+        await onRemove(folderId, disposition);
+      } else if (operation === 'move-folder') {
+        if (!folderId || !onMoveFolder) throw new Error('Folder movement is unavailable.');
+        await onMoveFolder(folderId, destination || null);
       } else {
         if (!selectedCount) throw new Error('Select at least one asset to move.');
-        onMove(destination || null);
+        await onMove(destination || null);
       }
-      open = false;
-    } catch (cause) { error = cause instanceof Error ? cause.message : 'Could not update the folder.'; }
+      if (session === dialogSession) open = false;
+    } catch (cause) { if (session === dialogSession) error = cause instanceof Error ? cause.message : 'Could not update the folder.'; }
+    finally { submitBusy = false; }
   }
 </script>
 
@@ -100,6 +118,7 @@
         <DropdownMenu.Trigger bind:ref={menuTrigger} class="folder-button folder-menu-trigger" aria-label={`Folder settings for ${activeFolder.title}`} title="Folder settings"><MoreHorizontal size={16}/></DropdownMenu.Trigger>
         <DropdownMenu.Portal><DropdownMenu.Content class="folder-menu" sideOffset={6} align="end" onCloseAutoFocus={event => { if (open) event.preventDefault(); }}>
           <DropdownMenu.Item class="folder-menu-item" onSelect={() => begin('rename')}><Pencil size={13}/>Rename folder</DropdownMenu.Item>
+          {#if onMoveFolder}<DropdownMenu.Item class="folder-menu-item" onSelect={() => begin('move-folder')}><FolderInput size={13}/>Move folder</DropdownMenu.Item>{/if}
           {#if onCover}<DropdownMenu.Item class="folder-menu-item" onSelect={() => begin('cover')}><Image size={13}/>Folder cover</DropdownMenu.Item>{/if}
           <DropdownMenu.Item class="folder-menu-item destructive" onSelect={() => begin('remove')}><Trash2 size={13}/>Delete folder</DropdownMenu.Item>
         </DropdownMenu.Content></DropdownMenu.Portal>
@@ -113,7 +132,7 @@
     <Dialog.Overlay class="folder-overlay"/>
     <Dialog.Content class="folder-dialog" onCloseAutoFocus={event => { event.preventDefault(); if (returnFocus?.isConnected) returnFocus.focus(); }}>
       <div class="dialog-heading"><Dialog.Title class="folder-dialog-title">{title}</Dialog.Title><Dialog.Close class="folder-close" aria-label="Close folder dialog"><X size={17}/></Dialog.Close></div>
-      <Dialog.Description class="folder-description">{#if operation === 'create'}Create a folder {activeFolder ? `inside “${activeFolder.title}”` : 'at the project root'}. {persistent ? 'Saved to your workspace.' : 'Stored in this session.'}{:else if operation === 'rename'}Update “{folderTitle}”.{:else if operation === 'remove'}Choose what happens to the assets in “{folderTitle}”. Subfolders must be moved or removed first.{:else if operation === 'cover'}Uses the newest image in this folder unless you choose a cover. Stored in this tab only.{:else}Choose a destination in this project. {persistent ? 'The new location is saved to your workspace.' : 'Your media files stay on this device.'}{/if}</Dialog.Description>
+      <Dialog.Description class="folder-description">{#if operation === 'create'}Create a folder {activeFolder ? `inside “${activeFolder.title}”` : 'at the project root'}. {persistent ? 'Saved to your workspace.' : 'Stored in this session.'}{:else if operation === 'rename'}Update “{folderTitle}”.{:else if operation === 'remove'}Choose what happens to the assets in “{folderTitle}”. Subfolders must be moved or removed first.{:else if operation === 'move-folder'}Move “{folderTitle}” and its subfolders to another parent in this project.{:else if operation === 'cover'}Uses the newest image in this folder unless you choose a cover. Stored in this tab only.{:else}Choose a destination in this project. {persistent ? 'The new location is saved to your workspace.' : 'Your media files stay on this device.'}{/if}</Dialog.Description>
       {#if operation === 'cover'}
         <div class="cover-preview">
           {#if coverUrl && folderId === activeFolderId}<img src={coverUrl} alt={`Cover for ${folderTitle}`}/>{:else}<Image size={26}/><span>No cover image</span>{/if}
@@ -127,16 +146,16 @@
         {#if error}<p class="folder-error" role="alert">{error}</p>{/if}
         <div class="dialog-actions"><Dialog.Close class="folder-cancel" type="button">Done</Dialog.Close></div>
       {:else}
-        <form onsubmit={submit}>
+        <form onsubmit={submit} aria-busy={submitBusy}>
         {#if operation === 'create' || operation === 'rename'}
           <label class="folder-field">Folder name<input aria-label="Folder name" bind:value={name} placeholder="Folder name" maxlength="100" required/></label>
-        {:else if operation === 'move'}
-          <label class="folder-field">Destination<select aria-label="Folder destination" bind:value={destination}><option value="">Project root</option>{#each folders as folder (folder.id)}<option value={folder.id}>{folder.title}</option>{/each}</select></label>
+        {:else if operation === 'move' || operation === 'move-folder'}
+          <label class="folder-field">Destination<select aria-label="Folder destination" bind:value={destination}><option value="">Project root</option>{#each destinations as folder (folder.id)}<option value={folder.id}>{folder.title}</option>{/each}</select></label>
         {:else}
           <fieldset class="disposition"><legend>Assets in this folder</legend><label><input type="radio" bind:group={disposition} value="move_to_root"/><span>Move to project root<small>Keep the assets available outside this folder.</small></span></label><label><input type="radio" bind:group={disposition} value="archive_assets"/><span>Archive assets<small>Hide these assets from active views in this session.</small></span></label></fieldset>
         {/if}
         {#if error}<p class="folder-error" role="alert">{error}</p>{/if}
-        <div class="dialog-actions"><Dialog.Close class="folder-cancel" type="button">Cancel</Dialog.Close><button type="submit" class="folder-submit" class:danger={operation === 'remove'} disabled={!canManage || ((operation === 'create' || operation === 'rename') && !name.trim()) || (operation === 'move' && selectedCount === 0)}>{operation === 'create' ? 'Create folder' : operation === 'rename' ? 'Save name' : operation === 'remove' ? 'Delete folder' : 'Move assets'}</button></div>
+        <div class="dialog-actions"><Dialog.Close class="folder-cancel" type="button">Cancel</Dialog.Close><button type="submit" class="folder-submit" class:danger={operation === 'remove'} disabled={submitBusy || !canManage || ((operation === 'create' || operation === 'rename') && !name.trim()) || (operation === 'move' && selectedCount === 0)}>{submitBusy ? 'Saving…' : operation === 'create' ? 'Create folder' : operation === 'rename' ? 'Save name' : operation === 'remove' ? 'Delete folder' : operation === 'move-folder' ? 'Move folder' : 'Move assets'}</button></div>
         </form>
       {/if}
     </Dialog.Content>

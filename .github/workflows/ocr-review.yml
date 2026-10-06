@@ -73,7 +73,7 @@ jobs:
           pr_number: ${{ github.event.pull_request.number || inputs.pr_number }}
 
       - name: Retry with GLM 5.3 Flash
-        if: ${{ !cancelled() && (steps.primary.outcome == 'failure' || inputs.fallback_only) }}
+        if: ${{ !cancelled() && (github.event_name == 'pull_request_target' || steps.context.outcome == 'success') && (steps.primary.outcome == 'failure' || inputs.fallback_only) }}
         uses: alibaba/open-code-review@a758d9cbfb689937c7857ad64b2dd66adb58c0c2
         with:
           ocr_version: '1.12.11'

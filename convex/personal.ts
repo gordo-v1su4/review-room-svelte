@@ -1,3 +1,5 @@
+import { purgeDependencyBatch } from './lib/archivePurge';
+import { importedMediaMetadata } from './lib/sourceImport';
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -5,7 +7,7 @@ import type { Id } from "./_generated/dataModel";
 import { internal } from './_generated/api';
 import { getReviewLink, passcodeDigest, randomSecret } from "./lib/reviewAccess";
 import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
-import { validateFolderParent, requireEmptyChildFolders } from './lib/folderTree';
+import { validateFolderParent, disposeFolder, folderNameKey } from './lib/folderTree';
 
 const OWNER_EMAIL = "owner@review-room.invalid";
 type Ctx = QueryCtx | MutationCtx;
@@ -63,11 +65,7 @@ export const snapshot = internalQuery({
     for (const project of projects) {
       const imports = await ctx.db.query('sourceImports').withIndex('by_project', q => q.eq('projectId', project._id)).collect();
       for (const record of imports) {
-        const source = JSON.parse(record.sourceDocumentsJson);
-        for (const mapping of JSON.parse(record.mediaMappingsJson)) {
-          const artifact = source.artifacts?.find((item: { artifact_id: string }) => item.artifact_id === mapping.sourceArtifactId);
-          if (artifact) importedMetadata.push({ assetId: mapping.assetId, label: artifact.title ?? '', prompt: artifact.version_prompt ?? artifact.prompt_text ?? '', model: artifact.video_model ?? artifact.model ?? '', sourceCreatedAt: artifact.created_at ?? '', sourceVersionNumber: artifact.version_number ?? mapping.displayedVersionNumber });
-        }
+        importedMetadata.push(...importedMediaMetadata(record.sourceDocumentsJson, record.mediaMappingsJson));
       }
     }
     return { projects, folders, assets, versions, mediaJobs, comments, publications, showcases, links, importedMetadata, projectIds: Array.from(projectIds) };
@@ -105,14 +103,17 @@ export const processing = internalQuery({
   }
 });
 
-async function deleteOwnedAssets(ctx: MutationCtx, projectId: Id<'projects'>, assetIds: Id<'videos'>[], allowArchived = false) {
-    await ownedProject(ctx,projectId,allowArchived);
+async function deleteOwnedAssets(ctx: MutationCtx, projectId: Id<'projects'>, assetIds: Id<'videos'>[], allowArchived = false, purgeOwnerId?: Id<'appUsers'>) {
+    if (purgeOwnerId) {
+      const project = await ctx.db.get(projectId);
+      if (!project || project.createdBy !== purgeOwnerId || !project.archived || !project.purgeStartedAt) throw new Error('Purge project unavailable');
+    } else await ownedProject(ctx,projectId,allowArchived);
     const ids=[...new Set(assetIds)];
     if(!ids.length || ids.length>50) throw new Error('Invalid selection');
     const assets=await Promise.all(ids.map(id=>ctx.db.get(id)));
     if(assets.some(asset=>!asset || asset.projectId!==projectId)) throw new Error('Selection changed');
     const sessions=await ctx.db.query('uploadSessions').withIndex('by_project',q=>q.eq('projectId',projectId)).collect();
-    if(sessions.some(session=>session.assetId && ids.includes(session.assetId) && ['pending','finalizing'].includes(session.status))) throw new Error('Replacement upload in progress');
+    if(!allowArchived && sessions.some(session=>session.assetId && ids.includes(session.assetId) && ['pending','finalizing'].includes(session.status))) throw new Error('Replacement upload in progress');
     const keys=new Set<string>();
     const publicationIds=new Set<Id<'publications'>>();
     for(const asset of assets) {
@@ -154,22 +155,54 @@ export const deleteSelectedAssets = internalMutation({ args: {projectId:v.id('pr
 export const purgeArchivedProject = internalMutation({
   args: { projectId: v.id('projects') },
   handler: async (ctx, args) => {
-    const { project } = await ownedProject(ctx, args.projectId, true);
+    const { project, profile } = await ownedProject(ctx, args.projectId, true);
     if (!project.archived) throw new Error('Only archived projects may be purged');
-    const assets = await ctx.db.query('videos').withIndex('by_project', q => q.eq('projectId', project._id)).collect();
-    for (let start = 0; start < assets.length; start += 50) await deleteOwnedAssets(ctx, project._id, assets.slice(start, start + 50).map(asset => asset._id), true);
-    const links = await ctx.db.query('reviewLinks').withIndex('by_project', q => q.eq('projectId', project._id)).collect();
-    for (const link of links) {
-      for (const session of await ctx.db.query('reviewerSessions').withIndex('by_token', q => q.eq('token', link.token)).collect()) await ctx.db.delete(session._id);
-      await ctx.db.delete(link._id);
+    if (project.purgeStartedAt) return { projectId: project._id, status: 'queued' as const };
+    await ctx.db.patch(project._id, { purgeStartedAt: project.purgeStartedAt ?? Date.now() });
+    await ctx.scheduler.runAfter(0, internal.personal.continueArchivedPurge, { projectId: project._id, ownerId: profile._id });
+    return { projectId: project._id, status: 'queued' as const };
+  },
+});
+export const continueArchivedPurge = internalMutation({
+  args: { projectId: v.id('projects'), ownerId: v.id('appUsers'), publicationId: v.optional(v.id('publications')), showcaseCursor: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return;
+    if (project.createdBy !== args.ownerId || !project.archived || !project.purgeStartedAt) throw new Error('Purge project unavailable');
+    const uploads = await ctx.db.query('uploadSessions').withIndex('by_project', q => q.eq('projectId', project._id)).take(50);
+    if (uploads.some(session => session.expiresAt > Date.now())) {
+      await ctx.scheduler.runAfter(60_000, internal.personal.continueArchivedPurge, args);
+      return;
     }
-    for (const table of ['projectFolders', 'projectMembers', 'projectAccessRules', 'collections', 'uploadSessions', 'sourceImports'] as const) {
-      for (const row of await ctx.db.query(table).withIndex('by_project', q => q.eq('projectId', project._id)).collect()) await ctx.db.delete(row._id);
+    const nextAsset = await ctx.db.query('videos').withIndex('by_project', q => q.eq('projectId', project._id)).first();
+    if (nextAsset) {
+      const activeJob = await ctx.db.query('mediaJobs').withIndex('by_asset', q => q.eq('assetId', nextAsset._id)).filter(q => q.or(q.eq(q.field('status'), 'queued'), q.eq(q.field('status'), 'running'))).first();
+      if (activeJob) {
+        await ctx.scheduler.runAfter(60_000, internal.personal.continueArchivedPurge, args);
+        return;
+      }
+      const publication = args.publicationId ? await ctx.db.get(args.publicationId) : await ctx.db.query('publications').withIndex('by_asset', q => q.eq('assetId', nextAsset._id)).first();
+      if (publication) {
+        if (publication.assetId !== nextAsset._id) throw new Error('Purge publication changed');
+        const page = await ctx.db.query('showcases').paginate({ numItems: 100, cursor: args.showcaseCursor ?? null });
+        for (const showcase of page.page) if (showcase.publicationIds.includes(publication._id)) await ctx.db.patch(showcase._id, { publicationIds: showcase.publicationIds.filter(id => id !== publication._id), updatedAt: Date.now() });
+        if (page.isDone) {
+          await ctx.db.delete(publication._id);
+          await ctx.scheduler.runAfter(0, internal.personal.continueArchivedPurge, { projectId: args.projectId, ownerId: args.ownerId });
+        } else await ctx.scheduler.runAfter(0, internal.personal.continueArchivedPurge, { ...args, publicationId: publication._id, showcaseCursor: page.continueCursor });
+        return;
+      }
     }
-    for (const row of await ctx.db.query('workspacePreferences').collect()) if (row.projectId === project._id) await ctx.db.delete(row._id);
-    for (const credential of await ctx.db.query('automationCredentials').collect()) if (credential.projectId === project._id) await ctx.db.patch(credential._id, { revokedAt: Date.now() });
-    await ctx.db.delete(project._id);
-    return { deletedProjectId: project._id, deletedAssets: assets.length };
+    const credentials = await ctx.db.query('automationCredentials').withIndex('by_project', q => q.eq('projectId', project._id)).take(100);
+    // Revoked records retain their audit history; clear the removed project scope.
+    if (credentials.length) {
+      for (const credential of credentials) await ctx.db.patch(credential._id, { revokedAt: credential.revokedAt ?? Date.now(), projectId: undefined });
+    } else if (!await purgeDependencyBatch(ctx, project._id)) {
+      const asset = await ctx.db.query('videos').withIndex('by_project', q => q.eq('projectId', project._id)).first();
+      if (asset) await deleteOwnedAssets(ctx, project._id, [asset._id], true, args.ownerId);
+      else { await ctx.db.delete(project._id); return; }
+    }
+    await ctx.scheduler.runAfter(0, internal.personal.continueArchivedPurge, { projectId: args.projectId, ownerId: args.ownerId });
   },
 });
 
@@ -248,8 +281,9 @@ export const moveFolder = internalMutation({
     await ownedProject(ctx, folder.projectId);
     await validateFolderParent(ctx, folder.projectId, args.parentFolderId, folder._id);
     const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', folder.projectId)).collect();
-    if (folders.some(item => item._id !== folder._id && item.parentFolderId === args.parentFolderId && item.title.toLowerCase() === folder.title.toLowerCase())) throw new Error('Folder already exists');
-    await ctx.db.patch(folder._id, { parentFolderId: args.parentFolderId, updatedAt: Date.now() });
+    if (folders.some(item => item._id !== folder._id && item.parentFolderId === args.parentFolderId && folderNameKey(item.title) === folderNameKey(folder.title))) throw new Error('Folder already exists');
+    const order = Math.max(0, ...folders.filter(item => item._id !== folder._id && item.parentFolderId === args.parentFolderId).map(item => item.order)) + 1;
+    await ctx.db.patch(folder._id, { parentFolderId: args.parentFolderId, order, updatedAt: Date.now() });
   },
 });
 
@@ -271,10 +305,7 @@ export const removeFolder = internalMutation({
     const folder = await ctx.db.get(args.folderId);
     if (!folder) throw new Error('Folder unavailable');
     await ownedProject(ctx, folder.projectId);
-    await requireEmptyChildFolders(ctx, folder._id, folder.projectId);
-    const assets = await ctx.db.query('videos').withIndex('by_project_folder', q => q.eq('projectId', folder.projectId).eq('folderId', folder._id)).collect();
-    for (const asset of assets) await ctx.db.patch(asset._id, { folderId: undefined, ...(args.assetDisposition === 'archive_assets' ? { status: 'archived' as const } : {}), updatedAt: Date.now() });
-    await ctx.db.delete(folder._id);
+    return await disposeFolder(ctx, folder, args.assetDisposition);
   },
 });
 

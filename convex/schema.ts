@@ -81,6 +81,7 @@ const applicationTables = {
     ),
     nextAssetNumber: v.optional(v.number()),
     createdBy: v.id("appUsers"),
+    purgeStartedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
     archived: v.optional(v.boolean()),
@@ -141,7 +142,7 @@ const applicationTables = {
     expiresAt: v.optional(v.number()),
     revokedAt: v.optional(v.number()),
     lastUsedAt: v.optional(v.number()),
-  }).index("by_digest", ["keyDigest"]),
+  }).index("by_digest", ["keyDigest"]).index("by_project", ["projectId"]),
 
   automationRequests: defineTable({
     credentialId: v.id("automationCredentials"),

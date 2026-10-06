@@ -1,13 +1,18 @@
 import type { MutationCtx } from '../_generated/server';
-import type { Id } from '../_generated/dataModel';
+import type { Doc, Id } from '../_generated/dataModel';
 import { randomSecret } from './reviewAccess';
 import { reserveAssetNumber } from './assetNumber';
-import { validateFolderParent } from './folderTree';
+import { validateFolderParent, folderNameKey } from './folderTree';
 
 function title(value: string, kind: string) {
   const normalized = value.trim();
   if (!normalized || normalized.length > 120) throw new Error(`${kind} title must be 1–120 characters`);
   return normalized;
+}
+
+function requireUploadFamily(asset: Doc<'videos'>, mimeType: string) {
+  const isVideo = asset.assetClass ? asset.assetClass === 'VID' : asset.mimeType.startsWith('video/');
+  if (isVideo !== mimeType.startsWith('video/')) throw new Error('Upload class does not match the existing asset');
 }
 
 export async function createPersonalProject(ctx: MutationCtx, ownerId: Id<'appUsers'>, input: { title: string; description?: string }) {
@@ -24,6 +29,7 @@ export async function updatePersonalProject(ctx: MutationCtx, ownerId: Id<'appUs
   input: { title?: string; description?: string; clientName?: string; brandColor?: string; archived?: boolean }) {
   const project = await ctx.db.get(projectId);
   if (!project || project.createdBy !== ownerId) throw new Error('Project unavailable');
+  if (project.purgeStartedAt) throw new Error('Project deletion is in progress');
   if (input.brandColor !== undefined && !/^#[0-9a-f]{6}$/i.test(input.brandColor)) throw new Error('Invalid brand color');
   await ctx.db.patch(projectId, {
     ...(input.title !== undefined ? { title: title(input.title, 'Project') } : {}),
@@ -42,7 +48,7 @@ export async function createPersonalFolder(ctx: MutationCtx, ownerId: Id<'appUse
   const normalized = title(name, 'Folder');
   const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', projectId)).collect();
   await validateFolderParent(ctx, projectId, parentFolderId);
-  if (folders.some(folder => folder.parentFolderId === parentFolderId && folder.title.toLowerCase() === normalized.toLowerCase())) throw new Error('Folder already exists');
+  if (folders.some(folder => folder.parentFolderId === parentFolderId && folderNameKey(folder.title) === folderNameKey(normalized))) throw new Error('Folder already exists');
   const now = Date.now();
   return await ctx.db.insert('projectFolders', {
     projectId, parentFolderId, title: normalized, order: Math.max(0, ...folders.filter(folder => folder.parentFolderId === parentFolderId).map(folder => folder.order)) + 1,
@@ -57,7 +63,7 @@ export async function renamePersonalFolder(ctx: MutationCtx, ownerId: Id<'appUse
   if (!project || project.createdBy !== ownerId || project.archived) throw new Error('Project unavailable');
   const normalized = title(name, 'Folder');
   const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', folder.projectId)).collect();
-  if (folders.some(item => item._id !== folderId && item.parentFolderId === folder.parentFolderId && item.title.toLowerCase() === normalized.toLowerCase())) throw new Error('Folder already exists');
+  if (folders.some(item => item._id !== folderId && item.parentFolderId === folder.parentFolderId && folderNameKey(item.title) === folderNameKey(normalized))) throw new Error('Folder already exists');
   await ctx.db.patch(folderId, { title: normalized, updatedAt: Date.now() });
   return folderId;
 }
@@ -76,12 +82,14 @@ export async function beginPersonalUpload(ctx: MutationCtx, ownerId: Id<'appUser
   if (input.assetId) {
     const asset = await ctx.db.get(input.assetId);
     if (!asset || asset.projectId !== project._id || asset.status !== 'approved') throw new Error('Approved asset unavailable');
+    requireUploadFamily(asset, input.mimeType);
   }
   if (input.folderId) {
     const folder = await ctx.db.get(input.folderId);
     if (!folder || folder.projectId !== project._id) throw new Error('Folder unavailable');
   }
-  const extension = input.originalFilename.match(/\.([a-zA-Z0-9]{1,8})$/)?.[1]?.toLowerCase() ?? 'mp4';
+  const extensions: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
+  const extension = input.originalFilename.match(/\.([a-zA-Z0-9]{1,8})$/)?.[1]?.toLowerCase() ?? extensions[input.mimeType] ?? 'bin';
   const objectKey = `assets/${project._id}/${input.mimeType.startsWith('image/') ? 'images' : 'videos'}/${randomSecret()}/original.${extension}`;
   const now = Date.now();
   const sessionId = await ctx.db.insert('uploadSessions', {
@@ -112,6 +120,10 @@ export async function finalizePersonalUpload(ctx: MutationCtx, ownerId: Id<'appU
   }
   if (session.status !== 'finalizing' || session.expiresAt <= Date.now() ||
     session.sizeBytes !== args.verifiedSizeBytes) throw new Error('Upload verification failed');
+  if (session.folderId) {
+    const folder = await ctx.db.get(session.folderId);
+    if (!folder || folder.projectId !== project._id) throw new Error('Folder unavailable');
+  }
   const isImage = session.mimeType.startsWith('image/');
   const processing = !!args.processWithTrigger && !isImage;
   if (args.posterKey !== `${session.objectKey.slice(0, session.objectKey.lastIndexOf('/'))}/poster.jpg` ||
@@ -126,6 +138,7 @@ export async function finalizePersonalUpload(ctx: MutationCtx, ownerId: Id<'appU
   if (assetId) {
     const existing = await ctx.db.get(assetId);
     if (!existing || existing.projectId !== project._id || existing.status !== 'approved') throw new Error('Approved asset unavailable');
+    requireUploadFamily(existing, session.mimeType);
     const versions = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', assetId!)).collect();
     version = Math.max(0, ...versions.map(item => item.version)) + 1;
   } else {

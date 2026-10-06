@@ -5,7 +5,7 @@ A client media review portal. Product rules live in `init-docs/01-PRD.md`; visua
 - **Asset**: a reviewable video, image, contact/context sheet or storyboard. Existing persistence calls the table `videos`; this does not imply every asset is playable video.
 - **Workflow status**: one production/review decision field. Rating, shortlist, viewed state and feedback are independent facets.
 - **Select**: the shortlist facet, distinct from UI selection of the active asset.
-- **Real folder**: one-level project organization. Smart collections and smart views are metadata queries, not nested folders.
+- **Real folder**: nested project organization with stable folder and parent IDs. Uploads use the selected folder or project root; moving or renaming folders does not change blob identity. Smart collections and smart views remain metadata queries.
 - **Review session**: active asset, playback/inspection and review interactions in a project or token-scoped client view.
 - **Inspector**: asset fields/comments alongside the media. Responsive rearrangement must retain the review session.
 - **Playback adapter**: native or accelerated implementation of the shared playback interface. Capability detection alone does not prove accelerated playback ran.
