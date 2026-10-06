@@ -96,8 +96,14 @@ export const reconcile = internalAction({
     try {
       for (let offset = 0; offset < jobs.length; offset += 100) {
         const page = jobs.slice(offset, offset + 100);
-        const result = await post('status', { versions: page.map(job => ({ source_asset_id: job.assetId, source_version_id: job.versionId })) });
-        if (!Array.isArray(result.versions) || result.versions.length !== page.length) throw new DestinationFailure('Destination status did not match the requested versions');
+        // Historical jobs share a source identity with later consent generations.
+        // Ask once per identity, then retain each job's generation fence below.
+        const versions = [...new Map(page.map(job => [
+          `${job.assetId}/${job.versionId}`,
+          { source_asset_id: job.assetId, source_version_id: job.versionId },
+        ])).values()];
+        const result = await post('status', { versions });
+        if (!Array.isArray(result.versions) || result.versions.length !== versions.length) throw new DestinationFailure('Destination status did not match the requested versions');
         const acknowledgements = page.map(job => {
           const matches = result.versions.filter((item: Record<string, unknown>) => item.source_asset_id === job.assetId && item.source_version_id === job.versionId);
           const target = matches[0];

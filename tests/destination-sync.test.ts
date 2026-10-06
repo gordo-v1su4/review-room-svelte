@@ -238,6 +238,7 @@ test('explicit Sync again rotates exact-version consent once and safely retries 
     expect(snapshot.items).toHaveLength(2);
     expect(snapshot.items.find(item => item.consentGeneration === 2)?.state).toBe('synced');
     expect(snapshot.items.find(item => item.consentGeneration === 2)?.targetVersionNumber).toBe(1);
+    expect(await t.action(internal.destinationDelivery.reconcile, { projectId:project })).toEqual({ok:true});
   } finally {
     globalThis.fetch = oldFetch;
     if (oldKey === undefined) delete process.env.TRAILER_FEED_REVIEW_INGEST_KEY; else process.env.TRAILER_FEED_REVIEW_INGEST_KEY = oldKey;
