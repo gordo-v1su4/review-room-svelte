@@ -1,0 +1,11 @@
+# Exact-version destination grants
+
+Implementation checkpoint for V1S-165. The backend and HTTP resolver are implemented on `codex/destination-version-grants`; production deployment and cross-app acceptance remain pending.
+
+An owner session can `POST /api/owner-publication-grants` with `destinationKey: "trailer-feed"`, an immutable `versionId`, explicit `referenceVersionIds` (an empty array is valid), `allowedOrigins`, and optional future Unix-millisecond `expiresAt`. All selected versions must be ready. References must be still images in the same project. Approval/final status is not required; choosing this operation supplies publication consent.
+
+The response contains grant identity, a random capability slug, the pinned root/reference IDs and a relative `mediaPath`. It contains no storage keys, service keys or presigned URLs. Original and poster requests use `/api/destination-media/<slug>/<versionId>/<original|poster>`; selected image originals use the same path. A later upload or source metadata edit does not change the allowlist. Identical issuance retries reuse the grant; changed consent is rejected rather than silently expanding it.
+
+Resolver GET, HEAD and OPTIONS check the current grant, source ownership, project/archive state, requested exact version and readiness before accessing the shared byte cache. Explicit revocation (`DELETE /api/owner-publication-grants` with `grantId`), expiry, deleted roots, and unavailable requested references deny delivery. A deleted reference does not revoke its surviving root. Browser origins must match the grant. Range, If-Range and If-None-Match are supported; CORS exposes Content-Length, Content-Range, Accept-Ranges and ETag. The player's `cors=1` query does not bypass authorization. Responses remain private and require revalidation; conditional 304 responses are authorized too.
+
+This is an owner-session interface. Basic automation credentials have no grant permissions. Dedicated issuer/consumer service authentication, deliberate reactivation generations, durable target handoff/removal, destination UI, and deployment evidence are still required by V1S-165–169. Revoked/expired grants cannot be restored by ordinary issuance retries.

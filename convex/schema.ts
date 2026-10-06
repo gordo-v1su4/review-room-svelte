@@ -327,6 +327,9 @@ const applicationTables = {
     createdBy: v.id('appUsers'),
     slug: v.string(),
     allowedOrigins: v.array(v.string()),
+    referenceVersionIds: v.array(v.id('assetVersions')),
+    revokedAt: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
     createdAt: v.number(),
   }).index('by_destination_version', ['destinationKey', 'versionId'])
     .index('by_slug', ['slug']).index('by_project', ['projectId']),
