@@ -6,7 +6,9 @@
   import type { AssetReview } from '$lib/review-session';
   import type { AssetMetadataPatch } from '$lib/asset-metadata';
 
-  let { asset, review, knownTags, canEdit, onChange, onOpen, onDesktopClose }: {
+  let { asset, review, knownTags, canEdit, onChange, onOpen, onDesktopClose, onSave, referenceImages = [] }: {
+    onSave?: (id: string) => Promise<void>;
+    referenceImages?: { versionId: string; label: string; url: string }[];
     asset: ReviewAsset;
     review: AssetReview;
     knownTags: readonly string[];
@@ -35,7 +37,7 @@
         <div><Dialog.Title class="dialog-title">Asset fields</Dialog.Title><Dialog.Description class="metadata-sheet-description">{asset.sourceFile.name}</Dialog.Description></div>
         <Dialog.Close class="metadata-sheet-close" aria-label="Close asset fields"><X size={17}/></Dialog.Close>
       </div>
-      <div class="metadata-sheet-body"><AssetDetails {asset} {review} {knownTags} {canEdit} {onChange}/></div>
+      <div class="metadata-sheet-body"><AssetDetails {asset} {review} {knownTags} {canEdit} {onChange} {onSave} {referenceImages}/></div>
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>

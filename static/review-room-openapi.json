@@ -725,6 +725,122 @@
           }
         }
       }
+    },
+    "/api/v1/versions/{versionId}/metadata": {
+      "get": {
+        "operationId": "getVersionMetadata",
+        "summary": "Read exact-version creative metadata and image reference IDs. Requires media:read within the authorized project.",
+        "parameters": [
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact version identity, metadata, and revision. Contains no storage keys or signed URLs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "versionId",
+                    "assetId",
+                    "projectId",
+                    "version",
+                    "metadata",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "versionId": {
+                      "type": "string"
+                    },
+                    "assetId": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "required": [
+                        "model",
+                        "prompt",
+                        "sourceLabel",
+                        "referenceImageVersionIds"
+                      ],
+                      "properties": {
+                        "model": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string"
+                        },
+                        "sourceLabel": {
+                          "type": "string"
+                        },
+                        "sourceCreatedAt": {
+                          "type": "integer",
+                          "description": "Source timestamp in Unix milliseconds"
+                        },
+                        "gridImageVersionId": {
+                          "type": "string"
+                        },
+                        "referenceImageVersionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "notes": {
+                          "type": "string"
+                        },
+                        "releaseDate": {
+                          "type": "string"
+                        },
+                        "releasePlatforms": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "customFields": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credential unavailable"
+          },
+          "403": {
+            "description": "Project or action outside credential scope"
+          },
+          "404": {
+            "description": "Version unavailable"
+          }
+        }
+      }
     }
   },
   "components": {

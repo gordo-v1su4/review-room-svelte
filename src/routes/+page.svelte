@@ -43,6 +43,7 @@
   import StillViewer from '$lib/components/StillViewer.svelte';
   import { annotationsEqual } from '$lib/annotations';
   import MediaCards from '$lib/components/MediaCards.svelte';
+  import { normalizeCreativeMetadata } from '$lib/asset-metadata';
   import MetadataSheet from '$lib/components/MetadataSheet.svelte';
   import AssetDetails from '$lib/components/AssetDetails.svelte';
   import SelectionBar from '$lib/components/SelectionBar.svelte';
@@ -221,6 +222,43 @@
   function updateAsset(id: string, fields: Partial<Pick<LocalAsset, 'assetClass' | 'assetCode' | 'tags' | 'duration' | 'width' | 'height' | 'fps' | 'codec' | 'metadata'>>) {
     media = media.map(asset => asset.id === id ? { ...asset, ...fields } : asset);
   }
+  const versionDrafts = new Map<string, ReviewAsset>();
+  function selectAssetVersion(id: string, versionId: string) {
+    const asset = media.find(item => item.id === id);
+    const version = data.snapshot?.versions.find(item => item._id === versionId && item.assetId === id);
+    if (!asset || !version) return;
+    if (asset.versionId) versionDrafts.set(asset.versionId, { ...asset });
+    player?.pause();
+    const draft = versionDrafts.get(versionId);
+    media = media.map(item => item.id === id ? { ...item,
+      versionId, metadataUpdatedAt: draft?.metadataUpdatedAt ?? version.metadataUpdatedAt ?? null,
+      metadata: draft?.metadata ?? normalizeCreativeMetadata(version.creativeMetadata),
+      url: version.processingState === 'ready' ? '/api/owner-media/' + id + '?versionId=' + versionId : '',
+      poster: version.posterKey && version.processingState === 'ready' ? '/api/owner-poster/' + id + '?versionId=' + versionId : undefined,
+      availability: version.processingState === 'ready' ? 'ready' : version.processingState === 'error' ? 'error' : 'running',
+    } : item);
+  }
+  async function saveVersionMetadata(id: string) {
+    const asset = media.find(item => item.id === id);
+    if (!asset?.versionId) throw new Error('Select a persisted version before saving.');
+    const versionId = asset.versionId;
+    const metadata = normalizeCreativeMetadata(asset.metadata);
+    const response = await fetch('/api/owner-version-metadata', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ versionId, expectedUpdatedAt: asset.metadataUpdatedAt ?? null,
+        metadata: { ...metadata, sourceLabel: metadata.sourceLabel ?? '', referenceImageVersionIds: metadata.referenceImageVersionIds ?? [] } }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message ?? 'Could not save version metadata. Your draft is retained.');
+    const previousDraft = versionDrafts.get(versionId);
+    if (previousDraft) versionDrafts.set(versionId, { ...previousDraft, metadataUpdatedAt: result.updatedAt });
+    media = media.map(item => item.id === id && item.versionId === versionId ? { ...item, metadataUpdatedAt: result.updatedAt } : item);
+  }
+  const referenceImages = $derived.by(() => (data.snapshot?.versions ?? []).flatMap(version => {
+    const image = data.snapshot?.assets.find(item => item._id === version.assetId && item.projectId === projectId);
+    if (!image || version.processingState !== 'ready' || !version.mimeType.startsWith('image/')) return [];
+    return [{ versionId: version._id, label: (image.assetCode ?? image.title) + ' · V' + version.version, url: '/api/owner-media/' + image._id + '?versionId=' + version._id }];
+  }));
   const approved = $derived(assets.filter(a => a.status === 'approved').length);
   async function ownerAction(action: string, fields: Record<string, string | readonly string[]>, reload = true) {
     const form = new FormData();
@@ -725,7 +763,10 @@
         size: item.sizeBytes ?? 0, sourceFile: { name: item.originalFilename ?? item.title, type: item.mimeType ?? 'video/mp4' },
         assetClass: item.mimeType?.startsWith('image/') ? 'IMG' as const : 'VID' as const, importedAt: item.uploadedAt,
         tags: item.tags, assetCode: item.assetCode ?? '',
+        versionId: item.currentVersionId, metadataUpdatedAt: data.snapshot.versions.find(version => version._id === item.currentVersionId)?.metadataUpdatedAt ?? null,
         metadata: (() => {
+          const durable = data.snapshot.versions.find(version => version._id === item.currentVersionId)?.creativeMetadata;
+          if (durable) return normalizeCreativeMetadata(durable);
           const imported = importedByAsset.get(item._id);
           return imported ? { notes: imported.label ? `Original title: ${imported.label}` : '', prompt: imported.prompt ?? '', model: imported.model ?? '', releaseDate: '', releasePlatforms: [], customFields: [] } : undefined;
         })()
@@ -754,8 +795,7 @@
           (previous.job?._id === update.job?._id && (update.job?.attempt ?? 0) < (previous.job?.attempt ?? 0))) continue;
       processing = processing.map(item => item.assetId === update.assetId ? update : item);
       media = media.map(item => item.id === update.assetId ? { ...item,
-        url: processingSource(update), poster: processingPoster(update),
-        availability: processingAvailability(update),
+        ...(item.versionId === update.versionId ? { url: processingSource(update), poster: processingPoster(update), availability: processingAvailability(update) } : {}),
         duration: update.duration ?? item.duration, width: update.width ?? item.width,
         height: update.height ?? item.height } : item);
     }
@@ -914,7 +954,7 @@
         </section>
       {/snippet}
       {#snippet viewer()}
-        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><div class="review-view-controls">{#if focusedReview}<button class="icon-button" aria-label="Notes & info" title="Notes & info" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={18}/></button>{/if}<button class="icon-button" aria-label={focusedReview ? "Return to folder" : "Expand review"} title={focusedReview ? "Return to folder (Esc)" : "Expand review"} onclick={() => focusedReview ? void returnToFolder() : focusedReview = true}>{#if focusedReview}<Minimize2 size={18}/>{:else}<Maximize2 size={18}/>{/if}</button><button class="icon-button" aria-label="Close review" title="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div></div>
+        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><div class="review-view-controls">{#if live && active.versionId}<select aria-label="Asset version" value={active.versionId} onchange={event => selectAssetVersion(active.id, event.currentTarget.value)}>{#each data.snapshot?.versions.filter(version => version.assetId === active.id).sort((a, b) => a.version - b.version) ?? [] as version (version._id)}<option value={version._id}>V{version.version}</option>{/each}</select>{/if}{#if focusedReview}<button class="icon-button" aria-label="Notes & info" title="Notes & info" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={18}/></button>{/if}<button class="icon-button" aria-label={focusedReview ? "Return to folder" : "Expand review"} title={focusedReview ? "Return to folder (Esc)" : "Expand review"} onclick={() => focusedReview ? void returnToFolder() : focusedReview = true}>{#if focusedReview}<Minimize2 size={18}/>{:else}<Maximize2 size={18}/>{/if}</button><button class="icon-button" aria-label="Close review" title="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div></div>
           {#if activeMediaJob}<div class="media-job" role="status"><span>Processing: {activeMediaJob.status === 'ready' ? 'Ready' : activeMediaJob.status === 'error' ? 'Needs attention' : activeMediaJob.status === 'queued' ? 'Queued' : `${activeMediaJob.stage} in progress`}</span>{#if activeMediaJob.runId}<a href={`https://trigger.v1su4.dev/orgs/v1su4-91d9/projects/review-room-YXaz/env/prod/runs/${activeMediaJob.runId}`} target="_blank" rel="noopener noreferrer">Run {activeMediaJob.runId.slice(-8)}</a>{/if}{#if activeMediaJob.status === 'error' || (activeMediaJob.status === 'queued' && !activeMediaJob.runId)}<button onclick={() => retryMediaJob(activeMediaJob._id)}>{activeMediaJob.status === 'error' ? 'Retry' : 'Start processing'}</button>{:else if activeMediaJob.status === 'running'}<button onclick={() => processingObserver?.refresh()}>Refresh</button>{/if}</div>{/if}
           {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={reviewEnded} loop={!preview && reviewPlaybackMode === 'loop'} onfailure={previewFailed} sourceBlob={active.sourceFile instanceof File ? active.sourceFile : undefined} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} availability={active.availability ?? 'ready'} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
               canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => { updateAsset(active.id, info); readySource = active.url; }}/>{/if}
@@ -926,12 +966,12 @@
           <Tabs.Root value={compactInspector ? 'notes' : inspectorTab} onValueChange={value => { if (!compactInspector) inspectorTab = value; }}>
             <div class="inspector-heading">
               <Tabs.List class="inspector-tabs" aria-label="Asset inspector panels"><Tabs.Trigger value="notes" bind:ref={notesTrigger}>Notes <span>{active.comments.length}</span></Tabs.Trigger>{#if !compactInspector}<Tabs.Trigger value="fields">Fields</Tabs.Trigger>{/if}</Tabs.List>
-              <MetadataSheet asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onOpen={stopPreview} onDesktopClose={() => notesTrigger?.focus()}/>
+              <MetadataSheet asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onSave={live ? saveVersionMetadata : undefined} {referenceImages} onOpen={stopPreview} onDesktopClose={() => notesTrigger?.focus()}/>
             </div>
             <Tabs.Content value="notes">
           <ReviewNotes showHeader={false} comments={active.comments} draft={active.draft.body} time={active.draft.body && active.draft.timecodeSec !== null ? active.draft.timecodeSec : currentTime} isVideo={active.type === 'video'} pinTime={active.draft.body ? active.draft.timecodeSec !== null : pinTime} onPinTime={value => { pinTime = value; review({type:'draft',assetId:active.id,body:active.draft.body,timecodeSec:value && active.type === 'video' ? currentTime : null}); }} onDraft={updateDraft} onPublish={comment} onSeek={time => player?.seek(time)} onComplete={commentId => review({type:'toggle-comment-complete',assetId:active.id,commentId,actorId:'local-reviewer',at:Date.now()})} onReact={(commentId,emoji) => review({type:'toggle-comment-reaction',assetId:active.id,commentId,actorId:'local-reviewer',emoji})}/>
           </Tabs.Content>
-            <Tabs.Content value="fields"><AssetDetails asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset}/></Tabs.Content>
+            <Tabs.Content value="fields"><AssetDetails asset={active} review={active} {knownTags} canEdit={true} onChange={updateAsset} onSave={live ? saveVersionMetadata : undefined} {referenceImages}/></Tabs.Content>
           </Tabs.Root>
         </section>{/if}
       {/snippet}

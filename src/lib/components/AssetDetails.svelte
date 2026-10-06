@@ -3,7 +3,16 @@
   import type { ReviewAsset } from '$lib/review';
   import type { AssetReview } from '$lib/review-session';
   import { filterMetadataFields, normalizeCreativeMetadata, normalizeTags, type AssetMetadataPatch, type CreativeMetadata, type CustomMetadataField, type MetadataField, type MetadataFilter } from '$lib/asset-metadata';
-  let { asset, review, knownTags = [], canEdit = false, onChange }: { asset: ReviewAsset; review?: AssetReview; knownTags?: readonly string[]; canEdit?: boolean; onChange: (id: string, patch: AssetMetadataPatch) => void } = $props();
+  let { asset, review, knownTags = [], canEdit = false, onChange, onSave, referenceImages = [] }: { asset: ReviewAsset; review?: AssetReview; knownTags?: readonly string[]; canEdit?: boolean; onChange: (id: string, patch: AssetMetadataPatch) => void; onSave?: (id: string) => Promise<void>; referenceImages?: { versionId: string; label: string; url: string }[] } = $props();
+  let saves = $state<Record<string, { busy: boolean; message: string }>>({});
+  let customModels = $state<Record<string, boolean>>({});
+  async function save() {
+    const id = asset.id;
+    if (!onSave || saves[id]?.busy) return;
+    saves[id] = { busy: true, message: '' };
+    try { await onSave(id); saves[id] = { busy: false, message: 'Saved' }; }
+    catch (cause) { saves[id] = { busy: false, message: cause instanceof Error ? cause.message : 'Could not save. Your draft is retained.' }; }
+  }
   const uid = $props.id();
   let group = $state<MetadataFilter['group']>('all');
   let presence = $state<MetadataFilter['presence']>('all');
@@ -16,6 +25,7 @@
   const states = ['all', 'empty', 'filled'] as const;
   const kinds = ['text', 'number', 'boolean', 'date'] as const;
   let metadata = $derived(normalizeCreativeMetadata(asset.metadata));
+  let modelOptions = $derived([...new Set(['Seedance 2.0', 'Seedance 2.5', 'Sora 2', 'MiniMax H3', 'Kling', 'Veo 3', ...(metadata.model ? [metadata.model] : [])])]);
   let suggestions = $derived(normalizeTags(knownTags).filter(tag => !asset.tags.some(existing => existing.toLocaleLowerCase() === tag.toLocaleLowerCase())));
   let rows = $derived<MetadataField[]>([
     { id: 'status', label: 'Status', group: 'essentials', value: review?.status.replaceAll('_', ' ') },
@@ -39,12 +49,14 @@
     { id: 'notes', label: 'Production notes', group: 'creative', value: metadata.notes },
     { id: 'prompt', label: 'Prompt', group: 'creative', value: metadata.prompt },
     { id: 'model', label: 'Model', group: 'creative', value: metadata.model },
+    { id: 'sourceLabel', label: 'Source label', group: 'creative', value: metadata.sourceLabel },
+    { id: 'sourceCreatedAt', label: 'Source created', group: 'creative', value: metadata.sourceCreatedAt === undefined ? '' : new Date(metadata.sourceCreatedAt).toISOString() },
     { id: 'releaseDate', label: 'Release date', group: 'creative', value: metadata.releaseDate },
     { id: 'releasePlatforms', label: 'Release platforms', group: 'creative', value: metadata.releasePlatforms.join(', ') },
     ...metadata.customFields.map(field => ({ id: `custom:${field.id}`, label: field.label, group: 'creative' as const, value: field.value }))
   ]);
   let visible = $derived(filterMetadataFields(rows, { group, presence, search }));
-  function change(patch: AssetMetadataPatch) { if (canEdit) onChange(asset.id, patch); }
+  function change(patch: AssetMetadataPatch) { if (canEdit && !saves[asset.id]?.busy) { onChange(asset.id, patch); saves[asset.id] = { busy: false, message: 'Unsaved changes' }; } }
   function changeCreative(patch: Partial<CreativeMetadata>) { change({ metadata: normalizeCreativeMetadata({ ...metadata, ...patch }) }); }
   function addTags(value: string) { if (canEdit) { change({ tags: normalizeTags([...asset.tags, ...value.split(',')]) }); tagDrafts[asset.id] = ''; } }
   function editCustom(field: CustomMetadataField, raw: string) {
@@ -71,7 +83,7 @@
     <div class="group-options" aria-label="Field groups">{#each groups as item (item)}<button type="button" class:chosen={group === item} aria-pressed={group === item} onclick={() => group = item}>{item}</button>{/each}</div>
     <div class="field-search"><Search size={13} aria-hidden="true"/><input aria-label="Search metadata fields" placeholder="Search fields" bind:value={search}/><select aria-label="Field completeness" bind:value={presence}>{#each states as item (item)}<option value={item}>{item === 'all' ? 'All fields' : item === 'empty' ? 'Empty' : 'Filled'}</option>{/each}</select></div>
   </div>
-  <div class="field-list">
+  <fieldset class="field-list" disabled={saves[asset.id]?.busy}>
     {#each visible as row (row.id)}
       {@const custom = row.id.startsWith('custom:') ? metadata.customFields.find(field => `custom:${field.id}` === row.id) : undefined}
       <div class:wide={['tags', 'notes', 'prompt', 'releasePlatforms'].includes(row.id)} class="field-row">
@@ -84,7 +96,12 @@
             {#if canEdit}<form class="tag-entry" onsubmit={event => { event.preventDefault(); addTags(tagDrafts[asset.id] ?? ''); }}><input id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label="Add tags" placeholder="Add tags…" list={`tag-suggestions-${uid}-${asset.id}`} maxlength="500" value={tagDrafts[asset.id] ?? ''} oninput={event => tagDrafts[asset.id] = event.currentTarget.value}/><button type="submit" aria-label="Add tags" disabled={!tagDrafts[asset.id]?.trim()}><Plus size={14}/></button><datalist id={`tag-suggestions-${uid}-${asset.id}`}>{#each suggestions as tag (tag)}<option value={tag}></option>{/each}</datalist></form>{/if}
           {:else if (row.id === 'notes' || row.id === 'prompt') && canEdit}
             <textarea id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label={row.label} rows="3" value={row.value as string} placeholder="—" onchange={event => changeCreative({ [row.id]: event.currentTarget.value })}></textarea>
-          {:else if (row.id === 'model' || row.id === 'releaseDate' || row.id === 'releasePlatforms') && canEdit}
+          {:else if row.id === 'model' && canEdit}
+            <select id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label="Model" value={customModels[asset.id] ? '__custom__' : metadata.model} onchange={event => { customModels[asset.id] = event.currentTarget.value === '__custom__'; if (!customModels[asset.id]) changeCreative({ model: event.currentTarget.value }); }}><option value="">—</option>{#each modelOptions as model (model)}<option value={model}>{model}</option>{/each}<option value="__custom__">Custom model…</option></select>
+            {#if customModels[asset.id]}<input aria-label="Custom model name" maxlength="200" value={metadata.model} onchange={event => changeCreative({ model: event.currentTarget.value })}/>{/if}
+          {:else if row.id === 'sourceCreatedAt' && canEdit}
+            <input id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label="Source created (UTC)" type="datetime-local" value={metadata.sourceCreatedAt === undefined ? '' : new Date(metadata.sourceCreatedAt).toISOString().slice(0, 16)} onchange={event => changeCreative({ sourceCreatedAt: event.currentTarget.value ? Date.parse(event.currentTarget.value + ':00Z') : undefined })}/>
+          {:else if (row.id === 'sourceLabel' || row.id === 'releaseDate' || row.id === 'releasePlatforms') && canEdit}
             <input id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label={row.label} type={row.id === 'releaseDate' ? 'date' : 'text'} value={row.value as string} placeholder={row.id === 'releasePlatforms' ? 'Web, Instagram, cinema…' : '—'} onchange={event => changeCreative(row.id === 'releasePlatforms' ? { releasePlatforms: normalizeTags(event.currentTarget.value.split(',')) } : { [row.id]: event.currentTarget.value })}/>
           {:else if custom && canEdit}
             <div class="custom-control">{#if custom.kind === 'boolean'}<select id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label={custom.label} value={custom.value === null ? '' : String(custom.value)} onchange={event => editCustom(custom, event.currentTarget.value)}><option value="">—</option><option value="true">Yes</option><option value="false">No</option></select>{:else}<input id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label={custom.label} type={custom.kind === 'number' ? 'number' : custom.kind === 'date' ? 'date' : 'text'} step={custom.kind === 'number' ? 'any' : undefined} value={custom.value ?? ''} placeholder="—" onchange={event => editCustom(custom, event.currentTarget.value)}/>{/if}<button type="button" class="remove-field" aria-label={`Remove field ${custom.label}`} onclick={() => changeCreative({ customFields: metadata.customFields.filter(field => field.id !== custom.id) })}><X size={12}/></button></div>
@@ -92,13 +109,29 @@
         </div>
       </div>
     {:else}<p class="no-fields">No fields match these filters.</p>{/each}
-  </div>
+  </fieldset>
   {#if canEdit && (group === 'all' || group === 'creative')}
     <div class="custom-fields">{#if customDraft.open}<form onsubmit={event => { event.preventDefault(); addField(); }}><input aria-label="Custom field name" placeholder="Field name" maxlength="80" value={customDraft.name} oninput={event => updateCustomDraft({ name: event.currentTarget.value })} required/><select aria-label="Custom field type" value={customDraft.kind} onchange={event => { const kind = event.currentTarget.value; if (kind === 'text' || kind === 'number' || kind === 'boolean' || kind === 'date') updateCustomDraft({ kind }); }}>{#each kinds as kind (kind)}<option value={kind}>{kind === 'boolean' ? 'Yes / No' : kind[0].toUpperCase() + kind.slice(1)}</option>{/each}</select><div class="custom-actions"><button type="button" onclick={() => updateCustomDraft({ open: false })}>Cancel</button><button type="submit" class="chosen" disabled={!customDraft.name.trim()}>Add field</button></div></form>{:else}<button type="button" class="add-field" onclick={() => updateCustomDraft({ open: true })}><Plus size={13}/> Add field</button>{/if}</div>
   {/if}
+  {#if asset.versionId && (group === 'all' || group === 'creative')}
+    <div class="reference-fields">
+      <label for={`grid-${uid}`}>Image grid</label>
+      <select id={`grid-${uid}`} disabled={!canEdit || saves[asset.id]?.busy} value={metadata.gridImageVersionId ?? ''} onchange={event => changeCreative({ gridImageVersionId: event.currentTarget.value || undefined })}><option value="">—</option>{#each referenceImages as image (image.versionId)}<option value={image.versionId}>{image.label}</option>{/each}</select>
+      <label for={`refs-${uid}`}>Reference images</label>
+      <select id={`refs-${uid}`} multiple disabled={!canEdit || saves[asset.id]?.busy} value={metadata.referenceImageVersionIds ?? []} onchange={event => changeCreative({ referenceImageVersionIds: Array.from(event.currentTarget.selectedOptions, option => option.value) })}>{#each referenceImages as image (image.versionId)}<option value={image.versionId}>{image.label}</option>{/each}</select>
+      <div class="reference-previews">{#each referenceImages.filter(image => image.versionId === metadata.gridImageVersionId || metadata.referenceImageVersionIds?.includes(image.versionId)) as image (image.versionId)}<a href={image.url} target="_blank" rel="noreferrer"><img src={image.url} alt={image.label} loading="lazy"/></a>{/each}</div>
+    </div>
+  {/if}
+  {#if canEdit && onSave}<div class="save-fields"><button type="button" class="chosen" disabled={!asset.versionId || saves[asset.id]?.busy} onclick={save}>{saves[asset.id]?.busy ? 'Saving…' : 'Save version metadata'}</button><p role="status">{saves[asset.id]?.message ?? ''}</p></div>{/if}
 </section>
 <style>
   .asset-fields { min-width: 0; font-size: 11px; color: var(--ink); }
+  fieldset.field-list { border: 0; padding: 0; margin: 0; min-width: 0; }
+  .save-fields,.reference-fields { display: grid; gap: 8px; padding: 12px 0; }
+  .save-fields button { padding: 9px; }
+  .save-fields p { margin: 0; color: var(--muted); }
+  .reference-previews { display: flex; flex-wrap: wrap; gap: 6px; }
+  .reference-previews img { width: 90px; height: 70px; object-fit: contain; }
   .field-tools { padding: 12px 0; border-bottom: 1px solid var(--border); display: grid; gap: 10px; }
   .group-options { display: flex; flex-wrap: wrap; gap: 3px; }
   button { font: inherit; color: var(--muted); border: 0; background: transparent; border-radius: 4px; cursor: pointer; }

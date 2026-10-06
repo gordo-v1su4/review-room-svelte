@@ -1,13 +1,14 @@
 type JsonObject = Record<string, unknown>;
 function object(value: unknown): value is JsonObject { return !!value && typeof value === 'object' && !Array.isArray(value); }
-export type SourceMediaMapping = { assetId: string; sourceArtifactId: string; displayedVersionNumber?: number };
+export type SourceMediaMapping = { assetId: string; sourceArtifactId: string; displayedVersionNumber?: number; versionId?: string; kind?: string };
 export function parseSourceImport(sourceJson: string, mappingsJson: string) {
   const source: unknown = JSON.parse(sourceJson);
   const mappings: unknown = JSON.parse(mappingsJson);
   if (!object(source) || !Array.isArray(source.artifacts) || !source.artifacts.every(object) || !Array.isArray(mappings)) throw new Error('Invalid import metadata');
   const mediaMappings: SourceMediaMapping[] = mappings.map(value => {
     if (!object(value) || typeof value.assetId !== 'string' || !value.assetId || typeof value.sourceArtifactId !== 'string' || !value.sourceArtifactId || (value.displayedVersionNumber !== undefined && (!Number.isSafeInteger(value.displayedVersionNumber) || (value.displayedVersionNumber as number) < 1))) throw new Error('Invalid import mapping');
-    return { assetId: value.assetId, sourceArtifactId: value.sourceArtifactId, displayedVersionNumber: value.displayedVersionNumber as number | undefined };
+    if ((value.versionId !== undefined && typeof value.versionId !== 'string') || (value.kind !== undefined && typeof value.kind !== 'string')) throw new Error('Invalid import mapping');
+    return { assetId: value.assetId, sourceArtifactId: value.sourceArtifactId, displayedVersionNumber: value.displayedVersionNumber as number | undefined, versionId: value.versionId as string | undefined, kind: value.kind as string | undefined };
   });
   return { artifacts: source.artifacts as JsonObject[], mediaMappings };
 }

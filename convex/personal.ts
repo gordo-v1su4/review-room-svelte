@@ -1,4 +1,5 @@
 import { purgeDependencyBatch } from './lib/archivePurge';
+import { creativeMetadata, writeVersionMetadata } from './lib/versionMetadata';
 import { importedMediaMetadata } from './lib/sourceImport';
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
@@ -375,6 +376,14 @@ export const approveAsset = internalMutation({
   },
 });
 
+export const updateVersionMetadata = internalMutation({
+  args: { versionId: v.id('assetVersions'), metadata: creativeMetadata, expectedUpdatedAt: v.optional(v.union(v.number(), v.null())) },
+  handler: async (ctx, { versionId, metadata, expectedUpdatedAt }) => {
+    const profile = await owner(ctx);
+    return await writeVersionMetadata(ctx, profile._id, versionId, metadata, expectedUpdatedAt);
+  },
+});
+
 export const updateAssetReview = internalMutation({
   args: { assetId: v.id('videos'), status: v.optional(v.string()),
     rating: v.optional(v.number()), shortlisted: v.optional(v.boolean()),
@@ -608,14 +617,15 @@ export const reviewMedia = internalQuery({
 });
 
 export const ownerMedia = internalQuery({
-  args: { assetId: v.id("videos"), poster: v.boolean() },
+  args: { assetId: v.id("videos"), poster: v.boolean(), versionId: v.optional(v.id('assetVersions')) },
   handler: async (ctx, args) => {
     const asset = await ctx.db.get(args.assetId);
     if (!asset) return null;
     await ownedProject(ctx, asset.projectId, true);
-    if (asset.processingStatus !== "ready" || !asset.currentVersionId) return null;
-    const version = await ctx.db.get(asset.currentVersionId);
-    if (!version || version.processingState !== "ready") return null;
+    const versionId = args.versionId ?? asset.currentVersionId;
+    if (!versionId || (!args.versionId && asset.processingStatus !== 'ready')) return null;
+    const version = await ctx.db.get(versionId);
+    if (!version || version.assetId !== asset._id || version.processingState !== "ready") return null;
     return { key: args.poster ? version.posterKey : version.originalKey,
       mimeType: args.poster ? "image/jpeg" : version.mimeType };
   },

@@ -131,6 +131,20 @@ export const catalog = internalMutation({
   },
 });
 
+export const versionMetadata = internalMutation({
+  args: { keyDigest: v.string(), versionId: v.id('assetVersions') },
+  handler: async (ctx, { keyDigest, versionId }) => {
+    const version = await ctx.db.get(versionId);
+    const asset = version && await ctx.db.get(version.assetId);
+    const credential = await authorize(ctx, keyDigest, 'media:read', asset?.projectId);
+    const project = asset && await ctx.db.get(asset.projectId);
+    if (!version || !asset || !project || project.archived || project.createdBy !== credential.createdBy) throw new Error('Version unavailable');
+    return { versionId, assetId: asset._id, projectId: project._id, version: version.version,
+      metadata: version.creativeMetadata ?? { model: '', prompt: '', sourceLabel: '', referenceImageVersionIds: [] },
+      updatedAt: version.metadataUpdatedAt ?? null };
+  },
+});
+
 export const createFolder = internalMutation({
   args: { ...request, projectId: v.id('projects'), title: v.string(), parentFolderId: v.optional(v.id('projectFolders')) },
   handler: async (ctx, args) => {

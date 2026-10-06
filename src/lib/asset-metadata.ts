@@ -1,10 +1,14 @@
-/** Device-local production metadata. Live adapters must validate authorization and persist separately. */
+/** Creative fields are version-scoped in live workspaces; fixture adapters remain local. */
 export type CustomMetadataField = { id: string; label: string } & (
   | { kind: 'text' | 'date'; value: string }
   | { kind: 'number'; value: number | null }
   | { kind: 'boolean'; value: boolean | null }
 );
 export type CreativeMetadata = {
+  sourceLabel?: string;
+  sourceCreatedAt?: number;
+  gridImageVersionId?: string;
+  referenceImageVersionIds?: string[];
   notes: string;
   prompt: string;
   model: string;
@@ -54,6 +58,10 @@ export function normalizeCreativeMetadata(value: unknown): CreativeMetadata {
     ids.add(field.id);
   }
   return {
+    sourceLabel: text('sourceLabel'),
+    sourceCreatedAt: typeof input.sourceCreatedAt === 'number' && Number.isFinite(input.sourceCreatedAt) ? input.sourceCreatedAt : undefined,
+    gridImageVersionId: typeof input.gridImageVersionId === 'string' && input.gridImageVersionId ? input.gridImageVersionId : undefined,
+    referenceImageVersionIds: Array.isArray(input.referenceImageVersionIds) ? [...new Set(input.referenceImageVersionIds.filter((id): id is string => typeof id === 'string' && !!id))] : [],
     notes: text('notes'), prompt: text('prompt'), model: text('model'), releaseDate: dateValue(input.releaseDate),
     releasePlatforms: normalizeTags(Array.isArray(input.releasePlatforms) ? input.releasePlatforms.filter((item): item is string => typeof item === 'string') : []),
     customFields

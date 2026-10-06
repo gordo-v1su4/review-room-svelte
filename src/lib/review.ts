@@ -1,5 +1,5 @@
 import type { CreativeMetadata } from './asset-metadata';
-export type ReviewAsset = { availability?: 'queued' | 'running' | 'error' | 'ready'; id: string; name: string; url: string; poster?: string; type: 'video' | 'image'; size: number; sourceFile: Pick<File, 'name' | 'type'>; assetClass: 'VID' | 'IMG' | 'CTX' | 'STB'; importedAt: number; tags: string[]; assetCode: string; duration?: number; width?: number; height?: number; fps?: number; codec?: string; metadata?: CreativeMetadata };
+export type ReviewAsset = { versionId?: string; metadataUpdatedAt?: number | null; availability?: 'queued' | 'running' | 'error' | 'ready'; id: string; name: string; url: string; poster?: string; type: 'video' | 'image'; size: number; sourceFile: Pick<File, 'name' | 'type'>; assetClass: 'VID' | 'IMG' | 'CTX' | 'STB'; importedAt: number; tags: string[]; assetCode: string; duration?: number; width?: number; height?: number; fps?: number; codec?: string; metadata?: CreativeMetadata };
 export type LocalAsset = ReviewAsset & { sourceFile: File };
 export function openLocalAsset(file: File): LocalAsset {
   // Keep the original upload format contract when OS file pickers omit MIME data.

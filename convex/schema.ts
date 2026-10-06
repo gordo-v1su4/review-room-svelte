@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
+import { creativeMetadata } from './lib/versionMetadata';
 
 const status = v.union(
   v.literal("not_started"),
@@ -272,6 +273,8 @@ const applicationTables = {
     sizeBytes: v.number(),
     etag: v.optional(v.string()),
     processingState: v.union(v.literal("processing"), v.literal("ready"), v.literal("error")),
+    creativeMetadata: v.optional(creativeMetadata),
+    metadataUpdatedAt: v.optional(v.number()),
     createdAt: v.number(),
   }).index("by_asset", ["assetId"]),
 
