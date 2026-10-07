@@ -14,7 +14,8 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
     const dispatch = session.completedJobId
       ? await dispatchMediaJob(session.completedJobId, 1)
       : { dispatched: false as const, reason: 'Legacy upload has no media job' };
-    return json({ assetId: session.completedAssetId, jobId: session.completedJobId, ...dispatch },
+    const asset = await db().query(personal.uploadDescriptor, { assetId: session.completedAssetId });
+    return json({ assetId: session.completedAssetId, jobId: session.completedJobId, asset, ...dispatch },
       { headers: { 'cache-control': 'no-store' } });
   }
   try {
@@ -30,7 +31,8 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
     catch { console.error('Upload staging cleanup failed'); }
     const dispatch = jobId ? await dispatchMediaJob(jobId, 1)
       : { dispatched: false as const, reason: 'Trigger processing is not configured' };
-    return json({ assetId, jobId, ...dispatch }, { headers: { 'cache-control': 'no-store' } });
+    const asset = await db().query(personal.uploadDescriptor, { assetId });
+    return json({ assetId, jobId, asset, ...dispatch }, { headers: { 'cache-control': 'no-store' } });
   } catch (cause) {
     await db().mutation(personal.failUpload, { sessionId: session._id, finalizingAt: session.finalizingAt });
     throw cause;

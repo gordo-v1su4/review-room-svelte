@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { ConvexHttpClient } from 'convex/browser';
 import { anyApi } from 'convex/server';
-import { S3Client, PutObjectCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, HeadObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 // Run through the BWS process wrapper. Fixture imports only append new QA rows.
 const url = 'https://review-convex.v1su4.dev';
@@ -29,6 +29,23 @@ async function append(table, rows) {
   const [output, errors, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
   assert.equal(code, 0, `Synthetic ${table} append failed: ${errors.replaceAll(process.env.REVIEW_ROOM_CONVEX_SELF_HOSTED_ADMIN_KEY, '<REDACTED>')}`);
   console.log(`Appended ${rows.length} synthetic ${table} rows`);
+}
+async function dependentCounts(state) {
+  const query = `const projectId=${JSON.stringify(state.projectId)}, assetId=${JSON.stringify(state.assetId)}, token=${JSON.stringify(state.runId)};
+    return { uploadSessions:(await ctx.db.query('uploadSessions').withIndex('by_project',q=>q.eq('projectId',projectId)).collect()).length,
+      commentReactions:(await ctx.db.query('commentReactions').withIndex('by_project',q=>q.eq('projectId',projectId)).collect()).length,
+      preferences:(await ctx.db.query('workspacePreferences').withIndex('by_project_user',q=>q.eq('projectId',projectId)).collect()).length,
+      reviewerSessions:(await ctx.db.query('reviewerSessions').withIndex('by_token',q=>q.eq('token',token)).collect()).length };`;
+  // Use the same readonly run_test_function protocol as the installed Convex CLI;
+  // its Windows process prints the result then crashes during libuv shutdown.
+  const response = await fetch(url + '/api/run_test_function', { method: 'POST', headers: { 'content-type': 'application/json',
+    authorization: `Convex ${process.env.REVIEW_ROOM_CONVEX_SELF_HOSTED_ADMIN_KEY}` }, body: JSON.stringify({
+      adminKey: process.env.REVIEW_ROOM_CONVEX_SELF_HOSTED_ADMIN_KEY, args: {}, format: 'convex_encoded_json',
+      bundle: { path: 'testQuery.js', source: `import { query } from "convex:/_system/repl/wrappers.js"; export default query({handler:async(ctx)=>{${query}}});` } }) });
+  assert(response.ok, `Readonly fixture observation failed (${response.status})`);
+  const result = await response.json();
+  assert.equal(result.status, 'success', 'Readonly fixture observation failed');
+  return result.value;
 }
 const snapshot = () => client.query(anyApi.personal.snapshot, {});
 async function head(key) {
@@ -116,7 +133,7 @@ if (stage === 'setup') {
   assert.equal(waiting.versions.length, 101, 'Purge must wait for the active synthetic upload');
   console.log(JSON.stringify({ stage, projectId, queued: true, restoreLocked: true, activeUploadWait: true, syntheticVersions: 101, syntheticFolders: 110 }));
 } else {
-  state = JSON.parse(readFileSync(statePath, 'utf8'));
+  state = JSON.parse(readFileSync(stage === 'cleanup-orphan' ? `${directory}/pre-fix-state.json.local` : statePath, 'utf8'));
   assert(state.title.startsWith('Scheduled purge QA 2026-10-07 ') && Object.values(state.keys).every(key => key.startsWith(`assets/${state.projectId}/purge-qa-`)), 'Fixture scope mismatch');
   if (stage === 'release') {
     assert(Date.now() > state.expiresAt, 'Allow the bounded twenty-second synthetic upload expiry');
@@ -134,12 +151,22 @@ if (stage === 'setup') {
     // every following dependency transaction is scheduled by the real implementation.
     await client.mutation(anyApi.personal.continueArchivedPurge, { projectId: state.projectId, ownerId: state.ownerId });
     console.log(JSON.stringify({ stage, queuedJobWait: true, runningJobWait: true, duplicateStartIdempotent: true, resumedContinuation: true }));
+  } else if (stage === 'cleanup-orphan') {
+    const s = await snapshot();
+    assert(!s.projects.some(row => row._id === state.projectId), 'Old disposable project must already be purged');
+    assert(state.keys.cover.endsWith('/cover.jpg'), 'Only the exact known synthetic cover orphan may be removed');
+    await storage.send(new DeleteObjectCommand({ Bucket: bucket, Key: state.keys.cover }));
+    assert.equal((await head(state.keys.cover)).status, 404, 'Exact synthetic orphan must be absent');
+    const summary = JSON.parse(readFileSync(summaryPath, 'utf8'));
+    summary.oldSyntheticOrphanCleanup = { projectId: state.projectId, exactObjects: 1, objectAbsent: true };
+    writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+    console.log(JSON.stringify(summary.oldSyntheticOrphanCleanup));
   } else if (stage === 'check') {
     const after = await snapshot();
     const remaining = scoped(after, state.projectId);
     const actual = await Promise.all(Object.entries(state.keys).map(async ([kind, key]) => ({ kind, ...await head(key) })));
     const summary = { observedAt: new Date().toISOString(), projectId: state.projectId,
-      remaining: Object.fromEntries(Object.entries(remaining).map(([table, rows]) => [table, rows.length])), storage: actual,
+      remaining: { ...Object.fromEntries(Object.entries(remaining).map(([table, rows]) => [table, rows.length])), ...await dependentCounts(state) }, storage: actual,
       canonicalCount: scoped(after, state.canonicalId).assets.length,
       canonicalUnchanged: hash(scoped(after, state.canonicalId)) === state.canonicalDigest,
       canonicalObject: await head(state.canonicalKey) };

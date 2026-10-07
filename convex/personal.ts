@@ -479,6 +479,32 @@ export const createReviewLink = internalMutation({
   },
 });
 
+export const uploadDescriptor = internalQuery({
+  args: { assetId: v.id('videos') },
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) throw new Error('Asset unavailable');
+    await ownedProject(ctx, asset.projectId);
+    return { id: asset._id, projectId: asset.projectId, folderId: asset.folderId, name: asset.assetCode ?? asset.title,
+      assetCode: asset.assetCode ?? '', assetClass: asset.assetClass ?? (asset.mimeType.startsWith('image/') ? 'IMG' as const : 'VID' as const),
+      versionId: asset.currentVersionId, mimeType: asset.mimeType, size: asset.sizeBytes ?? 0,
+      duration: asset.durationSec, width: asset.width, height: asset.height, importedAt: asset.uploadedAt };
+  }
+});
+
+export const cancelUpload = internalMutation({
+  args: { sessionId: v.id('uploadSessions') },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) throw new Error('Upload unavailable');
+    await ownedProject(ctx, session.projectId, true);
+    if (session.status === 'complete') return { cancelled: false, complete: true };
+    if (session.status === 'finalizing') throw new Error('Upload verification is already in progress');
+    await ctx.db.patch(session._id, { status: 'failed' });
+    return { cancelled: true, complete: false };
+  }
+});
+
 export const setAssetDownload = internalMutation({
   args: { assetId: v.id('videos'), enabled: v.boolean() },
   handler: async (ctx, args) => {

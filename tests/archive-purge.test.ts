@@ -63,3 +63,17 @@ test('archive purge removes publication references across showcase pages without
   expect(last.showcases.length).toBe(105);
   expect(last.showcases.every(row => row.publicationIds.length === 1 && row.publicationIds[0] === ids.retained)).toBe(true);
 });
+
+test('scheduled continuation requires the captured owner and the archived purge lock', async () => {
+  const { t, owner, project } = await fixture();
+  const other = await t.run(async ctx => {
+    const user = await ctx.db.insert('users', { email: 'other@purge.invalid' });
+    return ctx.db.insert('appUsers', { authUserId: user, name: 'Other', role: 'admin' });
+  });
+  await expect(t.mutation(internal.personal.continueArchivedPurge, { projectId: project, ownerId: other })).rejects.toThrow('Purge project unavailable');
+  await t.run(ctx => ctx.db.patch(project, { archived: false }));
+  await expect(t.mutation(internal.personal.continueArchivedPurge, { projectId: project, ownerId: owner })).rejects.toThrow('Purge project unavailable');
+  await t.run(ctx => ctx.db.patch(project, { archived: true, purgeStartedAt: undefined }));
+  await expect(t.mutation(internal.personal.continueArchivedPurge, { projectId: project, ownerId: owner })).rejects.toThrow('Purge project unavailable');
+  expect(await t.run(ctx => ctx.db.get(project))).not.toBeNull();
+});

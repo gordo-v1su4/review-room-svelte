@@ -32,8 +32,8 @@ const saved=await owner(consent); assert.deepEqual(await owner(consent),saved,'C
 for(let i=0;i<30;i++){const operations=await c.query('destinationRefresh:snapshot',{projectId});const operation=operations.find(x=>x.id===saved.refreshId);if(operation.state==='complete')break;assert(!['failed','disconnected'].includes(operation.state),'Refresh delivery failed');await new Promise(r=>setTimeout(r,1000));}
 assert.equal((await c.query('destinationRefresh:snapshot',{projectId})).find(x=>x.id===saved.refreshId).state,'complete');
 const after=await catalog(), current=after.find(a=>a.artifact_id===artifact.artifact_id);
-assert.equal(current.media_url,artifact.media_url); assert.equal(current.version_number,artifact.version_number);assert.equal(current.created_at,artifact.created_at);
-if(artifact.shot_grid_url) assert.equal(current.shot_grid_url,artifact.shot_grid_url);
+assert(current.media_url===artifact.media_url,'Published root URL changed'); assert.equal(current.version_number,artifact.version_number);assert.equal(current.created_at,artifact.created_at);
+if(artifact.shot_grid_url) assert(current.shot_grid_url===artifact.shot_grid_url,'Published grid URL changed');
 if(artifact.version_prompt) assert.equal(current.version_prompt,artifact.version_prompt);
 if(artifact.video_model) assert.equal(current.video_model,artifact.video_model);
 if(!canonical){ assert.equal(current.version_prompt,'Frozen refresh prompt');assert(current.shot_grid_url,'New image was not published');const image=await fetch(current.shot_grid_url);assert(image.ok && Number(image.headers.get('content-length'))>0,'New bounded image grant not readable'); }

@@ -62,6 +62,13 @@ if(mode==='prepare'){
   await wait(async()=> (await scope()).items.some(j=>j.versionId===state.video.versionId&&j.state==='synced'&&j.consentGeneration>state.oldGeneration));
   const artifacts=await catalog(),root=artifacts.find(a=>a.source_version_id===state.video.versionId);assert.equal(root.artifact_id,state.root.artifact_id);assert.equal(root.version_number,state.root.version_number);assert.equal((await fetch(state.root.media_url)).status,404);state.root=root;state.imageUrl=root.shot_grid_url;persist();
   awaitableSnapshot=await snap();summary('reactivated',{freshConsent:true,sameArtifactAndNumber:true,oldGrantDenied:true,canonicalUnchanged:true});
+}else if(mode==='stale-retry'){
+  const before=hash(await catalog());const source=await scope();const batch=source.batches.find(b=>b._id===state.batchId);
+  await owner('/api/owner-sync',{action:'retry',batchId:state.batchId});
+  const payload={run_id:state.runId,batch_id:batch.confirmationId,source_asset_id:state.video.assetId,source_version_id:state.video.versionId,source_created_at:new Date((await snap()).versions.find(v=>v._id===state.video.versionId).createdAt).toISOString(),consent_generation:state.oldGeneration,media_url:state.root.media_url,metadata:{sourceLabel:'Synthetic lifecycle',model:'QA',prompt:'Preserve source',referenceImageVersionIds:[]},references:[]};
+  const response=await fetch(target+'/external/review/versions',{method:'POST',headers:{authorization:'Bearer '+process.env.TRAILER_FEED_REVIEW_INGEST_KEY,'content-type':'application/json'},body:JSON.stringify(payload)});
+  assert.equal(response.status,409,'Stale registration accepted');assert.equal(hash(await catalog()),before,'Stale retry changed target');
+  awaitableSnapshot=await snap();summary('stale-retry',{genericRetryHarmless:true,stalePartnerRegister:409,targetUnchanged:true,canonicalUnchanged:true});
 }else if(mode==='delete-image'||mode==='delete-video'){
   const asset=mode==='delete-image'?state.image:state.video;const s=await snap();assert(s.assets.some(a=>a._id===asset.assetId&&a.projectId===state.projectId),'Delete outside synthetic fixture');
   await owner('/api/owner-assets/delete',{projectId:state.projectId,assetIds:[asset.assetId]});
@@ -71,6 +78,6 @@ if(mode==='prepare'){
   await wait(async()=> (await scope()).removals.some(x=>x.versionId===state.deletedVersion&&x.state==='complete'));
   const artifacts=await catalog();const imageDeleted=state.deletedVersion===state.image.versionId;
   assert.equal(artifacts.length,imageDeleted?1:0);
-  if(imageDeleted){assert.equal(artifacts[0].artifact_id,state.root.artifact_id);assert.equal(artifacts[0].media_url,state.root.media_url);assert(!artifacts[0].shot_grid_url);assert((await fetch(state.root.media_url)).ok);}
+  if(imageDeleted){assert.equal(artifacts[0].artifact_id,state.root.artifact_id);assert(artifacts[0].media_url===state.root.media_url,'Surviving root URL changed');assert(!artifacts[0].shot_grid_url);assert((await fetch(state.root.media_url)).ok);}
   awaitableSnapshot=await snap();summary('deletion-complete',{imageOnly:imageDeleted,targetRemovedExactly:true,survivingRootStable:imageDeleted,canonicalUnchanged:true});
 }else throw Error('Choose explicit lifecycle step');

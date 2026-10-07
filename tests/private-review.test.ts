@@ -40,5 +40,17 @@ test('exact original downloads enforce asset/link consent, archive, version owne
   await t.run(async ctx => { await ctx.db.patch(project, { archived: false }); await ctx.db.patch(link, { revokedAt: Date.now() }); });
   await expect(t.query(internal.privateReview.download, request)).rejects.toThrow('Review link unavailable');
 });
+test('upload cancellation cannot invalidate a committed receipt or interrupt active verification', async () => {
+  const { t, project } = await fixture();
+  const ticket = await t.mutation(internal.personal.beginUpload, { projectId: project, originalFilename: 'new.mp4', mimeType: 'video/mp4', sizeBytes: 100 });
+  const claim = await t.mutation(internal.personal.claimUpload, { sessionId: ticket.sessionId });
+  await expect(t.mutation(internal.personal.cancelUpload, { sessionId: ticket.sessionId })).rejects.toThrow('verification is already');
+  const completed = await t.mutation(internal.personal.finalizeUpload, { sessionId: ticket.sessionId, verifiedSizeBytes: 100, posterKey: ticket.objectKey.slice(0,ticket.objectKey.lastIndexOf('/'))+'/poster.jpg', durationSec: 1, width: 320, height: 180, processWithTrigger: true });
+  expect(await t.mutation(internal.personal.cancelUpload, { sessionId: ticket.sessionId })).toEqual({ cancelled: false, complete: true });
+  expect((await t.mutation(internal.personal.claimUpload, { sessionId: ticket.sessionId })).completedAssetId).toBe(typeof completed === 'string' ? completed : completed.assetId);
+  const pending = await t.mutation(internal.personal.beginUpload, { projectId: project, originalFilename: 'cancel.mp4', mimeType: 'video/mp4', sizeBytes: 100 });
+  expect(await t.mutation(internal.personal.cancelUpload, { sessionId: pending.sessionId })).toEqual({ cancelled: true, complete: false });
+  await expect(t.mutation(internal.personal.claimUpload, { sessionId: pending.sessionId })).rejects.toThrow('Upload session unavailable');
+});
 
 

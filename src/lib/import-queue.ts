@@ -2,10 +2,10 @@ import type { LocalAsset } from './review';
 
 export type ImportTarget = { projectId: string; folderId?: string; dateKey: string; assetClass: 'VID' | 'IMG' | 'CTX' | 'STB' };
 export type ImportRequest = { file: File; target: ImportTarget; destinationLabel: string };
-export type ImportJob = ImportRequest & { id: string; status: 'queued' | 'preparing' | 'ready' | 'failed' | 'cancelled'; error?: string };
+export type ImportJob = ImportRequest & { id: string; status: 'queued' | 'preparing' | 'ready' | 'failed' | 'cancelled'; error?: string; stage?: string; progress?: number; canCancel?: boolean };
 type ImportPort = {
   prepare: (file: File, signal: AbortSignal) => Promise<LocalAsset>;
-  commit: (asset: LocalAsset, target: ImportTarget) => void | Promise<void>;
+  commit: (asset: LocalAsset, target: ImportTarget, signal: AbortSignal, jobId: string) => void | Promise<void>;
   release: (asset: LocalAsset) => void;
   onChange: (jobs: readonly ImportJob[]) => void;
   concurrency?: number;
@@ -40,7 +40,7 @@ export function createImportQueue(port: ImportPort) {
     try {
       prepared = await port.prepare(job.file, controller.signal);
       if (disposed || controller.signal.aborted) return;
-      await port.commit({ ...prepared, id: job.id }, job.target);
+      await port.commit({ ...prepared, id: job.id }, job.target, controller.signal, job.id);
       prepared = undefined;
       job.status = 'ready';
     } catch (error) {
@@ -64,7 +64,7 @@ export function createImportQueue(port: ImportPort) {
     cancel(id: string) {
       if (disposed) return;
       const job = jobs.find(item => item.id === id);
-      if (!job || (job.status !== 'queued' && job.status !== 'preparing')) return;
+      if (!job || job.canCancel === false || (job.status !== 'queued' && job.status !== 'preparing')) return;
       job.status = 'cancelled';
       delete job.error;
       attempts.get(id)?.abort();
@@ -77,6 +77,7 @@ export function createImportQueue(port: ImportPort) {
       if (!job || (job.status !== 'failed' && job.status !== 'cancelled')) return;
       job.status = 'queued';
       delete job.error;
+      delete job.stage; delete job.progress; delete job.canCancel;
       publish();
       pump();
     },
@@ -84,6 +85,10 @@ export function createImportQueue(port: ImportPort) {
       if (disposed) return;
       jobs = jobs.filter(job => job.status !== 'ready' && job.status !== 'cancelled');
       publish();
+    },
+    update(id: string, value: Pick<ImportJob, 'stage' | 'progress' | 'canCancel'>) {
+      const job = jobs.find(job => job.id === id);
+      if (!disposed && job?.status === 'preparing') { Object.assign(job, value); publish(); }
     },
     dispose() {
       disposed = true;

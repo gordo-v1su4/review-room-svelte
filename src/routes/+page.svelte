@@ -211,11 +211,20 @@
   const thumbnails = createThumbnailExtractor({ concurrency: 2 });
   let disposed = false;
   let importJobs = $state.raw<readonly ImportJob[]>([]);
+  type LiveUploadAttempt = { session?: { sessionId: string; url: string; posterUrl: string }; preview?: { blob: Blob; duration: number; sourceWidth: number; sourceHeight: number }; assetId?: string };
+  const liveUploads = new Map<string, LiveUploadAttempt>();
   const importQueue = createImportQueue({
     prepare: prepareLocalImport,
-    commit: commitImport,
+    commit: (asset, target, signal, jobId) => live ? commitLiveImport(asset, target, signal, jobId) : commitImport(asset, target),
     release: asset => { URL.revokeObjectURL(asset.url); if (asset.poster) URL.revokeObjectURL(asset.poster); },
-    onChange: jobs => importJobs = jobs,
+    onChange: jobs => {
+      importJobs = jobs;
+      if (live) for (const job of jobs) activityFeed.upsert({ id: `upload:${job.id}`, kind: 'upload', label: job.file.name,
+        project: projects.find(project => project.id === job.target.projectId)?.name ?? 'Project', projectId: job.target.projectId,
+        assetId: liveUploads.get(job.id)?.assetId, updatedAt: Date.now(),
+        state: job.status === 'ready' ? 'complete' : job.status === 'preparing' ? 'running' : job.status,
+        stage: job.status === 'ready' ? 'Uploaded · queued for ingest' : job.status === 'failed' ? 'Upload failed · retry this file in Imports' : job.status === 'cancelled' ? 'Upload cancelled' : job.status === 'queued' ? 'Waiting to upload' : job.stage ?? 'Preparing preview', progress: job.progress });
+    },
     concurrency: 2
   });
   const coverRequests = new Map<string, symbol>();
@@ -390,29 +399,80 @@
     if (!response.ok) { feedback = `Could not retry processing (${response.status}).`; return; }
     processingObserver?.refresh();
   }
-  async function uploadOriginal(file: File, destination: { projectId: string; folderId: string | null }, report: (stage: string, progress?: number) => void) {
+  async function uploadOriginal(file: File, destination: { projectId: string; folderId: string | null }, report: (stage: string, progress?: number) => void, signal: AbortSignal, attempt: LiveUploadAttempt) {
     const isImage = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type);
     if (!file.type.startsWith('video/') && !isImage) throw new Error('Choose a video or a JPEG, PNG, WebP or AVIF image.');
     feedback = `Preparing preview for ${file.name}…`;
     report('Preparing preview');
-    const preview = isImage ? await imageUploadPreview(file) : await thumbnails.extract(file);
+    const preview = attempt.preview ??= isImage ? await imageUploadPreview(file) : await thumbnails.extract(file);
+    signal.throwIfAborted();
     feedback = `Uploading ${file.name}…`;
-    const begin = await fetch('/api/uploads/begin', { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...destination, name: file.name, type: file.type, size: file.size }) });
-    if (!begin.ok) throw new Error(await begin.text());
-    const session = await begin.json();
-    report('Uploading original', 0);
-    await uploadWithProgress(session.url, file, percent => report('Uploading original', percent));
-    report('Uploading preview');
-    const posterPut = await fetch(session.posterUrl, { method: 'PUT', headers: { 'content-type': 'image/jpeg' }, body: preview.blob });
-    if (!posterPut.ok) throw new Error(`Storage rejected the preview (${posterPut.status}).`);
-    feedback = `Verifying ${file.name}…`;
-    report('Verifying upload');
-    const finish = await fetch('/api/uploads/complete', { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId: session.sessionId, posterSizeBytes: preview.blob.size,
-        durationSec: preview.duration, width: preview.sourceWidth, height: preview.sourceHeight }) });
-    if (!finish.ok) throw new Error(await finish.text());
-    return await finish.json();
+    let completed = false;
+    if (attempt.session) {
+      const renewed = await fetch('/api/uploads/renew', { method: 'POST', signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId: attempt.session.sessionId }) });
+      if (renewed.status === 409) {
+        const cancelled = await fetch('/api/uploads/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId: attempt.session.sessionId }) });
+        if (!cancelled.ok) throw new Error('This upload may still be verifying. Wait briefly, then retry this file.');
+        const result = await cancelled.json();
+        if (result.complete) completed = true;
+        else if (result.cancelled) attempt.session = undefined;
+        else throw new Error('Could not confirm this upload state. Retry this file.');
+      }
+      else { if (!renewed.ok) throw new Error('Could not resume this upload. Check your sign-in and retry.'); const value = await renewed.json(); completed = !!value.complete; if (!completed) attempt.session = value; }
+    }
+    if (!attempt.session) {
+      const begin = await fetch('/api/uploads/begin', { method: 'POST', signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...destination, name: file.name, type: file.type, size: file.size }) });
+      if (!begin.ok) throw new Error('Could not start this upload. Check the destination and file size before retrying.');
+      attempt.session = await begin.json();
+    }
+    const session = attempt.session!;
+    try {
+      if (!completed) {
+        report('Uploading original', 0);
+        await uploadWithProgress(session.url, file, percent => report('Uploading original', percent), signal);
+        report('Uploading preview');
+        const posterPut = await fetch(session.posterUrl, { method: 'PUT', signal, headers: { 'content-type': 'image/jpeg' }, body: preview.blob });
+        if (!posterPut.ok) throw new Error(`Storage rejected the preview (${posterPut.status}).`);
+      }
+      signal.throwIfAborted();
+      feedback = `Verifying ${file.name}…`; report('Verifying upload');
+      const finish = await fetch('/api/uploads/complete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId: session.sessionId, posterSizeBytes: preview.blob.size, durationSec: preview.duration, width: preview.sourceWidth, height: preview.sourceHeight }) });
+      if (!finish.ok) throw new Error('Could not verify this upload. Retry this file to check its existing session.');
+      return await finish.json();
+    } catch (cause) {
+      if (signal.aborted) {
+        const cancelled = await fetch('/api/uploads/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId: session.sessionId }) });
+        if (cancelled.ok) {
+          const result = await cancelled.json();
+          if (result.cancelled) attempt.session = undefined;
+          else if (result.complete) {
+            const receipt = await fetch('/api/uploads/complete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId: session.sessionId }) });
+            if (receipt.ok) return await receipt.json();
+          }
+        }
+      }
+      throw cause;
+    }
+  }
+  async function commitLiveImport(local: LocalAsset, target: ImportTarget, signal: AbortSignal, jobId: string) {
+    const attempt = liveUploads.get(jobId) ?? {};
+    liveUploads.set(jobId, attempt);
+    const result = await uploadOriginal(local.sourceFile, { projectId: target.projectId, folderId: target.folderId ?? null }, (stage, progress) => importQueue.update(jobId, { stage, progress, canCancel: stage !== 'Verifying upload' }), signal, attempt);
+    if (!result.asset) throw new Error('Upload is saved. Retry to refresh its receipt.');
+    attempt.assetId = result.assetId;
+    const descriptor = result.asset;
+    const update: ProcessingUpdate = { assetId: descriptor.id, versionId: descriptor.versionId ?? null, versionNumber: 1, updatedAt: Date.now(), ready: local.type === 'image', hasPoster: true };
+    if (!media.some(asset => asset.id === descriptor.id)) {
+      const previousActive = activeId;
+      organization = { ...organization, placements: { ...organization.placements, [descriptor.id]: { projectId: target.projectId, ...(descriptor.folderId ? { folderId: descriptor.folderId } : {}) } } };
+      media = [...media, { ...descriptor, projectId: target.projectId, url: processingSource(update), poster: processingPoster(update), type: local.type, sourceFile: { name: local.sourceFile.name, type: local.sourceFile.type }, tags: [], availability: processingAvailability(update) }];
+      processing = [...processing, update];
+      review({ type: 'add-assets', assets: [{ id: descriptor.id }] });
+      review({ type: 'select', assetId: previousActive });
+    }
+    URL.revokeObjectURL(local.url); if (local.poster) URL.revokeObjectURL(local.poster);
+    processingObserver?.refresh();
+    feedback = `${local.sourceFile.name} uploaded privately.`;
   }
   async function imageUploadPreview(file: File) {
     const url = URL.createObjectURL(file);
@@ -437,24 +497,8 @@
     if (project.archived) { feedback = 'Restore this project before adding media.'; return; }
     if (live) {
       if (projectId === '__empty__') { feedback = 'Create a project before adding media.'; projectDialog = true; return; }
-      const destination = { projectId, folderId: importOptions.folderId };
-      const batch = Array.from(files, file => ({ file, item: { id: `upload:${crypto.randomUUID()}`, kind: 'upload' as const, label: file.name, project: project.name, projectId, state: 'queued' as const, stage: 'Waiting to upload', updatedAt: Date.now() } }));
-      for (const { item } of batch) activityFeed.upsert(item);
-      void (async () => {
-        let index = 0;
-        try {
-          for (const { file, item } of batch) {
-            const result = await uploadOriginal(file, destination, (stage, progress) => activityFeed.upsert({ ...item, state: 'running', stage, progress, updatedAt: Date.now() }));
-            activityFeed.upsert({ ...item, assetId: result.assetId, state: 'complete', stage: 'Uploaded · queued for ingest', updatedAt: Date.now() });
-            index++;
-          }
-          location.reload();
-        } catch (cause) {
-          feedback = cause instanceof Error ? cause.message : String(cause);
-          activityFeed.upsert({ ...batch[index].item, state: 'failed', stage: 'Upload needs attention · check project before retrying', updatedAt: Date.now() });
-          for (const { item } of batch.slice(index + 1)) activityFeed.upsert({ ...item, state: 'cancelled', stage: 'Not uploaded · batch stopped', updatedAt: Date.now() });
-        }
-      })();
+      const target: ImportTarget = { projectId, folderId: importOptions.folderId ?? undefined, dateKey: '', assetClass: importOptions.assetClass };
+      importQueue.enqueue(Array.from(files, file => ({ file, target, destinationLabel: `${project.name}${target.folderId ? ` / ${folderPath(projectFolders, target.folderId)}` : ' / Root'}` })));
       return;
     }
     const today = new Date();
@@ -1038,7 +1082,7 @@
       <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each ancestors as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if (focusedReview || mediaType !== 'all' || filter === 'selected' || activeCollectionId || archived)}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId && locationName !== project.name}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot} uploadContext={!project.archived && projectId !== "__empty__" ? {folders:folderDestinations,...importOptions,onChange:value => importOptions = value,onChoose:() => picker.click()} : undefined} destinationContext={!project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId) ? {projectId,folderId:activeFolderId,selectedVersionIds:destinationSelection} : undefined}/>{/if}<div class="header-account-tools">{#if live}<WorkActivity feed={activityFeed} onOpen={openActivity}/>{/if}{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
     </header>
     <div class="page-content folder-workspace">
-      <section class="project-heading" class:identity-banner={showsProjectIdentity && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if showsProjectIdentity && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{locationName}</h1>{#if project.archived || project.clientName || project.description}<p class="subtitle" class:subtitle-placeholder={!isProjectRoot} aria-hidden={!isProjectRoot} title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description}</p>{/if}</div><div class="project-tools"><ImportQueue jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} folderLabels={folderDestinations} onMoveFolder={moveFolder} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
+      <section class="project-heading" class:identity-banner={showsProjectIdentity && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if showsProjectIdentity && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{locationName}</h1>{#if project.archived || project.clientName || project.description}<p class="subtitle" class:subtitle-placeholder={!isProjectRoot} aria-hidden={!isProjectRoot} title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description}</p>{/if}</div><div class="project-tools"><ImportQueue persistent={live} jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} folderLabels={folderDestinations} onMoveFolder={moveFolder} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
       {#if feedback}<div class="notice" role="status">{feedback}<button class="icon-button" aria-label="Dismiss message" onclick={() => feedback = ''}><X size={16}/></button></div>{/if}
       {#if project.archived}<section class="archived-project-state" aria-label="Archived project">
         <h2>This project is archived.</h2><p>Your media, folders and feedback are retained.</p>
@@ -1179,3 +1223,4 @@
   .identity-banner { padding: 16px; border-radius: 8px; background: color-mix(in srgb, var(--project-accent) 18%, #030605); }
   .project-banner { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; opacity: .2; border-radius: inherit; pointer-events: none; }
 </style>
+
