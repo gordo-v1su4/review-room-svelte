@@ -82,7 +82,7 @@
   .activity-empty { padding: 18px 6px; margin: 0; font-size: 11px; text-align: center; color: var(--muted); line-height: 1.6; }
   .activity-notice { font-size: 10px; color: var(--muted); line-height: 1.6; }
   .activity-footer { margin: 0; padding-top: 8px; color: var(--muted); font-size: 9px; border-top: 1px solid var(--border); }
-  :global(.activity-spin) { animation: activity-spin 1.4s linear infinite; }
+  :global(.activity-spin) { animation: activity-spin 2s linear infinite; }
   :global(.work-activity-trigger:focus-visible), :global(.activity-close:focus-visible), button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
   @keyframes activity-enter { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes activity-spin { to { transform: rotate(360deg); } }
