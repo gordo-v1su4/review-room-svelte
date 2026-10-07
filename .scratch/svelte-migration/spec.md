@@ -1,5 +1,7 @@
 # Review Room Svelte migration
 
+> Historical September migration plan. October 7 live evidence is in [docs/verification](../../docs/verification/): the dedicated standalone owner backend, uploads, private reviews and destination integration now have candidate acceptance. The backend-deferral and fixture-only statements below describe the original migration checkpoint. They do not establish current production status. Full signed-in client workspace/upload parity and actual Safari/Android/Edge acceptance remain open; V1S-182–187 own final review, release and device gates.
+
 Status: direction and test seams approved after one interview round. Persistent shipping goal active; first local Svelte review slice implemented, full parity and live release gates remain open.
 
 ## Outcome

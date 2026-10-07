@@ -1,6 +1,6 @@
 # Review → Trailer Feed: canonical library and selected-version synchronization
 
-Status: decisions agreed; library/API foundation deployed; sync integration remains planned.
+Status (October 7, 2026): selected-version synchronization, editable version metadata, grants, durable retry, Refresh, Unsync, suppression/deletion and explicit target replacement are implemented with deployed candidate acceptance. Final Greptile 5/5, merged-main releases and physical-device acceptance remain separate gates under V1S-182–187. Current evidence lives in `docs/verification/`; this specification owns the intended contract, not runtime release identities.
 Linear project: https://linear.app/v1su4/project/review-trailer-feed-selected-version-sync-e0514e685b1b
 Repositories: gordo-v1su4/review-room-svelte and gordo-v1su4/trailer-feed.
 
@@ -30,7 +30,7 @@ Successful entries remain available if others fail. Persist per-version status a
 
 ## Migration and current implementation limits
 
-Neon Afterlife: seven video versions plus two grids. The Last Prescription: three videos plus one grid. All 13 originals copied into the Trailer Feed Review project and named source folders; bytes checked by SHA-256 and all processing ready. Original source labels/version numbering and complete JSON documents are preserved by private sourceImports records and mappings; global Review codes remain canonical. Imported prompt/model hydration works. General per-version editable metadata is still a future issue.
+Neon Afterlife: seven video versions plus two grids. The Last Prescription: three videos plus one grid. All 13 originals copied into the Trailer Feed Review project and named source folders; bytes checked by SHA-256 and all processing ready. Original source labels/version numbering and complete JSON documents are preserved by private sourceImports records and mappings; global Review codes remain canonical. Imported prompt/model hydration and durable editable per-version metadata are implemented; exact-version image/reference acceptance is recorded in `docs/verification/v1s164-image-references.md`.
 
 The owner explicitly authorized resetting all Trailer Feed projects and removing Review archived tests. Review archived tests were purged. Trailer Feed's five projects were removed after checking the backed-up catalog and all 43 recovery media objects. Its live catalog, documents and uploads are empty. Review was reloaded afterward: all ten imported videos played and all three grids decoded. All 43 source objects returned 404 with fresh cache keys; stale unchanged URLs may still serve Cloudflare cache, and the existing DNS token cannot purge that cache. V1S-170 remains open because sampled playback success did not reproduce or fix the intermittent failure. Recovery backup: app-vm /var/backups/trailer-feed-review-migration-20261005/catalog.sqlite, plus local complete catalog and 43 binary media objects under .scratch/trailer-feed-import/trailer-feed-backup (205,369,289 bytes). Keep recovery files private and out of git. Full evidence: ../../docs/verification/library-migration.md.
 
