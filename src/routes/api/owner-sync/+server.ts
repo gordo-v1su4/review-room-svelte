@@ -10,6 +10,7 @@ function syncError(cause: unknown): Response | never {
   const data = cause instanceof ConvexError ? cause.data : null;
   const code = data && typeof data === 'object' && 'code' in data ? data.code : null;
   if (code === 'SYNC_TARGET_CONFLICT') return json({ message: 'A target with this name already exists. Choose it or change the name.', existingRunId: data && typeof data === 'object' && 'existingRunId' in data ? data.existingRunId : undefined }, { status: 409, headers: { 'cache-control': 'private, no-store' } });
+  if (code === 'SYNC_REPLACEMENT_UNAVAILABLE') throw error(409, 'The exact connected target must be deleted before replacement. Reload if the chosen connection has changed.');
   if (code === 'SYNC_PROJECT_UNAVAILABLE' || code === 'SYNC_FOLDER_UNAVAILABLE' || code === 'SYNC_CONNECTION_UNAVAILABLE' || code === 'SYNC_BATCH_UNAVAILABLE' || code === 'SYNC_VERSION_UNAVAILABLE') throw error(404, 'Selected source or connection is unavailable');
   if (code === 'SYNC_SELECTION_CHANGED' || code === 'SYNC_CONFIRMATION_CHANGED' || code === 'SYNC_CONNECTION_CHANGED' || code === 'SYNC_REACTIVATION_UNAVAILABLE') throw error(409, 'Selection or destination consent changed. Reload and confirm the exact version again.');
   if (code === 'SYNC_VERSION_ALREADY_SELECTED') throw error(409, 'This version already has a saved sync operation. Retry its failed delivery or use Sync again after disconnection.');
@@ -29,7 +30,8 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
     const reconciliation = await db().action(internal.destinationDelivery.reconcile, { projectId });
     const snapshot = await db().query(internal.destinationSync.snapshot, { projectId: projectId as Id<'projects'> });
     const refreshes = await db().query(internal.destinationRefresh.snapshot, { projectId: projectId as Id<'projects'> });
-    return json({ ...workspace, ...snapshot, refreshes, ...(reconciliation.ok ? {} : { reconciliationError: reconciliation.error }) }, { headers: { 'cache-control': 'private, no-store' } });
+    const unsyncs = await db().query(internal.destinationUnsync.snapshot, { projectId: projectId as Id<'projects'> });
+    return json({ ...workspace, ...snapshot, refreshes, unsyncs, ...(reconciliation.ok ? {} : { reconciliationError: reconciliation.error }) }, { headers: { 'cache-control': 'private, no-store' } });
   } catch (cause) { return syncError(cause); }
 };
 
@@ -40,8 +42,9 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
   try {
     if (body.action === 'connect') {
       if (typeof body.projectId !== 'string' || (body.folderId !== undefined && typeof body.folderId !== 'string') || !['create', 'connect'].includes(body.mode) || (body.targetTitle !== undefined && typeof body.targetTitle !== 'string') || (body.targetRunId !== undefined && typeof body.targetRunId !== 'string')) throw error(400, 'Explicit target connection required');
+      if ((body.replacesConnectionId !== undefined && (typeof body.replacesConnectionId !== 'string' || body.replacementConsent !== true || typeof body.replacementId !== 'string')) || (body.replacementId !== undefined && body.replacesConnectionId === undefined)) throw error(400, 'Explicit removed-target replacement consent required');
       return json(await db().action(internal.destinationDelivery.connect, { destinationKey: 'trailer-feed', projectId: body.projectId, folderId: body.folderId,
-        mode: body.mode, targetTitle: body.targetTitle, targetRunId: body.targetRunId }), { headers: { 'cache-control': 'private, no-store' } });
+        mode: body.mode, targetTitle: body.targetTitle, targetRunId: body.targetRunId, replacesConnectionId: body.replacesConnectionId, replacementId: body.replacementId }), { headers: { 'cache-control': 'private, no-store' } });
     }
     if (body.action === 'confirm') {
       if (typeof body.connectionId !== 'string' || typeof body.confirmationId !== 'string' || !Array.isArray(body.versions) || !body.versions.length || body.versions.length > 100 || body.versions.some((item: { versionId?: unknown; expectedMetadataUpdatedAt?: unknown }) => !item || typeof item.versionId !== 'string' || (item.expectedMetadataUpdatedAt !== null && (!Number.isSafeInteger(item.expectedMetadataUpdatedAt) || Number(item.expectedMetadataUpdatedAt) < 0)))) throw error(400, 'Exact versions and their metadata revisions required');
@@ -54,6 +57,10 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
     if (body.action === 'refresh') {
       if (typeof body.jobId !== 'string' || typeof body.operationId !== 'string' || !Number.isSafeInteger(body.expectedGeneration) || body.expectedGeneration < 1 || (body.expectedMetadataUpdatedAt !== null && (!Number.isSafeInteger(body.expectedMetadataUpdatedAt) || body.expectedMetadataUpdatedAt < 0))) throw error(400, 'Exact published version and metadata revision required');
       return json(await db().mutation(internal.destinationRefresh.confirm, { jobId: body.jobId as Id<'syncOutbox'>, operationId: body.operationId, expectedGeneration: body.expectedGeneration, expectedMetadataUpdatedAt: body.expectedMetadataUpdatedAt }), { headers: { 'cache-control': 'private, no-store' } });
+    }
+    if (body.action === 'unsync') {
+      if (typeof body.jobId !== 'string' || !Number.isSafeInteger(body.expectedGeneration) || body.expectedGeneration < 1) throw error(400, 'Exact selected version and consent generation required');
+      return json(await db().mutation(internal.destinationUnsync.confirm, { jobId: body.jobId as Id<'syncOutbox'>, expectedGeneration: body.expectedGeneration }), { headers: { 'cache-control': 'private, no-store' } });
     }
     if (body.action === 'retry-refresh' && typeof body.refreshId === 'string') {
       await db().mutation(internal.destinationRefresh.retry, { refreshId: body.refreshId as Id<'destinationRefreshes'> });

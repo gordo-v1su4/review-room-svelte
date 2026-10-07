@@ -331,6 +331,7 @@ const applicationTables = {
   destinationConnections: defineTable({
     destinationKey: v.string(), projectId: v.id('projects'), folderId: v.optional(v.id('projectFolders')),
     targetRunId: v.string(), createdBy: v.id('appUsers'), createdAt: v.number(), updatedAt: v.number(),
+    replacesConnectionId: v.optional(v.id('destinationConnections')), replacedByConnectionId: v.optional(v.id('destinationConnections')),
   }).index('by_source_folder', ['destinationKey', 'projectId', 'folderId']).index('by_project', ['projectId']),
 
   syncBatches: defineTable({
@@ -352,6 +353,13 @@ const applicationTables = {
   }).index('by_batch', ['batchId']).index('by_connection', ['connectionId'])
     .index('by_source_version', ['connectionId', 'versionId']).index('by_project', ['projectId']).index('by_version', ['versionId'])
     .index('by_project_state', ['projectId', 'state']),
+
+  destinationUnsyncs: defineTable({
+    jobId: v.id('syncOutbox'), projectId: v.string(), sourceAssetId: v.string(), sourceVersionId: v.string(), consentGeneration: v.number(),
+    state: v.union(v.literal('queued'), v.literal('sending'), v.literal('complete')),
+    attempts: v.number(), nextAttemptAt: v.number(), leaseUntil: v.optional(v.number()), attemptToken: v.optional(v.string()), lastError: v.optional(v.string()),
+    createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_job', ['jobId']).index('by_project', ['projectId']),
 
   destinationRefreshes: defineTable({
     operationId: v.string(), requestFingerprint: v.string(), projectId: v.id('projects'), jobId: v.id('syncOutbox'),

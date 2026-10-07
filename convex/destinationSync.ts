@@ -16,13 +16,32 @@ async function ownedProject(ctx: MutationCtx | QueryCtx, projectId: Id<'projects
 
 /** The server persists a verified target connection; ordinary upload never calls this module. */
 export const saveConnection = internalMutation({
-  args: { destinationKey: v.literal('trailer-feed'), projectId: v.id('projects'), folderId: v.optional(v.id('projectFolders')), targetRunId: v.string() },
+  args: { destinationKey: v.literal('trailer-feed'), projectId: v.id('projects'), folderId: v.optional(v.id('projectFolders')), targetRunId: v.string(), replacesConnectionId: v.optional(v.id('destinationConnections')) },
   handler: async (ctx, args) => {
     const { profile } = await ownedProject(ctx, args.projectId);
     const folder = args.folderId && await ctx.db.get(args.folderId);
     if (args.folderId && (!folder || folder.projectId !== args.projectId)) throw new ConvexError({ code: 'SYNC_FOLDER_UNAVAILABLE' });
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(args.targetRunId)) throw new ConvexError({ code: 'SYNC_TARGET_INVALID' });
-    const existing = await ctx.db.query('destinationConnections').withIndex('by_source_folder', q => q.eq('destinationKey', args.destinationKey).eq('projectId', args.projectId).eq('folderId', args.folderId)).unique();
+    const history = await ctx.db.query('destinationConnections').withIndex('by_source_folder', q => q.eq('destinationKey', args.destinationKey).eq('projectId', args.projectId).eq('folderId', args.folderId)).collect();
+    const existing = history.find(item => !item.replacedByConnectionId);
+    if (args.replacesConnectionId) {
+      const old = history.find(item => item._id === args.replacesConnectionId);
+      if (!old || old.createdBy !== profile._id || old.targetRunId === args.targetRunId) throw new ConvexError({ code: 'SYNC_CONNECTION_CHANGED' });
+      if (old.replacedByConnectionId) {
+        if (existing?._id === old.replacedByConnectionId && existing.targetRunId === args.targetRunId) return existing._id;
+        throw new ConvexError({ code: 'SYNC_CONNECTION_CHANGED' });
+      }
+      if (existing?._id !== old._id) throw new ConvexError({ code: 'SYNC_CONNECTION_CHANGED' });
+      const replacement = await ctx.db.insert('destinationConnections', { ...args, createdBy: profile._id, createdAt: Date.now(), updatedAt: Date.now() });
+      await ctx.db.patch(old._id, { replacedByConnectionId: replacement, updatedAt: Date.now() });
+      const jobs = await ctx.db.query('syncOutbox').withIndex('by_connection', q => q.eq('connectionId', old._id)).collect();
+      for (const job of jobs) {
+        if (job.state !== 'source_deleted') await ctx.db.patch(job._id, { state: 'disconnected', targetState: 'target_suppressed', targetConsentGeneration: job.targetConsentGeneration ?? job.consentGeneration, attemptToken: undefined, leaseUntil: undefined, lastError: 'Target project was removed; connection replaced with fresh consent required', updatedAt: Date.now() });
+        const grant = await ctx.db.query('publicationGrants').withIndex('by_destination_version', q => q.eq('destinationKey', 'trailer-feed').eq('versionId', job.versionId)).unique();
+        if (grant?.consentGeneration === job.consentGeneration && grant.revokedAt === undefined) await ctx.db.patch(grant._id, { revokedAt: Date.now() });
+      }
+      return replacement;
+    }
     if (existing) {
       if (existing.targetRunId !== args.targetRunId) throw new ConvexError({ code: 'SYNC_CONNECTION_CHANGED' });
       return existing._id;
@@ -32,7 +51,7 @@ export const saveConnection = internalMutation({
 });
 
 export const prepareConnection = internalQuery({
-  args: { projectId: v.string(), folderId: v.optional(v.string()) },
+  args: { projectId: v.string(), folderId: v.optional(v.string()), replacesConnectionId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const projectId = ctx.db.normalizeId('projects', args.projectId);
     const folderId = args.folderId ? ctx.db.normalizeId('projectFolders', args.folderId) : undefined;
@@ -40,7 +59,10 @@ export const prepareConnection = internalQuery({
     const { project } = await ownedProject(ctx, projectId);
     const folder = folderId && await ctx.db.get(folderId);
     if (args.folderId && (!folder || folder.projectId !== project._id)) throw new ConvexError({ code: 'SYNC_FOLDER_UNAVAILABLE' });
-    return { projectId: project._id, folderId: folderId ?? undefined, title: folder ? folder.title : project.title };
+    const oldId = args.replacesConnectionId && ctx.db.normalizeId('destinationConnections', args.replacesConnectionId);
+    const old = oldId && await ctx.db.get(oldId);
+    if (args.replacesConnectionId && (!old || old.projectId !== project._id || old.folderId !== (folderId ?? undefined))) throw new ConvexError({ code: 'SYNC_CONNECTION_UNAVAILABLE' });
+    return { projectId: project._id, folderId: folderId ?? undefined, title: folder ? folder.title : project.title, ...(old ? { replacesConnectionId: old._id, oldTargetRunId: old.targetRunId } : {}) };
   },
 });
 
@@ -132,7 +154,7 @@ async function confirmSelection(ctx: MutationCtx, args: { connectionId: string; 
     const profile = await owner(ctx);
     const connectionId = ctx.db.normalizeId('destinationConnections', args.connectionId);
     const connection = connectionId && await ctx.db.get(connectionId);
-    if (!connection || connection.createdBy !== profile._id) throw new ConvexError({ code: 'SYNC_CONNECTION_UNAVAILABLE' });
+    if (!connection || connection.createdBy !== profile._id || connection.replacedByConnectionId) throw new ConvexError({ code: 'SYNC_CONNECTION_UNAVAILABLE' });
     await ownedProject(ctx, connection.projectId);
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(args.confirmationId) || !args.versions.length || args.versions.length > 100 || new Set(args.versions.map(item => item.versionId)).size !== args.versions.length) throw new ConvexError({ code: 'SYNC_SELECTION_INVALID' });
     if (args.expectedGeneration !== undefined && (!Number.isSafeInteger(args.expectedGeneration) || args.expectedGeneration < 1 || args.versions.length !== 1)) throw new ConvexError({ code: 'SYNC_SELECTION_INVALID' });
@@ -142,6 +164,16 @@ async function confirmSelection(ctx: MutationCtx, args: { connectionId: string; 
       if (existing.requestFingerprint !== requestFingerprint) throw new ConvexError({ code: 'SYNC_CONFIRMATION_CHANGED' });
       return { batchId: existing._id };
     }
+    const retiredConnectionIds = new Set<string>();
+    let ancestorId = connection.replacesConnectionId;
+    while (ancestorId && retiredConnectionIds.size < 100) {
+      if (retiredConnectionIds.has(ancestorId)) throw new ConvexError({ code: 'SYNC_CONNECTION_CHANGED' });
+      retiredConnectionIds.add(ancestorId);
+      const ancestor = await ctx.db.get(ancestorId);
+      if (!ancestor || ancestor.projectId !== connection.projectId || ancestor.folderId !== connection.folderId) throw new ConvexError({ code: 'SYNC_CONNECTION_CHANGED' });
+      ancestorId = ancestor.replacesConnectionId;
+    }
+    if (ancestorId) throw new ConvexError({ code: 'SYNC_CONNECTION_CHANGED' });
     const selected = [];
     for (const item of args.versions) {
       const id = ctx.db.normalizeId('assetVersions', item.versionId);
@@ -154,22 +186,26 @@ async function confirmSelection(ctx: MutationCtx, args: { connectionId: string; 
       if (args.expectedGeneration !== undefined) {
         if (!previous || previous.state !== 'disconnected' || previous.targetState !== 'target_suppressed' || previous.consentGeneration !== args.expectedGeneration || !previous.targetConsentGeneration) throw new ConvexError({ code: 'SYNC_REACTIVATION_UNAVAILABLE' });
       } else if (previous) throw new ConvexError({ code: 'SYNC_VERSION_ALREADY_SELECTED' });
-      selected.push({ version, asset, previous, sourceCreatedAt: version.creativeMetadata?.sourceCreatedAt ?? version.createdAt });
+      const priorConnectionJobs = retiredConnectionIds.size ? (await ctx.db.query('syncOutbox').withIndex('by_version', q => q.eq('versionId', version._id)).collect()).filter(job => retiredConnectionIds.has(job.connectionId)) : [];
+      const replacementPrevious = priorConnectionJobs.sort((a,b) => b.consentGeneration - a.consentGeneration)[0];
+      if (replacementPrevious && (replacementPrevious.state !== 'disconnected' || replacementPrevious.targetState !== 'target_suppressed')) throw new ConvexError({ code: 'SYNC_REACTIVATION_UNAVAILABLE' });
+      selected.push({ version, asset, previous, replacementPrevious, sourceCreatedAt: version.creativeMetadata?.sourceCreatedAt ?? version.createdAt });
     }
     selected.sort((a, b) => a.sourceCreatedAt - b.sourceCreatedAt || a.version._id.localeCompare(b.version._id));
     const jobs = [];
     let bytes = 0;
-    let reactivationJson: string | undefined;
-    for (const { version, asset, previous, sourceCreatedAt } of selected) {
+    const reactivations = [];
+    for (const { version, asset, previous, replacementPrevious, sourceCreatedAt } of selected) {
       const metadata = version.creativeMetadata ?? { model: '', prompt: '', sourceLabel: '', referenceImageVersionIds: [] };
       const references = [...new Set([...(metadata.gridImageVersionId ? [metadata.gridImageVersionId] : []), ...metadata.referenceImageVersionIds])];
       const consent = { destinationKey: 'trailer-feed' as const, versionId: version._id, referenceVersionIds: references, allowedOrigins: ['https://www.trailerfeed.video', 'https://trailerfeed.video'] };
-      const currentGrant = args.expectedGeneration !== undefined ? await ctx.db.query('publicationGrants').withIndex('by_destination_version', q => q.eq('destinationKey', 'trailer-feed').eq('versionId', version._id)).unique() : null;
-      if (args.expectedGeneration !== undefined && !currentGrant) throw new ConvexError({ code: 'GRANT_UNAVAILABLE' });
-      const grant = currentGrant && previous ? await confirmGrantAgain(ctx, { ...consent, expectedGeneration: currentGrant.consentGeneration, nextGeneration: Math.max(currentGrant.consentGeneration, previous.targetConsentGeneration ?? 0) + 1, confirmationId: args.confirmationId }) : await issueGrant(ctx, consent);
+      const reactivated = previous ?? replacementPrevious;
+      const currentGrant = args.expectedGeneration !== undefined || replacementPrevious ? await ctx.db.query('publicationGrants').withIndex('by_destination_version', q => q.eq('destinationKey', 'trailer-feed').eq('versionId', version._id)).unique() : null;
+      if ((args.expectedGeneration !== undefined || replacementPrevious) && !currentGrant) throw new ConvexError({ code: 'GRANT_UNAVAILABLE' });
+      const grant = currentGrant && reactivated ? await confirmGrantAgain(ctx, { ...consent, expectedGeneration: currentGrant.consentGeneration, nextGeneration: Math.max(currentGrant.consentGeneration, reactivated.targetConsentGeneration ?? 0) + 1, confirmationId: args.confirmationId }) : await issueGrant(ctx, consent);
       const media = (id: string, variant = 'original') => `https://review.v1su4.dev/api/destination-media/${grant.slug}/${id}/${variant}`;
       const identity = { source_asset_id: asset._id, source_version_id: version._id, source_created_at: new Date(sourceCreatedAt).toISOString(), consent_generation: grant.consentGeneration };
-      if (args.expectedGeneration !== undefined && previous) reactivationJson = JSON.stringify({ ...identity, intent: 'sync-again', expected_generation: previous.targetConsentGeneration, run_id: connection.targetRunId, batch_id: randomSecret() });
+      if (reactivated) reactivations.push({ ...identity, intent: 'sync-again', expected_generation: reactivated.targetConsentGeneration, run_id: connection.targetRunId, batch_id: randomSecret() });
       const payloadJson = JSON.stringify({ ...identity, run_id: connection.targetRunId, batch_id: args.confirmationId,
         source_asset_code: asset.assetCode ?? asset.title,
         media_url: media(version._id), ...(version.posterKey ? { poster_url: media(version._id, 'poster') } : {}), metadata,
@@ -182,7 +218,7 @@ async function confirmSelection(ctx: MutationCtx, args: { connectionId: string; 
     }
     const now = Date.now();
     const batchId = await ctx.db.insert('syncBatches', { confirmationId: args.confirmationId, connectionId: connection._id, projectId: connection.projectId,
-      requestFingerprint, reactivationJson, reservationJson: JSON.stringify({ batch_id: args.confirmationId, run_id: connection.targetRunId, versions: jobs.map(job => job.identity) }),
+      requestFingerprint, reactivationJson: reactivations.length ? JSON.stringify(reactivations) : undefined, reservationJson: JSON.stringify({ batch_id: args.confirmationId, run_id: connection.targetRunId, versions: jobs.map(job => job.identity) }),
       orderedVersionIds: jobs.map(job => job.versionId), state: 'queued', attempts: 0, createdAt: now, updatedAt: now });
     for (const job of jobs) await ctx.db.insert('syncOutbox', { batchId, connectionId: connection._id, projectId: connection.projectId,
       versionId: job.versionId, assetId: job.assetId, consentGeneration: job.consentGeneration, payloadJson: job.payloadJson,
@@ -239,7 +275,7 @@ async function stillAuthorized(ctx: MutationCtx, job: { connectionId: Id<'destin
   const asset = await ctx.db.get(job.assetId);
   const version = await ctx.db.get(job.versionId);
   const grant = await ctx.db.query('publicationGrants').withIndex('by_destination_version', q => q.eq('destinationKey', 'trailer-feed').eq('versionId', job.versionId)).unique();
-  if (!(connection && project && !project.archived && project.createdBy === connection.createdBy && asset && asset.projectId === project._id && asset.status !== 'archived' && version && version.assetId === asset._id && version.processingState === 'ready' && grant && grant.projectId === project._id && grant.assetId === asset._id && grant.createdBy === connection.createdBy && grant.consentGeneration === job.consentGeneration && grant.revokedAt === undefined && (grant.expiresAt === undefined || grant.expiresAt > Date.now()))) return false;
+  if (!(connection && !connection.replacedByConnectionId && project && !project.archived && project.createdBy === connection.createdBy && asset && asset.projectId === project._id && asset.status !== 'archived' && version && version.assetId === asset._id && version.processingState === 'ready' && grant && grant.projectId === project._id && grant.assetId === asset._id && grant.createdBy === connection.createdBy && grant.consentGeneration === job.consentGeneration && grant.revokedAt === undefined && (grant.expiresAt === undefined || grant.expiresAt > Date.now()))) return false;
   for (const id of grant.referenceVersionIds) {
     const reference = await ctx.db.get(id);
     const image = reference && await ctx.db.get(reference.assetId);

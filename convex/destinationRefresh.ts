@@ -52,7 +52,7 @@ export const confirm = internalMutation({
     }
     const imageUrl = (id: Id<'assetVersions'>) => `https://review.v1su4.dev/api/destination-media/${grant.referenceVersionIds.includes(id) ? grant.slug : auxiliary!.slug}/${id}/original`;
     const original = JSON.parse(job.payloadJson);
-    const payloadJson = JSON.stringify({ operation_id: args.operationId, intent: 'refresh-empty', run_id: original.run_id, source_asset_id: original.source_asset_id, source_version_id: original.source_version_id, consent_generation: job.consentGeneration, media_url: original.media_url, metadata,
+    const payloadJson = JSON.stringify({ operation_id: args.operationId, intent: 'refresh-empty', run_id: original.run_id, source_asset_id: original.source_asset_id, source_version_id: original.source_version_id, source_created_at: original.source_created_at, consent_generation: job.consentGeneration, media_url: original.media_url, metadata,
       ...(metadata.gridImageVersionId ? { grid: { source_version_id: metadata.gridImageVersionId, media_url: imageUrl(metadata.gridImageVersionId) } } : {}),
       references: metadata.referenceImageVersionIds.map(id => ({ source_version_id: id, media_url: imageUrl(id) })) });
     if (new TextEncoder().encode(payloadJson).byteLength > 800000) throw new ConvexError({ code: 'SYNC_BATCH_TOO_LARGE' });

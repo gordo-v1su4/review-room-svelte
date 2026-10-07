@@ -22,6 +22,12 @@ The second divider's native drag changed viewer 44→38 while the explorer staye
 
 Evidence: `docs/verification/evidence/divider-20261007.json` and private screenshot `output/playwright/native-divider-20261007.jpg`. The browser ended paused and muted. No canonical originals, folders, review status, rating or comments were changed. Pane preference changes are routine reversible test input. This investigation found no current divider failure to patch on this desktop/browser; intermittent behavior on other devices remains outside these measurements.
 
-## Remaining release acceptance
+## Deployed frontend acceptance
 
-Deploy frontend and repeat poster correctness/decoded-frame handoff with cold and warm canonical clips, rapid next/previous, mute and close/navigation cancellation. Original V1S-170 codec/blank report needs actual visible frames for all ten clips and processing-to-ready/long-session acceptance. Readiness, poster display and these isolated checks do not resolve that original intermittent diagnosis.
+Frontend 478d746 was deployed by the parent. A native browser held a real original request without substituting its response: exactly one active video, readyState 0, correct selected poster decoded at 854 px and visible, small 23 px loading status. Queued muted Play→Pause cancelled; Close left zero video elements and the captured media paused/muted with its src released. Interception and cache overrides were cleared. Screenshot `output/playwright/native-poster-handoff-20261007.jpg` was visually inspected.
+
+All ten canonical clips passed selected-source equality, native requestVideoFrameCallback, following animation-frame CSS visibility and center hit testing. Visible-frame samples ranged 315–453 ms, browser cache disabled per tab, network unthrottled and server/storage caches uncontrolled. Screenshots and the full-proportion contact sheet `output/playwright/native-all-ten-visible-20261007.jpg` show all ten real frames and were visually inspected. This is bounded evidence for the checking desktop/device, not a universal latency guarantee.
+
+The predeploy immediate-Play probe rejected two clips with NotSupportedError; all ten completed that same probe after deployment. One naive postdeploy callback preceded visible media state, so final acceptance additionally required selected-source identity and a visible paint, instead of counting readiness or callback alone. These observations do not isolate the cause of the older intermittent user report; V1S-170 remains an investigation, with current-head native frame and close checks credited. Local queued→ready observation is credited separately from actual production processing acceptance.
+
+Safe reports: `docs/verification/evidence/playback-frames-20261007.json` and `playback-handoff-20261007.json`. V1S-180 and V1S-181 are Done with their scoped deployed evidence.

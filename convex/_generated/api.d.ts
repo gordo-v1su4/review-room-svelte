@@ -16,6 +16,7 @@ import type * as destinationDelivery from "../destinationDelivery.js";
 import type * as destinationRefresh from "../destinationRefresh.js";
 import type * as destinationRemovals from "../destinationRemovals.js";
 import type * as destinationSync from "../destinationSync.js";
+import type * as destinationUnsync from "../destinationUnsync.js";
 import type * as folders from "../folders.js";
 import type * as http from "../http.js";
 import type * as inbox from "../inbox.js";
@@ -58,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   destinationRefresh: typeof destinationRefresh;
   destinationRemovals: typeof destinationRemovals;
   destinationSync: typeof destinationSync;
+  destinationUnsync: typeof destinationUnsync;
   folders: typeof folders;
   http: typeof http;
   inbox: typeof inbox;

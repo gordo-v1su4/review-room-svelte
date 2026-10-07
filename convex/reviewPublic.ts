@@ -1,5 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { action, internalQuery, mutation } from "./_generated/server";
+import { internal } from './_generated/api';
+import type { ApiFromModules, FunctionReturnType } from 'convex/server';
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { digest, getReviewLink, getReviewerSession } from "./lib/reviewAccess";
@@ -26,8 +28,8 @@ const annotationStrokeValidator = v.object({
   ),
 });
 
-export const getProjectByToken = query({
-  args: { token: v.string(), accessKey: v.optional(v.string()) },
+export const projectByToken = internalQuery({
+  args: { token: v.string(), accessKey: v.optional(v.string()), checkedAt: v.number() },
   handler: async (ctx, args) => {
     const { link, project } = await getReviewLink(ctx, args.token, args.accessKey);
     return {
@@ -37,8 +39,8 @@ export const getProjectByToken = query({
   },
 });
 
-export const listVideosByToken = query({
-  args: { token: v.string(), accessKey: v.optional(v.string()) },
+export const videosByToken = internalQuery({
+  args: { token: v.string(), accessKey: v.optional(v.string()), checkedAt: v.number() },
   handler: async (ctx, args) => {
     const { link } = await getReviewLink(ctx, args.token, args.accessKey);
     const videos = await ctx.db
@@ -62,8 +64,8 @@ export const listVideosByToken = query({
   },
 });
 
-export const getReviewerName = query({
-  args: { token: v.string(), accessKey: v.string() },
+export const reviewerName = internalQuery({
+  args: { token: v.string(), accessKey: v.string(), checkedAt: v.number() },
   handler: async (ctx, args) => {
     await getReviewLink(ctx, args.token, args.accessKey);
     return (await getReviewerSession(ctx, args.token, args.accessKey)).displayName;
@@ -266,8 +268,8 @@ export const clientRequestChanges = mutation({
   },
 });
 
-export const listCommentsByVideo = query({
-  args: { token: v.string(), accessKey: v.optional(v.string()), videoId: v.id("videos") },
+export const commentsByVideo = internalQuery({
+  args: { token: v.string(), accessKey: v.optional(v.string()), videoId: v.id("videos"), checkedAt: v.number() },
   handler: async (ctx, args) => {
     const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
     const video = await ctx.db.get(args.videoId);
@@ -283,6 +285,25 @@ export const listCommentsByVideo = query({
       comments.sort((a, b) => b.createdAt - a.createdAt),
     );
   },
+});
+
+// Expiry is wall-clock authorization. Public actions generate the cache key on
+// the server, so a caller cannot reuse a warmed query's timestamp after expiry.
+export const getProjectByToken = action({
+  args: { token: v.string(), accessKey: v.optional(v.string()) },
+  handler: (ctx, args): Promise<FunctionReturnType<ApiFromModules<{ read: { get: typeof projectByToken } }>['read']['get']>> => ctx.runQuery(internal.reviewPublic.projectByToken, { ...args, checkedAt: Date.now() })
+});
+export const listVideosByToken = action({
+  args: { token: v.string(), accessKey: v.optional(v.string()) },
+  handler: (ctx, args): Promise<FunctionReturnType<ApiFromModules<{ read: { get: typeof videosByToken } }>['read']['get']>> => ctx.runQuery(internal.reviewPublic.videosByToken, { ...args, checkedAt: Date.now() })
+});
+export const getReviewerName = action({
+  args: { token: v.string(), accessKey: v.string() },
+  handler: (ctx, args): Promise<string> => ctx.runQuery(internal.reviewPublic.reviewerName, { ...args, checkedAt: Date.now() })
+});
+export const listCommentsByVideo = action({
+  args: { token: v.string(), accessKey: v.optional(v.string()), videoId: v.id('videos') },
+  handler: (ctx, args): Promise<FunctionReturnType<ApiFromModules<{ read: { get: typeof commentsByVideo } }>['read']['get']>> => ctx.runQuery(internal.reviewPublic.commentsByVideo, { ...args, checkedAt: Date.now() })
 });
 
 export const clientAddComment = mutation({
@@ -330,3 +351,4 @@ export const clientAddComment = mutation({
     });
   },
 });
+

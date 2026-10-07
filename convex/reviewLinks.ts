@@ -1,5 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { action, internalQuery, mutation, query } from "./_generated/server";
+import { internal } from './_generated/api';
+import type { ApiFromModules, FunctionReturnType } from 'convex/server';
 import { getProjectForOwner } from "./lib/access";
 import { digest, passcodeDigest, randomSecret } from "./lib/reviewAccess";
 
@@ -93,8 +95,8 @@ export const verifyPasscode = mutation({
   },
 });
 
-export const getAccessState = query({
-  args: { token: v.string() },
+export const accessState = internalQuery({
+  args: { token: v.string(), checkedAt: v.number() },
   handler: async (ctx, args) => {
     const link = await ctx.db.query("reviewLinks").withIndex("by_token", (q) => q.eq("token", args.token)).unique();
     if (!link || link.revokedAt || (link.expiresAt !== undefined && link.expiresAt <= Date.now())) return { available: false };
@@ -102,6 +104,11 @@ export const getAccessState = query({
     if (!project || project.archived) return { available: false };
     return { available: true, requiresPasscode: Boolean(link.passcodeHash) };
   },
+});
+
+export const getAccessState = action({
+  args: { token: v.string() },
+  handler: (ctx, args): Promise<FunctionReturnType<ApiFromModules<{ read: { get: typeof accessState } }>['read']['get']>> => ctx.runQuery(internal.reviewLinks.accessState, { ...args, checkedAt: Date.now() })
 });
 
 export const revoke = mutation({
@@ -113,3 +120,4 @@ export const revoke = mutation({
     await ctx.db.patch(link._id, { revokedAt: Date.now() });
   },
 });
+

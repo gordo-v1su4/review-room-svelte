@@ -8,7 +8,7 @@ class DestinationFailure extends Error {
   constructor(message: string, readonly disconnected = false) { super(message); }
 }
 
-async function post(path: 'batches' | 'versions' | 'connections' | 'status' | 'reactivations' | 'source-deletions' | 'metadata-refreshes', payload: Record<string, unknown>) {
+async function post(path: 'batches' | 'versions' | 'connections' | 'status' | 'reactivations' | 'source-deletions' | 'metadata-refreshes' | 'unsyncs', payload: Record<string, unknown>) {
   const key = process.env.TRAILER_FEED_REVIEW_INGEST_KEY;
   if (!key) throw new DestinationFailure('Destination delivery is not configured');
   const response = await fetch(`https://media.v1su4.dev/trailer-feed/external/review/${path}`, {
@@ -18,6 +18,7 @@ async function post(path: 'batches' | 'versions' | 'connections' | 'status' | 'r
   if (!response.ok) {
     if (path === 'connections' && response.status === 409) {
       const body = await response.json().catch(() => ({}));
+      if (payload.expected_run_id && !body.existing_run_id) throw new ConvexError({ code: 'SYNC_REPLACEMENT_UNAVAILABLE' });
       throw new ConvexError({ code: 'SYNC_TARGET_CONFLICT', message: 'Choose the existing target project or a different name',
         ...(typeof body.existing_run_id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(body.existing_run_id) ? { existingRunId: body.existing_run_id } : {}) });
     }
@@ -33,16 +34,18 @@ function failure(cause: unknown) {
 }
 
 export const connect = internalAction({
-  args: { destinationKey: v.literal('trailer-feed'), projectId: v.string(), folderId: v.optional(v.string()), mode: v.union(v.literal('create'), v.literal('connect')), targetTitle: v.optional(v.string()), targetRunId: v.optional(v.string()) },
+  args: { destinationKey: v.literal('trailer-feed'), projectId: v.string(), folderId: v.optional(v.string()), mode: v.union(v.literal('create'), v.literal('connect')), targetTitle: v.optional(v.string()), targetRunId: v.optional(v.string()), replacesConnectionId: v.optional(v.string()), replacementId: v.optional(v.string()) },
   handler: async (ctx, args): Promise<{ connectionId: Id<'destinationConnections'>; targetRunId: string }> => {
-    const source = await ctx.runQuery(internal.destinationSync.prepareConnection, { projectId: args.projectId, folderId: args.folderId });
+    if (args.replacesConnectionId && (!args.replacementId || !/^[A-Za-z0-9_-]{1,128}$/.test(args.replacementId))) throw new ConvexError({ code: 'SYNC_TARGET_INVALID' });
+    const source = await ctx.runQuery(internal.destinationSync.prepareConnection, { projectId: args.projectId, folderId: args.folderId, replacesConnectionId: args.replacesConnectionId });
     const title = args.targetTitle ?? source.title;
     if ((args.mode === 'create' && (!title.trim() || title.trim().length > 120)) || (args.mode === 'connect' && (!args.targetRunId || !/^[A-Za-z0-9_-]{1,128}$/.test(args.targetRunId)))) throw new ConvexError({ code: 'SYNC_TARGET_INVALID' });
     try {
       const result = await post('connections', { source_project_id: source.projectId, source_folder_id: source.folderId ?? '__root__', mode: args.mode,
+        ...(source.replacesConnectionId ? { expected_run_id: source.oldTargetRunId, replacement_id: args.replacementId } : {}),
         ...(args.mode === 'create' ? { title: title.trim() } : { run_id: args.targetRunId }) });
       if (result.source_project_id !== source.projectId || result.source_folder_id !== (source.folderId ?? '__root__') || typeof result.run_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(result.run_id) || (args.mode === 'connect' && result.run_id !== args.targetRunId)) throw new DestinationFailure('Destination did not acknowledge the selected source connection');
-      const connectionId = await ctx.runMutation(internal.destinationSync.saveConnection, { destinationKey: args.destinationKey, projectId: source.projectId, folderId: source.folderId, targetRunId: result.run_id });
+      const connectionId = await ctx.runMutation(internal.destinationSync.saveConnection, { destinationKey: args.destinationKey, projectId: source.projectId, folderId: source.folderId, targetRunId: result.run_id, replacesConnectionId: source.replacesConnectionId });
       return { connectionId, targetRunId: result.run_id };
     } catch (cause) {
       if (cause instanceof ConvexError) throw cause;
@@ -58,9 +61,11 @@ export const reserve = internalAction({
     if (!claim) return;
     try {
       if (claim.reactivationJson) {
-        const consent = JSON.parse(claim.reactivationJson);
-        const acknowledgement = await post('reactivations', consent);
-        if (acknowledgement.batch_id !== consent.batch_id || acknowledgement.consent_generation !== consent.consent_generation || !Number.isSafeInteger(acknowledgement.version_number) || acknowledgement.version_number < 1) throw new DestinationFailure('Destination did not acknowledge the exact reactivation consent');
+        const saved = JSON.parse(claim.reactivationJson);
+        for (const consent of Array.isArray(saved) ? saved : [saved]) {
+          const acknowledgement = await post('reactivations', consent);
+          if (acknowledgement.batch_id !== consent.batch_id || acknowledgement.consent_generation !== consent.consent_generation || !Number.isSafeInteger(acknowledgement.version_number) || acknowledgement.version_number < 1) throw new DestinationFailure('Destination did not acknowledge the exact reactivation consent');
+        }
       }
       const payload = JSON.parse(claim.reservationJson);
       const result = await post('batches', payload);
@@ -107,7 +112,8 @@ export const reconcile = internalAction({
         const acknowledgements = page.map(job => {
           const matches = result.versions.filter((item: Record<string, unknown>) => item.source_asset_id === job.assetId && item.source_version_id === job.versionId);
           const target = matches[0];
-          if (matches.length !== 1 || !['registered', 'reserved', 'target_suppressed', 'source_deleted', 'unregistered'].includes(target.state) || (target.state !== 'unregistered' && (!Number.isSafeInteger(target.consent_generation) || target.consent_generation < 1 || typeof target.run_id !== 'string' || typeof target.artifact_id !== 'string' || !Number.isSafeInteger(target.version_number) || target.version_number < 1))) throw new DestinationFailure('Destination status did not acknowledge an exact source version');
+          const minimumVersion = target.state === 'target_suppressed' || target.state === 'source_deleted' ? 0 : 1;
+          if (matches.length !== 1 || !['registered', 'reserved', 'target_suppressed', 'source_deleted', 'unregistered'].includes(target.state) || (target.state !== 'unregistered' && (!Number.isSafeInteger(target.consent_generation) || target.consent_generation < 1 || typeof target.run_id !== 'string' || typeof target.artifact_id !== 'string' || !Number.isSafeInteger(target.version_number) || target.version_number < minimumVersion))) throw new DestinationFailure('Destination status did not acknowledge an exact source version');
           return { jobId: job.jobId, expectedGeneration: job.consentGeneration, state: target.state,
             ...(target.state === 'unregistered' ? {} : { consentGeneration: target.consent_generation, targetRunId: target.run_id, targetArtifactId: target.artifact_id, targetVersionNumber: target.version_number }) };
         });
@@ -144,5 +150,18 @@ export const refreshMetadata = internalAction({
       if (receipt.operation_id !== payload.operation_id || receipt.source_asset_id !== payload.source_asset_id || receipt.source_version_id !== payload.source_version_id || receipt.consent_generation !== payload.consent_generation || receipt.artifact_id !== claim.targetArtifactId || receipt.version_number !== claim.targetVersionNumber) throw new DestinationFailure('Destination did not acknowledge the exact Refresh');
       await ctx.runMutation(internal.destinationRefresh.finish, { ...args, token: claim.token, ok: true });
     } catch (cause) { await ctx.runMutation(internal.destinationRefresh.finish, { ...args, token: claim.token, ok: false, ...failure(cause) }); }
+  },
+});
+
+export const unsyncVersion = internalAction({
+  args: { unsyncId: v.id('destinationUnsyncs') },
+  handler: async (ctx, args): Promise<void> => {
+    const claim = await ctx.runMutation(internal.destinationUnsync.claim, args);
+    if (!claim) return;
+    try {
+      const receipt = await post('unsyncs', claim.payload);
+      if (!['target_suppressed', 'source_deleted'].includes(receipt.state) || receipt.source_asset_id !== claim.payload.source_asset_id || receipt.source_version_id !== claim.payload.source_version_id || receipt.consent_generation !== claim.payload.consent_generation) throw new DestinationFailure('Destination did not acknowledge the exact Unsync');
+      await ctx.runMutation(internal.destinationUnsync.finish, { ...args, token: claim.token, ok: true, terminal: receipt.state === 'source_deleted' });
+    } catch (cause) { await ctx.runMutation(internal.destinationUnsync.finish, { ...args, token: claim.token, ok: false, error: failure(cause).error }); }
   },
 });

@@ -22,7 +22,7 @@ test('comment retry is idempotent and changed payload cannot silently overwrite 
   const request = { token: 'review-token', videoId: asset, body: 'Keep the framing', requestId: 'comment-1' };
   await t.mutation(api.reviewPublic.clientAddComment, request);
   await t.mutation(api.reviewPublic.clientAddComment, request);
-  const comments = await t.query(api.reviewPublic.listCommentsByVideo, { token: request.token, videoId: asset });
+  const comments = await t.action(api.reviewPublic.listCommentsByVideo, { token: request.token, videoId: asset });
   expect(comments).toHaveLength(1);
   expect(comments[0].body).toBe('Keep the framing');
   await expect(t.mutation(api.reviewPublic.clientAddComment, { ...request, body: 'Changed note' })).rejects.toThrow('Comment retry changed');
@@ -40,4 +40,5 @@ test('exact original downloads enforce asset/link consent, archive, version owne
   await t.run(async ctx => { await ctx.db.patch(project, { archived: false }); await ctx.db.patch(link, { revokedAt: Date.now() }); });
   await expect(t.query(internal.privateReview.download, request)).rejects.toThrow('Review link unavailable');
 });
+
 

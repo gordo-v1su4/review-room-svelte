@@ -48,12 +48,17 @@ async function mutate(session, action, assetId, values = {}) {
   assert.equal(response.status,200,`Reviewer ${action} HTTP mutation failed`);
 }
 async function denied(grant, session, asset, label) {
+  const page = await request(session,`/review/${grant.token}`);
+  if (label === 'missingProofDenied' || label === 'differentLinkProofDenied') {
+    assert.equal(page.status,200,`${label}: locked bootstrap failed`);
+    assert((await page.text()).includes('Enter your passcode'),`${label}: private bootstrap bypass succeeded`);
+  } else { assert.equal(page.status,404,`${label}: private bootstrap remained available`); await page.arrayBuffer(); }
   const client = session?.client ?? guest();
   const scope = { token: grant.token, ...(session?.accessKey ? { accessKey: session.accessKey } : {}) };
   for (const [method, fn, args] of [
-    ['query','reviewPublic:getProjectByToken',scope],
-    ['query','reviewPublic:listVideosByToken',scope],
-    ['query','reviewPublic:listCommentsByVideo',{...scope,videoId:asset._id}],
+    ['action','reviewPublic:getProjectByToken',scope],
+    ['action','reviewPublic:listVideosByToken',scope],
+    ['action','reviewPublic:listCommentsByVideo',{...scope,videoId:asset._id}],
     ['mutation','reviewPublic:clientSetRating',{...scope,videoId:asset._id,rating:1}]
   ]) {
     let failed = false;
@@ -95,7 +100,7 @@ try {
     for(const [session,name] of [[a,'QA Reviewer Alpha'],[b,'QA Reviewer Beta']]) await session.client.mutation('reviewPublic:setReviewerName',{token:grant.token,accessKey:session.accessKey,displayName:name});
     await mutate(a,'viewed',video._id); await mutate(a,'rating',video._id,{rating:4});
     // Set desired shortlist once; toggling on rerun would obscure persisted behavior.
-    const list=await a.client.query('reviewPublic:listVideosByToken',{token:grant.token,accessKey:a.accessKey});
+    const list=await a.client.action('reviewPublic:listVideosByToken',{token:grant.token,accessKey:a.accessKey});
     if(!list.find(item=>item.id===video._id).isSelect) await mutate(a,'shortlist',video._id);
     await mutate(a,'status',video._id,{status:'needs_changes'});
     const suffix=randomBytes(6).toString('hex');
@@ -105,23 +110,23 @@ try {
     const strokes=[{id:'qa-rect',tool:'rect',color:'#ef4444',width:3,points:[{x:0.1,y:0.1},{x:0.8,y:0.8}]}];
     await mutate(b,'viewed',image._id);await mutate(b,'annotations',image._id,{strokes});
     const reload=guest();
-    const values=await reload.query('reviewPublic:listVideosByToken',{token:grant.token,accessKey:a.accessKey});
+    const values=await reload.action('reviewPublic:listVideosByToken',{token:grant.token,accessKey:a.accessKey});
     const persisted=values.find(item=>item.id===video._id), still=values.find(item=>item.id===image._id);
     assert(persisted.viewed&&persisted.rating===4&&persisted.isSelect&&persisted.status==='needs_changes','Reviewer reload lost feedback');
     assert.deepEqual(still.annotationStrokes,strokes,'Reviewer reload lost still markup');
-    const notes=await b.client.query('reviewPublic:listCommentsByVideo',{token:grant.token,accessKey:b.accessKey,videoId:video._id});
+    const notes=await b.client.action('reviewPublic:listCommentsByVideo',{token:grant.token,accessKey:b.accessKey,videoId:video._id});
     assert.equal(notes.filter(n=>n.body===first.body).length,1,'Retry duplicated comments');
     assert(notes.some(n=>n.body===first.body&&n.authorName==='QA Reviewer Alpha'&&n.timecodeSec===0.5),'Alpha attribution/timecode lost');
     assert(notes.some(n=>n.body===`Beta QA ${suffix}`&&n.authorName==='QA Reviewer Beta'),'Beta attribution overwritten');
     assert(!/clientRequestId|accessKeyHash|passcodeHash|storageKey/.test(JSON.stringify(notes)),'Private hashes leaked');
-    assert.equal(await a.client.query('reviewPublic:getReviewerName',{token:grant.token,accessKey:a.accessKey}),'QA Reviewer Alpha');
+    assert.equal(await a.client.action('reviewPublic:getReviewerName',{token:grant.token,accessKey:a.accessKey}),'QA Reviewer Alpha');
     snapshot=await admin.query('personal:snapshot',{});
     assert(snapshot.assets.find(x=>x._id===video._id).feedbackNeedsAttention,'Owner attention flag absent');
     const comment=snapshot.comments.find(n=>n.body===first.body);
     await admin.mutation('personal:ownerToggleCommentComplete',{commentId:comment._id});
-    assert((await b.client.query('reviewPublic:listCommentsByVideo',{token:grant.token,accessKey:b.accessKey,videoId:video._id})).find(n=>n._id===comment._id).completedAt,'Handled state did not persist');
+    assert((await b.client.action('reviewPublic:listCommentsByVideo',{token:grant.token,accessKey:b.accessKey,videoId:video._id})).find(n=>n._id===comment._id).completedAt,'Handled state did not persist');
     await admin.mutation('personal:ownerToggleCommentComplete',{commentId:comment._id});
-    assert(!(await a.client.query('reviewPublic:listCommentsByVideo',{token:grant.token,accessKey:a.accessKey,videoId:video._id})).find(n=>n._id===comment._id).completedAt,'Reopen state did not persist');
+    assert(!(await a.client.action('reviewPublic:listCommentsByVideo',{token:grant.token,accessKey:a.accessKey,videoId:video._id})).find(n=>n._id===comment._id).completedAt,'Reopen state did not persist');
     for(const session of [a,b]) { const page=await request(session,`/review/${grant.token}`);assert.equal(page.status,200,'Independent reviewer page reload failed');assert((await page.text()).includes('QA Reviewer'),'Reviewer identity missing page reload'); }
     results.twoReviewerPersisted=true;results.commentRetryDeduplicated=true;results.ownerHandledReopenPersisted=true;
     const original=await request(a,downloadPath(grant,image));assert.equal(original.status,200,'Enabled download failed');assert(original.headers.get('content-disposition')?.startsWith('attachment'),'Download not attachment');assert.equal(hash(Buffer.from(await original.arrayBuffer())),hash(readFileSync('.scratch/review-trailer-sync/live-qa/poster.jpg')),'Downloaded bytes differ');
@@ -147,10 +152,20 @@ try {
     try{await denied(arch,archSession,image,'archivedOpenSessionDenied');}finally{await admin.mutation('personal:updateProject',{projectId:state.projectId,archived:false});}
     const expiresAt=Date.now()+5000, exp=await link(state.projectId,{passcode:secret,canDownload:true,expiresAt}), expSession=await unlock(exp,secret);
     const before=await request(expSession,mediaPath(exp,image._id));assert.equal(before.status,200);await before.arrayBuffer();
+    const warmPage=await request(expSession,`/review/${exp.token}`);assert.equal(warmPage.status,200,'Expiry fixture bootstrap never warmed');await warmPage.text();
+    await expSession.client.action('reviewPublic:getProjectByToken',{token:exp.token,accessKey:expSession.accessKey});
+    await expSession.client.action('reviewPublic:listVideosByToken',{token:exp.token,accessKey:expSession.accessKey});
+    await expSession.client.action('reviewPublic:listCommentsByVideo',{token:exp.token,accessKey:expSession.accessKey,videoId:image._id});
     await new Promise(resolve=>setTimeout(resolve,Math.max(0,expiresAt-Date.now())+150));
     await denied(exp,expSession,image,'expiredOpenSessionDenied');
+    const logout=await request({cookie:ownerCookie},'/studio?/logout',{method:'POST',body:new FormData()});
+    const loggedOut=logout.status===200 ? await logout.json() : null;
+    assert(logout.status===303||loggedOut?.type==='redirect','Owner sign-out failed');assert(logout.headers.get('set-cookie')?.includes('Max-Age=0'),'Owner sign-out did not remove cookie');
+    assert.equal((await request(null,'/')).status,303,'Signed-out owner workspace accessible');
+    assert.equal((await request(null,'/api/owner-review',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({assetId:video._id,rating:1})})).status,303,'Signed-out owner mutation accessible');results.ownerSignOutDenied=true;
     const summary={releaseVersion:await(await fetch(base+'/_app/version.json')).json(),...results,qaOnly:true,actualPhoneCoverage:false,nativeBrowserCoverage:false};
     writeFileSync('.scratch/release-readiness/private-review-live-summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary));
   }
 } catch(cause) { console.error(cause instanceof Error ? cause.message.replace(/https?:\/\/\S+/g,'[private URL]'):'Private review acceptance failed');process.exitCode=1; }
 finally { for(const grant of grants) { try{await admin.mutation('personal:revokeReviewLink',{linkId:grant.linkId});}catch{console.error('QA private link cleanup failed');process.exitCode=1;} } }
+
