@@ -109,9 +109,11 @@ export const revoke = internalMutation({
 export const resolve = internalQuery({
   args: { slug: v.string(), versionId: v.string(), variant: v.union(v.literal('original'), v.literal('poster')), origin: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const grant = await ctx.db.query('publicationGrants').withIndex('by_slug', q => q.eq('slug', args.slug)).unique();
+    const primary = await ctx.db.query('publicationGrants').withIndex('by_slug', q => q.eq('slug', args.slug)).unique();
+    const auxiliary = primary ? null : await ctx.db.query('publicationReferenceGrants').withIndex('by_slug', q => q.eq('slug', args.slug)).unique();
+    const grant = primary ?? (auxiliary && await ctx.db.get(auxiliary.rootGrantId));
     const id = ctx.db.normalizeId('assetVersions', args.versionId);
-    if (!grant || grant.revokedAt !== undefined || (grant.expiresAt !== undefined && grant.expiresAt <= Date.now()) || !id || (id !== grant.versionId && !grant.referenceVersionIds.includes(id)) || (args.origin && !grant.allowedOrigins.includes(args.origin))) return null;
+    if (!grant || grant.revokedAt !== undefined || (grant.expiresAt !== undefined && grant.expiresAt <= Date.now()) || !id || (auxiliary ? auxiliary.consentGeneration !== grant.consentGeneration || !auxiliary.referenceVersionIds.includes(id) : id !== grant.versionId && !grant.referenceVersionIds.includes(id)) || (args.origin && !grant.allowedOrigins.includes(args.origin))) return null;
     const root = await ctx.db.get(grant.versionId);
     const asset = root && await ctx.db.get(root.assetId);
     const project = asset && await ctx.db.get(asset.projectId);

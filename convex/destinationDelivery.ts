@@ -8,7 +8,7 @@ class DestinationFailure extends Error {
   constructor(message: string, readonly disconnected = false) { super(message); }
 }
 
-async function post(path: 'batches' | 'versions' | 'connections' | 'status' | 'reactivations' | 'source-deletions', payload: Record<string, unknown>) {
+async function post(path: 'batches' | 'versions' | 'connections' | 'status' | 'reactivations' | 'source-deletions' | 'metadata-refreshes', payload: Record<string, unknown>) {
   const key = process.env.TRAILER_FEED_REVIEW_INGEST_KEY;
   if (!key) throw new DestinationFailure('Destination delivery is not configured');
   const response = await fetch(`https://media.v1su4.dev/trailer-feed/external/review/${path}`, {
@@ -130,5 +130,19 @@ export const removeSource = internalAction({
     } catch (cause) {
       await ctx.runMutation(internal.destinationRemovals.finish,{...args,token:claim.token,ok:false,error:failure(cause).error});
     }
+  },
+});
+
+export const refreshMetadata = internalAction({
+  args: { refreshId: v.id('destinationRefreshes') },
+  handler: async (ctx, args): Promise<void> => {
+    const claim = await ctx.runMutation(internal.destinationRefresh.claim, args);
+    if (!claim) return;
+    try {
+      const payload = JSON.parse(claim.payloadJson);
+      const receipt = await post('metadata-refreshes', payload);
+      if (receipt.operation_id !== payload.operation_id || receipt.source_asset_id !== payload.source_asset_id || receipt.source_version_id !== payload.source_version_id || receipt.consent_generation !== payload.consent_generation || receipt.artifact_id !== claim.targetArtifactId || receipt.version_number !== claim.targetVersionNumber) throw new DestinationFailure('Destination did not acknowledge the exact Refresh');
+      await ctx.runMutation(internal.destinationRefresh.finish, { ...args, token: claim.token, ok: true });
+    } catch (cause) { await ctx.runMutation(internal.destinationRefresh.finish, { ...args, token: claim.token, ok: false, ...failure(cause) }); }
   },
 });

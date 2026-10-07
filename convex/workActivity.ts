@@ -19,7 +19,7 @@ export const list = internalQuery({
     const addIngest = async (asset: Doc<'videos'>, project: Doc<'projects'>, observedJob?: Doc<'mediaJobs'>) => {
       if (!asset.currentVersionId) return;
       const job = observedJob ?? await ctx.db.query('mediaJobs').withIndex('by_version', q => q.eq('versionId', asset.currentVersionId!)).unique();
-      if (!job) return;
+      if (!job || job.versionId !== asset.currentVersionId) return;
       rows.set('ingest:' + job._id, { id: 'ingest:' + job._id, kind: 'ingest', label: asset.assetCode ?? asset.title,
         assetId: asset._id, projectId: project._id, project: project.title, updatedAt: job.updatedAt,
         state: job.status === 'ready' ? 'complete' : job.status === 'error' ? 'failed' : job.status === 'queued' ? 'queued' : 'running',

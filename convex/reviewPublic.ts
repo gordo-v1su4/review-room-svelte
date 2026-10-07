@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { getReviewLink, getReviewerSession } from "./lib/reviewAccess";
+import { digest, getReviewLink, getReviewerSession } from "./lib/reviewAccess";
 
 const annotationToolValidator = v.optional(
   v.union(
@@ -50,6 +50,7 @@ export const listVideosByToken = query({
       .sort((a, b) => a.order - b.order)
       .map((video) => ({
         id: video._id, title: video.assetCode ?? video.title, assetCode: video.assetCode,
+        versionId: video.currentVersionId,
         assetClass: video.assetClass, mimeType: video.mimeType, sizeBytes: video.sizeBytes,
         status: video.status, viewed: video.viewed, rating: video.rating,
         isSelect: video.isSelect, commentCount: video.commentCount,
@@ -81,7 +82,9 @@ async function withReactionSummaries(ctx: QueryCtx, comments: Doc<"comments">[])
         .withIndex("by_comment", (q) => q.eq("commentId", comment._id))
         .collect();
       return {
-        ...comment,
+        _id: comment._id, videoId: comment.videoId, authorName: comment.authorName,
+        authorRole: comment.authorRole, body: comment.body, timecodeSec: comment.timecodeSec,
+        createdAt: comment.createdAt, completedAt: comment.completedAt,
         reactions: {
           thumbs_up: reactions.filter((r) => r.emoji === "thumbs_up").length,
           thumbs_down: reactions.filter((r) => r.emoji === "thumbs_down").length,
@@ -288,6 +291,7 @@ export const clientAddComment = mutation({
     videoId: v.id("videos"),
     body: v.string(),
     timecodeSec: v.optional(v.number()),
+    requestId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
@@ -296,12 +300,25 @@ export const clientAddComment = mutation({
       throw new Error("Video not found");
     }
     const authorName = await reviewerNameForToken(ctx, args.token, args.accessKey);
+    const body = args.body.trim();
+    if (!body || body.length > 5000) throw new Error('Comment required');
+    if (args.timecodeSec !== undefined && (!Number.isFinite(args.timecodeSec) || args.timecodeSec < 0 || (video.assetClass !== 'VID' && !video.mimeType.startsWith('video/')))) throw new Error('Invalid timecode');
+    if (args.requestId && !/^[\w-]{1,100}$/.test(args.requestId)) throw new Error('Invalid comment request');
+    const clientRequestId = args.requestId ? await digest(`${args.token}:${args.accessKey ?? 'anonymous'}:${args.requestId}`) : undefined;
+    if (clientRequestId) {
+      const previous = (await ctx.db.query('comments').withIndex('by_video', q => q.eq('videoId', args.videoId)).collect()).find(comment => comment.clientRequestId === clientRequestId);
+      if (previous) {
+        if (previous.body !== body || previous.timecodeSec !== args.timecodeSec) throw new Error('Comment retry changed');
+        return;
+      }
+    }
     await ctx.db.insert("comments", {
       videoId: args.videoId,
       projectId: video.projectId,
       authorName,
       authorRole: "client",
-      body: args.body,
+      body,
+      clientRequestId,
       timecodeSec: args.timecodeSec,
       createdAt: Date.now(),
     });

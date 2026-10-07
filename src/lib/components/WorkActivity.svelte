@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
   import { Popover } from 'bits-ui';
-  import { ListTodo, ArrowUpRight, Check, CircleAlert, LoaderCircle, Upload, X } from 'lucide-svelte';
+  import { FolderDown, ListTodo, ArrowUpRight, Check, CircleAlert, LoaderCircle, Upload, X } from 'lucide-svelte';
   import type { ActivityFeed, ActivityItem } from '$lib/work-activity';
   import { observeActivity } from '$lib/activity-observer';
 
@@ -29,7 +29,7 @@
 
 <Popover.Root bind:open>
   <Popover.Trigger class={`work-activity-trigger ${working > 0 ? 'working' : ''}`} aria-label={`Work activity: ${summary}`} title={summary} onclick={() => automatic = false}>
-    <ListTodo size={15}/><span class="activity-summary">{summary}</span>{#if working}<span class="activity-count">{working}{activity.truncated ? '+' : ''}</span>{:else if activity.counts.failed}<span class="attention-dot" aria-hidden="true"></span>{/if}
+    <FolderDown size={15}/><span class="activity-summary">{summary}</span>{#if working}<span class="activity-count">{working}{activity.truncated ? '+' : ''}</span>{:else if activity.counts.failed}<span class="attention-dot" aria-hidden="true"></span>{/if}
   </Popover.Trigger>
   <Popover.Portal>
     <Popover.Content class="work-activity-panel" align="end" side="bottom" sideOffset={9} collisionPadding={12} aria-label="Work activity" onOpenAutoFocus={event => { if (automatic) event.preventDefault(); }} onCloseAutoFocus={event => { if (automatic) event.preventDefault(); }}>

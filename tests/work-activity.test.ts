@@ -34,6 +34,15 @@ test('owner activity exposes real job transitions without foreign projects or pr
   const finished = await t.query(internal.workActivity.list, { now: 15000, observedIds: [`ingest:${ids.own.job}`] });
   expect(finished.items[0].state).toBe('complete');
   expect(finished.items[0].stage).toBe('Ready to review');
+  const replacementJob = await t.run(async ctx => {
+    const version = await ctx.db.insert('assetVersions', { assetId: ids.own.asset, version: 2, originalKey: 'REPLACEMENT-PRIVATE-KEY', mimeType: 'video/mp4', sizeBytes: 200, processingState: 'processing', createdAt: 16000 });
+    await ctx.db.patch(ids.own.asset, { currentVersionId: version, processingStatus: 'processing', updatedAt: 16000 });
+    return ctx.db.insert('mediaJobs', { assetId: ids.own.asset, versionId: version, status: 'queued', stage: 'verify', attempt: 1, createdAt: 16000, updatedAt: 16000 });
+  });
+  const replaced = await t.query(internal.workActivity.list, { now: 17000, observedIds: [`ingest:${ids.own.job}`] });
+  expect(replaced.items).toHaveLength(1);
+  expect(replaced.items[0].id).toBe(`ingest:${replacementJob}`);
+  expect(replaced.items[0].state).toBe('queued');
   await t.run(ctx => ctx.db.patch(ids.project, { archived: true }));
   expect((await t.query(internal.workActivity.list, { now: 16000, observedIds: [`ingest:${ids.own.job}`] })).items).toEqual([]);
 });

@@ -15,7 +15,10 @@ function withoutReferences(metadata: NonNullable<Doc<'assetVersions'>['creativeM
 export async function sourceDeleted(ctx: MutationCtx, asset: Doc<'videos'>, versions: Doc<'assetVersions'>[]) {
   const deleted = new Set<string>(versions.map(version=>version._id));
   const projectGrants = await ctx.db.query('publicationGrants').withIndex('by_project',q=>q.eq('projectId',asset.projectId)).collect();
-  const linkedGrants = projectGrants.filter(grant=>!deleted.has(grant.versionId) && grant.referenceVersionIds.some(id=>deleted.has(id)));
+  const auxiliary = await ctx.db.query('publicationReferenceGrants').withIndex('by_project', q => q.eq('projectId', asset.projectId)).collect();
+  const linkedAuxiliary = auxiliary.filter(grant => grant.referenceVersionIds.some(id => deleted.has(id)));
+  const linkedGrants = projectGrants.filter(grant=>!deleted.has(grant.versionId) && (grant.referenceVersionIds.some(id=>deleted.has(id)) || linkedAuxiliary.some(imageGrant => imageGrant.rootGrantId === grant._id && imageGrant.consentGeneration === grant.consentGeneration)));
+  for (const grant of linkedAuxiliary) await ctx.db.patch(grant._id, { referenceVersionIds: grant.referenceVersionIds.filter(id => !deleted.has(id)) });
   for (const grant of linkedGrants) {
     // Removing a deleted reference contracts consent; the surviving video grant stays valid.
     await ctx.db.patch(grant._id,{referenceVersionIds:grant.referenceVersionIds.filter(id=>!deleted.has(id))});
@@ -42,7 +45,7 @@ export async function sourceDeleted(ctx: MutationCtx, asset: Doc<'videos'>, vers
   for (const version of versions) {
     const grant = await ctx.db.query('publicationGrants').withIndex('by_destination_version', q => q.eq('destinationKey', 'trailer-feed').eq('versionId', version._id)).unique();
     const jobs = await ctx.db.query('syncOutbox').withIndex('by_version', q => q.eq('versionId', version._id)).collect();
-    const references = linkedGrants.filter(grant=>grant.referenceVersionIds.includes(version._id));
+    const references = linkedGrants.filter(grant=>grant.referenceVersionIds.includes(version._id) || linkedAuxiliary.some(imageGrant => imageGrant.rootGrantId === grant._id && imageGrant.consentGeneration === grant.consentGeneration && imageGrant.referenceVersionIds.includes(version._id)));
     if (!grant && !jobs.length && !references.length) continue;
     if (grant && grant.revokedAt === undefined) await ctx.db.patch(grant._id, { revokedAt: Date.now() });
     for (const job of jobs) await ctx.db.patch(job._id, { state:'source_deleted', attemptToken:undefined, leaseUntil:undefined, lastError:'Source version was deleted', updatedAt:Date.now() });

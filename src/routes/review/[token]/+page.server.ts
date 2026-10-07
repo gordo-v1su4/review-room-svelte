@@ -11,7 +11,13 @@ export const load: PageServerLoad = async ({ params, cookies, setHeaders }) => {
   const token = params.token;
   const state = await db().query(links.getAccessState, { token });
   if (!state.available) throw error(404, 'Review unavailable');
-  const accessKey = cookies.get(cookieName(token));
+  let accessKey = cookies.get(cookieName(token));
+  if (!state.requiresPasscode && !accessKey) {
+    const session = await db().mutation(links.verifyPasscode, { token, passcode: '' });
+    if (!session.ok || !session.accessKey) throw error(404, 'Review unavailable');
+    accessKey = session.accessKey;
+    cookies.set(cookieName(token), accessKey, { path: '/', secure: !dev, httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 });
+  }
   if (state.requiresPasscode && !accessKey) return { locked: true as const, token };
   try {
     const project = await db().query(review.getProjectByToken, { token, accessKey });

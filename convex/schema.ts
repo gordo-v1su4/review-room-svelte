@@ -220,6 +220,7 @@ const applicationTables = {
     authorRole: v.union(v.literal("admin"), v.literal("client")),
     body: v.string(),
     timecodeSec: v.optional(v.number()),
+    clientRequestId: v.optional(v.string()),
     completedAt: v.optional(v.number()),
     completedBy: v.optional(v.id("appUsers")),
     createdAt: v.number(),
@@ -351,6 +352,19 @@ const applicationTables = {
   }).index('by_batch', ['batchId']).index('by_connection', ['connectionId'])
     .index('by_source_version', ['connectionId', 'versionId']).index('by_project', ['projectId']).index('by_version', ['versionId'])
     .index('by_project_state', ['projectId', 'state']),
+
+  destinationRefreshes: defineTable({
+    operationId: v.string(), requestFingerprint: v.string(), projectId: v.id('projects'), jobId: v.id('syncOutbox'),
+    consentGeneration: v.number(), payloadJson: v.string(), referenceVersionIds: v.array(v.id('assetVersions')),
+    state: v.union(v.literal('queued'), v.literal('sending'), v.literal('complete'), v.literal('failed'), v.literal('disconnected')),
+    attempts: v.number(), leaseUntil: v.optional(v.number()), attemptToken: v.optional(v.string()), lastError: v.optional(v.string()),
+    createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_operation', ['operationId']).index('by_project', ['projectId']),
+
+  publicationReferenceGrants: defineTable({
+    rootGrantId: v.id('publicationGrants'), projectId: v.id('projects'), consentGeneration: v.number(),
+    slug: v.string(), referenceVersionIds: v.array(v.id('assetVersions')), createdAt: v.number(),
+  }).index('by_root_generation', ['rootGrantId', 'consentGeneration']).index('by_slug', ['slug']).index('by_project', ['projectId']),
 
   publicationGrants: defineTable({
     destinationKey: v.literal('trailer-feed'),

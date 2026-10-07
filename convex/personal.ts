@@ -464,7 +464,7 @@ export const ownerToggleCommentComplete = internalMutation({
 });
 
 export const createReviewLink = internalMutation({
-  args: { projectId: v.id("projects"), passcode: v.optional(v.string()), expiresAt: v.optional(v.number()) },
+  args: { projectId: v.id("projects"), passcode: v.optional(v.string()), expiresAt: v.optional(v.number()), canDownload: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     await ownedProject(ctx, args.projectId);
     if (args.expiresAt !== undefined && args.expiresAt <= Date.now()) throw new Error("Expiry must be in the future");
@@ -473,10 +473,20 @@ export const createReviewLink = internalMutation({
     const passcodeHash = args.passcode ? await passcodeDigest(args.passcode, passcodeSalt!) : undefined;
     const linkId = await ctx.db.insert("reviewLinks", {
       projectId: args.projectId, token, passcodeSalt, passcodeHash,
-      canDownload: false, expiresAt: args.expiresAt, createdAt: Date.now(),
+      canDownload: args.canDownload ?? false, expiresAt: args.expiresAt, createdAt: Date.now(),
     });
     return { linkId, token };
   },
+});
+
+export const setAssetDownload = internalMutation({
+  args: { assetId: v.id('videos'), enabled: v.boolean() },
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) throw new Error('Asset unavailable');
+    await ownedProject(ctx, asset.projectId);
+    await ctx.db.patch(asset._id, { downloadEnabled: args.enabled, updatedAt: Date.now() });
+  }
 });
 
 export const revokeReviewLink = internalMutation({

@@ -28,7 +28,8 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
     const workspace = await db().query(internal.destinationSync.workspace, { projectId, folderId });
     const reconciliation = await db().action(internal.destinationDelivery.reconcile, { projectId });
     const snapshot = await db().query(internal.destinationSync.snapshot, { projectId: projectId as Id<'projects'> });
-    return json({ ...workspace, ...snapshot, ...(reconciliation.ok ? {} : { reconciliationError: reconciliation.error }) }, { headers: { 'cache-control': 'private, no-store' } });
+    const refreshes = await db().query(internal.destinationRefresh.snapshot, { projectId: projectId as Id<'projects'> });
+    return json({ ...workspace, ...snapshot, refreshes, ...(reconciliation.ok ? {} : { reconciliationError: reconciliation.error }) }, { headers: { 'cache-control': 'private, no-store' } });
   } catch (cause) { return syncError(cause); }
 };
 
@@ -48,6 +49,14 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
     }
     if (body.action === 'retry' && typeof body.batchId === 'string') {
       await db().mutation(internal.destinationSync.retry, { batchId: body.batchId });
+      return json({ ok: true }, { headers: { 'cache-control': 'private, no-store' } });
+    }
+    if (body.action === 'refresh') {
+      if (typeof body.jobId !== 'string' || typeof body.operationId !== 'string' || !Number.isSafeInteger(body.expectedGeneration) || body.expectedGeneration < 1 || (body.expectedMetadataUpdatedAt !== null && (!Number.isSafeInteger(body.expectedMetadataUpdatedAt) || body.expectedMetadataUpdatedAt < 0))) throw error(400, 'Exact published version and metadata revision required');
+      return json(await db().mutation(internal.destinationRefresh.confirm, { jobId: body.jobId as Id<'syncOutbox'>, operationId: body.operationId, expectedGeneration: body.expectedGeneration, expectedMetadataUpdatedAt: body.expectedMetadataUpdatedAt }), { headers: { 'cache-control': 'private, no-store' } });
+    }
+    if (body.action === 'retry-refresh' && typeof body.refreshId === 'string') {
+      await db().mutation(internal.destinationRefresh.retry, { refreshId: body.refreshId as Id<'destinationRefreshes'> });
       return json({ ok: true }, { headers: { 'cache-control': 'private, no-store' } });
     }
     if (body.action === 'sync-again') {

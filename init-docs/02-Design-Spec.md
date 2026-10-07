@@ -177,6 +177,8 @@ In the signed-in workspace, processing badges and media metadata update automati
 
 Queued/running media uses a labelled thumbnail placeholder and a waiting/processing viewer state. Originals and posters are requested only after the asset and current version are ready; sealed originals are not reviewed early while derivatives run. Failed ingest points to the owner’s safe Retry control. Unavailable media, expired access, interrupted delivery, unsupported format, and actual decoder failure have distinct messages; Retry playback reloads the current authorized source. Missing posters use a deliberate placeholder instead of a broken-image icon.
 
+When switching ready videos, the active player's correct selected poster stays visible until its decoded media is available, with a small loading status. Only the active player preloads its original; thumbnail hover remains sprite-only. Play can be requested while that active source loads, and Pause, navigation, and close cancel that request. Closing releases the media source. Missing posters retain the explicit preparing state; processing and delivery errors remain prominent.
+
 ## 17. Design priorities (if time is short)
 
 1. Admin workspace → 2. Client review page → 3. Video card system → 4. Right-side viewer panel → 5. Rating/comment/approval interactions → 6. Filters + smart-view tabs → 7. Upload states → 8. Table view → 9. Grouped (stacked) view → 10. Mobile refinements.
