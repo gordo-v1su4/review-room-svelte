@@ -8,14 +8,14 @@ A media review workspace for creators and clients. Organize videos and still ima
 
 | Explore | What you can do |
 | --- | --- |
-| **Organize your media** | Keep projects, nested folders, and collections together. Find assets with search and filters, then choose a grid, list, or table view. |
-| **Review the details** | Scrub video previews, adjust the playback pane, and inspect still images. Select an exact version with its prompts, model information, notes, and references. |
-| **Draw it out** | Draw directly over still images with freehand marks, arrows, rectangles, and circles to show exactly what needs attention. |
-| **Keep feedback together** | Add comments, pin video notes to a timecode, react to feedback, and mark notes handled. Follow outstanding feedback in the inbox. |
-| **Move toward approval** | Rate assets, build a shortlist, request changes, and approve finished work. |
-| **Share privately** | Invite reviewers through scoped links, control access and downloads, and keep creator and reviewer permissions separate. |
-| **Upload in batches** | Track progress, cancel or retry uploads, and generate thumbnails and scrub previews in the background. |
-| **Publish selected versions** | Send work to Trailer Feed with delivery status, metadata refresh, and removal controls. |
+| Organize&nbsp;media | Keep projects, nested folders, and collections together. Find assets with search and filters, then choose a grid, list, or table view. |
+| Review&nbsp;details | Scrub video previews, adjust the playback pane, and inspect still images. Select an exact version with its prompts, model information, notes, and references. |
+| Image&nbsp;annotations | Draw directly over still images with freehand marks, arrows, rectangles, and circles to show exactly what needs attention. |
+| Collect&nbsp;feedback | Add comments, pin video notes to a timecode, react to feedback, and mark notes handled. Follow outstanding feedback in the inbox. |
+| Approve&nbsp;work | Rate assets, build a shortlist, request changes, and approve finished work. |
+| Share&nbsp;privately | Invite reviewers through scoped links, control access and downloads, and keep creator and reviewer permissions separate. |
+| Batch&nbsp;uploads | Track progress, cancel or retry uploads, and generate thumbnails and scrub previews in the background. |
+| Publish&nbsp;versions | Send work to Trailer Feed with delivery status, metadata refresh, and removal controls. |
 
 ## How it works
 
