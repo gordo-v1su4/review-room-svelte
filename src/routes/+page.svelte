@@ -399,7 +399,7 @@
     if (!response.ok) { feedback = `Could not retry processing (${response.status}).`; return; }
     processingObserver?.refresh();
   }
-  async function uploadOriginal(file: File, destination: { projectId: string; folderId: string | null }, report: (stage: string, progress?: number) => void, signal: AbortSignal, attempt: LiveUploadAttempt) {
+  async function uploadOriginal(file: File, destination: { projectId: string; folderId: string | null; assetId?: string }, report: (stage: string, progress?: number) => void, signal: AbortSignal, attempt: LiveUploadAttempt) {
     const isImage = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type);
     if (!file.type.startsWith('video/') && !isImage) throw new Error('Choose a video or a JPEG, PNG, WebP or AVIF image.');
     feedback = `Preparing preview for ${file.name}…`;
@@ -457,11 +457,12 @@
   async function commitLiveImport(local: LocalAsset, target: ImportTarget, signal: AbortSignal, jobId: string) {
     const attempt = liveUploads.get(jobId) ?? {};
     liveUploads.set(jobId, attempt);
-    const result = await uploadOriginal(local.sourceFile, { projectId: target.projectId, folderId: target.folderId ?? null }, (stage, progress) => importQueue.update(jobId, { stage, progress, canCancel: stage !== 'Verifying upload' }), signal, attempt);
+    const result = await uploadOriginal(local.sourceFile, { projectId: target.projectId, folderId: target.folderId ?? null, assetId: target.assetId }, (stage, progress) => importQueue.update(jobId, { stage, progress, canCancel: stage !== 'Verifying upload' }), signal, attempt);
     if (!result.asset) throw new Error('Upload is saved. Retry to refresh its receipt.');
     attempt.assetId = result.assetId;
     const descriptor = result.asset;
-    const update: ProcessingUpdate = { assetId: descriptor.id, versionId: descriptor.versionId ?? null, versionNumber: 1, updatedAt: Date.now(), ready: local.type === 'image', hasPoster: true };
+    const previousProcessing = processing.find(item => item.assetId === descriptor.id);
+    const update: ProcessingUpdate = { assetId: descriptor.id, versionId: descriptor.versionId ?? null, versionNumber: previousProcessing ? previousProcessing.versionNumber + (previousProcessing.versionId === descriptor.versionId ? 0 : 1) : 1, updatedAt: Date.now(), ready: local.type === 'image', hasPoster: true };
     if (!media.some(asset => asset.id === descriptor.id)) {
       const previousActive = activeId;
       organization = { ...organization, placements: { ...organization.placements, [descriptor.id]: { projectId: target.projectId, ...(descriptor.folderId ? { folderId: descriptor.folderId } : {}) } } };
@@ -469,10 +470,21 @@
       processing = [...processing, update];
       review({ type: 'add-assets', assets: [{ id: descriptor.id }] });
       review({ type: 'select', assetId: previousActive });
+    } else {
+      // Replacement changes the exact media version; feedback and drafts stay
+      // on the existing canonical asset and selection remains untouched.
+      processing = processing.map(item => item.assetId === descriptor.id ? update : item);
+      media = media.map(asset => asset.id === descriptor.id ? { ...asset, versionId: descriptor.versionId, url: processingSource(update), poster: processingPoster(update), sprite: undefined, availability: processingAvailability(update), duration: undefined, width: undefined, height: undefined, metadata: undefined, metadataUpdatedAt: null } : asset);
     }
     URL.revokeObjectURL(local.url); if (local.poster) URL.revokeObjectURL(local.poster);
     processingObserver?.refresh();
     feedback = `${local.sourceFile.name} uploaded privately.`;
+  }
+  function queueReplacement(file: File, replacementProjectId: string, assetId: string) {
+    const asset = media.find(asset => asset.id === assetId && organization.placements[assetId]?.projectId === replacementProjectId);
+    if (!asset) { feedback = 'This asset is no longer available. Refresh the project before replacing it.'; return; }
+    const target: ImportTarget = { projectId: replacementProjectId, assetId, dateKey: '', assetClass: 'VID' };
+    importQueue.enqueue([{ file, target, destinationLabel: `${projects.find(project => project.id === replacementProjectId)?.name ?? 'Project'} / New version of ${asset.assetCode}` }]);
   }
   async function imageUploadPreview(file: File) {
     const url = URL.createObjectURL(file);
@@ -1079,7 +1091,7 @@
   <main ondragover={dragFiles} ondrop={dropFiles}>
     <header class="topbar">
       <Dialog.Root bind:open={navOpen}><Dialog.Trigger class="icon-button mobile-menu" aria-label="Open navigation" title="Open navigation"><Menu size={20}/></Dialog.Trigger><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="nav-drawer" onCloseAutoFocus={event => { if (restoringFromNavigation) { event.preventDefault(); restoringFromNavigation = false; void focusProjectHeading(); } }} style={`--project-accent: ${project.brandColor ?? "#14b8a6"}`}><Dialog.Title class="visually-hidden">Workspace navigation</Dialog.Title><Dialog.Description class="visually-hidden">Browse local media and review status</Dialog.Description><Dialog.Close class="icon-button drawer-close" aria-label="Close navigation"><X size={20}/></Dialog.Close>{@render navigation()}</Dialog.Content></Dialog.Portal></Dialog.Root>
-      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each ancestors as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if (focusedReview || mediaType !== 'all' || filter === 'selected' || activeCollectionId || archived)}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId && locationName !== project.name}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot} uploadContext={!project.archived && projectId !== "__empty__" ? {folders:folderDestinations,...importOptions,onChange:value => importOptions = value,onChoose:() => picker.click()} : undefined} destinationContext={!project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId) ? {projectId,folderId:activeFolderId,selectedVersionIds:destinationSelection} : undefined}/>{/if}<div class="header-account-tools">{#if live}<WorkActivity feed={activityFeed} onOpen={openActivity}/>{/if}{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
+      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each ancestors as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if (focusedReview || mediaType !== 'all' || filter === 'selected' || activeCollectionId || archived)}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId && locationName !== project.name}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot} onVersionFile={queueReplacement} uploadContext={!project.archived && projectId !== "__empty__" ? {folders:folderDestinations,...importOptions,onChange:value => importOptions = value,onChoose:() => picker.click()} : undefined} destinationContext={!project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId) ? {projectId,folderId:activeFolderId,selectedVersionIds:destinationSelection} : undefined}/>{/if}<div class="header-account-tools">{#if live}<WorkActivity feed={activityFeed} onOpen={openActivity}/>{/if}{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
     </header>
     <div class="page-content folder-workspace">
       <section class="project-heading" class:identity-banner={showsProjectIdentity && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if showsProjectIdentity && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{locationName}</h1>{#if project.archived || project.clientName || project.description}<p class="subtitle" class:subtitle-placeholder={!isProjectRoot} aria-hidden={!isProjectRoot} title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description}</p>{/if}</div><div class="project-tools"><ImportQueue persistent={live} jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} folderLabels={folderDestinations} onMoveFolder={moveFolder} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
@@ -1223,4 +1235,5 @@
   .identity-banner { padding: 16px; border-radius: 8px; background: color-mix(in srgb, var(--project-accent) 18%, #030605); }
   .project-banner { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; opacity: .2; border-radius: inherit; pointer-events: none; }
 </style>
+
 

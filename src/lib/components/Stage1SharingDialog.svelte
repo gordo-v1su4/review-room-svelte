@@ -7,7 +7,7 @@
   import Stage1Controls from './Stage1Controls.svelte';
 
   type Snapshot = FunctionReturnType<typeof internal.personal.snapshot>;
-  let { snapshot, destinationContext, uploadContext }: { snapshot: Snapshot; destinationContext?: {projectId:string;folderId:string|null;selectedVersionIds:string[]}; uploadContext?: {folders:readonly {id:string;title:string}[];folderId:string|null;assetClass:'VID'|'IMG'|'CTX'|'STB';onChange:(value:{folderId:string|null;assetClass:'VID'|'IMG'|'CTX'|'STB'})=>void;onChoose:()=>void} } = $props();
+  let { snapshot, destinationContext, uploadContext, onVersionFile }: { snapshot: Snapshot; onVersionFile?: (file: File, projectId: string, assetId: string) => void; destinationContext?: {projectId:string;folderId:string|null;selectedVersionIds:string[]}; uploadContext?: {folders:readonly {id:string;title:string}[];folderId:string|null;assetClass:'VID'|'IMG'|'CTX'|'STB';onChange:(value:{folderId:string|null;assetClass:'VID'|'IMG'|'CTX'|'STB'})=>void;onChoose:()=>void} } = $props();
   let open = $state(false);
   onMount(() => { open = new URLSearchParams(location.search).get('sharing') === '1'; });
 </script>
@@ -21,7 +21,7 @@
         <div><Dialog.Title class="dialog-title">Publish &amp; share</Dialog.Title><Dialog.Description>Private reviews and optional published embeds</Dialog.Description></div>
         <Dialog.Close class="publishing-close" aria-label="Close publishing tools"><X size={17} /></Dialog.Close>
       </div>
-      <Stage1Controls {snapshot} destinationContext={open ? destinationContext : undefined} uploadContext={uploadContext ? {...uploadContext,onChoose:() => { open = false; uploadContext?.onChoose(); }} : undefined} />
+      <Stage1Controls {snapshot} onVersionFile={onVersionFile ? (file, projectId, assetId) => { open = false; onVersionFile?.(file, projectId, assetId); } : undefined} destinationContext={open ? destinationContext : undefined} uploadContext={uploadContext ? {...uploadContext,onChoose:() => { open = false; uploadContext?.onChoose(); }} : undefined} />
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
@@ -37,3 +37,4 @@
   @media(max-width:760px) { :global(body .stage-one-sheet) { width:100%;border-radius:12px 12px 0 0;padding-bottom:max(18px,env(safe-area-inset-bottom)); } }
   @media(pointer:coarse) { :global(.publishing-close) { min-width:44px;min-height:44px; } }
 </style>
+

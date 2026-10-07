@@ -1,6 +1,6 @@
 # V1S-179 explicit deleted-target replacement — October 7, 2026
 
-Implementation checkpoint; deployed acceptance is pending the combined release.
+Basic deployed acceptance passed on Review frontend `118ec9a`, Convex `382c7d4` and target `4c41cb4`. The final mixed queued/registered hardening described below still awaits its source deployment and parent native Browser gate.
 
 The owner chooses Replace removed target, Create new or Use existing by stable target ID, and explicitly authorizes replacement. The target backend accepts this operation only when the exact previously connected project has a durable deletion tombstone. A stable replacement nonce records the operation and history; replay returns the same target, changed/superseded intent denies, and ordinary connection retry cannot recreate the removed target.
 
@@ -15,6 +15,10 @@ The same dialog includes V1S-178's separate exact-version Unsync preview and con
 - Target external tests:21 pass, including Create/Connect replacement, deny while old target exists, deny generic recreation, exact replay, changed intent rejection and retained old/new IDs.
 - Svelte check:zero errors, eight existing warnings. Svelte autofixer:no component issues; lifecycle/effect suggestions were reviewed against the existing cancellable observation lifecycle.
 
-## Deployed gate
+## Deployed acceptance and final gate
 
-Deploy target backend, source Convex and frontend together, then delete only the dedicated disposable activity QA target. Explicitly replace it, verify sources/history remain, publish chosen exact versions once, reject old receipt/payload generations and reopen in the native Browser. Do not mark Done from this checkpoint. No PR is opened.
+The dedicated Activity panel QA target was independently asserted to contain only two selected synthetic videos and their attached external grid before deletion. Explicit Create replacement lost-receipt replay retained the same new mapping, preserved the retired connection and published nothing automatically. Fresh exact consent delivered two videos at generation2 plus the referenced grid. Review originals and creative metadata stayed unchanged; the old target remains404. Old target delivery denied409, retired owner connection denied404 and the replacement catalog remained unchanged. Safe results: `.scratch/release-readiness/v1s179-live-summary.json`; private fixture state is excluded from commits.
+
+Final hardening queries authoritative per-version target state before replacement. Never-registered versions receive fresh grants and an ordered idempotent singleton reservation; previously registered versions receive explicit reactivation. Interleaving those preparations in source-date order preserves numbering in mixed batches. Queued Unsync removes the cancelled version from the plan and fences the old reservation acknowledgment; remaining fresh reservations get a new stored nonce. Six focused replacement/Refresh/Unsync tests pass with57 assertions; TypeScript check passes.
+
+Deploy that source hardening, run the bounded replacement replay check, and finish the parent native Browser gate before marking Done. No PR is opened.

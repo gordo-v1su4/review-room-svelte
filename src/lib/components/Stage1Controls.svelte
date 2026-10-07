@@ -12,7 +12,7 @@
   import type { FunctionReturnType } from 'convex/server';
   import { internal } from '../../../convex/_generated/api';
   type Snapshot = FunctionReturnType<typeof internal.personal.snapshot>;
-  let { snapshot, destinationContext, uploadContext }: { snapshot: Snapshot; destinationContext?: {projectId:string;folderId:string|null;selectedVersionIds:string[]}; uploadContext?: {folders:readonly {id:string;title:string}[];folderId:string|null;assetClass:'VID'|'IMG'|'CTX'|'STB';onChange:(value:{folderId:string|null;assetClass:'VID'|'IMG'|'CTX'|'STB'})=>void;onChoose:()=>void} } = $props();
+  let { snapshot, destinationContext, uploadContext, onVersionFile }: { snapshot: Snapshot; onVersionFile?: (file: File, projectId: string, assetId: string) => void; destinationContext?: {projectId:string;folderId:string|null;selectedVersionIds:string[]}; uploadContext?: {folders:readonly {id:string;title:string}[];folderId:string|null;assetClass:'VID'|'IMG'|'CTX'|'STB';onChange:(value:{folderId:string|null;assetClass:'VID'|'IMG'|'CTX'|'STB'})=>void;onChoose:()=>void} } = $props();
   let showcaseOrder = $state<string[]>([]);
   let showcasePick = $state('');
   let sharingTab = $state('reviews');
@@ -109,7 +109,7 @@
     <div class="asset-list">{#each snapshot.publications as publication (publication._id)}
       {@const asset = snapshot.assets.find((item) => item._id === publication.assetId)}
       <article class="asset"><div><h3>{asset?.title ?? 'Video'} <span class="muted">{publication.revokedAt ? '· Revoked' : ''}</span></h3><a href={`/embed/video/${publication.slug}`}>/embed/video/{publication.slug}</a><small>Allowed: {publication.allowedOrigins.join(', ')}</small></div>
-        {#if !publication.revokedAt}<div class="actions"><label class="version-upload" aria-label={`Upload new version of ${asset?.title ?? 'video'}`}>New version<input type="file" accept="video/*" disabled={uploading} onchange={(event) => { const file = event.currentTarget.files?.[0]; if (file && asset) void uploadVersion(file, asset.projectId, asset._id); }} /></label><form method="POST" action="/studio?/replace" class="row"><input type="hidden" name="publicationId" value={publication._id}/><Stage1Select name="versionId" label="Replacement version" items={snapshot.versions.filter((version) => version.assetId === publication.assetId).map((version) => ({ value: version._id, label: `Version ${version.version}` }))} value={publication.versionId} required /><button>Replace at URL</button></form><form method="POST" action="/studio?/revokePublication"><input type="hidden" name="publicationId" value={publication._id}/><button class="danger">Revoke</button></form></div>{/if}
+        {#if !publication.revokedAt}<div class="actions"><label class="version-upload" aria-label={`Upload new version of ${asset?.title ?? 'video'}`}>New version<input type="file" accept="video/*" disabled={uploading} onchange={(event) => { const file = event.currentTarget.files?.[0]; if (file && asset) { if (onVersionFile) onVersionFile(file, asset.projectId, asset._id); else void uploadVersion(file, asset.projectId, asset._id); } }} /></label><form method="POST" action="/studio?/replace" class="row"><input type="hidden" name="publicationId" value={publication._id}/><Stage1Select name="versionId" label="Replacement version" items={snapshot.versions.filter((version) => version.assetId === publication.assetId).map((version) => ({ value: version._id, label: `Version ${version.version}` }))} value={publication.versionId} required /><button>Replace at URL</button></form><form method="POST" action="/studio?/revokePublication"><input type="hidden" name="publicationId" value={publication._id}/><button class="danger">Revoke</button></form></div>{/if}
       </article>
     {/each}</div>
   </Tabs.Content>
@@ -162,3 +162,4 @@
   button:focus-visible,input:focus-visible,summary:focus-visible,:global(.sharing-tabs button:focus-visible) { outline:1px solid var(--accent);outline-offset:2px; }
   @media(pointer:coarse) { button,input,:global(.sharing-tabs button) { min-height:44px; } input { font-size:16px; } }
 </style>
+

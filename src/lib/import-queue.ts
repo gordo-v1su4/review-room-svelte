@@ -1,6 +1,6 @@
 import type { LocalAsset } from './review';
 
-export type ImportTarget = { projectId: string; folderId?: string; dateKey: string; assetClass: 'VID' | 'IMG' | 'CTX' | 'STB' };
+export type ImportTarget = { projectId: string; folderId?: string; assetId?: string; dateKey: string; assetClass: 'VID' | 'IMG' | 'CTX' | 'STB' };
 export type ImportRequest = { file: File; target: ImportTarget; destinationLabel: string };
 export type ImportJob = ImportRequest & { id: string; status: 'queued' | 'preparing' | 'ready' | 'failed' | 'cancelled'; error?: string; stage?: string; progress?: number; canCancel?: boolean };
 type ImportPort = {

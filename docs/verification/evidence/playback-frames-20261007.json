@@ -382,5 +382,12 @@
       "width": 854
     }
   ],
-  "deployed": "478d746"
+  "deployed": "478d746",
+  "interpretation": {
+    "predeployProbe": "Direct CDP video.play() at readyState 0 bypassed old disabled Play UI; not a valid user-path failure reproduction or codec-regression verdict",
+    "postdeployProbe": "Preliminary native callback samples; one callback preceded visible state; excluded from final visible-frame acceptance",
+    "acceptedMatrix": "selectedSourceAndPaintVerified: expected native source, presented frame, following visible paint and non-occluded center; ten clips pass",
+    "originalHistoricalCause": "Undetermined; no speculative decoder fix claimed",
+    "scope": "Current Windows native Codex Browser desktop session; browser cache disabled per tab, server/storage caches uncontrolled; no actual phone or Edge claim"
+  }
 }

@@ -41,11 +41,23 @@ export const connect = internalAction({
     const title = args.targetTitle ?? source.title;
     if ((args.mode === 'create' && (!title.trim() || title.trim().length > 120)) || (args.mode === 'connect' && (!args.targetRunId || !/^[A-Za-z0-9_-]{1,128}$/.test(args.targetRunId)))) throw new ConvexError({ code: 'SYNC_TARGET_INVALID' });
     try {
+      const replacementStatuses = [];
+      if (source.replacesConnectionId) for (let offset = 0; offset < source.previousVersions.length; offset += 100) {
+        const versions = source.previousVersions.slice(offset, offset + 100);
+        const status = await post('status', { versions: versions.map(version => ({ source_asset_id: version.assetId, source_version_id: version.versionId })) });
+        if (!Array.isArray(status.versions) || status.versions.length !== versions.length) throw new DestinationFailure('Destination status did not match the replaced connection');
+        for (const version of versions) {
+          const matches = status.versions.filter((item: Record<string, unknown>) => item.source_asset_id === version.assetId && item.source_version_id === version.versionId);
+          const current = matches[0];
+          if (matches.length !== 1 || !['registered', 'reserved', 'target_suppressed', 'source_deleted', 'unregistered'].includes(current.state) || (current.state !== 'unregistered' && (!Number.isSafeInteger(current.consent_generation) || current.consent_generation < 1))) throw new DestinationFailure('Destination status did not acknowledge the exact replaced source version');
+          replacementStatuses.push({ versionId: version.versionId, state: current.state, ...(current.state === 'unregistered' ? {} : { consentGeneration: current.consent_generation }) });
+        }
+      }
       const result = await post('connections', { source_project_id: source.projectId, source_folder_id: source.folderId ?? '__root__', mode: args.mode,
         ...(source.replacesConnectionId ? { expected_run_id: source.oldTargetRunId, replacement_id: args.replacementId } : {}),
         ...(args.mode === 'create' ? { title: title.trim() } : { run_id: args.targetRunId }) });
       if (result.source_project_id !== source.projectId || result.source_folder_id !== (source.folderId ?? '__root__') || typeof result.run_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(result.run_id) || (args.mode === 'connect' && result.run_id !== args.targetRunId)) throw new DestinationFailure('Destination did not acknowledge the selected source connection');
-      const connectionId = await ctx.runMutation(internal.destinationSync.saveConnection, { destinationKey: args.destinationKey, projectId: source.projectId, folderId: source.folderId, targetRunId: result.run_id, replacesConnectionId: source.replacesConnectionId });
+      const connectionId = await ctx.runMutation(internal.destinationSync.saveConnection, { destinationKey: args.destinationKey, projectId: source.projectId, folderId: source.folderId, targetRunId: result.run_id, replacesConnectionId: source.replacesConnectionId, ...(source.replacesConnectionId ? { replacementStatuses } : {}) });
       return { connectionId, targetRunId: result.run_id };
     } catch (cause) {
       if (cause instanceof ConvexError) throw cause;
@@ -63,6 +75,13 @@ export const reserve = internalAction({
       if (claim.reactivationJson) {
         const saved = JSON.parse(claim.reactivationJson);
         for (const consent of Array.isArray(saved) ? saved : [saved]) {
+          if (consent.intent === 'reserve-fresh') {
+            const acknowledgement = await post('batches', { batch_id: consent.batch_id, run_id: consent.run_id, versions: consent.versions });
+            const identity = consent.versions[0];
+            const version = acknowledgement.versions?.[0];
+            if (acknowledgement.batch_id !== consent.batch_id || !Array.isArray(acknowledgement.versions) || acknowledgement.versions.length !== 1 || version.source_asset_id !== identity.source_asset_id || version.source_version_id !== identity.source_version_id || version.consent_generation !== identity.consent_generation || !Number.isSafeInteger(version.version_number) || version.version_number < 1) throw new DestinationFailure('Destination did not acknowledge the exact fresh replacement version');
+            continue;
+          }
           const acknowledgement = await post('reactivations', consent);
           if (acknowledgement.batch_id !== consent.batch_id || acknowledgement.consent_generation !== consent.consent_generation || !Number.isSafeInteger(acknowledgement.version_number) || acknowledgement.version_number < 1) throw new DestinationFailure('Destination did not acknowledge the exact reactivation consent');
         }
