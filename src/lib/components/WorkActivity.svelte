@@ -54,7 +54,8 @@
 <style>
   :global(.work-activity-trigger) { display: flex; align-items: center; gap: 7px; height: 30px; max-width: 245px; padding: 0 8px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; }
   :global(.work-activity-trigger:hover) { background: var(--raised); color: var(--ink); }
-  :global(.work-activity-trigger.working) { color: var(--teal); }
+  :global(.work-activity-trigger.working) { color: var(--teal); background: color-mix(in srgb, var(--teal) 9%, transparent); border-color: color-mix(in srgb, var(--teal) 24%, transparent); box-shadow: inset 0 1px #6ad2b512; }
+  :global(.work-activity-trigger.working:hover) { background: color-mix(in srgb, var(--teal) 14%, transparent); }
   .activity-summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
   .activity-count { display: none; font-size: 10px; }
   .attention-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--warning, #e2b882); }
