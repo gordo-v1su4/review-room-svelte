@@ -6,6 +6,25 @@ Confirmation freezes exact metadata, revision and image versions under an immuta
 
 Explicit `sync-again` confirms one verified suppressed source version, rotates its grant and saves a new durable operation. A separate immutable target reactivation ID precedes batch reservation. Retrying a lost reactivation response does not rotate consent again. Old resolver URLs, deliveries and removals cannot act on newer consent. Same-target reactivation preserves Vn; newer source uploads remain unselected.
 
+## Delivery and deletion flow
+
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+flowchart TD
+  A[Owner confirms exact versions] --> B[Save batch and consent]
+  B --> C[Claim fenced lease]
+  C --> D[Prepare up to three versions]
+  D --> E[Save progress and release lease]
+  E --> C
+  C --> F[All preparations saved]
+  F --> G[Reserve complete batch]
+  G --> H[Deliver each selected version]
+  H --> I[Save exact destination receipt]
+  J[Source deletion] --> K[Save removal identity and revoke access]
+  K --> L[Retry destination removal]
+  K --> M[Clean references in bounded pages]
+```
+
 ## Source deletion
 
 Normal owner deletion and archived-project purge invoke destination removal in the same transaction as source deletion. Published root grants are revoked immediately and their sync items become `source_deleted`. The independent `destinationRemovals` ledger stores scalar source identity/generation, survives deletion of project/version rows, and retries server-only removal with capped backoff and fenced leases. A verified exact terminal acknowledgment completes it; network or configuration errors retain it for retry. UI distinguishes immediate source deletion from pending or confirmed target removal.
