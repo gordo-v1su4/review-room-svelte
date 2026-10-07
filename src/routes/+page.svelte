@@ -19,7 +19,19 @@
     if (asset?.type === 'video') orderedStart = { id: next, source: asset.url };
   }
 
-  import { onDestroy, onMount, tick, untrack } from 'svelte';
+  import { onDestroy, onMount, tick, untrack, setContext } from 'svelte';
+  import WorkActivity from '$lib/components/WorkActivity.svelte';
+  import { ACTIVITY_CONTEXT, createActivityFeed, type ActivityItem } from '$lib/work-activity';
+  import { uploadWithProgress } from '$lib/upload-progress';
+  const activityFeed = createActivityFeed();
+  setContext(ACTIVITY_CONTEXT, activityFeed);
+  function openActivity(item: ActivityItem) {
+    if (item.projectId && projects.some(project => project.id === item.projectId)) {
+      projectId = item.projectId; projectOverview();
+      if (item.assetId && allAssets.some(asset => asset.id === item.assetId)) select(item.assetId);
+      else if (live) location.reload();
+    }
+  }
   import { startShortlistPreview, advanceShortlistPreview, type ShortlistPreview } from '$lib/playback/shortlist-preview';
   import { ASSET_DRAG_TYPE, beginAssetDrag, folderDropAction, type AssetDrag } from '$lib/asset-drag';
   import CollectionActions from '$lib/components/CollectionActions.svelte';
@@ -378,25 +390,29 @@
     if (!response.ok) { feedback = `Could not retry processing (${response.status}).`; return; }
     processingObserver?.refresh();
   }
-  async function uploadOriginal(file: File) {
+  async function uploadOriginal(file: File, destination: { projectId: string; folderId: string | null }, report: (stage: string, progress?: number) => void) {
     const isImage = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type);
     if (!file.type.startsWith('video/') && !isImage) throw new Error('Choose a video or a JPEG, PNG, WebP or AVIF image.');
     feedback = `Preparing preview for ${file.name}…`;
+    report('Preparing preview');
     const preview = isImage ? await imageUploadPreview(file) : await thumbnails.extract(file);
     feedback = `Uploading ${file.name}…`;
     const begin = await fetch('/api/uploads/begin', { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ projectId, folderId: importOptions.folderId, name: file.name, type: file.type, size: file.size }) });
+      body: JSON.stringify({ ...destination, name: file.name, type: file.type, size: file.size }) });
     if (!begin.ok) throw new Error(await begin.text());
     const session = await begin.json();
-    const put = await fetch(session.url, { method: 'PUT', headers: { 'content-type': file.type }, body: file });
-    if (!put.ok) throw new Error(`Storage rejected the upload (${put.status}).`);
+    report('Uploading original', 0);
+    await uploadWithProgress(session.url, file, percent => report('Uploading original', percent));
+    report('Uploading preview');
     const posterPut = await fetch(session.posterUrl, { method: 'PUT', headers: { 'content-type': 'image/jpeg' }, body: preview.blob });
     if (!posterPut.ok) throw new Error(`Storage rejected the preview (${posterPut.status}).`);
     feedback = `Verifying ${file.name}…`;
+    report('Verifying upload');
     const finish = await fetch('/api/uploads/complete', { method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sessionId: session.sessionId, posterSizeBytes: preview.blob.size,
         durationSec: preview.duration, width: preview.sourceWidth, height: preview.sourceHeight }) });
     if (!finish.ok) throw new Error(await finish.text());
+    return await finish.json();
   }
   async function imageUploadPreview(file: File) {
     const url = URL.createObjectURL(file);
@@ -421,9 +437,23 @@
     if (project.archived) { feedback = 'Restore this project before adding media.'; return; }
     if (live) {
       if (projectId === '__empty__') { feedback = 'Create a project before adding media.'; projectDialog = true; return; }
+      const destination = { projectId, folderId: importOptions.folderId };
+      const batch = Array.from(files, file => ({ file, item: { id: `upload:${crypto.randomUUID()}`, kind: 'upload' as const, label: file.name, project: project.name, projectId, state: 'queued' as const, stage: 'Waiting to upload', updatedAt: Date.now() } }));
+      for (const { item } of batch) activityFeed.upsert(item);
       void (async () => {
-        try { for (const file of files) await uploadOriginal(file); location.reload(); }
-        catch (cause) { feedback = cause instanceof Error ? cause.message : String(cause); }
+        let index = 0;
+        try {
+          for (const { file, item } of batch) {
+            const result = await uploadOriginal(file, destination, (stage, progress) => activityFeed.upsert({ ...item, state: 'running', stage, progress, updatedAt: Date.now() }));
+            activityFeed.upsert({ ...item, assetId: result.assetId, state: 'complete', stage: 'Uploaded · queued for ingest', updatedAt: Date.now() });
+            index++;
+          }
+          location.reload();
+        } catch (cause) {
+          feedback = cause instanceof Error ? cause.message : String(cause);
+          activityFeed.upsert({ ...batch[index].item, state: 'failed', stage: 'Upload needs attention · check project before retrying', updatedAt: Date.now() });
+          for (const { item } of batch.slice(index + 1)) activityFeed.upsert({ ...item, state: 'cancelled', stage: 'Not uploaded · batch stopped', updatedAt: Date.now() });
+        }
       })();
       return;
     }
@@ -1005,7 +1035,7 @@
   <main ondragover={dragFiles} ondrop={dropFiles}>
     <header class="topbar">
       <Dialog.Root bind:open={navOpen}><Dialog.Trigger class="icon-button mobile-menu" aria-label="Open navigation" title="Open navigation"><Menu size={20}/></Dialog.Trigger><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="nav-drawer" onCloseAutoFocus={event => { if (restoringFromNavigation) { event.preventDefault(); restoringFromNavigation = false; void focusProjectHeading(); } }} style={`--project-accent: ${project.brandColor ?? "#14b8a6"}`}><Dialog.Title class="visually-hidden">Workspace navigation</Dialog.Title><Dialog.Description class="visually-hidden">Browse local media and review status</Dialog.Description><Dialog.Close class="icon-button drawer-close" aria-label="Close navigation"><X size={20}/></Dialog.Close>{@render navigation()}</Dialog.Content></Dialog.Portal></Dialog.Root>
-      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each ancestors as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if (focusedReview || mediaType !== 'all' || filter === 'selected' || activeCollectionId || archived)}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId && locationName !== project.name}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot} uploadContext={!project.archived && projectId !== "__empty__" ? {folders:folderDestinations,...importOptions,onChange:value => importOptions = value,onChoose:() => picker.click()} : undefined} destinationContext={!project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId) ? {projectId,folderId:activeFolderId,selectedVersionIds:destinationSelection} : undefined}/>{/if}<div class="header-account-tools">{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
+      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each ancestors as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if (focusedReview || mediaType !== 'all' || filter === 'selected' || activeCollectionId || archived)}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId && locationName !== project.name}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot} uploadContext={!project.archived && projectId !== "__empty__" ? {folders:folderDestinations,...importOptions,onChange:value => importOptions = value,onChoose:() => picker.click()} : undefined} destinationContext={!project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId) ? {projectId,folderId:activeFolderId,selectedVersionIds:destinationSelection} : undefined}/>{/if}<div class="header-account-tools">{#if live}<WorkActivity feed={activityFeed} onOpen={openActivity}/>{/if}{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
     </header>
     <div class="page-content folder-workspace">
       <section class="project-heading" class:identity-banner={showsProjectIdentity && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if showsProjectIdentity && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{locationName}</h1>{#if project.archived || project.clientName || project.description}<p class="subtitle" class:subtitle-placeholder={!isProjectRoot} aria-hidden={!isProjectRoot} title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description}</p>{/if}</div><div class="project-tools"><ImportQueue jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} folderLabels={folderDestinations} onMoveFolder={moveFolder} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>

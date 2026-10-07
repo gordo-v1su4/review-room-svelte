@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, getContext } from 'svelte';
+  import { ACTIVITY_CONTEXT, type ActivityFeed, type ActivityItem } from '$lib/work-activity';
+  import { uploadWithProgress } from '$lib/upload-progress';
+  const activityFeed = getContext<ActivityFeed | undefined>(ACTIVITY_CONTEXT);
   import { Tabs } from 'bits-ui';
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
   import ShowcaseEditor from '$lib/components/ShowcaseEditor.svelte';
@@ -27,6 +30,11 @@
   async function uploadVersion(file: File, projectId: string, assetId: string) {
     if (uploading) return;
     uploading = true;
+    const item: ActivityItem = { id: `upload:${crypto.randomUUID()}`, kind: 'upload', label: file.name,
+      project: snapshot.projects.find(project => project._id === projectId)?.title ?? 'Project', projectId, assetId,
+      state: 'running', stage: 'Preparing preview', updatedAt: Date.now() };
+    const report = (stage: string, progress?: number) => activityFeed?.upsert({ ...item, stage, progress, updatedAt: Date.now() });
+    report('Preparing preview');
     try {
       if (!file.type.startsWith('video/')) throw new Error('Choose a video file.');
       uploadMessage = `Preparing ${file.name}…`;
@@ -36,18 +44,22 @@
       if (!begin.ok) throw new Error(`Could not start upload (${begin.status}).`);
       const session = await begin.json();
       uploadMessage = `Uploading ${file.name}…`;
-      const original = await fetch(session.url, { method: 'PUT', headers: { 'content-type': file.type }, body: file });
-      if (!original.ok) throw new Error(`Storage rejected the video (${original.status}).`);
+      report('Uploading original', 0);
+      await uploadWithProgress(session.url, file, percent => report('Uploading original', percent));
+      report('Uploading preview');
       const poster = await fetch(session.posterUrl, { method: 'PUT', headers: { 'content-type': 'image/jpeg' }, body: preview.blob });
       if (!poster.ok) throw new Error(`Storage rejected the poster (${poster.status}).`);
       uploadMessage = `Verifying ${file.name}…`;
+      report('Verifying upload');
       const finish = await fetch('/api/uploads/complete', { method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sessionId: session.sessionId, posterSizeBytes: preview.blob.size,
           durationSec: preview.duration, width: preview.sourceWidth, height: preview.sourceHeight }) });
       if (!finish.ok) throw new Error(`Could not verify upload (${finish.status}).`);
+      activityFeed?.upsert({ ...item, state: 'complete', stage: 'Uploaded · queued for ingest', updatedAt: Date.now() });
       location.assign('/?sharing=1');
     } catch (cause) {
       uploadMessage = cause instanceof Error ? cause.message : 'Could not upload this version.';
+      activityFeed?.upsert({ ...item, state: 'failed', stage: 'Upload needs attention · check project before retrying', updatedAt: Date.now() });
     } finally { uploading = false; }
   }
 

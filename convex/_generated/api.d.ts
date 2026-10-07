@@ -38,6 +38,7 @@ import type * as storageDeletion from "../storageDeletion.js";
 import type * as storageDeletionWorker from "../storageDeletionWorker.js";
 import type * as videos from "../videos.js";
 import type * as videosInternal from "../videosInternal.js";
+import type * as workActivity from "../workActivity.js";
 import type * as workspacePreferences from "../workspacePreferences.js";
 
 import type {
@@ -77,6 +78,7 @@ declare const fullApi: ApiFromModules<{
   storageDeletionWorker: typeof storageDeletionWorker;
   videos: typeof videos;
   videosInternal: typeof videosInternal;
+  workActivity: typeof workActivity;
   workspacePreferences: typeof workspacePreferences;
 }>;
 

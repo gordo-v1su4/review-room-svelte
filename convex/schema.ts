@@ -210,7 +210,8 @@ const applicationTables = {
     .index("by_project", ["projectId"])
     .index("by_project_folder", ["projectId", "folderId"])
     .index("by_project_status", ["projectId", "status"])
-    .index("by_project_uploadedAt", ["projectId", "uploadedAt"]),
+    .index("by_project_uploadedAt", ["projectId", "uploadedAt"])
+    .index("by_project_processing", ["projectId", "processingStatus"]),
 
   comments: defineTable({
     videoId: v.id("videos"),
@@ -348,7 +349,8 @@ const applicationTables = {
     targetState: v.optional(v.string()), targetConsentGeneration: v.optional(v.number()),
     createdAt: v.number(), updatedAt: v.number(),
   }).index('by_batch', ['batchId']).index('by_connection', ['connectionId'])
-    .index('by_source_version', ['connectionId', 'versionId']).index('by_project', ['projectId']).index('by_version', ['versionId']),
+    .index('by_source_version', ['connectionId', 'versionId']).index('by_project', ['projectId']).index('by_version', ['versionId'])
+    .index('by_project_state', ['projectId', 'state']),
 
   publicationGrants: defineTable({
     destinationKey: v.literal('trailer-feed'),
