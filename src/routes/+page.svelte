@@ -471,10 +471,8 @@
       review({ type: 'add-assets', assets: [{ id: descriptor.id }] });
       review({ type: 'select', assetId: previousActive });
     } else {
-      // Replacement changes the exact media version; feedback and drafts stay
-      // on the existing canonical asset and selection remains untouched.
-      processing = processing.map(item => item.assetId === descriptor.id ? update : item);
-      media = media.map(asset => asset.id === descriptor.id ? { ...asset, versionId: descriptor.versionId, url: processingSource(update), poster: processingPoster(update), sprite: undefined, availability: processingAvailability(update), duration: undefined, width: undefined, height: undefined, metadata: undefined, metadataUpdatedAt: null } : asset);
+      // Follow Latest while retaining an explicitly selected historical version.
+      applyProcessing([update]);
     }
     URL.revokeObjectURL(local.url); if (local.poster) URL.revokeObjectURL(local.poster);
     processingObserver?.refresh();
