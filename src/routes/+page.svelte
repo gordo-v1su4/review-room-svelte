@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BrandLogo from "$lib/components/BrandLogo.svelte";
   import ReviewPlaybackMenu from '$lib/components/ReviewPlaybackMenu.svelte';
   import { nextReviewAsset, type ReviewPlaybackMode } from '$lib/playback/review-order';
   let reviewPlaybackMode = $state<ReviewPlaybackMode>('once');
@@ -1071,7 +1072,7 @@
 <svelte:head><title>Review Room — Studio</title><meta name="description" content="A focused space to watch, consider, and refine your work."/></svelte:head>
 <input class="visually-hidden" tabindex="-1" aria-label="Choose local media" bind:this={picker} type="file" accept="video/*,image/*" multiple onchange={() => { importFiles(picker.files); picker.value = ''; }}/>
 {#snippet navigation()}
-  <div class="brand"><span>review room.</span><button class="icon-button sidebar-collapse" aria-label="Collapse navigation" title="Collapse navigation" aria-expanded="true" onclick={() => navCollapsed = true}><PanelLeft size={18} strokeWidth={1.6}/></button></div>
+  <div class="brand"><BrandLogo/><button class="icon-button sidebar-collapse" aria-label="Collapse navigation" title="Collapse navigation" aria-expanded="true" onclick={() => navCollapsed = true}><PanelLeft size={18} strokeWidth={1.6}/></button></div>
   <WorkspaceSwitcher/>
   <ProjectTree onEditProject={editProject} canEditProject={id => folderAccess.isAdmin && folderAccess.editableProjectIds.includes(id)} {canDropAssets} onDropAssets={dropAssets} dragActive={!!dragged} selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={isProjectRoot} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
   <ArchivedProjects projects={archivedProjects} onRestore={restoreProject} closeOnRestore={navOpen} onNavigateFocus={focusProjectHeading}/>
