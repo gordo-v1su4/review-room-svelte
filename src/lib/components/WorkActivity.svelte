@@ -39,7 +39,7 @@
       {#if activity.truncated}<p class="activity-notice">Showing a limited activity window. More work may be in progress.</p>{/if}
       <div class="activity-rows" aria-live="polite" aria-relevant="additions text">
         {#each activity.items as item (item.id)}
-          <div class="activity-row" class:failed={item.state === 'failed'}>
+          <div class="activity-row" class:failed={item.state === 'failed'} class:complete={item.state === 'complete'}>
             <span class="activity-icon" aria-hidden="true">{#if item.state === 'running'}<LoaderCircle size={15} class="activity-spin"/>{:else if item.state === 'complete'}<Check size={15}/>{:else if item.state === 'failed'}<CircleAlert size={15}/>{:else if item.kind === 'upload'}<Upload size={15}/>{:else}<ListTodo size={15}/>{/if}</span>
             <div class="activity-copy"><strong title={item.label}>{item.label}</strong><span class="activity-project" title={item.project}>{item.project}</span><span class="activity-stage">{item.stage}{#if item.progress !== undefined} · {Math.floor(item.progress)}%{/if}</span>{#if item.progress !== undefined}<progress max="100" value={item.progress} aria-label={`Upload progress for ${item.label}`}></progress>{/if}</div>
             <div class="activity-actions">{#if item.projectId}<button onclick={() => inspect(item)} aria-label={`Open ${item.label} in ${item.project}`} title={item.state === 'failed' ? 'Open project to resolve' : 'Open project'}><ArrowUpRight size={14}/></button>{/if}{#if item.state !== 'queued' && item.state !== 'running'}<button onclick={() => feed.dismiss(item.id)} aria-label={`Dismiss ${item.label}`} title="Dismiss"><X size={13}/></button>{/if}</div>
@@ -54,11 +54,11 @@
 <style>
   :global(.work-activity-trigger) { display: flex; align-items: center; gap: 7px; height: 30px; max-width: 245px; padding: 0 8px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; }
   :global(.work-activity-trigger:hover) { background: var(--raised); color: var(--ink); }
-  :global(.work-activity-trigger.working) { color: var(--teal); background: color-mix(in srgb, var(--teal) 9%, transparent); border-color: color-mix(in srgb, var(--teal) 24%, transparent); box-shadow: inset 0 1px #6ad2b512; }
-  :global(.work-activity-trigger.working:hover) { background: color-mix(in srgb, var(--teal) 14%, transparent); }
+  :global(.work-activity-trigger.working) { color: var(--status-awaiting-review); background: color-mix(in srgb, var(--status-awaiting-review) 9%, transparent); border-color: color-mix(in srgb, var(--status-awaiting-review) 24%, transparent); box-shadow: inset 0 1px color-mix(in srgb, var(--status-awaiting-review) 7%, transparent); }
+  :global(.work-activity-trigger.working:hover) { background: color-mix(in srgb, var(--status-awaiting-review) 14%, transparent); }
   .activity-summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
   .activity-count { display: none; font-size: 10px; }
-  .attention-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--warning, #e2b882); }
+  .attention-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--status-needs-changes); }
   :global(.work-activity-panel) { z-index: 95; width: min(370px, calc(100vw - 24px)); padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--raised) 68%, transparent); backdrop-filter: blur(18px); box-shadow: inset 0 1px #d3eee609, 0 16px 50px #0006; animation: activity-enter .18s ease-out; }
   .activity-heading { display: flex; align-items: center; justify-content: space-between; }
   h2 { margin: 0; color: var(--ink); font-size: 12px; font-weight: 550; }
@@ -68,16 +68,17 @@
   .activity-rows { max-height: min(420px, 60svh); overflow-y: auto; overscroll-behavior: contain; }
   .activity-row { display: flex; align-items: flex-start; gap: 10px; padding: 13px 0; border-bottom: 1px solid var(--border); }
   .activity-row:last-child { border-bottom: 0; }
-  .activity-icon { padding-top: 2px; color: var(--teal); }
-  .failed .activity-icon, .attention { color: var(--warning, #e2b882); }
+  .activity-icon { padding-top: 2px; color: var(--status-awaiting-review); }
+  .complete .activity-icon { color: var(--status-approved); }
+  .failed .activity-icon, .attention { color: var(--status-needs-changes); }
   .activity-copy { display: grid; gap: 4px; flex: 1; min-width: 0; }
   .activity-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 500; color: var(--ink); }
   .activity-project { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--muted); }
   .activity-stage { font-size: 10px; color: var(--ink); opacity: .8; }
   .activity-actions { display: flex; }
-  progress { width: 100%; height: 2px; margin-top: 3px; accent-color: var(--teal); border: 0; }
+  progress { width: 100%; height: 2px; margin-top: 3px; accent-color: var(--status-awaiting-review); border: 0; }
   progress::-webkit-progress-bar { background: var(--border); }
-  progress::-webkit-progress-value { background: var(--teal); }
+  progress::-webkit-progress-value { background: var(--status-awaiting-review); }
   .activity-empty { padding: 18px 6px; margin: 0; font-size: 11px; text-align: center; color: var(--muted); line-height: 1.6; }
   .activity-notice { font-size: 10px; color: var(--muted); line-height: 1.6; }
   .activity-footer { margin: 0; padding-top: 8px; color: var(--muted); font-size: 9px; border-top: 1px solid var(--border); }
