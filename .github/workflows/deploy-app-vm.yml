@@ -1,0 +1,29 @@
+name: Deploy to App VM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: review-room-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64, review-room-production]
+    timeout-minutes: 30
+    environment:
+      name: production-app-vm
+      url: https://review.v1su4.dev
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Test, build, deploy and verify
+        run: node scripts/deploy-app-vm.mjs "$GITHUB_SHA"

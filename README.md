@@ -2,6 +2,10 @@
 
 ![Review Room workspace with Neon Afterlife media, playback, and feedback](docs/images/review-room.webp)
 
+[Download the high-resolution screenshot (4818 × 3528)](docs/images/review-room-high-resolution.jpg)
+
+[![App VM deployment](https://github.com/gordo-v1su4/review-room-svelte/actions/workflows/deploy-app-vm.yml/badge.svg)](https://github.com/gordo-v1su4/review-room-svelte/actions/workflows/deploy-app-vm.yml)
+
 A Svelte 5 and TypeScript media review workspace. This is the only frontend in the repository.
 
 ```sh
