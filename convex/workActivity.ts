@@ -48,6 +48,9 @@ export const list = internalQuery({
         truncated ||= jobs.length > 100;
         for (const job of jobs.slice(0, 100)) await addTransfer(job, project);
       }
+      // Fast deliveries can finish between polls. Include fresh receipts too.
+      const receipts = await ctx.db.query('syncOutbox').withIndex('by_project', q => q.eq('projectId', project._id)).order('desc').take(20);
+      for (const job of receipts) if (job.updatedAt >= args.now - 8000 && job.state === 'synced') await addTransfer(job, project);
     }
     // Finish rows already observed even if they fall outside a recent-page boundary.
     for (const value of new Set(args.observedIds)) {

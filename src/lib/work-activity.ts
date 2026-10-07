@@ -34,6 +34,7 @@ export function createActivityFeed(clock = Date.now) {
     if (prior && prior.updatedAt > item.updatedAt) return;
     if ((item.state === 'complete' || item.state === 'cancelled') && clock() - item.updatedAt >= 8000) { items.delete(item.id); publish(); return; }
     if ((!prior || prior.state === 'complete' || prior.state === 'cancelled' || prior.state === 'failed') && (item.state === 'running' || item.state === 'queued')) pulse++;
+    if (!prior && item.state === 'complete') pulse++; // A real fast receipt may arrive between polls.
     items.set(item.id, { ...item, progress: item.progress === undefined || !Number.isFinite(item.progress) ? undefined : Math.min(100, Math.max(0, item.progress)) });
     tick();
   }

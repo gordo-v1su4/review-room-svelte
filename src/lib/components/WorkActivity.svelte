@@ -28,7 +28,7 @@
 </script>
 
 <Popover.Root bind:open>
-  <Popover.Trigger class={`work-activity-trigger ${working > 0 ? 'working' : ''}`} aria-label={`Work state: ${summary}`} title={summary} onclick={() => automatic = false}>
+  <Popover.Trigger class={`work-activity-trigger ${working > 0 ? 'working' : ''}`} aria-label={`Work activity: ${summary}`} title={summary} onclick={() => automatic = false}>
     <Activity size={15}/><span class="activity-summary">{summary}</span>{#if working}<span class="activity-count">{working}{activity.truncated ? '+' : ''}</span>{:else if activity.counts.failed}<span class="attention-dot" aria-hidden="true"></span>{/if}
   </Popover.Trigger>
   <Popover.Portal>

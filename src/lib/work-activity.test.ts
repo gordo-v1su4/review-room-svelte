@@ -58,3 +58,12 @@ test('success history is capped and nonfinite progress is never displayed', () =
   feed.upsert({ id: 'upload:new', kind: 'upload', label: 'Clip', project: 'Neon', state: 'running', stage: 'Uploading', progress: NaN, updatedAt: 1000 });
   expect(feed.snapshot().items[0].progress).toBeUndefined();
 });
+
+test('a fast fresh completion opens the feed once, without replaying on every poll', () => {
+  const feed = createActivityFeed(() => 1000);
+  const item = { id: 'transfer:fast', kind: 'transfer' as const, label: 'V1', project: 'Neon', state: 'complete' as const, stage: 'Synced', updatedAt: 1000 };
+  feed.observe([item]);
+  expect(feed.snapshot().pulse).toBe(1);
+  feed.observe([item]);
+  expect(feed.snapshot().pulse).toBe(1);
+});
