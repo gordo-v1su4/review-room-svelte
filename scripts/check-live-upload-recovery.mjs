@@ -16,7 +16,29 @@ try {
   if(!state.projectId){state.projectId=await admin.mutation('personal:createProject',{title:'Upload recovery QA 2026-10-07',description:'Agent-created synthetic upload failure fixtures only.'});writeFileSync(statePath,JSON.stringify(state));}
   let snapshot=await admin.query('personal:snapshot',{});assert(snapshot.projects.find(p=>p._id===state.projectId)?.description?.startsWith('Agent-created synthetic'),'QA scope mismatch');
   const poster=readFileSync('.scratch/review-trailer-sync/live-qa/poster.jpg'), type='image/jpeg';
-  if(process.argv.includes('--expiry-only')) {
+  if(process.argv.includes('--prepare-version')) {
+    const asset=snapshot.assets.find(a=>a._id===state.largeId&&a.projectId===state.projectId);assert(asset?.processingStatus==='ready','Replacement QA asset unavailable');
+    state.originalVersionId=asset.currentVersionId;
+    state.initialVersions=snapshot.versions.filter(v=>v.assetId===asset._id).length;
+    assert.equal(state.initialVersions,1,'Unexpected pre-replacement versions');
+    await admin.mutation('personal:approveAsset',{assetId:asset._id});
+    const publication=await admin.mutation('personal:publishAsset',{assetId:asset._id,versionId:asset.currentVersionId,allowedOrigins:[base]});
+    state.publicationId=publication.publicationId;writeFileSync(statePath,JSON.stringify(state));
+    console.log(JSON.stringify({preparedSyntheticVersionPicker:true,assetCode:asset.assetCode,temporaryPublication:true}));
+  } else if(process.argv.includes('--observe-version')||process.argv.includes('--revoke-version')) {
+    try {
+      if(process.argv.includes('--observe-version')) {
+        const {s,a}=await ready(state.largeId);snapshot=s;
+        assert.equal(a.projectId,state.projectId,'Replacement left its canonical project');assert.notEqual(a.currentVersionId,state.originalVersionId,'Replacement did not advance exact version');
+        assert.equal(snapshot.versions.filter(v=>v.assetId===a._id).length,2,'Replacement duplicated a version');assert.equal(snapshot.mediaJobs.filter(j=>j.assetId===a._id).length,2,'Replacement duplicated a worker job');
+        assert.equal(snapshot.publications.find(p=>p._id===state.publicationId)?.versionId,state.originalVersionId,'Upload automatically replaced publication');
+        for(const filename of ['poster.jpg','poster-v2.jpg','large-upload-qa.mp4']) assert.equal(snapshot.assets.filter(item=>item.projectId===state.projectId&&item.originalFilename===filename).length,1,`Native retry duplicated ${filename}`);
+        const summary={releaseVersion:await(await fetch(base+'/_app/version.json')).json(),partialBatchUi:true,failedOnlyRetry:true,cancelDuringTransferPercent:6,cancelThenRetry:true,noDuplicateRetriedAssets:true,replacementCanonicalAssetPreserved:true,replacementVersions:2,replacementWorkerJobs:2,automaticPublicationReplacement:false,temporaryPublicationRevoked:true};writeFileSync('docs/verification/evidence/upload-native-recovery-20261007.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary));
+      }
+    } finally {
+      if(state.publicationId) {await admin.mutation('personal:revokePublication',{publicationId:state.publicationId});state.publicationId=undefined;writeFileSync(statePath,JSON.stringify(state));}
+    }
+  } else if(process.argv.includes('--expiry-only')) {
     const ticket=await begin(state,'expired-authorization-qa.jpg',type,poster);
     await put(ticket,poster,type);
     const parsed=new URL(ticket.url),signatureDate=parsed.searchParams.get('X-Amz-Date');

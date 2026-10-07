@@ -113,6 +113,10 @@ if (mode === '--delete-disposable-target') {
   assert.deepEqual(await catalog(state.targetRunId), before, 'Replacement replay changed published exact versions');
   const rows = (await scope()).items.filter(item => item.connectionId === state.connectionId);
   assert(rows.length === 2 && rows.every(item => item.state === 'synced' && item.consentGeneration === 2), 'Replacement replay revoked or changed fresh delivery');
+  const summaryPath = '.scratch/release-readiness/v1s179-live-summary.json';
+  const summary = JSON.parse(readFileSync(summaryPath, 'utf8'));
+  Object.assign(summary, { authoritativeStatusReplay: true, publishedGenerationsUnchanged: true, stableReplacementIdentity: true });
+  writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
   console.log(JSON.stringify({ authoritativeStatusReplay: true, publishedGenerationsUnchanged: true, stableReplacementIdentity: true }));
 } else if (mode === '--stale-delivery') {
   assert(state.complete && state.oldArtifacts?.length, 'Verify the replacement publication first');

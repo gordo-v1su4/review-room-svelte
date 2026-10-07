@@ -17,6 +17,7 @@ const catalog=async()=>{const r=await fetch(`${target}/data/comparisons/${state.
 const canonical=s=>{const assets=s.assets.filter(a=>a.projectId==='ks70059gkp2ndsw6gy8a2sr5758fqfgk');const ids=new Set(assets.map(a=>a._id));return hash({assets,versions:s.versions.filter(v=>ids.has(v.assetId))});};
 const summary=(step,values)=>{assert.equal(canonical(awaitableSnapshot),state.canonicalHash,'Canonical source changed');writeFileSync(`.scratch/release-readiness/lifecycle-${step}-summary.json`,JSON.stringify(values,null,2));console.log(JSON.stringify(values));};
 let awaitableSnapshot=await snap();
+if (state.projectId) assert(state.projectId !== 'ks70059gkp2ndsw6gy8a2sr5758fqfgk' && awaitableSnapshot.projects.find(p=>p._id===state.projectId)?.title==='Lifecycle QA 2026-10-07','Refuse lifecycle mutation outside the dedicated disposable QA project');
 state.canonicalHash??=canonical(awaitableSnapshot);persist();
 async function wait(check,limit=80){for(let i=0;i<limit;i++){if(await check())return;await new Promise(r=>setTimeout(r,1000));}throw Error('Lifecycle wait exceeded');}
 async function upload(name,file,type){

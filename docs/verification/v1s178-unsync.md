@@ -1,0 +1,7 @@
+# V1S-178 — durable exact-version Unsync
+
+Review frontend24c4142, dedicated Convex24c4142 and Trailer Feed API4c41cb4. On separate Lifecycle QA project, target service stopped for a bounded outage. Owner Unsync durably saved while root and image capabilities immediately returned404, including conditional root request. After service restore, leased suppression retry completed, target catalog became empty, source originals/metadata/comments digest stayed identical. Fresh exact-version consent restored the same artifact/Vn at generation2; old root remained404, generic old-batch retry was harmless and stale partner registration409 left target unchanged.
+
+Native @Browser confirms exact-version preview/unchecked consent/disabled confirmation, Cancel retains selection, Removal confirmed permits Sync again, and older generation history cannot offer reactivation after newer publication. Evidence: scripts/check-live-sync-lifecycle.mjs and private-free lifecycle summaries; output/playwright/native-unsync-confirmation-20261007.jpg. Focused observable tests cover immediate revocation, failed durable suppression replay, source preservation, and queued cancellation fencing/remainder reservation; mixed replacement preparation plan cancellation is covered by six replacement/lifecycle tests.
+
+Unsync does not reuse source deletion. Partner unsyncs route is server-scoped, not target owner removal. Pre-reservation tombstones consume no real targetVn. All auxiliary grants inherit root revocation/generation. Final PR/review/merge remain separate release tasks.

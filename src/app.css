@@ -1703,7 +1703,7 @@ button {
 .folder-workspace .project-heading h1 { margin-block: 0; }
 
 /* Appearance preferences apply to the media itself without remounting playback. */
-.media-grid:not(.list-layout) { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--card-width,190px)), 1fr)); }
+.media-grid:not(.list-layout) { grid-template-columns: repeat(auto-fill, min(100%, var(--card-width,190px))); justify-content: start; }
 .media-grid:not(.list-layout) .thumbnail { aspect-ratio: var(--card-ratio,16 / 9); }
 .media-grid .thumbnail img { object-fit: var(--card-fit,cover); }
 .thumbnail { background: #080b0c; }

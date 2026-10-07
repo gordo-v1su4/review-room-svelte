@@ -87,7 +87,7 @@
   .card-rating { display: flex; flex: 0 0 100%; min-width: 0; }
   .card-star { display: grid; place-items: center; flex: 0 1 24px; min-width: 0; height: 28px; padding: 0; background: transparent; color: var(--muted); border-radius: 3px; }
   .card-star.filled, .card-star:hover:not(:disabled) { color: var(--teal); }
-  @media (pointer: coarse) { .card-star { flex-basis: 44px; height: 44px; } .media-grid:not(.list-layout) { grid-template-columns: repeat(auto-fill, minmax(min(100%, max(240px, var(--card-width))), 1fr)); } }
+  @media (pointer: coarse) { .card-star { flex-basis: 44px; height: 44px; } .media-grid:not(.list-layout) { grid-template-columns: repeat(auto-fill, min(100%, max(240px, var(--card-width)))); } }
   .card-body .card-fields { display: flex; align-items: center; flex-wrap: wrap; white-space: nowrap; margin-top: 3px; gap: 0 8px; font-size: 10px; }
   .card-fields > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .card-open:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
