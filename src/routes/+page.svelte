@@ -19,7 +19,19 @@
     if (asset?.type === 'video') orderedStart = { id: next, source: asset.url };
   }
 
-  import { onDestroy, onMount, tick, untrack } from 'svelte';
+  import { onDestroy, onMount, tick, untrack, setContext } from 'svelte';
+  import WorkActivity from '$lib/components/WorkActivity.svelte';
+  import { ACTIVITY_CONTEXT, createActivityFeed, type ActivityItem } from '$lib/work-activity';
+  import { uploadWithProgress } from '$lib/upload-progress';
+  const activityFeed = createActivityFeed();
+  setContext(ACTIVITY_CONTEXT, activityFeed);
+  function openActivity(item: ActivityItem) {
+    if (item.projectId && projects.some(project => project.id === item.projectId)) {
+      projectId = item.projectId; projectOverview();
+      if (item.assetId && allAssets.some(asset => asset.id === item.assetId)) select(item.assetId);
+      else if (live) location.reload();
+    }
+  }
   import { startShortlistPreview, advanceShortlistPreview, type ShortlistPreview } from '$lib/playback/shortlist-preview';
   import { ASSET_DRAG_TYPE, beginAssetDrag, folderDropAction, type AssetDrag } from '$lib/asset-drag';
   import CollectionActions from '$lib/components/CollectionActions.svelte';
@@ -31,6 +43,7 @@
   import FolderActions from '$lib/components/FolderActions.svelte';
   import ProjectIdentityDialog from '$lib/components/ProjectIdentityDialog.svelte';
   import ShareDialog from '$lib/components/ShareDialog.svelte';
+  import DestinationSyncDialog from '$lib/components/DestinationSyncDialog.svelte';
   import ProjectAccessDialog from '$lib/components/ProjectAccessDialog.svelte';
   import AccountDialog from '$lib/components/AccountDialog.svelte';
   import OwnerAccountMenu from '$lib/components/OwnerAccountMenu.svelte';
@@ -69,7 +82,7 @@
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
   import { type LocalAsset, type ReviewAsset } from '$lib/review';
   import { createReviewSession, transitionReviewSession, type ReviewAction, type ReviewAccess } from '$lib/review-session';
-  import { observeProcessing, processingSource, processingPoster, processingAvailability, type ProcessingUpdate } from '$lib/processing';
+  import { observeProcessing, processingSource, processingPoster, processingSprite, processingAvailability, type ProcessingUpdate } from '$lib/processing';
   let { data } = $props();
   const live = !!data.snapshot;
   let media = $state<ReviewAsset[]>([]);
@@ -106,6 +119,12 @@
   let navCollapsed = $state(false);
   let projectDialog = $state(false), projectName = $state('');
   let identityDialogOpen = $state(false);
+  let destinationDialogOpen = $state(false);
+  let destinationSelection = $state<string[]>([]);
+  function openDestinations() {
+    destinationSelection = (checked.ids.length ? checked.ids : active ? [active.id] : []).map(id => selectedVersions[id] && selectedVersions[id] !== "__current__" ? selectedVersions[id] : allAssets.find(asset => asset.id === id)?.versionId).filter((id):id is string => !!id);
+    navOpen = false; destinationDialogOpen = true;
+  }
   const allAssets = $derived(media.map(asset => ({ ...asset, ...session.assets[asset.id], ...organization.placements[asset.id], status: organization.placements[asset.id]?.archived ? 'archived' as VideoStatus : session.assets[asset.id].status, folderName: organization.folders.find(folder => folder.id === organization.placements[asset.id]?.folderId)?.title, commentsCount: session.assets[asset.id]?.comments.length ?? 0 })));
   const assets = $derived(projects.find(item => item.id === projectId)?.archived ? [] : allAssets.filter(asset => asset.projectId === projectId && (Boolean(asset.archived) === archived || (!archived && filters.statuses.includes('archived')))));
   const project = $derived(projects.find(item => item.id === projectId)!);
@@ -192,11 +211,20 @@
   const thumbnails = createThumbnailExtractor({ concurrency: 2 });
   let disposed = false;
   let importJobs = $state.raw<readonly ImportJob[]>([]);
+  type LiveUploadAttempt = { session?: { sessionId: string; url: string; posterUrl: string }; preview?: { blob: Blob; duration: number; sourceWidth: number; sourceHeight: number }; assetId?: string };
+  const liveUploads = new Map<string, LiveUploadAttempt>();
   const importQueue = createImportQueue({
     prepare: prepareLocalImport,
-    commit: commitImport,
+    commit: (asset, target, signal, jobId) => live ? commitLiveImport(asset, target, signal, jobId) : commitImport(asset, target),
     release: asset => { URL.revokeObjectURL(asset.url); if (asset.poster) URL.revokeObjectURL(asset.poster); },
-    onChange: jobs => importJobs = jobs,
+    onChange: jobs => {
+      importJobs = jobs;
+      if (live) for (const job of jobs) activityFeed.upsert({ id: `upload:${job.id}`, kind: 'upload', label: job.file.name,
+        project: projects.find(project => project.id === job.target.projectId)?.name ?? 'Project', projectId: job.target.projectId,
+        assetId: liveUploads.get(job.id)?.assetId, updatedAt: job.updatedAt,
+        state: job.status === 'ready' ? 'complete' : job.status === 'preparing' ? 'running' : job.status,
+        stage: job.status === 'ready' ? 'Uploaded · queued for ingest' : job.status === 'failed' ? 'Upload failed · retry this file in Imports' : job.status === 'cancelled' ? 'Upload cancelled' : job.status === 'queued' ? 'Waiting to upload' : job.stage ?? 'Preparing preview', progress: job.progress });
+    },
     concurrency: 2
   });
   const coverRequests = new Map<string, symbol>();
@@ -239,7 +267,7 @@
     }
     media = media.map(asset => asset.id === id ? { ...asset, ...fields } : asset);
   }
-  type VersionDetails = { id: string; assetId: string; version: number; processingState: string; hasPoster: boolean; sizeBytes: number; mimeType: string; metadata: unknown; metadataUpdatedAt: number | null };
+  type VersionDetails = { id: string; assetId: string; version: number; processingState: string; hasPoster: boolean; hasSprite?: boolean; sizeBytes: number; mimeType: string; metadata: unknown; metadataUpdatedAt: number | null };
   function metadataForVersion(version: Pick<VersionDetails, 'id' | 'assetId' | 'metadata'>) {
     return displayVersionMetadata(version.metadata, importedMetadata, version.assetId, version.id, knownVersions);
   }
@@ -280,6 +308,7 @@
         type: version.mimeType.startsWith('image/') ? 'image' : 'video',
         url: version.processingState === 'ready' ? item.url || '/api/owner-media/' + item.id + '?versionId=' + versionId : '',
         poster: version.hasPoster && version.processingState === 'ready' ? item.poster || '/api/owner-poster/' + item.id + '?versionId=' + versionId : undefined,
+        sprite: version.hasSprite && version.processingState === 'ready' ? item.sprite || '/api/owner-poster/' + item.id + '?variant=sprite&versionId=' + versionId : undefined,
         availability: version.processingState === 'ready' ? 'ready' : version.processingState === 'error' ? 'error' : 'running',
         ...(update?.ready ? { duration: update.duration, width: update.width, height: update.height } : {}),
       } : item);
@@ -308,6 +337,7 @@
       metadata: draft ? draft.metadata : metadataForVersion(version),
       url: version.processingState === 'ready' ? '/api/owner-media/' + id + '?versionId=' + versionId : '',
       poster: version.hasPoster && version.processingState === 'ready' ? '/api/owner-poster/' + id + '?versionId=' + versionId : undefined,
+      sprite: version.hasSprite && version.processingState === 'ready' ? '/api/owner-poster/' + id + '?variant=sprite&versionId=' + versionId : undefined,
       availability: version.processingState === 'ready' ? 'ready' : version.processingState === 'error' ? 'error' : 'running',
       size: version.sizeBytes, sourceFile: versionedSourceFile(item.sourceFile, version.mimeType),
       type: version.mimeType.startsWith('image/') ? 'image' : 'video',
@@ -369,25 +399,90 @@
     if (!response.ok) { feedback = `Could not retry processing (${response.status}).`; return; }
     processingObserver?.refresh();
   }
-  async function uploadOriginal(file: File) {
+  async function uploadOriginal(file: File, destination: { projectId: string; folderId: string | null; assetId?: string }, report: (stage: string, progress?: number) => void, signal: AbortSignal, attempt: LiveUploadAttempt) {
     const isImage = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type);
     if (!file.type.startsWith('video/') && !isImage) throw new Error('Choose a video or a JPEG, PNG, WebP or AVIF image.');
     feedback = `Preparing preview for ${file.name}…`;
-    const preview = isImage ? await imageUploadPreview(file) : await thumbnails.extract(file);
+    report('Preparing preview');
+    const preview = attempt.preview ??= isImage ? await imageUploadPreview(file) : await thumbnails.extract(file);
+    signal.throwIfAborted();
     feedback = `Uploading ${file.name}…`;
-    const begin = await fetch('/api/uploads/begin', { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ projectId, folderId: importOptions.folderId, name: file.name, type: file.type, size: file.size }) });
-    if (!begin.ok) throw new Error(await begin.text());
-    const session = await begin.json();
-    const put = await fetch(session.url, { method: 'PUT', headers: { 'content-type': file.type }, body: file });
-    if (!put.ok) throw new Error(`Storage rejected the upload (${put.status}).`);
-    const posterPut = await fetch(session.posterUrl, { method: 'PUT', headers: { 'content-type': 'image/jpeg' }, body: preview.blob });
-    if (!posterPut.ok) throw new Error(`Storage rejected the preview (${posterPut.status}).`);
-    feedback = `Verifying ${file.name}…`;
-    const finish = await fetch('/api/uploads/complete', { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId: session.sessionId, posterSizeBytes: preview.blob.size,
-        durationSec: preview.duration, width: preview.sourceWidth, height: preview.sourceHeight }) });
-    if (!finish.ok) throw new Error(await finish.text());
+    let completed = false;
+    if (attempt.session) {
+      const renewed = await fetch('/api/uploads/renew', { method: 'POST', signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId: attempt.session.sessionId }) });
+      if (renewed.status === 409) {
+        const cancelled = await fetch('/api/uploads/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId: attempt.session.sessionId }) });
+        if (!cancelled.ok) throw new Error('This upload may still be verifying. Wait briefly, then retry this file.');
+        const result = await cancelled.json();
+        if (result.complete) completed = true;
+        else if (result.cancelled) attempt.session = undefined;
+        else throw new Error('Could not confirm this upload state. Retry this file.');
+      }
+      else { if (!renewed.ok) throw new Error('Could not resume this upload. Check your sign-in and retry.'); const value = await renewed.json(); completed = !!value.complete; if (!completed) attempt.session = value; }
+    }
+    if (!attempt.session) {
+      const begin = await fetch('/api/uploads/begin', { method: 'POST', signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...destination, name: file.name, type: file.type, size: file.size }) });
+      if (!begin.ok) throw new Error('Could not start this upload. Check the destination and file size before retrying.');
+      attempt.session = await begin.json();
+    }
+    const session = attempt.session!;
+    try {
+      if (!completed) {
+        report('Uploading original', 0);
+        await uploadWithProgress(session.url, file, percent => report('Uploading original', percent), signal);
+        report('Uploading preview');
+        const posterPut = await fetch(session.posterUrl, { method: 'PUT', signal, headers: { 'content-type': 'image/jpeg' }, body: preview.blob });
+        if (!posterPut.ok) throw new Error(`Storage rejected the preview (${posterPut.status}).`);
+      }
+      signal.throwIfAborted();
+      feedback = `Verifying ${file.name}…`; report('Verifying upload');
+      const finish = await fetch('/api/uploads/complete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId: session.sessionId, posterSizeBytes: preview.blob.size, durationSec: preview.duration, width: preview.sourceWidth, height: preview.sourceHeight }) });
+      if (!finish.ok) throw new Error('Could not verify this upload. Retry this file to check its existing session.');
+      return await finish.json();
+    } catch (cause) {
+      if (signal.aborted) {
+        const cancelled = await fetch('/api/uploads/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId: session.sessionId }) });
+        if (cancelled.ok) {
+          const result = await cancelled.json();
+          if (result.cancelled) attempt.session = undefined;
+          else if (result.complete) {
+            const receipt = await fetch('/api/uploads/complete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId: session.sessionId }) });
+            if (receipt.ok) return await receipt.json();
+          }
+        }
+      }
+      throw cause;
+    }
+  }
+  async function commitLiveImport(local: LocalAsset, target: ImportTarget, signal: AbortSignal, jobId: string) {
+    const attempt = liveUploads.get(jobId) ?? {};
+    liveUploads.set(jobId, attempt);
+    const result = await uploadOriginal(local.sourceFile, { projectId: target.projectId, folderId: target.folderId ?? null, assetId: target.assetId }, (stage, progress) => importQueue.update(jobId, { stage, progress, canCancel: stage !== 'Verifying upload' }), signal, attempt);
+    if (!result.asset) throw new Error('Upload is saved. Retry to refresh its receipt.');
+    attempt.assetId = result.assetId;
+    const descriptor = result.asset;
+    const previousProcessing = processing.find(item => item.assetId === descriptor.id);
+    const update: ProcessingUpdate = { assetId: descriptor.id, versionId: descriptor.versionId ?? null, versionNumber: previousProcessing ? previousProcessing.versionNumber + (previousProcessing.versionId === descriptor.versionId ? 0 : 1) : 1, updatedAt: Date.now(), ready: local.type === 'image', hasPoster: true };
+    if (!media.some(asset => asset.id === descriptor.id)) {
+      const previousActive = activeId;
+      organization = { ...organization, placements: { ...organization.placements, [descriptor.id]: { projectId: target.projectId, ...(descriptor.folderId ? { folderId: descriptor.folderId } : {}) } } };
+      media = [...media, { ...descriptor, projectId: target.projectId, url: processingSource(update), poster: processingPoster(update), type: local.type, sourceFile: { name: local.sourceFile.name, type: local.sourceFile.type }, tags: [], availability: processingAvailability(update) }];
+      processing = [...processing, update];
+      review({ type: 'add-assets', assets: [{ id: descriptor.id }] });
+      review({ type: 'select', assetId: previousActive });
+    } else {
+      // Follow Latest while retaining an explicitly selected historical version.
+      applyProcessing([update]);
+    }
+    URL.revokeObjectURL(local.url); if (local.poster) URL.revokeObjectURL(local.poster);
+    processingObserver?.refresh();
+    feedback = `${local.sourceFile.name} uploaded privately.`;
+  }
+  function queueReplacement(file: File, replacementProjectId: string, assetId: string) {
+    const asset = media.find(asset => asset.id === assetId && organization.placements[assetId]?.projectId === replacementProjectId);
+    if (!asset) { feedback = 'This asset is no longer available. Refresh the project before replacing it.'; return; }
+    const target: ImportTarget = { projectId: replacementProjectId, assetId, dateKey: '', assetClass: 'VID' };
+    importQueue.enqueue([{ file, target, destinationLabel: `${projects.find(project => project.id === replacementProjectId)?.name ?? 'Project'} / New version of ${asset.assetCode}` }]);
   }
   async function imageUploadPreview(file: File) {
     const url = URL.createObjectURL(file);
@@ -412,10 +507,8 @@
     if (project.archived) { feedback = 'Restore this project before adding media.'; return; }
     if (live) {
       if (projectId === '__empty__') { feedback = 'Create a project before adding media.'; projectDialog = true; return; }
-      void (async () => {
-        try { for (const file of files) await uploadOriginal(file); location.reload(); }
-        catch (cause) { feedback = cause instanceof Error ? cause.message : String(cause); }
-      })();
+      const target: ImportTarget = { projectId, folderId: importOptions.folderId ?? undefined, dateKey: '', assetClass: importOptions.assetClass };
+      importQueue.enqueue(Array.from(files, file => ({ file, target, destinationLabel: `${project.name}${target.folderId ? ` / ${folderPath(projectFolders, target.folderId)}` : ' / Root'}` })));
       return;
     }
     const today = new Date();
@@ -836,7 +929,7 @@
   onMount(() => {
     if (data.snapshot) {
       knownVersions = data.snapshot.versions.map(version => ({ id: version._id, assetId: version.assetId, version: version.version,
-        processingState: version.processingState, hasPoster: !!version.posterKey, sizeBytes: version.sizeBytes,
+        processingState: version.processingState, hasPoster: !!version.posterKey, hasSprite: data.snapshot?.mediaJobs.some(job => job.versionId === version._id && job.status === "ready" && !!job.spriteKey), sizeBytes: version.sizeBytes,
         mimeType: version.mimeType, metadata: version.creativeMetadata ?? null, metadataUpdatedAt: version.metadataUpdatedAt ?? null }));
       processing = data.snapshot.assets.map(item => {
         const job = data.snapshot.mediaJobs.find(job => job.assetId === item._id && job.versionId === item.currentVersionId);
@@ -844,7 +937,7 @@
         return { assetId: item._id, versionId: item.currentVersionId ?? null, versionNumber: version?.version ?? 0,
           updatedAt: Math.max(item.updatedAt, job?.updatedAt ?? 0), job,
           ready: item.processingStatus === 'ready' && version?.processingState === 'ready',
-          hasPoster: !!version?.posterKey, duration: item.durationSec, width: item.width, height: item.height };
+          hasPoster: !!version?.posterKey, hasSprite: !!(job?.status === "ready" && job.spriteKey), duration: item.durationSec, width: item.width, height: item.height };
       });
       organization = {
         folders: data.snapshot.folders.map(folder => ({ id: folder._id, projectId: folder.projectId,
@@ -857,7 +950,7 @@
       const fromServer = data.snapshot.assets.map(item => ({
         id: item._id, projectId: item.projectId, name: item.assetCode ?? item.title,
         url: processingSource(processingByAsset.get(item._id)!), type: item.mimeType?.startsWith('image/') ? 'image' as const : 'video' as const,
-        poster: processingPoster(processingByAsset.get(item._id)!),
+        poster: processingPoster(processingByAsset.get(item._id)!), sprite: processingSprite(processingByAsset.get(item._id)!),
         availability: processingAvailability(processingByAsset.get(item._id)!),
         ...(processingByAsset.get(item._id)?.ready ? { duration: item.durationSec, width: item.width, height: item.height } : {}),
         size: item.sizeBytes ?? 0, sourceFile: { name: item.originalFilename ?? item.title, type: item.mimeType ?? 'video/mp4' },
@@ -902,7 +995,7 @@
       }
       media = media.map(item => item.id === update.assetId ? { ...item,
         ...((item.versionId ?? null) === update.versionId ? {
-          url: processingSource(update), poster: processingPoster(update), availability: processingAvailability(update),
+          url: processingSource(update), poster: processingPoster(update), sprite: processingSprite(update), availability: processingAvailability(update),
           ...(update.ready ? { duration: update.duration ?? item.duration, width: update.width ?? item.width,
             height: update.height ?? item.height } : {})
         } : {}) } : item);
@@ -983,6 +1076,7 @@
   <ProjectTree onEditProject={editProject} canEditProject={id => folderAccess.isAdmin && folderAccess.editableProjectIds.includes(id)} {canDropAssets} onDropAssets={dropAssets} dragActive={!!dragged} selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={isProjectRoot} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
   <ArchivedProjects projects={archivedProjects} onRestore={restoreProject} closeOnRestore={navOpen} onNavigateFocus={focusProjectHeading}/>
   {#if folderAccess.isAdmin}<FeedbackInbox groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}
+  {#if live && !project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId)}<div class="nav-divider"></div><span class="nav-heading">DESTINATIONS</span><button class="nav-item" onclick={openDestinations}><ArrowUpRight size={16}/> Trailer Feed</button>{/if}
   <div class="nav-divider"></div><span class="nav-heading">REVIEW STATUS</span>
   <button class:nav-active={!activeCollection && filter === 'awaiting_review'} class="nav-item" disabled={!!project.archived} onclick={() => filterBy('awaiting_review')}><span class="status-dot pending"></span> Awaiting review</button>
   <button class:nav-active={!activeCollection && filter === 'needs_changes'} class="nav-item" disabled={!!project.archived} onclick={() => filterBy('needs_changes')}><span class="status-dot changes"></span> Needs changes</button>
@@ -995,10 +1089,10 @@
   <main ondragover={dragFiles} ondrop={dropFiles}>
     <header class="topbar">
       <Dialog.Root bind:open={navOpen}><Dialog.Trigger class="icon-button mobile-menu" aria-label="Open navigation" title="Open navigation"><Menu size={20}/></Dialog.Trigger><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="nav-drawer" onCloseAutoFocus={event => { if (restoringFromNavigation) { event.preventDefault(); restoringFromNavigation = false; void focusProjectHeading(); } }} style={`--project-accent: ${project.brandColor ?? "#14b8a6"}`}><Dialog.Title class="visually-hidden">Workspace navigation</Dialog.Title><Dialog.Description class="visually-hidden">Browse local media and review status</Dialog.Description><Dialog.Close class="icon-button drawer-close" aria-label="Close navigation"><X size={20}/></Dialog.Close>{@render navigation()}</Dialog.Content></Dialog.Portal></Dialog.Root>
-      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each ancestors as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if (focusedReview || mediaType !== 'all' || filter === 'selected' || activeCollectionId || archived)}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId && locationName !== project.name}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot}/>{/if}<div class="header-account-tools">{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
+      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each ancestors as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if (focusedReview || mediaType !== 'all' || filter === 'selected' || activeCollectionId || archived)}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId && locationName !== project.name}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot} onVersionFile={queueReplacement} uploadContext={!project.archived && projectId !== "__empty__" ? {folders:folderDestinations,...importOptions,onChange:value => importOptions = value,onChoose:() => picker.click()} : undefined} destinationContext={!project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId) ? {projectId,folderId:activeFolderId,selectedVersionIds:destinationSelection} : undefined}/>{/if}<div class="header-account-tools">{#if live}<WorkActivity feed={activityFeed} onOpen={openActivity}/>{/if}{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
     </header>
     <div class="page-content folder-workspace">
-      <section class="project-heading" class:identity-banner={showsProjectIdentity && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if showsProjectIdentity && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{locationName}</h1>{#if project.archived || project.clientName || project.description}<p class="subtitle" class:subtitle-placeholder={!isProjectRoot} aria-hidden={!isProjectRoot} title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description}</p>{/if}</div><div class="project-tools"><ImportQueue jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} folderLabels={folderDestinations} onMoveFolder={moveFolder} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
+      <section class="project-heading" class:identity-banner={showsProjectIdentity && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if showsProjectIdentity && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{locationName}</h1>{#if project.archived || project.clientName || project.description}<p class="subtitle" class:subtitle-placeholder={!isProjectRoot} aria-hidden={!isProjectRoot} title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description}</p>{/if}</div><div class="project-tools"><ImportQueue persistent={live} jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} folderLabels={folderDestinations} onMoveFolder={moveFolder} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
       {#if feedback}<div class="notice" role="status">{feedback}<button class="icon-button" aria-label="Dismiss message" onclick={() => feedback = ''}><X size={16}/></button></div>{/if}
       {#if project.archived}<section class="archived-project-state" aria-label="Archived project">
         <h2>This project is archived.</h2><p>Your media, folders and feedback are retained.</p>
@@ -1067,7 +1161,7 @@
       {#snippet viewer()}
         {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><div class="review-view-controls">{#if live && active.versionId}<select aria-label="Asset version" value={selectedVersions[active.id] ?? "__current__"} onchange={event => selectAssetVersion(active.id, event.currentTarget.value)}><option value="__current__">Latest version</option>{#each knownVersions.filter(version => version.assetId === active.id).sort((a, b) => a.version - b.version) as version (version.id)}<option value={version.id}>V{version.version}</option>{/each}</select>{/if}{#if focusedReview}<button class="icon-button" aria-label="Notes & info" title="Notes & info" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={18}/></button>{/if}<button class="icon-button" aria-label={focusedReview ? "Return to folder" : "Expand review"} title={focusedReview ? "Return to folder (Esc)" : "Expand review"} onclick={() => focusedReview ? void returnToFolder() : focusedReview = true}>{#if focusedReview}<Minimize2 size={18}/>{:else}<Maximize2 size={18}/>{/if}</button><button class="icon-button" aria-label="Close review" title="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div></div>
           {#if activeMediaJob}<div class="media-job" role="status"><span>Processing: {activeMediaJob.status === 'ready' ? 'Ready' : activeMediaJob.status === 'error' ? 'Needs attention' : activeMediaJob.status === 'queued' ? 'Queued' : `${activeMediaJob.stage} in progress`}</span>{#if activeMediaJob.runId}<a href={`https://trigger.v1su4.dev/orgs/v1su4-91d9/projects/review-room-YXaz/env/prod/runs/${activeMediaJob.runId}`} target="_blank" rel="noopener noreferrer">Run {activeMediaJob.runId.slice(-8)}</a>{/if}{#if activeMediaJob.status === 'error' || (activeMediaJob.status === 'queued' && !activeMediaJob.runId)}<button onclick={() => retryMediaJob(activeMediaJob._id)}>{activeMediaJob.status === 'error' ? 'Retry' : 'Start processing'}</button>{:else if activeMediaJob.status === 'running'}<button onclick={() => processingObserver?.refresh()}>Refresh</button>{/if}</div>{/if}
-          {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={reviewEnded} loop={!preview && reviewPlaybackMode === 'loop'} onfailure={previewFailed} sourceBlob={active.sourceFile instanceof File ? active.sourceFile : undefined} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} availability={active.availability ?? 'ready'} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
+          {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={reviewEnded} loop={!preview && reviewPlaybackMode === 'loop'} onfailure={previewFailed} sourceBlob={active.sourceFile instanceof File ? active.sourceFile : undefined} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} poster={active.poster} availability={active.availability ?? 'ready'} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
               canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => { updateAsset(active.id, info); readySource = active.url; }}/>{/if}
           <div class="review-actions"><div class="review-feedback"><button class="shortlist-toggle" class:shortlisted={active.shortlisted} aria-label={active.shortlisted ? 'Remove from shortlist' : 'Add to shortlist'} aria-pressed={active.shortlisted} title={active.shortlisted ? 'Remove from shortlist' : 'Add to shortlist'} onclick={() => review({ type: 'shortlist', assetId: active.id, shortlisted: !active.shortlisted })}><Bookmark size={17} fill={active.shortlisted ? 'currentColor' : 'none'}/></button><div class="rating" aria-label="Rating">{#each [1,2,3,4,5] as rating (rating)}<button aria-label={`Rate ${rating} stars`} title={active.rating === rating ? "Clear rating" : `Rate ${rating} stars`} aria-pressed={active.rating === rating} onclick={() => review({ type: 'rate', assetId: active.id, rating: active.rating === rating ? 0 : rating })}><Star size={17} fill={active.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}</div></div><div class="review-outcome"><button class:decision-active={active.status === 'needs_changes'} class="secondary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'needs_changes' ? 'awaiting_review' : 'needs_changes' })}>Request changes</button><button class="primary-button" onclick={() => review({ type: 'status', assetId: active.id, status: active.status === 'approved' ? 'awaiting_review' : 'approved' })}><Check size={16}/>{active.status === 'approved' ? 'Approved' : 'Approve'}</button><div class="asset-nav" role="group" aria-label="Playback and asset navigation">{#if active.type === 'video'}<ReviewPlaybackMenu mode={reviewPlaybackMode} onChange={changePlaybackMode} disabled={!!preview}/>{/if}<div class="asset-step-pair"><button class="asset-step" aria-label="Previous asset" aria-keyshortcuts="ArrowLeft" title="Previous asset (←)" disabled={visibleIds.indexOf(activeId ?? '') <= 0} onclick={() => navigate(-1)}><ArrowLeft size={14}/></button><button class="asset-step" aria-label="Next asset" aria-keyshortcuts="ArrowRight" title="Next asset (→)" disabled={visibleIds.indexOf(activeId ?? '') >= visibleIds.length - 1} onclick={() => navigate(1)}><ArrowRight size={14}/></button></div></div></div></div>
         </section>{/if}
@@ -1092,6 +1186,7 @@
   </main>
 </div>
 
+{#if live && projectId !== "__empty__"}<DestinationSyncDialog bind:open={destinationDialogOpen} {projectId} folderId={activeFolderId} selectedVersionIds={destinationSelection}/>{/if}
 <Dialog.Root bind:open={projectDialog}>
   <Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="filter-sheet">
     <Dialog.Title class="dialog-title">New project</Dialog.Title>
@@ -1106,7 +1201,8 @@
 <style>
   .library-navigation { display: flex; align-items: center; flex-wrap: nowrap; gap: 6px; min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; padding: 0 0 8px; margin: 0 0 10px; scrollbar-width: thin; }
   .library-filter, .library-folder { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; white-space: nowrap; cursor: pointer; }
-  .library-filter.chosen { background: var(--raised); color: var(--ink); border-color: color-mix(in srgb, var(--teal) 35%, var(--border)); }
+  .library-filter { border:0; }
+  .library-filter.chosen { background: var(--raised); color: var(--ink); }
   .library-filter:hover, .library-folder:hover { background: var(--raised); color: var(--ink); }
   .library-filter > span, .library-folder-count { font-size: 10px; color: var(--muted); }
   .library-folder-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
@@ -1137,3 +1233,5 @@
   .identity-banner { padding: 16px; border-radius: 8px; background: color-mix(in srgb, var(--project-accent) 18%, #030605); }
   .project-banner { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; opacity: .2; border-radius: inherit; pointer-events: none; }
 </style>
+
+

@@ -1,0 +1,85 @@
+{
+  "deployed": "478d746",
+  "samples": [
+    {
+      "correctPoster": true,
+      "errors": false,
+      "muted": false,
+      "name": "VID_20261005_00026",
+      "paused": true,
+      "priorPaused": true,
+      "type": "video",
+      "videoElements": 1
+    },
+    {
+      "correctPoster": true,
+      "errors": false,
+      "muted": false,
+      "name": "VID_20261005_00025",
+      "paused": true,
+      "priorPaused": true,
+      "type": "video",
+      "videoElements": 1
+    },
+    {
+      "correctPoster": true,
+      "errors": false,
+      "muted": false,
+      "name": "VID_20261005_00026",
+      "paused": true,
+      "priorPaused": true,
+      "type": "video",
+      "videoElements": 1
+    },
+    {
+      "correctPoster": true,
+      "errors": false,
+      "muted": false,
+      "name": "VID_20261005_00025",
+      "paused": true,
+      "priorPaused": true,
+      "type": "video",
+      "videoElements": 1
+    },
+    {
+      "correctPoster": true,
+      "errors": false,
+      "muted": false,
+      "name": "VID_20261005_00026",
+      "paused": true,
+      "priorPaused": true,
+      "type": "video",
+      "videoElements": 1
+    },
+    {
+      "correctPoster": true,
+      "errors": false,
+      "muted": true,
+      "name": "IMG_20261005_00027",
+      "paused": true,
+      "priorPaused": true,
+      "type": "still",
+      "videoElements": 0
+    },
+    {
+      "correctPoster": true,
+      "errors": false,
+      "muted": false,
+      "name": "VID_20261005_00026",
+      "paused": true,
+      "priorPaused": true,
+      "type": "video",
+      "videoElements": 1
+    },
+    {
+      "correctPoster": true,
+      "errors": false,
+      "muted": true,
+      "name": "IMG_20261005_00027",
+      "paused": true,
+      "priorPaused": true,
+      "type": "still",
+      "videoElements": 0
+    }
+  ]
+}

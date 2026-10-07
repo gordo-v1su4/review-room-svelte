@@ -1,0 +1,22 @@
+{
+  "releaseVersion": {
+    "version": "1791348052747"
+  },
+  "twoReviewerPersisted": true,
+  "commentRetryDeduplicated": true,
+  "ownerHandledReopenPersisted": true,
+  "enabledExactDownload": true,
+  "disabledDownloadDenied": true,
+  "missingProofDenied": true,
+  "wrongPasscodeDenied": true,
+  "differentLinkProofDenied": true,
+  "invalidTokenDenied": true,
+  "wrongProjectDenied": true,
+  "revokedOpenSessionDenied": true,
+  "archivedOpenSessionDenied": true,
+  "expiredOpenSessionDenied": true,
+  "ownerSignOutDenied": true,
+  "qaOnly": true,
+  "actualPhoneCoverage": false,
+  "nativeBrowserCoverage": false
+}

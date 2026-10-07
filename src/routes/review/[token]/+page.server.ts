@@ -9,17 +9,27 @@ function cookieName(token: string) { return `rr_review_${token.slice(0, 24)}`; }
 export const load: PageServerLoad = async ({ params, cookies, setHeaders }) => {
   setHeaders({ 'cache-control': 'private, no-store', 'referrer-policy': 'same-origin', 'x-robots-tag': 'noindex, nofollow' });
   const token = params.token;
-  const state = await db().query(links.getAccessState, { token });
+  const state = await db().action(links.getAccessState, { token });
   if (!state.available) throw error(404, 'Review unavailable');
-  const accessKey = cookies.get(cookieName(token));
+  let accessKey = cookies.get(cookieName(token));
+  if (!state.requiresPasscode && accessKey) {
+    try { await db().action(review.getReviewerName, { token, accessKey }); }
+    catch { accessKey = undefined; }
+  }
+  if (!state.requiresPasscode && !accessKey) {
+    const session = await db().mutation(links.verifyPasscode, { token, passcode: '' });
+    if (!session.ok || !session.accessKey) throw error(404, 'Review unavailable');
+    accessKey = session.accessKey;
+    cookies.set(cookieName(token), accessKey, { path: '/', secure: !dev, httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 });
+  }
   if (state.requiresPasscode && !accessKey) return { locked: true as const, token };
   try {
-    const project = await db().query(review.getProjectByToken, { token, accessKey });
-    const videos = await db().query(review.listVideosByToken, { token, accessKey });
-    const reviewerName = accessKey ? await db().query(review.getReviewerName, { token, accessKey }) : undefined;
+    const project = await db().action(review.getProjectByToken, { token, accessKey });
+    const videos = await db().action(review.listVideosByToken, { token, accessKey });
+    const reviewerName = accessKey ? await db().action(review.getReviewerName, { token, accessKey }) : undefined;
     const comments = await Promise.all(videos.map(async (video) => ({
       videoId: video.id,
-      items: await db().query(review.listCommentsByVideo, { token, accessKey, videoId: video.id })
+      items: await db().action(review.listCommentsByVideo, { token, accessKey, videoId: video.id })
     })));
     return { locked: false as const, token, project, videos, comments, reviewerName };
   } catch {
@@ -53,3 +63,4 @@ export const actions: Actions = {
     redirect(303, `/review/${params.token}`);
   }
 };
+

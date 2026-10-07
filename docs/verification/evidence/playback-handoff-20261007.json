@@ -1,0 +1,22 @@
+{
+  "deployed": "478d746",
+  "liveHandoff": {
+    "correctPoster": true,
+    "loadingHeight": 23,
+    "name": "VID_20261005_00035",
+    "posterDecoded": 854,
+    "posterVisible": true,
+    "ready": 0,
+    "videoElements": 1
+  },
+  "liveCanceled": {
+    "muted": true,
+    "paused": true
+  },
+  "liveClosed": {
+    "muted": true,
+    "paused": true,
+    "sourceReleased": true,
+    "videos": 0
+  }
+}

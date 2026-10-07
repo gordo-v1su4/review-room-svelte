@@ -1,6 +1,7 @@
 import type { MutationCtx } from '../_generated/server';
 import type { Id } from '../_generated/dataModel';
 import { internal } from '../_generated/api';
+import { sourceDeleted } from '../destinationRemovals';
 
 async function queueKeys(ctx: MutationCtx, values: (string | undefined)[]) {
   const keys = [...new Set(values.filter((key): key is string => !!key))];
@@ -21,8 +22,11 @@ export async function purgeDependencyBatch(ctx: MutationCtx, projectId: Id<'proj
   }
   const asset = await ctx.db.query('videos').withIndex('by_project', q => q.eq('projectId', projectId)).first();
   if (asset) {
-    const versions = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', asset._id)).take(100);
+    // Metadata can approach the document size limit. Capture external identities
+    // before deleting a single bounded version, while it still exists.
+    const versions = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', asset._id)).take(1);
     if (versions.length) {
+      await sourceDeleted(ctx, asset, versions);
       await queueKeys(ctx, versions.flatMap(version => [version.originalKey, version.posterKey]));
       for (const version of versions) await ctx.db.delete(version._id);
       return true;
@@ -49,7 +53,13 @@ export async function purgeDependencyBatch(ctx: MutationCtx, projectId: Id<'proj
     if (!sessions.length) await ctx.db.delete(link._id);
     return true;
   }
-  for (const table of ['projectFolders', 'projectMembers', 'projectAccessRules', 'collections', 'sourceImports'] as const) {
+  const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', projectId)).take(100);
+  if (folders.length) {
+    await queueKeys(ctx, folders.map(folder => folder.coverImageKey));
+    for (const folder of folders) await ctx.db.delete(folder._id);
+    return true;
+  }
+  for (const table of ['projectMembers', 'projectAccessRules', 'collections', 'sourceImports'] as const) {
     const rows = await ctx.db.query(table).withIndex('by_project', q => q.eq('projectId', projectId)).take(100);
     if (rows.length) { for (const row of rows) await ctx.db.delete(row._id); return true; }
   }

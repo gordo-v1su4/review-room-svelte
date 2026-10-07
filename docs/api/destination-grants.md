@@ -1,0 +1,15 @@
+# Exact-version destination grants
+
+Implementation checkpoint for V1S-165. The backend and HTTP resolver are implemented on `codex/destination-version-grants`; production deployment and cross-app acceptance remain pending.
+
+An owner session can `POST /api/owner-publication-grants` with `destinationKey: "trailer-feed"`, an immutable `versionId`, explicit `referenceVersionIds` (an empty array is valid), `allowedOrigins`, and optional future Unix-millisecond `expiresAt`. All selected versions must be ready. References must be still images in the same project. Approval/final status is not required; choosing this operation supplies publication consent.
+
+The response contains grant identity, a random capability slug, the pinned root/reference IDs and a relative `mediaPath`. It contains no storage keys, service keys or presigned URLs. Original and poster requests use `/api/destination-media/<slug>/<versionId>/<original|poster>`; selected image originals use the same path. A later upload or source metadata edit does not change the allowlist. Identical issuance retries reuse the grant; changed consent is rejected rather than silently expanding it.
+
+Resolver GET, HEAD and OPTIONS check the current grant, source ownership, project/archive state, requested exact version and readiness before accessing the shared byte cache. Explicit revocation (`DELETE /api/owner-publication-grants` with `grantId`), expiry, deleted roots, and unavailable requested references deny delivery. A deleted reference does not revoke its surviving root. Browser origins must match the grant. Range, If-Range and If-None-Match are supported; CORS exposes Content-Length, Content-Range, Accept-Ranges and ETag. The player's `cors=1` query does not bypass authorization. Responses remain private and require revalidation; conditional 304 responses are authorized too.
+
+The HTTP server checks the grant's expiry against its current clock after every lookup. This covers reuse of a positive Convex lookup as time advances; database dependency invalidation still governs source deletion and revocation. See [Convex query/time guidance](https://docs.convex.dev/understanding/best-practices).
+
+Initial issuance creates `consentGeneration: 1`. Owner `POST /api/owner-publication-grants` with `intent: "sync-again"`, `expectedGeneration`, a unique `confirmationId`, the explicitly selected media/origins/expiry, and optional higher `nextGeneration` rotates the capability slug and advances consent. Retrying that exact confirmation returns the same grant; changed or superseded confirmations conflict. Old resolver URLs stop working. Revocation accepts `expectedGeneration` so a stale owner request cannot revoke newly confirmed consent. General issuance cannot acquire a later generation implicitly.
+
+This is an owner-session interface. Basic automation credentials have no grant permissions. Dedicated issuer/consumer service authentication, durable target handoff/removal, destination UI, and deployment evidence are still required by V1S-165–169. Revoked/expired grants cannot be restored by ordinary issuance retries.

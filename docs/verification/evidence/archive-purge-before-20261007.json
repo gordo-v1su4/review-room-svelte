@@ -1,0 +1,54 @@
+{
+  "observedAt": "2026-10-07T04:38:19.691Z",
+  "projectId": "ks72w1e93dz9a45s3xcm59bs9x8ftmyw",
+  "remaining": {
+    "projects": 0,
+    "folders": 0,
+    "assets": 0,
+    "versions": 0,
+    "jobs": 0,
+    "comments": 0,
+    "links": 0
+  },
+  "storage": [
+    {
+      "kind": "original",
+      "status": 404
+    },
+    {
+      "kind": "poster",
+      "status": 404
+    },
+    {
+      "kind": "sprite",
+      "status": 404
+    },
+    {
+      "kind": "cover",
+      "status": 200,
+      "bytes": 118817
+    },
+    {
+      "kind": "pending",
+      "status": 404
+    },
+    {
+      "kind": "pendingSeal",
+      "status": 404
+    },
+    {
+      "kind": "pendingPoster",
+      "status": 404
+    },
+    {
+      "kind": "pendingPosterSeal",
+      "status": 404
+    }
+  ],
+  "canonicalCount": 13,
+  "canonicalUnchanged": true,
+  "canonicalObject": {
+    "status": 200,
+    "bytes": 6519781
+  }
+}

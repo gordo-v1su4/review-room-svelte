@@ -210,7 +210,8 @@ const applicationTables = {
     .index("by_project", ["projectId"])
     .index("by_project_folder", ["projectId", "folderId"])
     .index("by_project_status", ["projectId", "status"])
-    .index("by_project_uploadedAt", ["projectId", "uploadedAt"]),
+    .index("by_project_uploadedAt", ["projectId", "uploadedAt"])
+    .index("by_project_processing", ["projectId", "processingStatus"]),
 
   comments: defineTable({
     videoId: v.id("videos"),
@@ -219,6 +220,7 @@ const applicationTables = {
     authorRole: v.union(v.literal("admin"), v.literal("client")),
     body: v.string(),
     timecodeSec: v.optional(v.number()),
+    clientRequestId: v.optional(v.string()),
     completedAt: v.optional(v.number()),
     completedBy: v.optional(v.id("appUsers")),
     createdAt: v.number(),
@@ -318,6 +320,76 @@ const applicationTables = {
     attempt: v.number(),
     createdAt: v.number(),
   }),
+
+  destinationRemovals: defineTable({
+    projectId: v.string(), sourceAssetId: v.string(), sourceVersionId: v.string(), consentGeneration: v.number(),
+    state: v.union(v.literal('queued'), v.literal('sending'), v.literal('complete')),
+    attempts: v.number(), nextAttemptAt: v.number(), leaseUntil: v.optional(v.number()), attemptToken: v.optional(v.string()), lastError: v.optional(v.string()),
+    createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_source_version', ['sourceVersionId']).index('by_project', ['projectId']),
+
+  destinationConnections: defineTable({
+    destinationKey: v.string(), projectId: v.id('projects'), folderId: v.optional(v.id('projectFolders')),
+    targetRunId: v.string(), createdBy: v.id('appUsers'), createdAt: v.number(), updatedAt: v.number(),
+    replacesConnectionId: v.optional(v.id('destinationConnections')), replacedByConnectionId: v.optional(v.id('destinationConnections')),
+  }).index('by_source_folder', ['destinationKey', 'projectId', 'folderId']).index('by_project', ['projectId']),
+
+  syncBatches: defineTable({
+    confirmationId: v.string(), connectionId: v.id('destinationConnections'), projectId: v.id('projects'),
+    requestFingerprint: v.string(), reservationJson: v.string(), reactivationJson: v.optional(v.string()), preparationIndex: v.optional(v.number()), orderedVersionIds: v.array(v.id('assetVersions')),
+    state: v.union(v.literal('queued'), v.literal('reserved'), v.literal('failed'), v.literal('complete')),
+    attempts: v.number(), leaseUntil: v.optional(v.number()), attemptToken: v.optional(v.string()), lastError: v.optional(v.string()),
+    createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_confirmation', ['confirmationId']).index('by_project', ['projectId']),
+
+  syncOutbox: defineTable({
+    batchId: v.id('syncBatches'), connectionId: v.id('destinationConnections'), projectId: v.id('projects'),
+    versionId: v.id('assetVersions'), assetId: v.id('videos'), consentGeneration: v.number(), payloadJson: v.string(),
+    state: v.union(v.literal('queued'), v.literal('sending'), v.literal('synced'), v.literal('failed'), v.literal('disconnected'), v.literal('source_deleted')),
+    attempts: v.number(), leaseUntil: v.optional(v.number()), attemptToken: v.optional(v.string()), lastError: v.optional(v.string()),
+    targetArtifactId: v.optional(v.string()), targetVersionNumber: v.optional(v.number()),
+    targetState: v.optional(v.string()), targetConsentGeneration: v.optional(v.number()),
+    createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_batch', ['batchId']).index('by_connection', ['connectionId'])
+    .index('by_source_version', ['connectionId', 'versionId']).index('by_project', ['projectId']).index('by_version', ['versionId'])
+    .index('by_project_state', ['projectId', 'state']),
+
+  destinationUnsyncs: defineTable({
+    jobId: v.id('syncOutbox'), projectId: v.string(), sourceAssetId: v.string(), sourceVersionId: v.string(), consentGeneration: v.number(),
+    state: v.union(v.literal('queued'), v.literal('sending'), v.literal('complete')),
+    attempts: v.number(), nextAttemptAt: v.number(), leaseUntil: v.optional(v.number()), attemptToken: v.optional(v.string()), lastError: v.optional(v.string()),
+    createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_job', ['jobId']).index('by_project', ['projectId']),
+
+  destinationRefreshes: defineTable({
+    operationId: v.string(), requestFingerprint: v.string(), projectId: v.id('projects'), jobId: v.id('syncOutbox'),
+    consentGeneration: v.number(), payloadJson: v.string(), referenceVersionIds: v.array(v.id('assetVersions')),
+    state: v.union(v.literal('queued'), v.literal('sending'), v.literal('complete'), v.literal('failed'), v.literal('disconnected')),
+    attempts: v.number(), leaseUntil: v.optional(v.number()), attemptToken: v.optional(v.string()), lastError: v.optional(v.string()),
+    createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_operation', ['operationId']).index('by_project', ['projectId']),
+
+  publicationReferenceGrants: defineTable({
+    rootGrantId: v.id('publicationGrants'), projectId: v.id('projects'), consentGeneration: v.number(),
+    slug: v.string(), referenceVersionIds: v.array(v.id('assetVersions')), createdAt: v.number(),
+  }).index('by_root_generation', ['rootGrantId', 'consentGeneration']).index('by_slug', ['slug']).index('by_project', ['projectId']),
+
+  publicationGrants: defineTable({
+    destinationKey: v.literal('trailer-feed'),
+    projectId: v.id('projects'),
+    assetId: v.id('videos'),
+    versionId: v.id('assetVersions'),
+    createdBy: v.id('appUsers'),
+    slug: v.string(),
+    allowedOrigins: v.array(v.string()),
+    referenceVersionIds: v.array(v.id('assetVersions')),
+    consentGeneration: v.number(),
+    lastConfirmationId: v.optional(v.string()),
+    revokedAt: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index('by_destination_version', ['destinationKey', 'versionId'])
+    .index('by_slug', ['slug']).index('by_project', ['projectId']),
 
   publications: defineTable({
     assetId: v.id("videos"),

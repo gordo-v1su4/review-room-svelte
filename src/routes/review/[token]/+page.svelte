@@ -2,11 +2,50 @@
   import { onMount } from 'svelte';
   import { MessageSquare, Play } from 'lucide-svelte';
   import Player from '$lib/playback/Player.svelte';
+  import StillViewer from '$lib/components/StillViewer.svelte';
+  import type { AnnotationStroke } from '$lib/annotations';
+  import { invalidateAll } from '$app/navigation';
 
   let { data, form } = $props();
   let selectedId = $state('');
+  let player = $state<Player>();
+  let time = $state(0);
+  let busy = $state(false);
+  let message = $state('');
+  let drafts = $state<Record<string, { body: string; requestId: string; timecodeSec?: number }>>({});
+  let markup = $state<Record<string, AnnotationStroke[]>>({});
   const selected = $derived(data.locked ? undefined : data.videos.find((video) => video.id === selectedId) ?? data.videos[0]);
   const comments = $derived(data.locked || !selected ? [] : data.comments.find((entry) => entry.videoId === selected.id)?.items ?? []);
+  const isVideo = $derived(selected?.assetClass === 'VID' || selected?.mimeType?.startsWith('video/'));
+  async function mutate(action: string, assetId: string, values: Record<string, unknown> = {}) {
+    const response = await fetch(`/api/private-review/${data.token}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action, assetId, ...values }) });
+    if (!response.ok) throw new Error('Could not save. Check that this review link is still available, then retry.');
+    await invalidateAll();
+  }
+  async function update(action: string, values: Record<string, unknown> = {}) {
+    if (!selected || busy) return;
+    busy = true; message = '';
+    try { await mutate(action, selected.id, values); } catch (cause) { message = cause instanceof Error ? cause.message : 'Could not save.'; }
+    finally { busy = false; }
+  }
+  function draft() {
+    if (!selected) return;
+    return drafts[selected.id] ??= { body: '', requestId: crypto.randomUUID() };
+  }
+  async function comment(event: SubmitEvent) {
+    event.preventDefault();
+    if (!selected || busy) return;
+    const assetId = selected.id, note = drafts[assetId];
+    if (!note?.body.trim()) return;
+    busy = true; message = '';
+    try { await mutate('comment', assetId, note); delete drafts[assetId]; }
+    catch (cause) { message = cause instanceof Error ? cause.message : 'Could not post comment.'; }
+    finally { busy = false; }
+  }
+  async function viewed(assetId: string) {
+    if (data.locked || data.videos.find(v => v.id === assetId)?.viewed) return;
+    try { await mutate('viewed', assetId); } catch { message = 'Viewed state could not be saved.'; }
+  }
 
   onMount(() => {
     if (!data.locked) {
@@ -43,12 +82,20 @@
             </button>
           {/each}
         </nav>
-        {#if selected}<section class="viewer" aria-label="Selected video review"><div class="pane-heading">{selected.title}</div><Player src={`/api/review-media/${data.token}/${selected.id}`} name={selected.title} />
+        {#if selected}<section class="viewer" aria-label="Selected media review"><div class="pane-heading">{selected.title}</div>
+          {#if isVideo}<Player bind:this={player} src={`/api/review-media/${data.token}/${selected.id}`} poster={selected.hasPoster ? `/api/review-poster/${data.token}/${selected.id}` : undefined} name={selected.title} ontime={value => time = value} onViewed={() => selected && viewed(selected.id)}/>
+          {:else}<StillViewer assetId={selected.id} src={`/api/review-media/${data.token}/${selected.id}`} name={selected.title} strokes={markup[selected.id] ?? selected.annotationStrokes ?? []} dirty={selected.id in markup} canAnnotate={true} saveDisabled={busy} onChange={strokes => { if (selected) markup[selected.id] = strokes; }} onSave={async () => { if (!selected) return; const id = selected.id; await mutate('annotations', id, { strokes: markup[id] ?? [] }); delete markup[id]; }} onViewed={() => selected && viewed(selected.id)}/>{/if}
           <div class="video-meta"><span>{selected.assetCode ?? 'VIDEO'}</span><span>{selected.status.replaceAll('_', ' ')}</span></div>
+          <div class="review-controls">
+            <label>Rating<select aria-label="Rating" value={selected.rating} disabled={busy} onchange={event => update('rating', { rating: Number(event.currentTarget.value) })}>{#each [0,1,2,3,4,5] as rating (rating)}<option value={rating}>{rating ? `${rating} / 5` : 'Unrated'}</option>{/each}</select></label>
+            <button disabled={busy} aria-pressed={selected.isSelect} onclick={() => update('shortlist')}>{selected.isSelect ? 'Shortlisted' : 'Shortlist'}</button>
+            <label>Review status<select aria-label="Review status" value={selected.status} disabled={busy} onchange={event => update('status', { status: event.currentTarget.value })}><option value="awaiting_review">Awaiting review</option><option value="in_progress">In review</option><option value="needs_changes">Needs changes</option><option value="approved">Approved</option></select></label>
+            {#if selected.downloadEnabled && selected.versionId}<a href={`/api/review-download/${data.token}/${selected.id}/${selected.versionId}`} download>Download original</a>{/if}
+          </div>
         </section>
         <aside class="feedback" aria-label="Feedback"><div class="pane-heading">Notes <span>{comments.length}</span></div>
-          <div class="comment-list">{#each comments as comment (comment._id)}<article class="comment"><strong>{comment.authorName}</strong><p>{comment.body}</p></article>{:else}<p class="empty-note">No notes yet.</p>{/each}</div>
-          <form method="POST" action="?/comment" class="comment-form"><input type="hidden" name="videoId" value={selected.id}/><label>Comment <textarea name="body" rows="3" maxlength="5000" required placeholder="Leave a note…"></textarea></label>{#if form?.commentInvalid}<p role="alert">Write a comment before posting.</p>{/if}<button class="primary">Add comment</button></form>
+          <div class="comment-list">{#each comments as comment (comment._id)}<article class="comment"><strong>{comment.authorName}</strong>{#if isVideo && comment.timecodeSec !== undefined}<button class="timecode" onclick={() => player?.seek(comment.timecodeSec!)} aria-label={`Seek to ${comment.timecodeSec} seconds`}>{comment.timecodeSec.toFixed(1)}s</button>{/if}<p>{comment.body}</p>{#if comment.completedAt}<small>Handled</small>{/if}</article>{:else}<p class="empty-note">No notes yet.</p>{/each}</div>
+          <form class="comment-form" onsubmit={comment}><label>Comment <textarea name="body" rows="3" maxlength="5000" required disabled={busy} placeholder="Leave a note…" value={drafts[selected.id]?.body ?? ''} oninput={event => { const note = draft(); if (note && note.body !== event.currentTarget.value) { note.body = event.currentTarget.value; note.requestId = crypto.randomUUID(); } }}></textarea></label>{#if isVideo}<label class="timecode"><input type="checkbox" disabled={busy} checked={drafts[selected.id]?.timecodeSec !== undefined} onchange={event => { const note = draft(); const timecodeSec = event.currentTarget.checked ? time : undefined; if (note && note.timecodeSec !== timecodeSec) { note.timecodeSec = timecodeSec; note.requestId = crypto.randomUUID(); } }}/>Attach current time ({(drafts[selected.id]?.timecodeSec ?? time).toFixed(1)}s)</label>{/if}<button class="primary" disabled={busy}>{busy ? 'Saving…' : 'Add comment'}</button>{#if message}<p role="alert">{message}</p>{/if}</form>
         </aside>{/if}
       </div>
     {/if}
@@ -56,6 +103,7 @@
 </main>
 
 <style>
+  .review-controls{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin-top:14px}.review-controls label{display:grid;gap:5px;color:var(--muted);font-size:11px}.review-controls button,.review-controls select,.review-controls a,.timecode{min-height:34px;padding:6px 9px;background:var(--panel);border:1px solid var(--control-border);border-radius:4px;color:var(--ink);font:inherit;font-size:11px}.review-controls a{text-decoration:none}.comment .timecode{margin-left:8px;min-height:24px}.comment-form .timecode{display:flex;align-items:center}.timecode input{width:auto}
   .review-shell{min-height:100svh;background:linear-gradient(125deg,#14191a 0%,#0d1112 25%,#090b0c 60%);color:var(--ink)}
   .review-header{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--border)}
   .brand{font-size:18px;font-weight:600;letter-spacing:-.8px}.private-label,.eyebrow{color:var(--muted);font-size:10px;letter-spacing:.12em;text-transform:uppercase}

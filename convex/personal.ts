@@ -1,4 +1,5 @@
 import { purgeDependencyBatch } from './lib/archivePurge';
+import { sourceDeleted } from './destinationRemovals';
 import { parseVersionMetadata, writeVersionMetadata } from './lib/versionMetadata';
 import { importedMediaMetadata } from './lib/sourceImport';
 import { v, ConvexError } from "convex/values";
@@ -93,7 +94,7 @@ export const processing = internalQuery({
         assetId, versionId: version?._id ?? null, versionNumber: version?.version ?? 0,
         updatedAt: Math.max(asset.updatedAt, job?.updatedAt ?? 0),
         ready: asset.processingStatus === 'ready' && version?.processingState === 'ready',
-        hasPoster: !!version?.posterKey,
+        hasPoster: !!version?.posterKey, hasSprite: !!(job?.status === "ready" && job.spriteKey),
         duration: asset.durationSec, width: asset.width, height: asset.height,
         job: job ? { _id: job._id, assetId: job.assetId, versionId: job.versionId,
           attempt: job.attempt, status: job.status, stage: job.stage, runId: job.runId,
@@ -122,6 +123,7 @@ async function deleteOwnedAssets(ctx: MutationCtx, projectId: Id<'projects'>, as
       const jobs=await ctx.db.query('mediaJobs').withIndex('by_asset',q=>q.eq('assetId',asset._id)).collect();
       if(!allowArchived && (jobs.some(job=>job.status==='queued'||job.status==='running') || asset.processingStatus==='uploading'||asset.processingStatus==='processing')) throw new Error('Processing in progress');
       const versions=await ctx.db.query('assetVersions').withIndex('by_asset',q=>q.eq('assetId',asset._id)).collect();
+      await sourceDeleted(ctx, asset, versions);
       for(const key of [asset.storageKey,asset.thumbnailKey,asset.spriteKey,...versions.flatMap(version=>[version.originalKey,version.posterKey]),...jobs.flatMap(job=>[job.thumbnailKey,job.spriteKey])]) if(key) keys.add(key);
       const publications=await ctx.db.query('publications').withIndex('by_asset',q=>q.eq('assetId',asset._id)).collect();
       for(const publication of publications) {publicationIds.add(publication._id); await ctx.db.delete(publication._id);}
@@ -394,8 +396,9 @@ export const versionDetails = internalQuery({
     const asset = version && await ctx.db.get(version.assetId);
     if (!version || !asset) return null;
     await ownedProject(ctx, asset.projectId, true);
+    const job = await ctx.db.query("mediaJobs").withIndex("by_version", q => q.eq("versionId", version._id)).unique();
     return { id: version._id, assetId: asset._id, version: version.version,
-      processingState: version.processingState, hasPoster: !!version.posterKey,
+      processingState: version.processingState, hasPoster: !!version.posterKey, hasSprite: !!(job?.status === "ready" && job.spriteKey),
       sizeBytes: version.sizeBytes, mimeType: version.mimeType,
       metadata: version.creativeMetadata ?? null, metadataUpdatedAt: version.metadataUpdatedAt ?? null };
   },
@@ -461,7 +464,7 @@ export const ownerToggleCommentComplete = internalMutation({
 });
 
 export const createReviewLink = internalMutation({
-  args: { projectId: v.id("projects"), passcode: v.optional(v.string()), expiresAt: v.optional(v.number()) },
+  args: { projectId: v.id("projects"), passcode: v.optional(v.string()), expiresAt: v.optional(v.number()), canDownload: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     await ownedProject(ctx, args.projectId);
     if (args.expiresAt !== undefined && args.expiresAt <= Date.now()) throw new Error("Expiry must be in the future");
@@ -470,10 +473,46 @@ export const createReviewLink = internalMutation({
     const passcodeHash = args.passcode ? await passcodeDigest(args.passcode, passcodeSalt!) : undefined;
     const linkId = await ctx.db.insert("reviewLinks", {
       projectId: args.projectId, token, passcodeSalt, passcodeHash,
-      canDownload: false, expiresAt: args.expiresAt, createdAt: Date.now(),
+      canDownload: args.canDownload ?? false, expiresAt: args.expiresAt, createdAt: Date.now(),
     });
     return { linkId, token };
   },
+});
+
+export const uploadDescriptor = internalQuery({
+  args: { assetId: v.id('videos') },
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) throw new Error('Asset unavailable');
+    await ownedProject(ctx, asset.projectId);
+    return { id: asset._id, projectId: asset.projectId, folderId: asset.folderId, name: asset.assetCode ?? asset.title,
+      assetCode: asset.assetCode ?? '', assetClass: asset.assetClass ?? (asset.mimeType.startsWith('image/') ? 'IMG' as const : 'VID' as const),
+      versionId: asset.currentVersionId, mimeType: asset.mimeType, size: asset.sizeBytes ?? 0,
+      duration: asset.durationSec, width: asset.width, height: asset.height, importedAt: asset.uploadedAt };
+  }
+});
+
+export const cancelUpload = internalMutation({
+  args: { sessionId: v.id('uploadSessions') },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) throw new Error('Upload unavailable');
+    await ownedProject(ctx, session.projectId, true);
+    if (session.status === 'complete') return { cancelled: false, complete: true };
+    if (session.status === 'finalizing') throw new Error('Upload verification is already in progress');
+    await ctx.db.patch(session._id, { status: 'failed' });
+    return { cancelled: true, complete: false };
+  }
+});
+
+export const setAssetDownload = internalMutation({
+  args: { assetId: v.id('videos'), enabled: v.boolean() },
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) throw new Error('Asset unavailable');
+    await ownedProject(ctx, asset.projectId);
+    await ctx.db.patch(asset._id, { downloadEnabled: args.enabled, updatedAt: Date.now() });
+  }
 });
 
 export const revokeReviewLink = internalMutation({
@@ -486,7 +525,7 @@ export const revokeReviewLink = internalMutation({
   },
 });
 
-function normalizeOrigins(origins: string[]) {
+export function normalizeOrigins(origins: string[]) {
   const normalized = origins.map((value) => {
     const url = new URL(value);
     if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "localhost")) throw new Error("HTTPS origin required");
@@ -634,7 +673,7 @@ export const reviewMedia = internalQuery({
 });
 
 export const ownerMedia = internalQuery({
-  args: { assetId: v.string(), poster: v.boolean(), versionId: v.optional(v.string()) },
+  args: { assetId: v.string(), poster: v.boolean(), versionId: v.optional(v.string()), sprite: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     const assetId = ctx.db.normalizeId('videos', args.assetId);
     const requestedVersionId = args.versionId === undefined ? undefined : ctx.db.normalizeId('assetVersions', args.versionId);
@@ -646,6 +685,12 @@ export const ownerMedia = internalQuery({
     if (!versionId || (!args.versionId && asset.processingStatus !== 'ready')) return null;
     const version = await ctx.db.get(versionId);
     if (!version || version.assetId !== asset._id || version.processingState !== "ready") return null;
+    if (args.sprite) {
+      if (!args.poster || !version.mimeType.startsWith('video/')) return null;
+      const job = await ctx.db.query('mediaJobs').withIndex('by_version', q => q.eq('versionId', version._id)).unique();
+      if (!job || job.assetId !== asset._id || job.status !== 'ready' || !job.spriteKey) return null;
+      return { key: job.spriteKey, mimeType: 'image/jpeg' };
+    }
     return { key: args.poster ? version.posterKey : version.originalKey,
       mimeType: args.poster ? "image/jpeg" : version.mimeType };
   },

@@ -48,7 +48,7 @@
 </Popover.Root>
 
 <style>
-  :global(.stage1-date-trigger) { display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:34px;padding:0 9px;border:1px solid var(--border);border-radius:5px;background:var(--canvas);color:var(--ink);font:inherit;font-size:12px;text-align:left; }
+  :global(.stage1-date-trigger) { display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:28px;padding:0 9px;border:1px solid var(--border);border-radius:5px;background:var(--canvas);color:var(--ink);font:inherit;font-size:12px;text-align:left; }
   :global(.stage1-date-trigger svg) { flex:none;color:var(--muted); }
   :global(.stage1-date-trigger:focus-visible),:global(.stage1-date-content button:focus-visible),:global(.stage1-date-content input:focus-visible) { outline:1px solid var(--accent);outline-offset:2px; }
   :global(.stage1-date-content) { z-index:110;width:288px;max-width:calc(100vw - 24px);padding:12px;border:1px solid var(--border);border-radius:6px;background:color-mix(in srgb,var(--raised) 70%,transparent);backdrop-filter:blur(18px);box-shadow:0 10px 30px #0008;color:var(--ink); }

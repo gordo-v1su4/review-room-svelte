@@ -1,0 +1,15 @@
+{
+  "releaseVersion": {
+    "version": "1791348729404"
+  },
+  "partialBatchUi": true,
+  "failedOnlyRetry": true,
+  "cancelDuringTransferPercent": 6,
+  "cancelThenRetry": true,
+  "noDuplicateRetriedAssets": true,
+  "replacementCanonicalAssetPreserved": true,
+  "replacementVersions": 2,
+  "replacementWorkerJobs": 2,
+  "automaticPublicationReplacement": false,
+  "temporaryPublicationRevoked": true
+}

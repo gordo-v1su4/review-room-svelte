@@ -8,6 +8,8 @@
     items,
     placeholder = 'Choose an option',
     required = false,
+    disabled = false,
+    onValueChange,
     value = $bindable('')
   }: {
     name?: string;
@@ -15,13 +17,15 @@
     items: { value: string; label: string }[];
     placeholder?: string;
     required?: boolean;
+    disabled?: boolean;
+    onValueChange?: (value: string) => void;
     value?: string;
   } = $props();
 
   const selectedLabel = $derived(items.find((item) => item.value === value)?.label ?? placeholder);
 </script>
 
-<Select.Root type="single" bind:value {name} {required} {items}>
+<Select.Root type="single" bind:value {name} {required} {items} {disabled} {onValueChange}>
   <Select.Trigger class="stage1-select-trigger" aria-label={label}>
     <span>{selectedLabel}</span><ChevronDown size={14} aria-hidden="true" />
   </Select.Trigger>
@@ -37,12 +41,13 @@
 </Select.Root>
 
 <style>
-  :global(.stage1-select-trigger) { display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:34px;padding:0 9px;border:1px solid var(--border);border-radius:5px;background:var(--canvas);color:var(--ink);font:inherit;font-size:12px;text-align:left; }
+  :global(.stage1-select-trigger) { display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:28px;padding:0 9px;border:1px solid var(--border);border-radius:5px;background:var(--canvas);color:var(--ink);font:inherit;font-size:11px;text-align:left; }
+  :global(.stage1-select-trigger:disabled) { opacity:.45;cursor:default; }
   :global(.stage1-select-trigger span) { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
   :global(.stage1-select-trigger svg) { flex:none;color:var(--muted); }
   :global(.stage1-select-trigger:focus-visible) { outline:1px solid var(--accent);outline-offset:2px; }
   :global(.stage1-select-content) { z-index:110;min-width:var(--bits-select-anchor-width);max-height:min(280px,var(--bits-select-content-available-height));overflow:auto;padding:4px;border:1px solid var(--border);border-radius:5px;background:color-mix(in srgb,var(--raised) 70%,transparent);backdrop-filter:blur(18px);box-shadow:0 10px 30px #0008; }
-  :global(.stage1-select-item) { display:flex;align-items:center;min-height:30px;padding:0 9px;border-radius:3px;color:var(--ink);font-size:12px;outline:none;cursor:pointer; }
+  :global(.stage1-select-item) { display:flex;align-items:center;min-height:28px;padding:0 9px;border-radius:3px;color:var(--ink);font-size:11px;outline:none;cursor:pointer; }
   :global(.stage1-select-item[data-highlighted]),:global(.stage1-select-item[data-state='checked']) { background:color-mix(in srgb,var(--accent) 20%,var(--panel));color:var(--ink); }
   @media(pointer:coarse) { :global(.stage1-select-trigger),:global(.stage1-select-item) { min-height:44px;font-size:16px; } }
 </style>

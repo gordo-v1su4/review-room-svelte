@@ -3,11 +3,12 @@
   import { Check, Files, RotateCcw, X } from 'lucide-svelte';
   import type { ImportJob } from '$lib/import-queue';
 
-  let { jobs, onRetry, onCancel, onClear }: {
+  let { jobs, onRetry, onCancel, onClear, persistent = false }: {
     jobs: readonly ImportJob[];
     onRetry: (id: string) => void;
     onCancel: (id: string) => void;
     onClear: () => void;
+    persistent?: boolean;
   } = $props();
 
   const ready = $derived(jobs.filter(job => job.status === 'ready').length);
@@ -37,9 +38,9 @@
                 <strong title={job.file.name}>{job.file.name}</strong>
                 <span class="queue-destination" title={job.destinationLabel}>{job.destinationLabel}</span>
               </div>
-              <span class="queue-state">{#if job.status === 'ready'}<Check size={12} aria-hidden="true"/>{/if}{labels[job.status]}</span>
+              <span class="queue-state">{#if job.status === 'ready'}<Check size={12} aria-hidden="true"/>{/if}{persistent && job.status === 'ready' ? 'Uploaded' : job.status === 'preparing' ? job.stage ?? labels[job.status] : labels[job.status]}{#if job.status === 'preparing' && job.progress !== undefined} · {Math.floor(job.progress)}%{/if}</span>
               {#if job.status === 'queued' || job.status === 'preparing'}
-                <button type="button" class="queue-action" aria-label={`Cancel import ${job.file.name}`} onclick={() => onCancel(job.id)}>Cancel</button>
+                <button type="button" class="queue-action" aria-label={`Cancel import ${job.file.name}`} disabled={job.canCancel === false} onclick={() => onCancel(job.id)}>Cancel</button>
               {:else if job.status === 'failed' || job.status === 'cancelled'}
                 <button type="button" class="queue-action" aria-label={`Retry import ${job.file.name}`} onclick={() => onRetry(job.id)}><RotateCcw size={12} aria-hidden="true"/>Retry</button>
               {/if}
@@ -48,7 +49,7 @@
           {/each}
         </ul>
         <footer class="queue-footer">
-          <p>Local to this tab. Files aren’t uploaded.</p>
+          <p>{persistent ? 'Uploads stay private. Processing continues in Activity.' : 'Local to this tab. Files aren’t uploaded.'}</p>
           <button type="button" class="queue-action" disabled={!finished} onclick={onClear}>Clear finished</button>
         </footer>
       </Popover.Content>

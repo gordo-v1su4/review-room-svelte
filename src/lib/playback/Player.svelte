@@ -8,7 +8,7 @@
   import type { PreviewInfo } from './accelerated/protocol';
   import { createScrubPreview } from './accelerated/preview';
   import { createGpuPreviewRenderer, type GpuPreviewRenderer } from './accelerated/gpu-renderer';
-  let { src, name, availability = 'ready', loop = false, sourceBlob, mediaInfo, onready = (_: string) => {}, onended = (_: string) => {}, onfailure = (_: string) => {}, onViewed = () => {}, onmetadata = (_: PreviewInfo) => {}, ontime = (_: number) => {} }: { src: string; name: string; availability?: 'queued' | 'running' | 'error' | 'ready'; loop?: boolean; sourceBlob?: Blob; mediaInfo?: PreviewInfo; onready?: (source: string) => void; onended?: (source: string) => void; onfailure?: (source: string) => void; diagnostics?: boolean; onViewed?: () => void; onmetadata?: (info: PreviewInfo) => void; ontime?: (time: number) => void } = $props();
+  let { src, name, poster, availability = 'ready', loop = false, sourceBlob, mediaInfo, onready = (_: string) => {}, onended = (_: string) => {}, onfailure = (_: string) => {}, onViewed = () => {}, onmetadata = (_: PreviewInfo) => {}, ontime = (_: number) => {} }: { src: string; name: string; poster?: string; availability?: 'queued' | 'running' | 'error' | 'ready'; loop?: boolean; sourceBlob?: Blob; mediaInfo?: PreviewInfo; onready?: (source: string) => void; onended?: (source: string) => void; onfailure?: (source: string) => void; diagnostics?: boolean; onViewed?: () => void; onmetadata?: (info: PreviewInfo) => void; ontime?: (time: number) => void } = $props();
   let video: HTMLVideoElement;
   let surface: HTMLDivElement;
   let paused = $state(true), muted = $state(false), time = $state(0), duration = $state(0);
@@ -20,6 +20,9 @@
   const hasFrameRate = $derived(validFrameRate(fps));
   const frameHint = $derived(hasFrameRate ? 'Step using the estimated source frame rate' : 'Frame stepping unavailable: source frame rate not detected');
   let error = $state(''), scrubbing = $state(false), ready = $state(false);
+  let failedPoster = $state<string>();
+  let playRequested = $state(false);
+  const canPlay = $derived(availability === 'ready' && !!src && (!error || ready));
   let session: ReturnType<typeof createPlaybackSession> | undefined;
   let transportRequest = 0;
   let retryTime: number | null = null;
@@ -107,7 +110,7 @@
         observer.dispose(); attached.dispose(); releasePointer();
         source = nextSource; mediaWidth = 0; mediaHeight = 0;
         retryTime = null;
-        ready = false; error = ''; time = 0; duration = 0; paused = true; muted = node.muted;
+        ready = false; error = ''; time = 0; duration = 0; paused = true; playRequested = false; muted = node.muted;
         attached = createPlaybackSession(node); session = attached;
         observer = observeNativePlayback(node, next => metrics = next); monitor = observer;
         ontime(0);
@@ -115,6 +118,7 @@
       destroy() {
         transportRequest += 1;
         observer.dispose(); attached.dispose(); releasePointer();
+        node.removeAttribute('src'); node.load();
         if (session === attached) session = undefined;
         if (monitor === observer) monitor = undefined;
       },
@@ -158,6 +162,7 @@
   /** Stop sequence playback without losing position or leaving a scrub muted. */
   export function pause() {
     transportRequest += 1;
+    playRequested = false;
     if (scrubbing) { releasePointer(); session?.cancelScrub(); }
     else cancelPreview?.();
     video?.pause();
@@ -181,10 +186,15 @@
     session.seek(target); time = video.currentTime; ontime(time);
   }
   async function toggle() {
+    if (!canPlay) return;
     const active = session;
     const request = ++transportRequest;
-    try { if (video.paused) await video.play(); else video.pause(); }
+    if (playRequested || !video.paused) { playRequested = false; video.pause(); return; }
+    playRequested = true;
+    error = '';
+    try { await video.play(); }
     catch { if (active === session && request === transportRequest) error = 'Playback could not start. Try again or choose another file.'; }
+    finally { if (active === session && request === transportRequest) playRequested = false; }
   }
   function target(event: PointerEvent) {
     const bounds = event.currentTarget instanceof HTMLElement ? event.currentTarget.getBoundingClientRect() : { left: 0, width: 1 };
@@ -259,7 +269,7 @@
   <div class="picture">
     <!-- The persistent media element survives layout changes. -->
     <!-- svelte-ignore a11y_media_has_caption -->
-    <video bind:this={video} use:attachMedia={src} src={availability === 'ready' && src ? src : undefined} {loop} playsinline preload="metadata" aria-label={name}
+    <video bind:this={video} use:attachMedia={src} src={availability === 'ready' && src ? src : undefined} {poster} {loop} playsinline preload="auto" aria-label={name} style:visibility={ready ? 'visible' : 'hidden'}
       onloadstart={() => { ready = false; error = ''; time = 0; duration = 0; }}
       onloadedmetadata={() => { duration = Number.isFinite(video.duration) ? video.duration : 0; mediaWidth = video.videoWidth; mediaHeight = video.videoHeight; }}
       onloadeddata={() => { ready = true; if (retryTime !== null) { seek(retryTime); retryTime = null; } onready(video.currentSrc); }}
@@ -267,8 +277,11 @@
       onplay={() => { paused = false; error = ''; onViewed(); }} onpause={() => paused = true} onended={ended}
       onvolumechange={() => muted = video.muted}
       onerror={mediaFailed}></video>
+    {#if !ready && availability === 'ready' && poster && failedPoster !== poster}
+      {#key poster}<img class="loading-poster" src={poster} alt="" aria-hidden="true" onerror={event => failedPoster = event.currentTarget.getAttribute('src') ?? undefined}/>{/key}
+    {/if}
     {#key sourceBlob}<canvas class="preview-canvas" use:attachPreview={sourceBlob} aria-hidden="true" style:visibility={previewVisible ? 'visible' : 'hidden'}></canvas>{/key}
-    {#if availability !== 'ready'}<div class="player-message" role="status">{availability === 'error' ? 'Processing failed. Retry processing above.' : availability === 'queued' ? 'Waiting for processing…' : 'Processing video…'}</div>{:else if error}<div class="player-message" role="alert">{error}<button onclick={retryPlayback}>Retry playback</button></div>{:else if !ready}<div class="player-message" role="status">Preparing playback…</div>{/if}
+    {#if availability !== 'ready'}<div class="player-message" role="status">{availability === 'error' ? 'Processing failed. Retry processing above.' : availability === 'queued' ? 'Waiting for processing…' : 'Processing video…'}</div>{:else if error}<div class="player-message" role="alert">{error}<button onclick={retryPlayback}>Retry playback</button></div>{:else if !ready}<div class:poster-loading={!!poster && failedPoster !== poster} class="player-message" role="status">Preparing playback…</div>{/if}
   </div>
   <div class="playback-controls">
     <div class="scrubber" role="slider" tabindex={ready ? 0 : -1} aria-label="Video timeline" aria-valuemin="0" aria-valuemax={duration || 1} aria-valuenow={time} aria-valuetext={stamp(time)} aria-disabled={!ready}
@@ -277,7 +290,7 @@
     </div>
     <div class="transport">
       <button class="icon-button secondary-transport" aria-label="Previous frame" title={frameHint} disabled={!ready || !hasFrameRate} onclick={() => stepFrame(-1)}><StepBack size={15}/></button>
-      <button class="icon-button play-button" aria-label={paused ? 'Play' : 'Pause'} title={paused ? 'Play' : 'Pause'} onclick={toggle} disabled={!ready}>{#if paused}<Play size={18} fill="currentColor"/>{:else}<Pause size={18}/>{/if}</button>
+      <button class="icon-button play-button" aria-label={paused && !playRequested ? 'Play' : 'Pause'} title={paused && !playRequested ? 'Play' : 'Pause'} onclick={toggle} disabled={!canPlay}>{#if paused && !playRequested}<Play size={18} fill="currentColor"/>{:else}<Pause size={18}/>{/if}</button>
       <button class="icon-button secondary-transport" aria-label="Next frame" title={frameHint} disabled={!ready || !hasFrameRate} onclick={() => stepFrame(1)}><StepForward size={15}/></button>
       <button class="icon-button secondary-transport" aria-label="Restart clip" title="Restart clip" onclick={() => seek(0)} disabled={!ready}><RotateCcw size={16}/></button>
       <button class="timecode" aria-label={showFrames && hasFrameRate ? 'Show elapsed time and duration' : 'Show frame numbers and estimated FPS'} aria-pressed={showFrames && hasFrameRate} title={hasFrameRate ? 'Toggle time / frames (estimated average FPS)' : 'Frame rate not detected'} disabled={!hasFrameRate} onclick={() => showFrames = !showFrames}>{#if showFrames && hasFrameRate}{frameReadout(time, duration, fps)}{:else}{stamp(time)} <span>/ {stamp(duration)}</span>{/if}</button>
@@ -307,6 +320,8 @@
 </div>
 
 <style>
+  .loading-poster { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none; }
+  .player-message.poster-loading { inset:auto 8px 8px auto; padding:4px 7px; min-height:0; width:auto; background:rgb(0 0 0 / .65); border-radius:4px; font-size:10px; }
   .player { container-name:player; container-type:inline-size; }
   .transport { flex-wrap:nowrap; gap:3px; }
   .transport :global(.compact-transport) { display:none; }

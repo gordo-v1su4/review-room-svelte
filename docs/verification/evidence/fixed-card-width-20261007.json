@@ -1,0 +1,195 @@
+{
+  "conditions": "Actual MediaCards component in local Workspace fixture, native Chrome via CUA; grid available width varied explicitly, original inline settings restored",
+  "before": [
+    {
+      "available": 273,
+      "cardWidth": 273,
+      "tracks": "273px"
+    },
+    {
+      "available": 274,
+      "cardWidth": 130,
+      "tracks": "130px 130px"
+    },
+    {
+      "available": 417,
+      "cardWidth": 201.5,
+      "tracks": "201.5px 201.5px"
+    },
+    {
+      "available": 418,
+      "cardWidth": 130,
+      "tracks": "130px 130px 130px"
+    }
+  ],
+  "after": [
+    {
+      "aspect": "16 / 9",
+      "available": 110,
+      "cardWidth": 110,
+      "columns": 1,
+      "preset": "small",
+      "tracks": "110px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 130,
+      "cardWidth": 130,
+      "columns": 1,
+      "preset": "small",
+      "tracks": "130px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 273,
+      "cardWidth": 130,
+      "columns": 1,
+      "preset": "small",
+      "tracks": "130px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 274,
+      "cardWidth": 130,
+      "columns": 2,
+      "preset": "small",
+      "tracks": "130px 130px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 275,
+      "cardWidth": 130,
+      "columns": 2,
+      "preset": "small",
+      "tracks": "130px 130px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 417,
+      "cardWidth": 130,
+      "columns": 2,
+      "preset": "small",
+      "tracks": "130px 130px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 418,
+      "cardWidth": 130,
+      "columns": 3,
+      "preset": "small",
+      "tracks": "130px 130px 130px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 170,
+      "cardWidth": 170,
+      "columns": 1,
+      "preset": "medium",
+      "tracks": "170px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 190,
+      "cardWidth": 190,
+      "columns": 1,
+      "preset": "medium",
+      "tracks": "190px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 393,
+      "cardWidth": 190,
+      "columns": 1,
+      "preset": "medium",
+      "tracks": "190px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 394,
+      "cardWidth": 190,
+      "columns": 2,
+      "preset": "medium",
+      "tracks": "190px 190px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 395,
+      "cardWidth": 190,
+      "columns": 2,
+      "preset": "medium",
+      "tracks": "190px 190px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 597,
+      "cardWidth": 190,
+      "columns": 2,
+      "preset": "medium",
+      "tracks": "190px 190px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 598,
+      "cardWidth": 190,
+      "columns": 3,
+      "preset": "medium",
+      "tracks": "190px 190px 190px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 260,
+      "cardWidth": 260,
+      "columns": 1,
+      "preset": "large",
+      "tracks": "260px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 280,
+      "cardWidth": 280,
+      "columns": 1,
+      "preset": "large",
+      "tracks": "280px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 573,
+      "cardWidth": 280,
+      "columns": 1,
+      "preset": "large",
+      "tracks": "280px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 574,
+      "cardWidth": 280,
+      "columns": 2,
+      "preset": "large",
+      "tracks": "280px 280px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 575,
+      "cardWidth": 280,
+      "columns": 2,
+      "preset": "large",
+      "tracks": "280px 280px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 867,
+      "cardWidth": 280,
+      "columns": 2,
+      "preset": "large",
+      "tracks": "280px 280px"
+    },
+    {
+      "aspect": "16 / 9",
+      "available": 868,
+      "cardWidth": 280,
+      "columns": 3,
+      "preset": "large",
+      "tracks": "280px 280px 280px"
+    }
+  ]
+}

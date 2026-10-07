@@ -1,0 +1,21 @@
+{
+  "releaseVersion": {
+    "version": "1791348052747"
+  },
+  "projectId": "ks79smcwarq3bt2mjp5fazsps58fvj8s",
+  "largeBytes": 61208608,
+  "largeCodec": "H.264 Constrained Baseline / yuv420p",
+  "transport": "direct PUT; no multipart path",
+  "largeReady": true,
+  "stableCompletionReplay": true,
+  "interruptedCompletion": 409,
+  "retrySameSession": true,
+  "destinationRemovalDenied": true,
+  "movedCapturedFolderPreserved": true,
+  "imageStillOnly": true,
+  "automaticPublication": false,
+  "automaticSync": false,
+  "partialBatchUi": false,
+  "cancelUi": false,
+  "openWorkspaceRecovery": false
+}

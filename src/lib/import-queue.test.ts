@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { createImportQueue, type ImportJob, type ImportRequest } from './import-queue';
 import type { LocalAsset } from './review';
+import { createActivityFeed } from './work-activity';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -17,6 +18,39 @@ function asset(file: File): LocalAsset {
 }
 
 describe('local import queue', () => {
+  test('unrelated upload progress cannot resurrect dismissed failures or retired completions', async () => {
+    let now = Date.now();
+    const feed = createActivityFeed(() => now);
+    const pending: ReturnType<typeof deferred<LocalAsset>>[] = [];
+    let jobs: readonly ImportJob[] = [];
+    const queue = createImportQueue({ prepare: () => { const work = deferred<LocalAsset>(); pending.push(work); return work.promise; }, commit: () => {}, release: () => {}, onChange: value => {
+      jobs = value;
+      for (const job of jobs) feed.upsert({ id: job.id, kind: 'upload', label: job.file.name, project: 'QA', stage: job.stage ?? job.status, updatedAt: job.updatedAt, state: job.status === 'ready' ? 'complete' : job.status === 'preparing' ? 'running' : job.status });
+    } });
+    const requests = [request('first.mp4'), request('second.mp4')];
+    queue.enqueue(requests);
+    const [firstId, secondId] = jobs.map(job => job.id);
+    pending[0].reject(new Error('Upload failed'));
+    await settle();
+    const failedAt = jobs[0].updatedAt;
+    feed.dismiss(firstId);
+    queue.update(secondId, { stage: 'Uploading', progress: 10 });
+    expect(jobs[0].updatedAt).toBe(failedAt);
+    expect(feed.snapshot().items.some(item => item.id === firstId)).toBe(false);
+    queue.retry(firstId);
+    expect(feed.snapshot().items.some(item => item.id === firstId && item.state === 'running')).toBe(true);
+    pending[2].resolve(asset(requests[0].file));
+    await settle();
+    const completedAt = jobs[0].updatedAt;
+    now = completedAt + 8001;
+    feed.tick();
+    const pulse = feed.snapshot().pulse;
+    queue.update(secondId, { stage: 'Uploading', progress: 20 });
+    expect(jobs[0].updatedAt).toBe(completedAt);
+    expect(feed.snapshot().items.some(item => item.id === firstId)).toBe(false);
+    expect(feed.snapshot().pulse).toBe(pulse);
+    queue.dispose();
+  });
   test('prepares a bounded number and commits once to the captured destination', async () => {
     const pending: ReturnType<typeof deferred<LocalAsset>>[] = [];
     const committed: { asset: LocalAsset; folder?: string }[] = [];

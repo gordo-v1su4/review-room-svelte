@@ -1,8 +1,10 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { action, internalQuery, mutation } from "./_generated/server";
+import { internal } from './_generated/api';
+import type { ApiFromModules, FunctionReturnType } from 'convex/server';
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { getReviewLink, getReviewerSession } from "./lib/reviewAccess";
+import { digest, getReviewLink, getReviewerSession } from "./lib/reviewAccess";
 
 const annotationToolValidator = v.optional(
   v.union(
@@ -26,8 +28,8 @@ const annotationStrokeValidator = v.object({
   ),
 });
 
-export const getProjectByToken = query({
-  args: { token: v.string(), accessKey: v.optional(v.string()) },
+export const projectByToken = internalQuery({
+  args: { token: v.string(), accessKey: v.optional(v.string()), checkedAt: v.number() },
   handler: async (ctx, args) => {
     const { link, project } = await getReviewLink(ctx, args.token, args.accessKey);
     return {
@@ -37,8 +39,8 @@ export const getProjectByToken = query({
   },
 });
 
-export const listVideosByToken = query({
-  args: { token: v.string(), accessKey: v.optional(v.string()) },
+export const videosByToken = internalQuery({
+  args: { token: v.string(), accessKey: v.optional(v.string()), checkedAt: v.number() },
   handler: async (ctx, args) => {
     const { link } = await getReviewLink(ctx, args.token, args.accessKey);
     const videos = await ctx.db
@@ -50,6 +52,7 @@ export const listVideosByToken = query({
       .sort((a, b) => a.order - b.order)
       .map((video) => ({
         id: video._id, title: video.assetCode ?? video.title, assetCode: video.assetCode,
+        versionId: video.currentVersionId,
         assetClass: video.assetClass, mimeType: video.mimeType, sizeBytes: video.sizeBytes,
         status: video.status, viewed: video.viewed, rating: video.rating,
         isSelect: video.isSelect, commentCount: video.commentCount,
@@ -61,8 +64,8 @@ export const listVideosByToken = query({
   },
 });
 
-export const getReviewerName = query({
-  args: { token: v.string(), accessKey: v.string() },
+export const reviewerName = internalQuery({
+  args: { token: v.string(), accessKey: v.string(), checkedAt: v.number() },
   handler: async (ctx, args) => {
     await getReviewLink(ctx, args.token, args.accessKey);
     return (await getReviewerSession(ctx, args.token, args.accessKey)).displayName;
@@ -81,7 +84,9 @@ async function withReactionSummaries(ctx: QueryCtx, comments: Doc<"comments">[])
         .withIndex("by_comment", (q) => q.eq("commentId", comment._id))
         .collect();
       return {
-        ...comment,
+        _id: comment._id, videoId: comment.videoId, authorName: comment.authorName,
+        authorRole: comment.authorRole, body: comment.body, timecodeSec: comment.timecodeSec,
+        createdAt: comment.createdAt, completedAt: comment.completedAt,
         reactions: {
           thumbs_up: reactions.filter((r) => r.emoji === "thumbs_up").length,
           thumbs_down: reactions.filter((r) => r.emoji === "thumbs_down").length,
@@ -263,8 +268,8 @@ export const clientRequestChanges = mutation({
   },
 });
 
-export const listCommentsByVideo = query({
-  args: { token: v.string(), accessKey: v.optional(v.string()), videoId: v.id("videos") },
+export const commentsByVideo = internalQuery({
+  args: { token: v.string(), accessKey: v.optional(v.string()), videoId: v.id("videos"), checkedAt: v.number() },
   handler: async (ctx, args) => {
     const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
     const video = await ctx.db.get(args.videoId);
@@ -282,12 +287,32 @@ export const listCommentsByVideo = query({
   },
 });
 
+// Expiry is wall-clock authorization. Public actions generate the cache key on
+// the server, so a caller cannot reuse a warmed query's timestamp after expiry.
+export const getProjectByToken = action({
+  args: { token: v.string(), accessKey: v.optional(v.string()) },
+  handler: (ctx, args): Promise<FunctionReturnType<ApiFromModules<{ read: { get: typeof projectByToken } }>['read']['get']>> => ctx.runQuery(internal.reviewPublic.projectByToken, { ...args, checkedAt: Date.now() })
+});
+export const listVideosByToken = action({
+  args: { token: v.string(), accessKey: v.optional(v.string()) },
+  handler: (ctx, args): Promise<FunctionReturnType<ApiFromModules<{ read: { get: typeof videosByToken } }>['read']['get']>> => ctx.runQuery(internal.reviewPublic.videosByToken, { ...args, checkedAt: Date.now() })
+});
+export const getReviewerName = action({
+  args: { token: v.string(), accessKey: v.string() },
+  handler: (ctx, args): Promise<string> => ctx.runQuery(internal.reviewPublic.reviewerName, { ...args, checkedAt: Date.now() })
+});
+export const listCommentsByVideo = action({
+  args: { token: v.string(), accessKey: v.optional(v.string()), videoId: v.id('videos') },
+  handler: (ctx, args): Promise<FunctionReturnType<ApiFromModules<{ read: { get: typeof commentsByVideo } }>['read']['get']>> => ctx.runQuery(internal.reviewPublic.commentsByVideo, { ...args, checkedAt: Date.now() })
+});
+
 export const clientAddComment = mutation({
   args: {
     token: v.string(), accessKey: v.optional(v.string()),
     videoId: v.id("videos"),
     body: v.string(),
     timecodeSec: v.optional(v.number()),
+    requestId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const link = (await getReviewLink(ctx, args.token, args.accessKey)).link;
@@ -296,12 +321,25 @@ export const clientAddComment = mutation({
       throw new Error("Video not found");
     }
     const authorName = await reviewerNameForToken(ctx, args.token, args.accessKey);
+    const body = args.body.trim();
+    if (!body || body.length > 5000) throw new Error('Comment required');
+    if (args.timecodeSec !== undefined && (!Number.isFinite(args.timecodeSec) || args.timecodeSec < 0 || (video.assetClass !== 'VID' && !video.mimeType.startsWith('video/')))) throw new Error('Invalid timecode');
+    if (args.requestId && !/^[\w-]{1,100}$/.test(args.requestId)) throw new Error('Invalid comment request');
+    const clientRequestId = args.requestId ? await digest(`${args.token}:${args.accessKey ?? 'anonymous'}:${args.requestId}`) : undefined;
+    if (clientRequestId) {
+      const previous = (await ctx.db.query('comments').withIndex('by_video', q => q.eq('videoId', args.videoId)).collect()).find(comment => comment.clientRequestId === clientRequestId);
+      if (previous) {
+        if (previous.body !== body || previous.timecodeSec !== args.timecodeSec) throw new Error('Comment retry changed');
+        return;
+      }
+    }
     await ctx.db.insert("comments", {
       videoId: args.videoId,
       projectId: video.projectId,
       authorName,
       authorRole: "client",
-      body: args.body,
+      body,
+      clientRequestId,
       timecodeSec: args.timecodeSec,
       createdAt: Date.now(),
     });
@@ -313,3 +351,4 @@ export const clientAddComment = mutation({
     });
   },
 });
+

@@ -45,7 +45,7 @@
       <button type="button" class="card-open" data-asset-id={asset.id} draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} aria-label={`Open ${asset.name}`} aria-current={activeId === asset.id ? 'true' : undefined}
         onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id, event)}>
         <div class="thumbnail">
-          <MediaThumbnail src={asset.url} poster={asset.poster} type={asset.type} name={asset.name} availability={asset.availability ?? 'ready'}/>
+          <MediaThumbnail src={asset.url} poster={asset.poster} sprite={asset.sprite} type={asset.type} name={asset.name} availability={asset.availability ?? 'ready'}/>
           <span class="asset-type">{asset.assetClass}</span>
           {#if asset.shortlisted}<span class="shortlist-icon" title="Shortlisted"><Bookmark size={16} fill="currentColor"/></span>{/if}
         </div>
@@ -87,7 +87,7 @@
   .card-rating { display: flex; flex: 0 0 100%; min-width: 0; }
   .card-star { display: grid; place-items: center; flex: 0 1 24px; min-width: 0; height: 28px; padding: 0; background: transparent; color: var(--muted); border-radius: 3px; }
   .card-star.filled, .card-star:hover:not(:disabled) { color: var(--teal); }
-  @media (pointer: coarse) { .card-star { flex-basis: 44px; height: 44px; } .media-grid:not(.list-layout) { grid-template-columns: repeat(auto-fill, minmax(min(100%, max(240px, var(--card-width))), 1fr)); } }
+  @media (pointer: coarse) { .card-star { flex-basis: 44px; height: 44px; } .media-grid:not(.list-layout) { grid-template-columns: repeat(auto-fill, min(100%, max(240px, var(--card-width)))); } }
   .card-body .card-fields { display: flex; align-items: center; flex-wrap: wrap; white-space: nowrap; margin-top: 3px; gap: 0 8px; font-size: 10px; }
   .card-fields > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .card-open:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }

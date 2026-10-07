@@ -67,11 +67,16 @@ export const actions: Actions = {
     const expiry = value(form, 'expiresAt');
     await db().mutation(personal.createReviewLink, { projectId: value(form, 'projectId') as Id<'projects'>,
       passcode: value(form, 'passcode') || undefined,
+      canDownload: value(form, 'canDownload') === 'true',
       expiresAt: expiry ? new Date(expiry).getTime() : undefined }); done();
   },
   revokeLink: async ({ cookies, request }) => {
     requireOwner(cookies); const form = await request.formData();
     await db().mutation(personal.revokeReviewLink, { linkId: value(form, 'linkId') as Id<'reviewLinks'> }); done();
+  },
+  setAssetDownload: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    await db().mutation(personal.setAssetDownload, { assetId: value(form, 'assetId') as Id<'videos'>, enabled: value(form, 'enabled') === 'true' }); done();
   },
   publish: async ({ cookies, request }) => {
     requireOwner(cookies); const form = await request.formData();
