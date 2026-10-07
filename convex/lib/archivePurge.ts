@@ -49,7 +49,13 @@ export async function purgeDependencyBatch(ctx: MutationCtx, projectId: Id<'proj
     if (!sessions.length) await ctx.db.delete(link._id);
     return true;
   }
-  for (const table of ['projectFolders', 'projectMembers', 'projectAccessRules', 'collections', 'sourceImports'] as const) {
+  const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', projectId)).take(100);
+  if (folders.length) {
+    await queueKeys(ctx, folders.map(folder => folder.coverImageKey));
+    for (const folder of folders) await ctx.db.delete(folder._id);
+    return true;
+  }
+  for (const table of ['projectMembers', 'projectAccessRules', 'collections', 'sourceImports'] as const) {
     const rows = await ctx.db.query(table).withIndex('by_project', q => q.eq('projectId', projectId)).take(100);
     if (rows.length) { for (const row of rows) await ctx.db.delete(row._id); return true; }
   }
