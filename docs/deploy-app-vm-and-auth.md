@@ -15,6 +15,10 @@ The Convex deployment is the `review-room-svelte-convex` Compose project on app-
 
 Browser uploads require bucket CORS for the exact frontend origin `https://review.v1su4.dev`: PUT/GET/HEAD, `content-type`, exposed `ETag`, max age 3600. The original frontend origin was added on October 2, 2026 and replaced with this hostname on October 5, preserving unrelated rules. The preceding policy is backed up on RustFS VM114 at `/var/backups/review-room-svelte/cors-pre-v1s135-1790959928.json`. Do not replace unrelated origins or change bucket access policy when repairing CORS.
 
+## Local development parity
+
+For authenticated UI work, populate the ignored `.env.local` from this app's dedicated BWS records and use the same dedicated Convex URL and RustFS bucket as production. Restart Vite after configuration changes. An unconfigured checkout uses an empty local-media workspace; it does not load published projects. Local and production owner sessions are separate, so sign in on localhost to inspect the live library. Changes made through that configured local workspace affect the same backend data. Direct browser uploads additionally need the exact localhost origin allowed by the bucket CORS policy; do not assume production-origin CORS covers localhost.
+
 ## Private App VM settings
 
 The root-owned mode-600 `/opt/review-room-svelte-app/private.env` contains `REVIEW_ROOM_CONVEX_ADMIN_KEY`, `REVIEW_ROOM_OWNER_PASSWORD`, `REVIEW_ROOM_SESSION_SECRET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `REVIEW_ROOM_TRIGGER_SECRET_KEY`, supplied from Review Room's BWS records. Compose sets `REVIEW_ROOM_OWNER_EMAIL=gordo@v1su4.com` and the frontend origin. The owner cookie and all Convex admin and S3 access stay server-side. Do not expose these as `PUBLIC_` variables.
