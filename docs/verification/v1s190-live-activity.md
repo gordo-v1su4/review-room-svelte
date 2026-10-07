@@ -1,6 +1,6 @@
 # V1S-190 live header activity — October 7, 2026
 
-Public frontend: `https://review.v1su4.dev`, image `abfdb86` at time of these observations. This is deployed acceptance of the existing activity panel; the replacement-job guard and requested FolderDown icon below are local changes awaiting serialized deployment.
+Public frontend: `https://review.v1su4.dev`, image `abfdb86` at time of these observations. The final replacement-job guard, FolderDown icon, yellow status and slower two-second spinner were subsequently deployed and verified in native @Browser on release 02439aa.
 
 ## Observable acceptance
 
@@ -17,6 +17,6 @@ Public frontend: `https://review.v1su4.dev`, image `abfdb86` at time of these ob
 
 `scripts/check-live-activity.mjs` includes bounded `--watch <exact synthetic asset code>` observation and `--activity-sync` against the explicitly asserted synthetic asset. Private fixture IDs and stage timestamps are in `.scratch/release-readiness/activity-observation.json.local`; they are not deployment credentials or committed capabilities. Existing prior cleanup state was not reused for publication.
 
-## Remaining gate
+## Final native gate
 
-Deploy/verify the replacement-job guard and final requested header icon/color refinement before marking V1S-190 Done. Failure retention/dismissal and reconnect behavior pass the focused local feed tests; this session did not induce a live worker failure or production observation outage. Source-sync reliability acceptance remains V1S-167. No PR was opened.
+The final native gate passed and V1S-190 is Done. The header uses FolderDown and the yellow spinner completes one rotation every two seconds. Failure retention/dismissal and reconnect behavior pass the focused local feed tests; this session did not induce a live worker failure or production observation outage. Source-sync reliability acceptance remains V1S-167. No PR was opened.

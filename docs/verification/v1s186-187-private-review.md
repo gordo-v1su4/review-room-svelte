@@ -17,6 +17,6 @@ Native Codex **@Browser** independently verified rendered video frames, reviewer
 
 Responsive IAB checks at 390×844 and 844×390 found no horizontal overflow and preserved the active video ID and exact typed draft. The browser viewport override was reset. The screenshots cover desktop, phone-size and short-landscape layouts; these are IAB viewport checks, **not actual iPhone Safari or Android Chrome/device acceptance**. The latter rows remain unchecked in Linear. Native keyboard/touch execution on actual phones and independent Edge coverage are not claimed.
 
-Evidence: [live summary](evidence/private-review-live-20261007.json), [desktop](evidence/private-review-desktop-20261007.png), [phone-size](evidence/private-review-phone-20261007.png), [short landscape](evidence/private-review-landscape-20261007.png). Focused validation: two Convex regression tests / eight assertions; Svelte check 0 errors and eight existing warnings; Convex type checking passed.
+Evidence: [live summary](evidence/private-review-live-20261007.json). Native screenshots remain local because review-link URLs are private capabilities. Focused validation: two Convex regression tests / eight assertions; Svelte check 0 errors and eight existing warnings; Convex type checking passed.
 
 Private review URLs are independent bearer capabilities: owner sign-out does not revoke a separately permitted review link. Revocation stops new server requests; it cannot erase bytes or rendered frames that a browser already received. No public Trailer Feed grant/publication was created by these checks.

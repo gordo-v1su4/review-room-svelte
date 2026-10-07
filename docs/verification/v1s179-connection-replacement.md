@@ -1,6 +1,6 @@
 # V1S-179 explicit deleted-target replacement — October 7, 2026
 
-Basic deployed acceptance passed on Review frontend `118ec9a`, Convex `382c7d4` and target `4c41cb4`. Final mixed queued/registered source hardening is deployed at `24c4142`; the parent native Browser gate is pending.
+Basic deployed acceptance passed on Review frontend `118ec9a`, Convex `382c7d4` and target `4c41cb4`. Final mixed queued/registered source hardening is deployed at `24c4142`; the parent native @Browser gate subsequently passed on the combined frontend release.
 
 The owner chooses Replace removed target, Create new or Use existing by stable target ID, and explicitly authorizes replacement. The target backend accepts this operation only when the exact previously connected project has a durable deletion tombstone. A stable replacement nonce records the operation and history; replay returns the same target, changed/superseded intent denies, and ordinary connection retry cannot recreate the removed target.
 
@@ -21,4 +21,4 @@ The dedicated Activity panel QA target was independently asserted to contain onl
 
 Final hardening queries authoritative per-version target state before replacement. Never-registered versions receive fresh grants and an ordered idempotent singleton reservation; previously registered versions receive explicit reactivation. Interleaving those preparations in source-date order preserves numbering in mixed batches. Queued Unsync removes the cancelled version from the plan and fences the old reservation acknowledgment; remaining fresh reservations get a new stored nonce. Six focused replacement/Refresh/Unsync tests pass with57 assertions; TypeScript check passes.
 
-The bounded live replacement replay check passed after source hardening deployment: authoritative status observed the already published generation2 versions, the exact replacement receipt replay retained the same connection and target identity, source jobs stayed Synced at generation2, and the target catalog remained unchanged. Finish the parent native Browser gate before marking Done. No PR is opened.
+The bounded live replacement replay check passed after source hardening deployment: authoritative status observed the already published generation2 versions, the exact replacement receipt replay retained the same connection and target identity, source jobs stayed Synced at generation2, and the target catalog remained unchanged. Parent native @Browser verified two Synced exact versions and the retained retired-connection history; V1S-179 is Done. No PR was opened during implementation.
