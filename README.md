@@ -1,6 +1,6 @@
 # Review Room
 
-![Review Room workspace with the geometric logo, media library, and review playback](docs/images/review-room.webp)
+![Review Room workspace with the geometric logo, media library, and review playback](docs/images/review-room-workspace-20261007.webp)
 
 A media review workspace for creators and clients. Organize videos and still images, review exact versions, collect feedback, and move projects from first review to approval.
 
