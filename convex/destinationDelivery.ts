@@ -74,17 +74,23 @@ export const reserve = internalAction({
     try {
       if (claim.reactivationJson) {
         const saved = JSON.parse(claim.reactivationJson);
-        for (const consent of Array.isArray(saved) ? saved : [saved]) {
+        const preparations = Array.isArray(saved) ? saved : [saved];
+        const end = Math.min(preparations.length, claim.preparationIndex + 3);
+        for (let index = claim.preparationIndex; index < end; index++) {
+          if (!await ctx.runMutation(internal.destinationSync.advancePreparation, { ...args, token: claim.token, index })) return;
+          const consent = preparations[index];
           if (consent.intent === 'reserve-fresh') {
             const acknowledgement = await post('batches', { batch_id: consent.batch_id, run_id: consent.run_id, versions: consent.versions });
             const identity = consent.versions[0];
             const version = acknowledgement.versions?.[0];
             if (acknowledgement.batch_id !== consent.batch_id || !Array.isArray(acknowledgement.versions) || acknowledgement.versions.length !== 1 || version.source_asset_id !== identity.source_asset_id || version.source_version_id !== identity.source_version_id || version.consent_generation !== identity.consent_generation || !Number.isSafeInteger(version.version_number) || version.version_number < 1) throw new DestinationFailure('Destination did not acknowledge the exact fresh replacement version');
-            continue;
+          } else {
+            const acknowledgement = await post('reactivations', consent);
+            if (acknowledgement.batch_id !== consent.batch_id || acknowledgement.consent_generation !== consent.consent_generation || !Number.isSafeInteger(acknowledgement.version_number) || acknowledgement.version_number < 1) throw new DestinationFailure('Destination did not acknowledge the exact reactivation consent');
           }
-          const acknowledgement = await post('reactivations', consent);
-          if (acknowledgement.batch_id !== consent.batch_id || acknowledgement.consent_generation !== consent.consent_generation || !Number.isSafeInteger(acknowledgement.version_number) || acknowledgement.version_number < 1) throw new DestinationFailure('Destination did not acknowledge the exact reactivation consent');
+          if (!await ctx.runMutation(internal.destinationSync.advancePreparation, { ...args, token: claim.token, index: index + 1, release: index + 1 === end })) return;
         }
+        if (claim.preparationIndex < preparations.length) return;
       }
       const payload = JSON.parse(claim.reservationJson);
       const result = await post('batches', payload);

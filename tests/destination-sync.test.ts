@@ -3,6 +3,8 @@ import { S3Client } from '@aws-sdk/client-s3';
 import { convexTest } from 'convex-test';
 import schema from '../convex/schema';
 import { internal } from '../convex/_generated/api';
+import { sourceDeleted } from '../convex/destinationRemovals';
+import { purgeDependencyBatch } from '../convex/lib/archivePurge';
 
 const modules = Object.fromEntries([...new Bun.Glob('**/*.{ts,js}').scanSync({ cwd: 'convex' })]
   .map(file => [`../convex/${file}`, () => import(`../convex/${file}`)]));
@@ -336,16 +338,135 @@ test('deleting a published reference removes its consent and metadata link while
     await t.mutation(internal.destinationSync.confirm,{connectionId,confirmationId:'publish-with-grid',versions:[{versionId:first,expectedMetadataUpdatedAt:11}]});
     await t.finishAllScheduledFunctions(()=>jest.runAllTimers());
     await t.mutation(internal.personal.deleteSelectedAssets,{projectId:project,assetIds:[image.assetId]});
-    const workspace = await t.query(internal.destinationSync.workspace,{projectId:project});
-    expect(workspace.versions.find(version=>version.versionId===first)?.images).toEqual([]);
     const slug = new URL(url).pathname.split('/')[3];
     expect(await t.query(internal.publicationGrants.resolve,{slug,versionId:first,variant:'original'})).not.toBeNull();
     expect(await t.query(internal.publicationGrants.resolve,{slug,versionId:image.versionId,variant:'original'})).toBeNull();
     await t.finishAllScheduledFunctions(()=>jest.runAllTimers());
+    const workspace = await t.query(internal.destinationSync.workspace,{projectId:project});
+    expect(workspace.versions.find(version=>version.versionId===first)?.images).toEqual([]);
     expect(removals).toEqual([{source_asset_id:image.assetId,source_version_id:image.versionId,consent_generation:1}]);
     expect((await t.query(internal.destinationSync.snapshot,{projectId:project})).items[0].state).toBe('synced');
   } finally {
     globalThis.fetch=oldFetch;storage.mockRestore();
     for(const key of keys) if(previous[key]===undefined) delete process.env[key];else process.env[key]=previous[key];
   }
+});
+
+test('replacement preparations checkpoint bounded requests, renew watchdogs and fence stale workers', async () => {
+  const {t,project,first} = await fixture();
+  const connectionId = await t.mutation(internal.destinationSync.saveConnection,{projectId:project,destinationKey:'trailer-feed',targetRunId:'target'});
+  const {batchId} = await t.mutation(internal.destinationSync.confirm,{connectionId,confirmationId:'bounded-prep',versions:[{versionId:first,expectedMetadataUpdatedAt:11}]});
+  await t.run(async ctx => {
+    const batch = await ctx.db.get(batchId);
+    const identity = JSON.parse(batch!.reservationJson).versions[0];
+    await ctx.db.patch(batchId,{reactivationJson:JSON.stringify(Array.from({length:7},(_,index)=>({intent:'reserve-fresh',run_id:'target',batch_id:`prep-${index}`,versions:[identity]})))});
+  });
+  const interrupted = await t.mutation(internal.destinationSync.claimBatch,{batchId});
+  expect(await t.mutation(internal.destinationSync.advancePreparation,{batchId,token:interrupted!.token,index:1})).toBe(true);
+  jest.setSystemTime(Date.now()+61001);
+  const recovered = await t.mutation(internal.destinationSync.claimBatch,{batchId});
+  expect(recovered?.preparationIndex).toBe(1);
+  expect(await t.mutation(internal.destinationSync.advancePreparation,{batchId,token:interrupted!.token,index:2})).toBe(false);
+  expect(await t.mutation(internal.destinationSync.advancePreparation,{batchId,token:recovered!.token,index:1,release:true})).toBe(true);
+  const oldFetch = globalThis.fetch; const oldKey = process.env.TRAILER_FEED_REVIEW_INGEST_KEY;
+  process.env.TRAILER_FEED_REVIEW_INGEST_KEY='fixture-only';
+  const requests:string[]=[];
+  globalThis.fetch = mock(async (_input:RequestInfo|URL,init?:RequestInit)=>{
+    const payload=JSON.parse(String(init?.body)); requests.push(payload.batch_id);
+    jest.setSystemTime(Date.now()+14000);
+    return Response.json({batch_id:payload.batch_id,versions:payload.versions.map((item:Record<string,unknown>)=>({...item,version_number:1}))});
+  }) as unknown as typeof fetch;
+  try {
+    await t.action(internal.destinationDelivery.reserve,{batchId});
+    expect(requests).toEqual(['prep-1','prep-2','prep-3']);
+    expect(await t.run(ctx=>ctx.db.get(batchId))).toMatchObject({state:'queued',preparationIndex:4});
+    await t.action(internal.destinationDelivery.reserve,{batchId});
+    expect(requests).toHaveLength(6);
+    expect(await t.run(ctx=>ctx.db.get(batchId))).toMatchObject({state:'queued',preparationIndex:7});
+    await t.action(internal.destinationDelivery.reserve,{batchId});
+    expect(requests).toHaveLength(7);
+    expect(await t.run(ctx=>ctx.db.get(batchId))).toMatchObject({state:'reserved',preparationIndex:7});
+    const watchdogs=await t.run(ctx=>ctx.db.system.query('_scheduled_functions').collect());
+    expect(watchdogs.filter(job=>job.name.includes('reserve')).length).toBeGreaterThan(6);
+  } finally {globalThis.fetch=oldFetch;if(oldKey===undefined) delete process.env.TRAILER_FEED_REVIEW_INGEST_KEY;else process.env.TRAILER_FEED_REVIEW_INGEST_KEY=oldKey;}
+});
+
+test('reconciliation cannot overwrite pending Unsync and suppression acknowledgment enables fresh consent', async () => {
+  const {t,project,first} = await fixture();
+  const connectionId = await t.mutation(internal.destinationSync.saveConnection,{projectId:project,destinationKey:'trailer-feed',targetRunId:'target'});
+  await t.mutation(internal.destinationSync.confirm,{connectionId,confirmationId:'unsync-race',versions:[{versionId:first,expectedMetadataUpdatedAt:11}]});
+  const job = await t.run(async ctx=> (await ctx.db.query('syncOutbox').collect())[0]);
+  await t.run(ctx=>ctx.db.patch(job._id,{state:'synced',targetArtifactId:'artifact',targetVersionNumber:1}));
+  const {unsyncId}=await t.mutation(internal.destinationUnsync.confirm,{jobId:job._id,expectedGeneration:1});
+  await t.mutation(internal.destinationSync.applyReconciliation,{results:[{jobId:job._id,expectedGeneration:1,state:'registered',consentGeneration:1,targetRunId:'target',targetArtifactId:'artifact',targetVersionNumber:1}]});
+  expect(await t.run(ctx=>ctx.db.get(job._id))).toMatchObject({state:'disconnected',targetState:'unsync_pending'});
+  const claim=await t.mutation(internal.destinationUnsync.claim,{unsyncId});
+  await t.mutation(internal.destinationUnsync.finish,{unsyncId,token:claim!.token,ok:true});
+  expect(await t.run(ctx=>ctx.db.get(job._id))).toMatchObject({targetState:'target_suppressed'});
+  expect((await t.query(internal.destinationSync.snapshot,{projectId:project})).items[0].canSyncAgain).toBe(true);
+});
+
+test('deleted-image cleanup pages grant history and metadata, and queued video delivery contracts safely before cleanup', async () => {
+  const {t,project,asset,first,second}=await fixture();
+  const image=await t.run(async ctx=>{
+    const original=await ctx.db.get(asset);
+    const imageAsset=await ctx.db.insert('videos',{...Object.fromEntries(Object.entries(original!).filter(([key])=>!['_id','_creationTime','currentVersionId'].includes(key))) as Omit<NonNullable<typeof original>,'_id'|'_creationTime'>,title:'Reference',mimeType:'image/png'});
+    const version=await ctx.db.insert('assetVersions',{assetId:imageAsset,version:1,originalKey:'assets/private/image.png',mimeType:'image/png',sizeBytes:100,processingState:'ready',createdAt:1});
+    await ctx.db.patch(first,{creativeMetadata:{sourceLabel:'Video',model:'',prompt:'',referenceImageVersionIds:[version],gridImageVersionId:version}});
+    return {asset:imageAsset,version};
+  });
+  const connectionId=await t.mutation(internal.destinationSync.saveConnection,{projectId:project,destinationKey:'trailer-feed',targetRunId:'target'});
+  const {batchId}=await t.mutation(internal.destinationSync.confirm,{connectionId,confirmationId:'queued-image-deletion',versions:[{versionId:first,expectedMetadataUpdatedAt:11}]});
+  const reservation=await t.mutation(internal.destinationSync.claimBatch,{batchId});
+  await t.mutation(internal.destinationSync.finishReservation,{batchId,token:reservation!.token,ok:true});
+  const untouched=await t.run(ctx=>ctx.db.get(second));
+  await t.run(async ctx=>{
+    const root=(await ctx.db.query('publicationGrants').collect())[0];
+    for(let i=0;i<12;i++) {
+      const versionId=await ctx.db.insert('assetVersions',{assetId:asset,version:i+3,originalKey:`assets/private/linked-${i}.mp4`,mimeType:'video/mp4',sizeBytes:100,processingState:'ready',createdAt:i+300,metadataUpdatedAt:17,creativeMetadata:{sourceLabel:'Linked',model:'',prompt:'',referenceImageVersionIds:[image.version]}});
+      const rootGrantId=await ctx.db.insert('publicationGrants',{...Object.fromEntries(Object.entries(root).filter(([key])=>!['_id','_creationTime'].includes(key))) as Omit<typeof root,'_id'|'_creationTime'>,versionId,slug:`linked-${i}`});
+      await ctx.db.insert('publicationReferenceGrants',{rootGrantId,projectId:project,consentGeneration:1,slug:`aux-${i}`,referenceVersionIds:[image.version],createdAt:1});
+    }
+    const imageAsset=await ctx.db.get(image.asset); const version=await ctx.db.get(image.version);
+    await sourceDeleted(ctx,imageAsset!,[version!]);
+    await ctx.db.delete(image.version);await ctx.db.delete(image.asset);
+  });
+  const job=await t.run(async ctx=>(await ctx.db.query('syncOutbox').collect())[0]);
+  const claim=await t.mutation(internal.destinationSync.claimItem,{jobId:job._id});
+  expect(claim).not.toBeNull();
+  expect(JSON.parse(claim!.payloadJson).metadata.referenceImageVersionIds).toEqual([]);
+  expect(JSON.parse(claim!.payloadJson).grid).toBeUndefined();
+  expect(await t.run(ctx=>ctx.db.get(job._id))).toMatchObject({state:'sending'});
+  // Source project disappearance cannot erase queued scalar cleanup identity.
+  await t.run(ctx=>ctx.db.delete(project));
+  const seen=new Set<string>();let firstPage:unknown;let pages=0;
+  while(true) {
+    const pending=await t.run(ctx=>ctx.db.system.query('_scheduled_functions').collect());
+    const page=pending.find(row=>row.name.includes('destinationRemovals:cleanup')&&!seen.has(row._id));
+    if(!page) break;
+    seen.add(page._id);firstPage??=page.args[0];pages++;
+    await t.mutation(internal.destinationRemovals.cleanup,page.args[0] as Parameters<typeof t.mutation<typeof internal.destinationRemovals.cleanup>>[1]);
+  }
+  expect(pages).toBeGreaterThanOrEqual(20);
+  const after=await t.run(async ctx=>({grants:await ctx.db.query('publicationGrants').collect(),aux:await ctx.db.query('publicationReferenceGrants').collect(),versions:await ctx.db.query('assetVersions').collect()}));
+  expect(after.grants.every(grant=>grant.revokedAt===undefined&&grant.referenceVersionIds.length===0)).toBe(true);
+  expect(after.aux.every(grant=>grant.referenceVersionIds.length===0)).toBe(true);
+  expect(after.versions.filter(version=>version.creativeMetadata).every(version=>version.creativeMetadata!.referenceImageVersionIds.length===0&&version.creativeMetadata!.gridImageVersionId===undefined)).toBe(true);
+  expect(await t.run(ctx=>ctx.db.get(second))).toEqual(untouched);
+  const updated=await t.run(ctx=>ctx.db.get(first));
+  await t.mutation(internal.destinationRemovals.cleanup,firstPage as Parameters<typeof t.mutation<typeof internal.destinationRemovals.cleanup>>[1]);
+  expect(await t.run(ctx=>ctx.db.get(first))).toEqual(updated);
+});
+
+test('archive dependency purge captures published exact identity before the version is deleted', async () => {
+  const {t,project,asset,first}=await fixture();
+  const connectionId=await t.mutation(internal.destinationSync.saveConnection,{projectId:project,destinationKey:'trailer-feed',targetRunId:'target'});
+  await t.mutation(internal.destinationSync.confirm,{connectionId,confirmationId:'published-purge',versions:[{versionId:first,expectedMetadataUpdatedAt:11}]});
+  const job=await t.run(async ctx=>(await ctx.db.query('syncOutbox').collect())[0]);
+  await t.run(async ctx=>{await ctx.db.patch(job._id,{state:'synced',targetArtifactId:'artifact',targetVersionNumber:1});await ctx.db.patch(project,{archived:true,purgeStartedAt:1});expect(await purgeDependencyBatch(ctx,project)).toBe(true);});
+  expect(await t.run(ctx=>ctx.db.get(first))).toBeNull();
+  const removal=await t.run(async ctx=>(await ctx.db.query('destinationRemovals').collect())[0]);
+  expect(removal).toMatchObject({projectId:project,sourceAssetId:asset,sourceVersionId:first,consentGeneration:1,state:'queued'});
+  await t.run(async ctx=>{await ctx.db.delete(asset);await ctx.db.delete(project);});
+  expect((await t.mutation(internal.destinationRemovals.claim,{jobId:removal._id}))?.payload).toEqual({source_asset_id:asset,source_version_id:first,consent_generation:1});
 });

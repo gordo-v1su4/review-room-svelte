@@ -11,51 +11,82 @@ function withoutReferences(metadata: NonNullable<Doc<'assetVersions'>['creativeM
     ...(gridImageVersionId && !deleted.has(gridImageVersionId) ? {gridImageVersionId}:{})};
 }
 
-/** Runs in the source deletion transaction; delivery survives removal of source/project rows. */
+/** Capture exact identity before source/project rows disappear. */
 export async function sourceDeleted(ctx: MutationCtx, asset: Doc<'videos'>, versions: Doc<'assetVersions'>[]) {
-  const deleted = new Set<string>(versions.map(version=>version._id));
-  const projectGrants = await ctx.db.query('publicationGrants').withIndex('by_project',q=>q.eq('projectId',asset.projectId)).collect();
-  const auxiliary = await ctx.db.query('publicationReferenceGrants').withIndex('by_project', q => q.eq('projectId', asset.projectId)).collect();
-  const linkedAuxiliary = auxiliary.filter(grant => grant.referenceVersionIds.some(id => deleted.has(id)));
-  const linkedGrants = projectGrants.filter(grant=>!deleted.has(grant.versionId) && (grant.referenceVersionIds.some(id=>deleted.has(id)) || linkedAuxiliary.some(imageGrant => imageGrant.rootGrantId === grant._id && imageGrant.consentGeneration === grant.consentGeneration)));
-  for (const grant of linkedAuxiliary) await ctx.db.patch(grant._id, { referenceVersionIds: grant.referenceVersionIds.filter(id => !deleted.has(id)) });
-  for (const grant of linkedGrants) {
-    // Removing a deleted reference contracts consent; the surviving video grant stays valid.
-    await ctx.db.patch(grant._id,{referenceVersionIds:grant.referenceVersionIds.filter(id=>!deleted.has(id))});
-    const jobs = await ctx.db.query('syncOutbox').withIndex('by_version',q=>q.eq('versionId',grant.versionId)).collect();
-    for (const job of jobs) {
-      const payload = JSON.parse(job.payloadJson);
-      payload.metadata = withoutReferences(payload.metadata,deleted);
-      payload.references = payload.references.filter((reference:{source_version_id:string})=>!deleted.has(reference.source_version_id));
-      if (payload.grid && deleted.has(payload.grid.source_version_id)) delete payload.grid;
-      await ctx.db.patch(job._id,{payloadJson:JSON.stringify(payload),updatedAt:Date.now()});
-    }
-  }
-  if (versions.some(version=>version.mimeType.startsWith('image/'))) {
-    const assets = await ctx.db.query('videos').withIndex('by_project',q=>q.eq('projectId',asset.projectId)).collect();
-    for (const candidate of assets) {
-      if (candidate._id === asset._id) continue;
-      const candidates = await ctx.db.query('assetVersions').withIndex('by_asset',q=>q.eq('assetId',candidate._id)).collect();
-      for (const version of candidates) {
-        const metadata = version.creativeMetadata;
-        if (metadata && (metadata.referenceImageVersionIds.some(id=>deleted.has(id)) || (metadata.gridImageVersionId && deleted.has(metadata.gridImageVersionId)))) await ctx.db.patch(version._id,{creativeMetadata:withoutReferences(metadata,deleted),metadataUpdatedAt:Math.max(Date.now(),(version.metadataUpdatedAt ?? 0)+1)});
-      }
-    }
-  }
   for (const version of versions) {
     const grant = await ctx.db.query('publicationGrants').withIndex('by_destination_version', q => q.eq('destinationKey', 'trailer-feed').eq('versionId', version._id)).unique();
-    const jobs = await ctx.db.query('syncOutbox').withIndex('by_version', q => q.eq('versionId', version._id)).collect();
-    const references = linkedGrants.filter(grant=>grant.referenceVersionIds.includes(version._id) || linkedAuxiliary.some(imageGrant => imageGrant.rootGrantId === grant._id && imageGrant.consentGeneration === grant.consentGeneration && imageGrant.referenceVersionIds.includes(version._id)));
-    if (!grant && !jobs.length && !references.length) continue;
+    // Read one payload at most; historical generations are paged later.
+    const job = await ctx.db.query('syncOutbox').withIndex('by_version', q => q.eq('versionId', version._id)).first();
+    if (!grant && !job && !version.mimeType.startsWith('image/')) continue;
     if (grant && grant.revokedAt === undefined) await ctx.db.patch(grant._id, { revokedAt: Date.now() });
-    for (const job of jobs) await ctx.db.patch(job._id, { state:'source_deleted', attemptToken:undefined, leaseUntil:undefined, lastError:'Source version was deleted', updatedAt:Date.now() });
+    if (job) await ctx.db.patch(job._id, { state:'source_deleted', attemptToken:undefined, leaseUntil:undefined, lastError:'Source version was deleted', updatedAt:Date.now() });
     const existing = await ctx.db.query('destinationRemovals').withIndex('by_source_version', q => q.eq('sourceVersionId', version._id)).unique();
     if (existing) continue;
     const jobId = await ctx.db.insert('destinationRemovals', { projectId:asset.projectId, sourceAssetId:asset._id, sourceVersionId:version._id,
-      consentGeneration:Math.max(grant?.consentGeneration ?? 1, ...jobs.map(job => job.consentGeneration),...references.map(grant=>grant.consentGeneration)), state:'queued', attempts:0, nextAttemptAt:Date.now(), createdAt:Date.now(), updatedAt:Date.now() });
+      consentGeneration:grant?.consentGeneration ?? job?.consentGeneration ?? 1, state:'queued', attempts:0, nextAttemptAt:Date.now(), createdAt:Date.now(), updatedAt:Date.now() });
     await ctx.scheduler.runAfter(0, internal.destinationDelivery.removeSource, {jobId});
+    await ctx.scheduler.runAfter(0, internal.destinationRemovals.cleanup, { jobId, stage: version.mimeType.startsWith('image/') ? 'grants' : 'deletedJobs' });
   }
 }
+
+/** Only recorded source deletions can contract saved consent during cleanup. */
+export async function contractDeletedReferences(ctx: MutationCtx, job: Doc<'syncOutbox'>) {
+  const payload = JSON.parse(job.payloadJson);
+  const ids = new Set<string>([...(payload.metadata?.referenceImageVersionIds ?? []), ...(payload.metadata?.gridImageVersionId ? [payload.metadata.gridImageVersionId] : []), ...(payload.references ?? []).map((reference: {source_version_id:string}) => reference.source_version_id), ...(payload.grid ? [payload.grid.source_version_id] : [])]);
+  const deleted = new Set<string>();
+  for (const id of ids) if (await ctx.db.query('destinationRemovals').withIndex('by_source_version', q => q.eq('sourceVersionId', id)).unique()) deleted.add(id);
+  if (!deleted.size) return job;
+  payload.metadata = withoutReferences(payload.metadata, deleted);
+  payload.references = (payload.references ?? []).filter((reference:{source_version_id:string})=>!deleted.has(reference.source_version_id));
+  if (payload.grid && deleted.has(payload.grid.source_version_id)) delete payload.grid;
+  const payloadJson = JSON.stringify(payload);
+  await ctx.db.patch(job._id, { payloadJson, updatedAt: Date.now() });
+  return { ...job, payloadJson };
+}
+
+// One large payload/version per continuation; scalar arguments survive purge.
+export const cleanup = internalMutation({
+  args: { jobId: v.id('destinationRemovals'), stage: v.union(v.literal('grants'), v.literal('auxiliary'), v.literal('jobs'), v.literal('assets'), v.literal('versions'), v.literal('deletedJobs')), cursor: v.optional(v.string()), assetId: v.optional(v.id('videos')), assetCursor: v.optional(v.string()) },
+  handler: async (ctx, args): Promise<void> => {
+    const removal = await ctx.db.get(args.jobId);
+    if (!removal) return;
+    const projectId = ctx.db.normalizeId('projects', removal.projectId);
+    const versionId = ctx.db.normalizeId('assetVersions', removal.sourceVersionId);
+    if (!projectId || !versionId) return;
+    const deleted = new Set([removal.sourceVersionId]);
+    const next = async (stage: typeof args.stage, cursor?: string, assetId?: typeof args.assetId, assetCursor?: string) => {
+      await ctx.scheduler.runAfter(0, internal.destinationRemovals.cleanup, { jobId: args.jobId, stage, ...(cursor ? {cursor}:{}), ...(assetId ? {assetId}:{}), ...(assetCursor ? {assetCursor}:{}) });
+    };
+    if (args.stage === 'grants' || args.stage === 'auxiliary') {
+      const page = args.stage === 'grants'
+        ? await ctx.db.query('publicationGrants').withIndex('by_project', q => q.eq('projectId', projectId)).paginate({cursor: args.cursor ?? null, numItems:10})
+        : await ctx.db.query('publicationReferenceGrants').withIndex('by_project', q => q.eq('projectId', projectId)).paginate({cursor: args.cursor ?? null, numItems:10});
+      for (const grant of page.page) if (grant.referenceVersionIds.includes(versionId)) await ctx.db.patch(grant._id, { referenceVersionIds: grant.referenceVersionIds.filter(id => id !== versionId) });
+      await next(page.isDone ? args.stage === 'grants' ? 'auxiliary' : 'jobs' : args.stage, page.isDone ? undefined : page.continueCursor);
+    } else if (args.stage === 'jobs' || args.stage === 'deletedJobs') {
+      const page = args.stage === 'jobs'
+        ? await ctx.db.query('syncOutbox').withIndex('by_project', q => q.eq('projectId', projectId)).paginate({cursor: args.cursor ?? null, numItems:1})
+        : await ctx.db.query('syncOutbox').withIndex('by_version', q => q.eq('versionId', versionId)).paginate({cursor: args.cursor ?? null, numItems:1});
+      for (const job of page.page) {
+        if (job.versionId === versionId) await ctx.db.patch(job._id, { state:'source_deleted', attemptToken:undefined, leaseUntil:undefined, lastError:'Source version was deleted', updatedAt:Date.now() });
+        else await contractDeletedReferences(ctx, job);
+      }
+      if (!page.isDone) await next(args.stage, page.continueCursor);
+      else if (args.stage === 'jobs') await next('assets');
+    } else if (args.stage === 'assets') {
+      const page = await ctx.db.query('videos').withIndex('by_project', q => q.eq('projectId', projectId)).paginate({cursor:args.cursor ?? null,numItems:1});
+      if (page.page.length) await next('versions', undefined, page.page[0]._id, page.isDone ? undefined : page.continueCursor);
+    } else if (args.assetId) {
+      const page = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', args.assetId!)).paginate({cursor:args.cursor ?? null,numItems:1});
+      for (const version of page.page) {
+        const metadata = version.creativeMetadata;
+        if (metadata && (metadata.referenceImageVersionIds.includes(versionId) || metadata.gridImageVersionId === versionId)) await ctx.db.patch(version._id, {creativeMetadata:withoutReferences(metadata,deleted),metadataUpdatedAt:Math.max(Date.now(),(version.metadataUpdatedAt ?? 0)+1)});
+      }
+      if (!page.isDone) await next('versions',page.continueCursor,args.assetId,args.assetCursor);
+      else if (args.assetCursor) await next('assets',args.assetCursor);
+    }
+  },
+});
 
 export const claim = internalMutation({
   args: {jobId:v.id('destinationRemovals')},

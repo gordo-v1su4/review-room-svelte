@@ -32,7 +32,7 @@ export const confirm = internalMutation({
         const saved = batch.reactivationJson ? JSON.parse(batch.reactivationJson) : [];
         const preparation = (Array.isArray(saved) ? saved : [saved]).filter(intent => ids.has(intent.intent === 'reserve-fresh' ? intent.versions[0].source_version_id : intent.source_version_id)).map(intent => intent.intent === 'reserve-fresh' ? { ...intent, batch_id: randomSecret() } : intent);
         for (const item of remaining) { const payload = JSON.parse(item.payloadJson); payload.batch_id = nonce; await ctx.db.patch(item._id, { payloadJson: JSON.stringify(payload), state: 'queued', attemptToken: undefined, leaseUntil: undefined, lastError: undefined, updatedAt: Date.now() }); }
-        await ctx.db.patch(batch._id, { reservationJson: JSON.stringify(reservation), reactivationJson: preparation.length ? JSON.stringify(preparation) : undefined, state: 'queued', attemptToken: undefined, leaseUntil: undefined, lastError: undefined, updatedAt: Date.now() });
+        await ctx.db.patch(batch._id, { reservationJson: JSON.stringify(reservation), reactivationJson: preparation.length ? JSON.stringify(preparation) : undefined, preparationIndex: 0, state: 'queued', attemptToken: undefined, leaseUntil: undefined, lastError: undefined, updatedAt: Date.now() });
         await ctx.scheduler.runAfter(0, internal.destinationDelivery.reserve, { batchId: batch._id });
       } else await ctx.db.patch(batch._id, { state: 'complete', attemptToken: undefined, leaseUntil: undefined, updatedAt: Date.now() });
     }

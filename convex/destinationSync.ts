@@ -1,4 +1,5 @@
 import { v, ConvexError } from 'convex/values';
+import { contractDeletedReferences } from './destinationRemovals';
 import { internalMutation, internalQuery } from './_generated/server';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import type { Id } from './_generated/dataModel';
@@ -149,7 +150,7 @@ export const applyReconciliation = internalMutation({
   handler: async (ctx, args) => {
     for (const result of args.results) {
       const job = await ctx.db.get(result.jobId);
-      if (!job || (job.state !== 'synced' && job.state !== 'disconnected') || job.consentGeneration !== result.expectedGeneration) continue;
+      if (!job || (job.state !== 'synced' && job.state !== 'disconnected') || job.targetState === 'unsync_pending' || job.consentGeneration !== result.expectedGeneration) continue;
       const connection = await ctx.db.get(job.connectionId);
       const matches = result.state === 'registered' && result.consentGeneration === job.consentGeneration && result.targetRunId === connection?.targetRunId && result.targetArtifactId === job.targetArtifactId && result.targetVersionNumber === job.targetVersionNumber;
       if (matches && await stillAuthorized(ctx, job)) continue;
@@ -248,7 +249,7 @@ export const syncAgain = internalMutation({
 
 export const claimBatch = internalMutation({
   args: { batchId: v.id('syncBatches') },
-  handler: async (ctx, args): Promise<{ token: string; reservationJson: string; reactivationJson?: string } | null> => {
+  handler: async (ctx, args): Promise<{ token: string; reservationJson: string; reactivationJson?: string; preparationIndex: number } | null> => {
     const batch = await ctx.db.get(args.batchId);
     if (!batch || batch.state !== 'queued' || (batch.leaseUntil ?? 0) > Date.now()) return null;
     const jobs = await ctx.db.query('syncOutbox').withIndex('by_batch', q => q.eq('batchId', batch._id)).collect();
@@ -260,7 +261,21 @@ export const claimBatch = internalMutation({
     const token = randomSecret();
     await ctx.db.patch(batch._id, { attemptToken: token, leaseUntil: Date.now() + 60000, attempts: batch.attempts + 1, updatedAt: Date.now() });
     await ctx.scheduler.runAfter(61000, internal.destinationDelivery.reserve, args);
-    return { token, reservationJson: batch.reservationJson, reactivationJson: batch.reactivationJson };
+    return { token, reservationJson: batch.reservationJson, reactivationJson: batch.reactivationJson, preparationIndex: batch.preparationIndex ?? 0 };
+  },
+});
+
+// Each acknowledged preparation is durable. Renewals also schedule recovery,
+// since an older watchdog may return while the extended lease is still active.
+export const advancePreparation = internalMutation({
+  args: { batchId: v.id('syncBatches'), token: v.string(), index: v.number(), release: v.optional(v.boolean()) },
+  handler: async (ctx, args): Promise<boolean> => {
+    const batch = await ctx.db.get(args.batchId);
+    if (!batch || batch.state !== 'queued' || batch.attemptToken !== args.token || (batch.leaseUntil ?? 0) <= Date.now()) return false;
+    if (!Number.isSafeInteger(args.index) || args.index < (batch.preparationIndex ?? 0) || args.index > (batch.preparationIndex ?? 0) + 1) return false;
+    await ctx.db.patch(batch._id, { preparationIndex: args.index, attemptToken: args.release ? undefined : args.token, leaseUntil: args.release ? undefined : Date.now() + 60000, updatedAt: Date.now() });
+    await ctx.scheduler.runAfter(args.release ? 0 : 61000, internal.destinationDelivery.reserve, { batchId: batch._id });
+    return true;
   },
 });
 
@@ -287,6 +302,7 @@ async function stillAuthorized(ctx: MutationCtx, job: { connectionId: Id<'destin
   if (!(connection && !connection.replacedByConnectionId && project && !project.archived && project.createdBy === connection.createdBy && asset && asset.projectId === project._id && asset.status !== 'archived' && version && version.assetId === asset._id && version.processingState === 'ready' && grant && grant.projectId === project._id && grant.assetId === asset._id && grant.createdBy === connection.createdBy && grant.consentGeneration === job.consentGeneration && grant.revokedAt === undefined && (grant.expiresAt === undefined || grant.expiresAt > Date.now()))) return false;
   for (const id of grant.referenceVersionIds) {
     const reference = await ctx.db.get(id);
+    if (!reference && await ctx.db.query('destinationRemovals').withIndex('by_source_version', q => q.eq('sourceVersionId', id)).unique()) continue;
     const image = reference && await ctx.db.get(reference.assetId);
     if (!reference || reference.processingState !== 'ready' || !reference.mimeType.startsWith('image/') || !image || image.assetClass === 'VID' || image.projectId !== project._id || image.status === 'archived') return false;
   }
@@ -307,7 +323,8 @@ export const claimItem = internalMutation({
     const token = randomSecret();
     await ctx.db.patch(job._id, { state: 'sending', attemptToken: token, leaseUntil: Date.now() + 30000, attempts: job.attempts + 1, updatedAt: Date.now() });
     await ctx.scheduler.runAfter(31000, internal.destinationDelivery.item, args);
-    return { token, payloadJson: job.payloadJson };
+    const contracted = await contractDeletedReferences(ctx, job);
+    return { token, payloadJson: contracted.payloadJson };
   },
 });
 

@@ -1,6 +1,7 @@
 import type { MutationCtx } from '../_generated/server';
 import type { Id } from '../_generated/dataModel';
 import { internal } from '../_generated/api';
+import { sourceDeleted } from '../destinationRemovals';
 
 async function queueKeys(ctx: MutationCtx, values: (string | undefined)[]) {
   const keys = [...new Set(values.filter((key): key is string => !!key))];
@@ -21,8 +22,11 @@ export async function purgeDependencyBatch(ctx: MutationCtx, projectId: Id<'proj
   }
   const asset = await ctx.db.query('videos').withIndex('by_project', q => q.eq('projectId', projectId)).first();
   if (asset) {
-    const versions = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', asset._id)).take(100);
+    // Metadata can approach the document size limit. Capture external identities
+    // before deleting a single bounded version, while it still exists.
+    const versions = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', asset._id)).take(1);
     if (versions.length) {
+      await sourceDeleted(ctx, asset, versions);
       await queueKeys(ctx, versions.flatMap(version => [version.originalKey, version.posterKey]));
       for (const version of versions) await ctx.db.delete(version._id);
       return true;

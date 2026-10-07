@@ -96,10 +96,12 @@ test('replacement observes mixed target states and only reactivates the version 
     const reserved = JSON.parse(claim!.reservationJson).versions;
     expect(reserved.map((version: { source_version_id: string; consent_generation: number }) => [version.source_version_id, version.consent_generation])).toEqual(ids.versions.map(id => [id, 2]));
     const cancelled = (await t.query(internal.destinationSync.snapshot, { projectId: ids.project })).items.find(item => item.batchId === fresh.batchId && item.versionId === ids.versions[1])!;
+    expect(await t.mutation(internal.destinationSync.advancePreparation, { batchId: fresh.batchId, token: claim!.token, index: 1 })).toBe(true);
     await t.mutation(internal.destinationUnsync.confirm, { jobId: cancelled.id, expectedGeneration: 2 });
     await t.mutation(internal.destinationSync.finishReservation, { batchId: fresh.batchId, token: claim!.token, ok: true });
     const renewed = await t.mutation(internal.destinationSync.claimBatch, { batchId: fresh.batchId });
     expect(renewed).not.toBeNull();
+    expect(renewed!.preparationIndex).toBe(0);
     const remainingPlan = JSON.parse(renewed!.reactivationJson!);
     expect(remainingPlan).toHaveLength(1);
     expect(remainingPlan[0].intent).toBe('reserve-fresh');
