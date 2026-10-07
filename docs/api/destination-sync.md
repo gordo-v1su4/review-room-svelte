@@ -14,4 +14,4 @@ Deleting a linked image contracts the surviving root grant's reference allowlist
 
 No destination removal calls source storage. Canonical Review originals are handled only by Review's existing scoped deletion worker. The partner contract lives in Trailer Feed's `docs/review-external-versions.md`.
 
-Unsync, fill-empty metadata refresh and deleted-target connection replacement still require implementation. Deployed browser acceptance, runtime service configuration and current-head review remain separate release gates.
+Explicit Unsync revokes access immediately and queues durable suppression; Sync again requires fresh exact-version consent after confirmation. Refresh freezes a metadata/image revision and fills empty destination fields while preserving target edits. Replace removed target retains retired connection history, creates or connects the explicitly chosen replacement, and publishes nothing until fresh selected-version consent. Deployed browser acceptance, runtime service configuration and current-head review remain separate release gates.

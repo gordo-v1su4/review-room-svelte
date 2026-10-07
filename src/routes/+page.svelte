@@ -221,7 +221,7 @@
       importJobs = jobs;
       if (live) for (const job of jobs) activityFeed.upsert({ id: `upload:${job.id}`, kind: 'upload', label: job.file.name,
         project: projects.find(project => project.id === job.target.projectId)?.name ?? 'Project', projectId: job.target.projectId,
-        assetId: liveUploads.get(job.id)?.assetId, updatedAt: Date.now(),
+        assetId: liveUploads.get(job.id)?.assetId, updatedAt: job.updatedAt,
         state: job.status === 'ready' ? 'complete' : job.status === 'preparing' ? 'running' : job.status,
         stage: job.status === 'ready' ? 'Uploaded · queued for ingest' : job.status === 'failed' ? 'Upload failed · retry this file in Imports' : job.status === 'cancelled' ? 'Upload cancelled' : job.status === 'queued' ? 'Waiting to upload' : job.stage ?? 'Preparing preview', progress: job.progress });
     },

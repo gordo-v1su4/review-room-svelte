@@ -2,7 +2,7 @@ import type { LocalAsset } from './review';
 
 export type ImportTarget = { projectId: string; folderId?: string; assetId?: string; dateKey: string; assetClass: 'VID' | 'IMG' | 'CTX' | 'STB' };
 export type ImportRequest = { file: File; target: ImportTarget; destinationLabel: string };
-export type ImportJob = ImportRequest & { id: string; status: 'queued' | 'preparing' | 'ready' | 'failed' | 'cancelled'; error?: string; stage?: string; progress?: number; canCancel?: boolean };
+export type ImportJob = ImportRequest & { id: string; updatedAt: number; status: 'queued' | 'preparing' | 'ready' | 'failed' | 'cancelled'; error?: string; stage?: string; progress?: number; canCancel?: boolean };
 type ImportPort = {
   prepare: (file: File, signal: AbortSignal) => Promise<LocalAsset>;
   commit: (asset: LocalAsset, target: ImportTarget, signal: AbortSignal, jobId: string) => void | Promise<void>;
@@ -20,6 +20,7 @@ export function createImportQueue(port: ImportPort) {
   // Cancelled work keeps its slot until it settles, including adapters that ignore abort.
   // A retry can be queued immediately but cannot overlap that job's old preparation.
   const attempts = new Map<string, AbortController>();
+  function changed(job: ImportJob) { job.updatedAt = Math.max(Date.now(), job.updatedAt + 1); }
   function publish() {
     if (!disposed) port.onChange(jobs.map(job => ({ ...job })));
   }
@@ -31,6 +32,7 @@ export function createImportQueue(port: ImportPort) {
       const controller = new AbortController();
       attempts.set(job.id, controller);
       job.status = 'preparing';
+      changed(job);
       publish();
       void run(job, controller);
     }
@@ -43,10 +45,12 @@ export function createImportQueue(port: ImportPort) {
       await port.commit({ ...prepared, id: job.id }, job.target, controller.signal, job.id);
       prepared = undefined;
       job.status = 'ready';
+      changed(job);
     } catch (error) {
       if (disposed || controller.signal.aborted) return;
       job.status = 'failed';
       job.error = error instanceof Error ? error.message : 'This file could not be imported. Try again.';
+      changed(job);
     } finally {
       if (prepared) port.release(prepared);
       attempts.delete(job.id);
@@ -57,7 +61,7 @@ export function createImportQueue(port: ImportPort) {
   return {
     enqueue(requests: readonly ImportRequest[]) {
       if (disposed) return;
-      jobs.push(...requests.map(request => ({ ...request, target: Object.freeze({ ...request.target }), id: crypto.randomUUID(), status: 'queued' as const })));
+      jobs.push(...requests.map(request => ({ ...request, target: Object.freeze({ ...request.target }), id: crypto.randomUUID(), updatedAt: Date.now(), status: 'queued' as const })));
       publish();
       pump();
     },
@@ -67,6 +71,7 @@ export function createImportQueue(port: ImportPort) {
       if (!job || job.canCancel === false || (job.status !== 'queued' && job.status !== 'preparing')) return;
       job.status = 'cancelled';
       delete job.error;
+      changed(job);
       attempts.get(id)?.abort();
       publish();
       pump();
@@ -78,6 +83,7 @@ export function createImportQueue(port: ImportPort) {
       job.status = 'queued';
       delete job.error;
       delete job.stage; delete job.progress; delete job.canCancel;
+      changed(job);
       publish();
       pump();
     },
@@ -88,7 +94,7 @@ export function createImportQueue(port: ImportPort) {
     },
     update(id: string, value: Pick<ImportJob, 'stage' | 'progress' | 'canCancel'>) {
       const job = jobs.find(job => job.id === id);
-      if (!disposed && job?.status === 'preparing') { Object.assign(job, value); publish(); }
+      if (!disposed && job?.status === 'preparing' && Object.entries(value).some(([key, next]) => job[key as keyof ImportJob] !== next)) { Object.assign(job, value); changed(job); publish(); }
     },
     dispose() {
       disposed = true;
