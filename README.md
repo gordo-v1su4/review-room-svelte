@@ -1,5 +1,7 @@
 # Review Room
 
+![Review Room workspace with Neon Afterlife media, playback, and feedback](docs/images/review-room.webp)
+
 A Svelte 5 and TypeScript media review workspace. This is the only frontend in the repository.
 
 ```sh
@@ -10,7 +12,7 @@ bun test
 bun run build
 ```
 
-The standalone frontend runs on App VM at `https://review-room.v1su4.dev`, backed by dedicated Convex, RustFS, and Trigger services. The owner signs in with Convex email/password after one-time setup using the current owner password. Public review routes remain token scoped.
+The standalone frontend runs on App VM at `https://review.v1su4.dev`, backed by dedicated Convex, RustFS, and Trigger services. The owner signs in with Convex email/password after one-time setup using the current owner password. Public review routes remain token scoped.
 
 The explorer supports appearance controls, metadata fields, hover scrubbing, collections and folders. Selecting media opens the adjustable review panes. Native playback has capability-gated WebCodecs previews and WebGPU rendering with fallback.
 
