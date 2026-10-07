@@ -4,6 +4,7 @@
   import { DropdownMenu } from 'bits-ui';
   import { frameReadout, frameStepTarget, validFrameRate } from './time-display';
   import { createPlaybackSession } from './session';
+  import { createLoadRecovery } from './load-recovery';
   import { observeNativePlayback, type PlaybackMetrics } from './diagnostics';
   import type { PreviewInfo } from './accelerated/protocol';
   import { createScrubPreview } from './accelerated/preview';
@@ -26,6 +27,15 @@
   let session: ReturnType<typeof createPlaybackSession> | undefined;
   let transportRequest = 0;
   let retryTime: number | null = null;
+  const recovery = createLoadRecovery({
+    current: source => src === source && availability === 'ready',
+    check: async (source, signal) => {
+      const response = await fetch(source, { method: 'HEAD', cache: 'no-store', signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]) });
+      return { status: response.status, redirected: response.redirected };
+    },
+    retry: () => reloadMedia(),
+    failed: (source, message) => { error = message; onfailure(source); },
+  });
   let monitor: ReturnType<typeof observeNativePlayback> | undefined;
   let metrics = $state<PlaybackMetrics>();
   let previewVisible = $state(false), previewBackend = $state('Native only'), previewCodec = $state('Not checked');
@@ -107,6 +117,7 @@
       update(nextSource: string) {
         if (nextSource === source) return;
         transportRequest += 1;
+        recovery.reset();
         observer.dispose(); attached.dispose(); releasePointer();
         source = nextSource; mediaWidth = 0; mediaHeight = 0;
         retryTime = null;
@@ -117,6 +128,7 @@
       },
       destroy() {
         transportRequest += 1;
+        recovery.dispose();
         observer.dispose(); attached.dispose(); releasePointer();
         node.removeAttribute('src'); node.load();
         if (session === attached) session = undefined;
@@ -237,32 +249,22 @@
     event.preventDefault(); seek(next);
   }
   async function mediaFailed() {
-    if (availability !== 'ready' || !src) return;
-    const source = src, request = transportRequest;
-    const code = video.error?.code;
+    if (availability !== 'ready' || !src || !video.error || !matchesSource(src)) return;
+    const source = src, code = video.error.code;
+    transportRequest++;
     ready = false;
-    error = code === 3 ? 'This video could not be decoded. Try a browser-supported MP4 or WebM.' : 'Checking media availability…';
-    if (code !== 3) {
-      try {
-        const response = await fetch(source, { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(10000) });
-        if (src !== source || request !== transportRequest || availability !== 'ready') return;
-        error = response.redirected || response.status === 401 || response.status === 403
-          ? 'Your media access has expired. Sign in again to continue.'
-          : !response.ok ? 'Media is unavailable. Retry playback or check processing.'
-          : code === 2 ? 'The media connection was interrupted. Retry playback.'
-          : 'This video format is not supported by this browser. Try a browser-supported MP4 or WebM.';
-      } catch {
-        if (src !== source || request !== transportRequest || availability !== 'ready') return;
-        error = 'The media connection was interrupted. Retry playback.';
-      }
-    }
-    onfailure(source);
+    error = ''; paused = true; playRequested = false;
+    await recovery.failed(source, code);
   }
-  function retryPlayback() {
+  function reloadMedia() {
     if (availability !== 'ready' || !src) return;
     transportRequest++;
     retryTime = Number.isFinite(video.currentTime) ? video.currentTime : 0;
-    error = ''; video.load();
+    ready = false; error = ''; video.load();
+  }
+  function retryPlayback() {
+    recovery.reset();
+    reloadMedia();
   }
 </script>
 <div class="player" bind:this={surface} data-playback={dev ? JSON.stringify({ native: metrics, preview: { backend: previewBackend, codec: previewCodec, decodeMs: previewDecodeMs, requestMs: previewRequestMs, time: previewTime, visible: previewVisible }, scrubbing }) : undefined}>
@@ -272,7 +274,7 @@
     <video bind:this={video} use:attachMedia={src} src={availability === 'ready' && src ? src : undefined} {poster} {loop} playsinline preload="auto" aria-label={name} style:visibility={ready ? 'visible' : 'hidden'}
       onloadstart={() => { ready = false; error = ''; time = 0; duration = 0; }}
       onloadedmetadata={() => { duration = Number.isFinite(video.duration) ? video.duration : 0; mediaWidth = video.videoWidth; mediaHeight = video.videoHeight; }}
-      onloadeddata={() => { ready = true; if (retryTime !== null) { seek(retryTime); retryTime = null; } onready(video.currentSrc); }}
+      onloadeddata={() => { if (!matchesSource(src)) return; recovery.loaded(); error = ''; ready = true; if (retryTime !== null) { seek(retryTime); retryTime = null; } onready(video.currentSrc); }}
       ontimeupdate={() => { if (!scrubbing) { time = video.currentTime; ontime(time); } }}
       onplay={() => { paused = false; error = ''; onViewed(); }} onpause={() => paused = true} onended={ended}
       onvolumechange={() => muted = video.muted}
