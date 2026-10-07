@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
   import { Popover } from 'bits-ui';
-  import { Activity, ArrowUpRight, Check, CircleAlert, LoaderCircle, Upload, X } from 'lucide-svelte';
+  import { ListTodo, ArrowUpRight, Check, CircleAlert, LoaderCircle, Upload, X } from 'lucide-svelte';
   import type { ActivityFeed, ActivityItem } from '$lib/work-activity';
   import { observeActivity } from '$lib/activity-observer';
 
@@ -29,7 +29,7 @@
 
 <Popover.Root bind:open>
   <Popover.Trigger class={`work-activity-trigger ${working > 0 ? 'working' : ''}`} aria-label={`Work activity: ${summary}`} title={summary} onclick={() => automatic = false}>
-    <Activity size={15}/><span class="activity-summary">{summary}</span>{#if working}<span class="activity-count">{working}{activity.truncated ? '+' : ''}</span>{:else if activity.counts.failed}<span class="attention-dot" aria-hidden="true"></span>{/if}
+    <ListTodo size={15}/><span class="activity-summary">{summary}</span>{#if working}<span class="activity-count">{working}{activity.truncated ? '+' : ''}</span>{:else if activity.counts.failed}<span class="attention-dot" aria-hidden="true"></span>{/if}
   </Popover.Trigger>
   <Popover.Portal>
     <Popover.Content class="work-activity-panel" align="end" side="bottom" sideOffset={9} collisionPadding={12} aria-label="Work activity" onOpenAutoFocus={event => { if (automatic) event.preventDefault(); }} onCloseAutoFocus={event => { if (automatic) event.preventDefault(); }}>
@@ -40,7 +40,7 @@
       <div class="activity-rows" aria-live="polite" aria-relevant="additions text">
         {#each activity.items as item (item.id)}
           <div class="activity-row" class:failed={item.state === 'failed'}>
-            <span class="activity-icon" aria-hidden="true">{#if item.state === 'running'}<LoaderCircle size={15} class="activity-spin"/>{:else if item.state === 'complete'}<Check size={15}/>{:else if item.state === 'failed'}<CircleAlert size={15}/>{:else if item.kind === 'upload'}<Upload size={15}/>{:else}<Activity size={15}/>{/if}</span>
+            <span class="activity-icon" aria-hidden="true">{#if item.state === 'running'}<LoaderCircle size={15} class="activity-spin"/>{:else if item.state === 'complete'}<Check size={15}/>{:else if item.state === 'failed'}<CircleAlert size={15}/>{:else if item.kind === 'upload'}<Upload size={15}/>{:else}<ListTodo size={15}/>{/if}</span>
             <div class="activity-copy"><strong title={item.label}>{item.label}</strong><span class="activity-project" title={item.project}>{item.project}</span><span class="activity-stage">{item.stage}{#if item.progress !== undefined} · {Math.floor(item.progress)}%{/if}</span>{#if item.progress !== undefined}<progress max="100" value={item.progress} aria-label={`Upload progress for ${item.label}`}></progress>{/if}</div>
             <div class="activity-actions">{#if item.projectId}<button onclick={() => inspect(item)} aria-label={`Open ${item.label} in ${item.project}`} title={item.state === 'failed' ? 'Open project to resolve' : 'Open project'}><ArrowUpRight size={14}/></button>{/if}{#if item.state !== 'queued' && item.state !== 'running'}<button onclick={() => feed.dismiss(item.id)} aria-label={`Dismiss ${item.label}`} title="Dismiss"><X size={13}/></button>{/if}</div>
           </div>
