@@ -34,7 +34,7 @@
     { id: 'viewed', label: 'Viewed', group: 'review', value: review ? (review.viewed ? 'Yes' : 'No') : null },
     { id: 'comments', label: 'Comments', group: 'review', value: review?.comments.length ?? null, filled: Boolean(review?.comments.length) },
     { id: 'attention', label: 'Needs attention', group: 'review', value: review ? (review.feedbackNeedsAttention ? 'Yes' : 'No') : null, filled: review?.feedbackNeedsAttention ?? false },
-    { id: 'filename', label: 'Filename', group: 'file', value: asset.sourceFile.name },
+    { id: 'filename', label: 'Original filename', group: 'file', value: asset.sourceFile.name },
     { id: 'size', label: 'File size', group: 'file', value: `${(asset.size / 1048576).toLocaleString(undefined, { maximumFractionDigits: 2 })} MB` },
     { id: 'mime', label: 'MIME type', group: 'file', value: asset.sourceFile.type },
     { id: 'resolution', label: 'Resolution', group: 'file', value: asset.width && asset.height ? `${asset.width} × ${asset.height}` : null },

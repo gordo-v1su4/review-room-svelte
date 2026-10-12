@@ -141,10 +141,12 @@
   .dragging { user-select: none; }
   @media (min-width: 1100px) {
     @container (min-width: 548px) {
+      .workspace-panes.has-active.inspector-hidden .viewer-pane { position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; }
       .workspace-panes.has-active.inspector-hidden { gap: 0; grid-template-columns: minmax(0, var(--explorer-size)) 8px minmax(0, var(--viewer-size)); grid-template-areas: 'explorer first viewer'; }
       .has-active.inspector-hidden .first-divider { display: flex; align-items: center; justify-content: center; align-self: stretch; min-height: 160px; cursor: col-resize; touch-action: none; grid-area: first; }
     }
     @container (min-width: 796px) {
+      .workspace-panes.has-active .viewer-pane { position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; }
       .workspace-panes.has-active { gap: 0; grid-template-columns: minmax(0, var(--explorer-size)) 8px minmax(0, var(--viewer-size)) 8px minmax(0, var(--inspector-size)); grid-template-areas: 'explorer first viewer second inspector'; }
       .has-active .pane-divider { display: flex; align-items: center; justify-content: center; align-self: stretch; min-height: 160px; cursor: col-resize; touch-action: none; }
       .first-divider { grid-area: first; }
