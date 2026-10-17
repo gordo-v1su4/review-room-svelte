@@ -221,6 +221,8 @@ const applicationTables = {
     currentVersionId: v.optional(v.id("assetVersions")),
     // Dropped into a locked folder without a matching shot code; awaiting fix-up.
     misfiled: v.optional(v.boolean()),
+    // Latest change to any of this asset's versions; lets the changes feed skip unchanged take histories.
+    versionsUpdatedAt: v.optional(v.number()),
     // A copy (for Trailer Feed submission) shares the source version's stored files and keeps its code.
     copiedFromAssetId: v.optional(v.id("videos")),
     copiedFromVersionId: v.optional(v.id("assetVersions")),

@@ -66,3 +66,21 @@ test('picking or copying an older image uses that image\'s own dimensions', asyn
   const { assetIds: [copy] } = await f.t.mutation(internal.personal.copyAssets, { projectId: f.project, sources: [{ assetId: still, versionId: older._id }] });
   expect(await f.t.run(ctx => ctx.db.get(copy))).toMatchObject({ width: 800, height: 600 });
 });
+
+test('quiet polls skip take histories of assets whose versions have not changed', async () => {
+  const f = await seriesFixture();
+  const { assetId } = await automationUpload(f, { folderId: f.scene, assetCode: 'BLR_EP101_PAR_0040' });
+  const first = await feed(f, 0);
+  expect(first.assets.map(asset => asset.assetId)).toContain(assetId);
+  // Old asset and version stamps: nothing is reported after the cursor.
+  await f.t.run(async ctx => {
+    await ctx.db.patch(assetId, { updatedAt: 1, versionsUpdatedAt: 1 });
+    for (const version of await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', assetId)).collect()) await ctx.db.patch(version._id, { createdAt: 1, updatedAt: 1 });
+  });
+  expect((await feed(f, Number(first.cursor))).assets).toEqual([]);
+  // A metadata write stamps the parent, so the version shows up again.
+  const [version] = await versionsOf(f, assetId);
+  await f.t.mutation(internal.personal.updateVersionMetadata, { versionId: version._id, metadata: { model: 'm', prompt: 'p', sourceLabel: '', referenceImageVersionIds: [] } });
+  await f.t.run(ctx => ctx.db.patch(assetId, { updatedAt: 1 }));
+  expect((await feed(f, Number(first.cursor))).versions.map(item => item.versionId)).toEqual([version._id]);
+});

@@ -62,7 +62,7 @@ export async function copyAssetsToFolder(ctx: MutationCtx, ownerId: Id<'appUsers
     });
     if (job?.status === 'ready') await ctx.db.insert('mediaJobs', { assetId: copyId, versionId: copyVersion, status: 'ready', stage: 'finalize', attempt: job.attempt,
       durationSec: job.durationSec, width: job.width, height: job.height, thumbnailKey: job.thumbnailKey, spriteKey: job.spriteKey, createdAt: now, updatedAt: now });
-    await ctx.db.patch(copyId, { currentVersionId: copyVersion });
+    await ctx.db.patch(copyId, { currentVersionId: copyVersion, versionsUpdatedAt: now });
     copies.push(copyId);
   }
   await ctx.db.patch(projectId, { updatedAt: now });

@@ -103,6 +103,6 @@ export async function writeVersionMetadata(ctx: MutationCtx, ownerId: Id<'appUse
   }
   const updatedAt = Math.max(Date.now(), (version.metadataUpdatedAt ?? 0) + 1);
   await ctx.db.patch(versionId, { creativeMetadata: { ...metadata, ...(customFields ? { customFields } : {}), referenceImageVersionIds: [...new Set(metadata.referenceImageVersionIds)] }, metadataUpdatedAt: updatedAt });
-  await ctx.db.patch(asset._id, { updatedAt: Date.now() });
+  await ctx.db.patch(asset._id, { updatedAt: Date.now(), versionsUpdatedAt: updatedAt });
   return { updatedAt };
 }

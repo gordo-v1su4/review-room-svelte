@@ -48,7 +48,7 @@ export async function fileAsTake(ctx: MutationCtx, ownerId: Id<'appUsers'>, asse
   await ctx.db.patch(shot._id, {
     ...(newest && stray.currentVersionId ? { currentVersionId: stray.currentVersionId, storageKey: stray.storageKey, thumbnailKey: stray.thumbnailKey, spriteKey: stray.spriteKey,
       mimeType: stray.mimeType, sizeBytes: stray.sizeBytes, durationSec: stray.durationSec, width: stray.width, height: stray.height, processingStatus: stray.processingStatus, originalFilename: stray.originalFilename } : {}),
-    commentCount: shot.commentCount + stray.commentCount, updatedAt: now,
+    commentCount: shot.commentCount + stray.commentCount, updatedAt: now, versionsUpdatedAt: now,
   });
   await ctx.db.delete(stray._id);
   await ctx.db.insert('removedAssets', { projectId: stray.projectId, assetId: stray._id, folderId: stray.folderId, mergedIntoAssetId: shot._id, reason: 'filed_as_take', removedAt: now });

@@ -61,7 +61,8 @@ export async function changesSince(ctx: QueryCtx | MutationCtx, projectId: Id<'p
     feed.removedAssets.push({ assetId: removed.assetId, folderId: removed.folderId ?? null, mergedIntoAssetId: removed.mergedIntoAssetId ?? null, reason: removed.reason, removedAt: removed.removedAt });
   }
   for (const asset of assets) {
-    // Every version change counts (processing, filing a take), even when the asset itself did not change.
+    // Every version change stamps versionsUpdatedAt on its asset, so quiet polls never read old take histories.
+    if (Math.max(asset.updatedAt, asset.versionsUpdatedAt ?? 0) <= after) continue;
     const versions = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', asset._id)).collect();
     const changed = versions.filter(version => versionChangedAt(version) > after);
     if (asset.updatedAt <= after && !changed.length) continue;
