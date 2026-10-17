@@ -47,6 +47,27 @@ export const actions: Actions = {
       folderId: value(form, 'folderId') ? value(form, 'folderId') as Id<'projectFolders'> : undefined,
       assetIds: form.getAll('assetIds').map(String) as Id<'videos'>[] }); done();
   },
+  setCurrentVersion: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    await db().mutation(personal.setCurrentVersion, { assetId: value(form, 'assetId') as Id<'videos'>, versionId: value(form, 'versionId') as Id<'assetVersions'> }); done();
+  },
+  copyAssets: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    const versions = form.getAll('versionIds').map(String);
+    await db().mutation(personal.copyAssets, { projectId: value(form, 'projectId') as Id<'projects'>,
+      folderId: value(form, 'folderId') ? value(form, 'folderId') as Id<'projectFolders'> : undefined,
+      ...(form.has('newFolderTitle') ? { newFolderTitle: value(form, 'newFolderTitle') } : {}),
+      sources: form.getAll('assetIds').map(String).map((assetId, index) => ({ assetId: assetId as Id<'videos'>, ...(versions[index] ? { versionId: versions[index] as Id<'assetVersions'> } : {}) })) }); done();
+  },
+  fileMisfiledAsTake: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    await db().mutation(personal.fileMisfiledAsTake, { assetId: value(form, 'assetId') as Id<'videos'>, shotId: value(form, 'shotId') as Id<'videos'> }); done();
+  },
+  moveMisfiledAsset: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    await db().mutation(personal.moveMisfiledAsset, { assetId: value(form, 'assetId') as Id<'videos'>,
+      folderId: value(form, 'folderId') ? value(form, 'folderId') as Id<'projectFolders'> : undefined }); done();
+  },
   removeFolder: async ({ cookies, request }) => {
     requireOwner(cookies); const form = await request.formData();
     const assetDisposition = value(form, 'assetDisposition');

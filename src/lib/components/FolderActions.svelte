@@ -1,11 +1,13 @@
 <script lang="ts">
   import { Dialog, DropdownMenu } from 'bits-ui';
-  import { FolderInput, FolderPlus, Image, MoreHorizontal, Pencil, Trash2, X } from 'lucide-svelte';
+  import { Copy, FolderInput, FolderPlus, Image, Lock, MoreHorizontal, Pencil, Trash2, X } from 'lucide-svelte';
 
-  let { folders, folderLabels, onMoveFolder, activeFolderId, canManage = false, selectedCount = 0, coverUrl, hasCustomCover = false, persistent = false, onCreate, onRename, onRemove, onMove, onCover }: {
-    folders: readonly { id: string; title: string; parentFolderId?: string }[];
+  let { folders, folderLabels, onMoveFolder, onCopy, activeFolderId, canManage = false, selectedCount = 0, coverUrl, hasCustomCover = false, persistent = false, onCreate, onRename, onRemove, onMove, onCover }: {
+    folders: readonly { id: string; title: string; parentFolderId?: string; locked?: boolean }[];
     folderLabels?: readonly { id: string; title: string }[];
     onMoveFolder?: (folderId: string, parentFolderId: string | null) => void | Promise<void>;
+    /** Opens Copy to folder for the selected assets. */
+    onCopy?: () => void;
     activeFolderId: string | null;
     canManage?: boolean;
     persistent?: boolean;
@@ -39,15 +41,20 @@
     }
     return false;
   }
-  const destinations = $derived((folderLabels ?? folders).filter(folder => operation !== 'move-folder' || !folderId || !isDescendant(folder.id, folderId)));
+  const lockedIds = $derived(new Set(folders.filter(folder => folder.locked).map(folder => folder.id)));
+  // Media may be filed into locked folders; folders may not be moved into them.
+  const destinations = $derived((folderLabels ?? folders).filter(folder => operation !== 'move-folder' || ((!folderId || !isDescendant(folder.id, folderId)) && !lockedIds.has(folder.id))));
   let coverInput = $state<HTMLInputElement>();
   let dialogSession = 0;
   let returnFocus: HTMLElement | undefined;
   let menuTrigger = $state<HTMLButtonElement | null>(null);
   let activeFolder = $derived(folders.find(folder => folder.id === activeFolderId));
+  let activeLocked = $derived(!!activeFolder?.locked);
+  const lockedNote = 'Locked by Creative Studio Pro — structure is managed there. You can still add media.';
   let title = $derived(operation === 'create' ? 'New folder' : operation === 'rename' ? 'Rename folder' : operation === 'remove' ? 'Delete folder' : operation === 'cover' ? 'Folder cover' : operation === 'move-folder' ? 'Move folder' : `Move ${selectedCount} ${selectedCount === 1 ? 'asset' : 'assets'}`);
 
   function begin(next: Operation, trigger?: HTMLElement) {
+    if (activeLocked && next !== 'move' && next !== 'cover') return;
     if (submitBusy || !canManage || ((next === 'rename' || next === 'remove' || next === 'cover' || next === 'move-folder') && !activeFolder) || (next === 'cover' && !onCover)) return;
     dialogSession += 1;
     coverBusy = false;
@@ -111,16 +118,17 @@
 
 {#if canManage}
   <div class="folder-actions">
-    <button type="button" class="folder-button" onclick={event => begin('create', event.currentTarget)}><FolderPlus size={14}/>New folder</button>
-    {#if selectedCount > 0}<button type="button" class="folder-button" onclick={event => begin('move', event.currentTarget)}><FolderInput size={14}/>Move {selectedCount}</button>{/if}
+    <button type="button" class="folder-button" disabled={activeLocked} title={activeLocked ? lockedNote : undefined} onclick={event => begin('create', event.currentTarget)}><FolderPlus size={14}/>New folder</button>
+    {#if selectedCount > 0}<button type="button" class="folder-button" onclick={event => begin('move', event.currentTarget)}><FolderInput size={14}/>Move {selectedCount}</button>{#if onCopy}<button type="button" class="folder-button" onclick={onCopy}><Copy size={14}/>Copy {selectedCount}</button>{/if}{/if}
     {#if activeFolder}
       <DropdownMenu.Root bind:open={menuOpen}>
         <DropdownMenu.Trigger bind:ref={menuTrigger} class="folder-button folder-menu-trigger" aria-label={`Folder settings for ${activeFolder.title}`} title="Folder settings"><MoreHorizontal size={16}/></DropdownMenu.Trigger>
         <DropdownMenu.Portal><DropdownMenu.Content class="folder-menu" sideOffset={6} align="end" onCloseAutoFocus={event => { if (open) event.preventDefault(); }}>
-          <DropdownMenu.Item class="folder-menu-item" onSelect={() => begin('rename')}><Pencil size={13}/>Rename folder</DropdownMenu.Item>
-          {#if onMoveFolder}<DropdownMenu.Item class="folder-menu-item" onSelect={() => begin('move-folder')}><FolderInput size={13}/>Move folder</DropdownMenu.Item>{/if}
+          {#if activeLocked}<p class="folder-menu-note"><Lock size={12}/><span>{lockedNote}</span></p>{/if}
+          <DropdownMenu.Item class="folder-menu-item" disabled={activeLocked} onSelect={() => begin('rename')}><Pencil size={13}/>Rename folder</DropdownMenu.Item>
+          {#if onMoveFolder}<DropdownMenu.Item class="folder-menu-item" disabled={activeLocked} onSelect={() => begin('move-folder')}><FolderInput size={13}/>Move folder</DropdownMenu.Item>{/if}
           {#if onCover}<DropdownMenu.Item class="folder-menu-item" onSelect={() => begin('cover')}><Image size={13}/>Folder cover</DropdownMenu.Item>{/if}
-          <DropdownMenu.Item class="folder-menu-item destructive" onSelect={() => begin('remove')}><Trash2 size={13}/>Delete folder</DropdownMenu.Item>
+          <DropdownMenu.Item class="folder-menu-item destructive" disabled={activeLocked} onSelect={() => begin('remove')}><Trash2 size={13}/>Delete folder</DropdownMenu.Item>
         </DropdownMenu.Content></DropdownMenu.Portal>
       </DropdownMenu.Root>
     {/if}
@@ -176,6 +184,9 @@
   :global(.folder-menu-item) { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 8px; color: var(--ink); font-size: 11px; border-radius: 4px; cursor: pointer; outline: none; }
   :global(.folder-menu-item[data-highlighted]) { background: var(--raised); }
   :global(.folder-menu-item.destructive) { color: #d79d9d; }
+  :global(.folder-menu-item[data-disabled]) { opacity: .4; cursor: default; }
+  .folder-menu-note { display: flex; align-items: start; gap: 7px; max-width: 220px; margin: 0 0 4px; padding: 7px 8px; border-radius: 4px; background: color-mix(in srgb, var(--folder-locked) 10%, transparent); color: var(--folder-locked); font-size: 10.5px; line-height: 1.45; }
+  .folder-menu-note :global(svg) { flex-shrink: 0; margin-top: 1px; }
   :global(.folder-overlay) { position: fixed; inset: 0; z-index: 100; background: #0009; }
   :global(.folder-dialog) { position: fixed; top: 50%; left: 50%; z-index: 101; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 28px)); max-height: calc(100dvh - 40px); overflow-y: auto; padding: 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--ink); box-shadow: 0 24px 90px #0008; outline: none; }
   .dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

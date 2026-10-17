@@ -12,18 +12,22 @@ export const POST: RequestHandler = async (event) => {
       typeof body.type !== 'string' || !Number.isSafeInteger(body.size) ||
       typeof body.sha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(body.sha256) ||
       (body.folderId !== undefined && typeof body.folderId !== 'string') ||
-      (body.assetId !== undefined && typeof body.assetId !== 'string')) {
+      (body.assetId !== undefined && typeof body.assetId !== 'string') ||
+      (body.assetCode !== undefined && typeof body.assetCode !== 'string') ||
+      (body.keepCurrentVersion !== undefined && typeof body.keepCurrentVersion !== 'boolean')) {
       return json({ error: 'Provide projectId, name, type, integer size and SHA-256 checksum' }, { status: 400 });
     }
     const input = { projectId: body.projectId as Id<'projects'>,
       folderId: body.folderId as Id<'projectFolders'> | undefined,
       assetId: body.assetId as Id<'videos'> | undefined,
-      originalFilename: body.name, mimeType: body.type, sizeBytes: body.size, sha256: body.sha256.toLowerCase() };
+      originalFilename: body.name, mimeType: body.type, sizeBytes: body.size, sha256: body.sha256.toLowerCase(),
+      ...(body.assetCode !== undefined ? { assetCode: body.assetCode as string } : {}),
+      ...(body.keepCurrentVersion ? { keepCurrentVersion: true } : {}) };
     const auth = automationRequest(event, input);
     const session = await db().mutation(internal.automation.beginUpload, { ...auth, ...input });
     const url = await uploadUrl(stagingKey(session.objectKey), body.type);
     const posterUrl = await uploadUrl(stagingKey(posterKey(session.objectKey)), 'image/jpeg');
-    return json({ sessionId: session.sessionId, url, posterUrl, expiresAt: session.expiresAt },
+    return json({ sessionId: session.sessionId, url, posterUrl, expiresAt: session.expiresAt, ...(session.assetId ? { assetId: session.assetId } : {}) },
       { status: 201, headers: { 'cache-control': 'private, no-store' } });
   } catch (cause) { return automationError(cause); }
 };

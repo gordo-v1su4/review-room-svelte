@@ -42,6 +42,10 @@
   import { prepareLocalImport } from '$lib/local-import';
   import ImportOptions from '$lib/components/ImportOptions.svelte';
   import FolderActions from '$lib/components/FolderActions.svelte';
+  import CodeLegend from '$lib/components/CodeLegend.svelte';
+  import MisfiledDialog from '$lib/components/MisfiledDialog.svelte';
+  import CopyToFolderDialog from '$lib/components/CopyToFolderDialog.svelte';
+  import { compareCodes, parseProductionCode } from '../../convex/lib/shotCode';
   import ProjectIdentityDialog from '$lib/components/ProjectIdentityDialog.svelte';
   import ShareDialog from '$lib/components/ShareDialog.svelte';
   import DestinationSyncDialog from '$lib/components/DestinationSyncDialog.svelte';
@@ -52,7 +56,8 @@
   import Stage1SharingDialog from '$lib/components/Stage1SharingDialog.svelte';
   import ArchivedProjects from '$lib/components/ArchivedProjects.svelte';
   import { updateProjectIdentity, setProjectArchived, prepareProjectBanner, type ProjectIdentity, type ProjectIdentityDraft } from '$lib/project-identity';
-  import { transitionFolderState, folderCoverUrl, folderAncestors, folderPath, type FolderState, type FolderAction } from '$lib/project-folders';
+  import { transitionFolderState, folderCoverUrl, folderAncestors, folderPath, canRestructureFolder, type FolderState, type FolderAction } from '$lib/project-folders';
+  import { canDropFolder } from '$lib/folder-tree';
   import { updateTags } from '$lib/bulk-tags';
   import StillViewer from '$lib/components/StillViewer.svelte';
   import { annotationsEqual } from '$lib/annotations';
@@ -78,7 +83,7 @@
   import type { VideoStatus } from '$lib/types';
   import { stepInList } from '$lib/mediaNavigation';
   import { Dialog, Tabs, DropdownMenu } from 'bits-ui';
-  import { Play, Square, Repeat, ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, PanelLeft, PanelRightOpen, ChevronRight, Maximize2, Minimize2 } from 'lucide-svelte';
+  import { Play, Square, Repeat, ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, FolderLock, FolderSync, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, PanelLeft, PanelRightOpen, ChevronRight, Maximize2, Minimize2 } from 'lucide-svelte';
   import Player from '$lib/playback/Player.svelte';
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
   import { type LocalAsset, type ReviewAsset } from '$lib/review';
@@ -112,6 +117,9 @@
   const projectFolders = $derived(organization.folders.filter(folder => folder.projectId === projectId));
   const activeFolder = $derived(projectFolders.find(folder => folder.id === activeFolderId));
   const ancestors = $derived(folderAncestors(projectFolders, activeFolderId));
+  let folderPathBar = $state<HTMLElement>();
+  // Narrow screens scroll the path so the current folder is in view.
+  $effect(() => { void ancestors; if (folderPathBar) folderPathBar.scrollLeft = folderPathBar.scrollWidth; });
   const childFolders = $derived(projectFolders.filter(folder => folder.parentFolderId === (activeFolderId ?? undefined)));
   const folderDestinations = $derived(projectFolders.map(folder => ({ ...folder, title: folderPath(projectFolders, folder.id) })));
 
@@ -159,7 +167,7 @@
   type FilterId = 'all' | 'selected' | VideoStatus;
   let query = $state(''), view = $state<'grid' | 'list' | 'table'>('grid');
   let mediaType = $state<WorkspaceMediaType | 'all'>('all');
-  const defaultFilters = (): WorkspaceFilterState => ({ search: '', statuses: [], assetClasses: [], tags: [], selectedOnly: false, minRating: 0, hasComments: false, sort: 'newest', groupBy: 'none' });
+  const defaultFilters = (): WorkspaceFilterState => ({ search: '', statuses: [], assetClasses: [], tags: [], selectedOnly: false, minRating: 0, hasComments: false, sort: 'default', groupBy: 'none' });
   let filters = $state<WorkspaceFilterState>(defaultFilters());
   const isProjectRoot = $derived(!activeFolderId && !activeCollectionId && !archived && mediaType === 'all' && !filters.selectedOnly && !filters.statuses.length);
   const showsProjectIdentity = $derived(!activeFolderId && !activeCollectionId && !archived);
@@ -236,11 +244,14 @@
   const scopedAssets = $derived(activeCollection?.sourceFolderId
     ? assets.filter(asset => asset.folderId === activeCollection.sourceFolderId)
     : activeFolderId ? assets.filter(asset => asset.folderId === activeFolderId) : assets);
+  // Inside a folder the default order is by code (natural sort), so shots read in order.
+  const effectiveSort = $derived(filters.sort === 'default' ? (activeFolderId ? 'code' as const : 'newest' as const) : filters.sort);
   const visible = $derived(activeCollection && !collectionIsConfigured(activeCollection) ? [] : queryWorkspace(scopedAssets, {
-    ...filters, search: query, shortlisted: filters.selectedOnly ? true : undefined,
+    ...filters, sort: effectiveSort, search: query, shortlisted: filters.selectedOnly ? true : undefined,
     mediaTypes: mediaType === 'all' ? undefined : [mediaType]
   }));
   const groups = $derived(groupWorkspaceAssets(visible, filters.groupBy));
+  const showCodeLegend = $derived(!!activeFolder?.locked || visible.some(asset => !!parseProductionCode(asset.assetCode)));
   const visibleIds = $derived(groups.flatMap(group => group.assets.map(asset => asset.id)));
   $effect(() => {
     const next = transitionSelection(checked, { type: 'reconcile', allIds: visibleIds });
@@ -320,6 +331,25 @@
       if (versionReads.get(versionId) === controller) versionReads.delete(versionId);
       if (discardDraft && metadataSaves[versionId]?.busy) metadataSaves[versionId] = previousSaveState ?? { busy: false, message: '' };
     }
+  }
+  // The saved current version (the pick); the displayed version follows whatever take is being reviewed.
+  const savedPicks = $derived(new Map((data.snapshot?.assets ?? []).map(item => [item._id as string, item.currentVersionId as string | undefined])));
+  let misfiledAssetId = $state<string | null>(null), misfiledOpen = $state(false);
+  const misfiledAsset = $derived(misfiledAssetId ? allAssets.find(asset => asset.id === misfiledAssetId) : undefined);
+  const misfiledShots = $derived(misfiledAsset ? allAssets.filter(asset => asset.projectId === misfiledAsset.projectId && asset.folderId === misfiledAsset.folderId && !asset.misfiled && !!parseProductionCode(asset.assetCode) && asset.type === misfiledAsset.type)
+    .sort((a, b) => compareCodes(a.assetCode, b.assetCode)).map(asset => ({ value: asset.id, label: asset.assetCode })) : []);
+  const misfiledFolders = $derived(misfiledAsset ? [{ value: '__root__', label: 'Project root' }, ...folderDestinations.filter(folder => folder.id !== misfiledAsset.folderId).map(folder => ({ value: folder.id, label: folder.title }))] : []);
+  // Copy to folder: the checked assets, or the open asset; a version chosen in review is copied instead of the current one.
+  let copyOpen = $state(false), copyIds = $state<string[]>([]);
+  const copyFolders = $derived(folderDestinations.filter(folder => !projectFolders.find(item => item.id === folder.id)?.locked));
+  function beginCopy(ids: readonly string[]) { copyIds = [...ids]; copyOpen = true; }
+  async function copyToFolder(target: { folderId: string | null; newFolderTitle?: string }) {
+    const versionIds = copyIds.map(id => selectedVersions[id] && selectedVersions[id] !== '__current__' ? selectedVersions[id] : '');
+    await ownerAction('copyAssets', { projectId, folderId: target.folderId ?? '', assetIds: copyIds, versionIds, ...(target.newFolderTitle !== undefined ? { newFolderTitle: target.newFolderTitle } : {}) });
+  }
+  async function makeCurrentVersion(assetId: string, versionId: string) {
+    try { await ownerAction('setCurrentVersion', { assetId, versionId }); }
+    catch (cause) { feedback = cause instanceof Error ? cause.message : 'Could not change the current version.'; }
   }
   function selectAssetVersion(id: string, versionId: string) {
     selectedVersions[id] = versionId;
@@ -836,6 +866,14 @@
     if (live) { await ownerAction('moveFolder', { folderId, parentFolderId: parentFolderId ?? '' }); return; }
     organize({ type: 'reparent', folderId, parentFolderId: parentFolderId ?? undefined });
   }
+  const foldersOf = (id: string) => organization.folders.filter(folder => folder.projectId === id);
+  const canManageFoldersIn = (id: string) => folderAccess.isAdmin && folderAccess.editableProjectIds.includes(id) && activeProjects.some(item => item.id === id);
+  function moveFolderInTree(id: string, folderId: string, parentFolderId: string | null) {
+    if (!canManageFoldersIn(id) || !canDropFolder(foldersOf(id), folderId, parentFolderId)) return;
+    const title = organization.folders.find(folder => folder.id === folderId)?.title ?? 'Folder';
+    const parent = parentFolderId ? organization.folders.find(folder => folder.id === parentFolderId)?.title : undefined;
+    void moveFolder(folderId, parentFolderId).then(() => { feedback = `Moved ${title} to ${parent ?? 'the project root'}.`; }).catch(cause => { feedback = cause instanceof Error ? cause.message : 'Could not move the folder.'; });
+  }
   async function moveAssets(assetIds: readonly string[], folderId: string | null) {
     if (!assetIds.length) return;
     if (moveBusy) throw new Error('A media move is already in progress.');
@@ -942,7 +980,8 @@
       });
       organization = {
         folders: data.snapshot.folders.map(folder => ({ id: folder._id, projectId: folder.projectId,
-          title: folder.title, order: folder.order, parentFolderId: folder.parentFolderId })),
+          title: folder.title, order: folder.order, parentFolderId: folder.parentFolderId,
+          ...(folder.ownerApp ? { locked: true } : {}), ...(data.snapshot.connectedFolderIds.includes(folder._id) ? { connected: true } : {}) })),
         placements: Object.fromEntries(data.snapshot.assets.map(asset => [asset._id,
           { projectId: asset.projectId, ...(asset.folderId ? { folderId: asset.folderId } : {}) }]))
       };
@@ -957,7 +996,8 @@
         size: item.sizeBytes ?? 0, sourceFile: { name: item.originalFilename ?? item.title, type: item.mimeType ?? 'video/mp4' },
         assetClass: item.mimeType?.startsWith('image/') ? 'IMG' as const : 'VID' as const, importedAt: item.uploadedAt,
         tags: item.tags, assetCode: item.assetCode ?? '',
-        versionId: item.currentVersionId, metadataUpdatedAt: data.snapshot.versions.find(version => version._id === item.currentVersionId)?.metadataUpdatedAt ?? null,
+        ...(item.misfiled ? { misfiled: true } : {}),
+        versionId: item.currentVersionId, versionNumber: data.snapshot.versions.find(version => version._id === item.currentVersionId)?.version, metadataUpdatedAt: data.snapshot.versions.find(version => version._id === item.currentVersionId)?.metadataUpdatedAt ?? null,
         metadata: displayVersionMetadata(
           data.snapshot.versions.find(version => version._id === item.currentVersionId)?.creativeMetadata ?? null,
           importedMetadata,
@@ -1074,7 +1114,7 @@
 {#snippet navigation()}
   <div class="brand"><BrandLogo/><button class="icon-button sidebar-collapse" aria-label="Collapse navigation" title="Collapse navigation" aria-expanded="true" onclick={() => navCollapsed = true}><PanelLeft size={18} strokeWidth={1.6}/></button></div>
   <WorkspaceSwitcher/>
-  <ProjectTree onEditProject={editProject} canEditProject={id => folderAccess.isAdmin && folderAccess.editableProjectIds.includes(id)} {canDropAssets} onDropAssets={dropAssets} dragActive={!!dragged} selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={isProjectRoot} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
+  <ProjectTree canDragFolder={(id, folderId) => canManageFoldersIn(id) && canRestructureFolder(foldersOf(id), folderId)} canDropFolder={(id, folderId, parentFolderId) => canManageFoldersIn(id) && canDropFolder(foldersOf(id), folderId, parentFolderId)} onMoveFolder={moveFolderInTree} onEditProject={editProject} canEditProject={id => folderAccess.isAdmin && folderAccess.editableProjectIds.includes(id)} {canDropAssets} onDropAssets={dropAssets} dragActive={!!dragged} selectedCustomCollectionId={activeCollectionId} onCollection={openCollection} overview={isProjectRoot} selectedFolderId={activeFolderId} {archived} onFolder={openRealFolder} onArchive={openArchived} onProject={openProject} projects={treeProjects} selectedProjectId={projectId} selectedCollection={filter === 'selected' ? 'selected' : mediaType} onOpen={openFolder} onCreate={() => { navOpen = false; projectDialog = true; }}/>
   <ArchivedProjects projects={archivedProjects} onRestore={restoreProject} closeOnRestore={navOpen} onNavigateFocus={focusProjectHeading}/>
   {#if folderAccess.isAdmin}<FeedbackInbox groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}
   {#if live && !project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId)}<div class="nav-divider"></div><span class="nav-heading">DESTINATIONS</span><button class="nav-item" onclick={openDestinations}><ArrowUpRight size={16}/> Trailer Feed</button>{/if}
@@ -1090,10 +1130,10 @@
   <main ondragover={dragFiles} ondrop={dropFiles}>
     <header class="topbar">
       <Dialog.Root bind:open={navOpen}><Dialog.Trigger class="icon-button mobile-menu" aria-label="Open navigation" title="Open navigation"><Menu size={20}/></Dialog.Trigger><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="nav-drawer" onCloseAutoFocus={event => { if (restoringFromNavigation) { event.preventDefault(); restoringFromNavigation = false; void focusProjectHeading(); } }} style={`--project-accent: ${project.brandColor ?? "#14b8a6"}`}><Dialog.Title class="visually-hidden">Workspace navigation</Dialog.Title><Dialog.Description class="visually-hidden">Browse local media and review status</Dialog.Description><Dialog.Close class="icon-button drawer-close" aria-label="Close navigation"><X size={20}/></Dialog.Close>{@render navigation()}</Dialog.Content></Dialog.Portal></Dialog.Root>
-      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each ancestors as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if (focusedReview || mediaType !== 'all' || filter === 'selected' || activeCollectionId || archived)}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId && locationName !== project.name}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot} onVersionFile={queueReplacement} uploadContext={!project.archived && projectId !== "__empty__" ? {folders:folderDestinations,...importOptions,onChange:value => importOptions = value,onChoose:() => picker.click()} : undefined} destinationContext={!project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId) ? {projectId,folderId:activeFolderId,selectedVersionIds:destinationSelection} : undefined}/>{/if}<div class="header-account-tools">{#if live}<WorkActivity feed={activityFeed} onOpen={openActivity}/>{/if}{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
+      <div class="breadcrumb"><button onclick={projectOverview}>{project.name}</button>{#each focusedReview ? ancestors : [] as ancestor (ancestor.id)}<ChevronRight size={13}/><button onclick={() => openRealFolder(projectId, ancestor.id)}>{ancestor.title}</button>{/each}{#if (focusedReview || mediaType !== 'all' || filter === 'selected' || activeCollectionId || archived)}<ChevronRight size={13}/>{#if focusedReview}{#if !activeFolderId && locationName !== project.name}<button aria-label={`Return to ${locationName}`} onclick={returnToFolder}>{locationName}</button><ChevronRight size={13}/>{/if}<strong>{active?.name}</strong>{:else}<strong>{locationName}</strong>{/if}{/if}</div>{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot} onVersionFile={queueReplacement} uploadContext={!project.archived && projectId !== "__empty__" ? {folders:folderDestinations,...importOptions,onChange:value => importOptions = value,onChoose:() => picker.click()} : undefined} destinationContext={!project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId) ? {projectId,folderId:activeFolderId,selectedVersionIds:destinationSelection} : undefined}/>{/if}<div class="header-account-tools">{#if live}<WorkActivity feed={activityFeed} onOpen={openActivity}/>{/if}{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}</div>
     </header>
     <div class="page-content folder-workspace">
-      <section class="project-heading" class:identity-banner={showsProjectIdentity && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if showsProjectIdentity && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy"><h1 bind:this={projectHeading} tabindex="-1">{locationName}</h1>{#if project.archived || project.clientName || project.description}<p class="subtitle" class:subtitle-placeholder={!isProjectRoot} aria-hidden={!isProjectRoot} title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description}</p>{/if}</div><div class="project-tools"><ImportQueue persistent={live} jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} folderLabels={folderDestinations} onMoveFolder={moveFolder} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
+      <section class="project-heading" class:identity-banner={showsProjectIdentity && !!project.bannerUrl} style:--project-accent={project.brandColor ?? "#14b8a6"}>{#if showsProjectIdentity && project.bannerUrl}<img class="project-banner" src={project.bannerUrl} alt=""/>{/if}<div class="project-heading-copy">{#if ancestors.length && !archived}<nav class="folder-path" aria-label="Folder path" bind:this={folderPathBar}><ol><li><button type="button" onclick={projectOverview}><span>{project.name}</span></button></li>{#each ancestors as ancestor, index (ancestor.id)}<li><span class="folder-path-separator" aria-hidden="true">/</span>{#if index === ancestors.length - 1 && !activeCollectionId}<span class="folder-path-current" class:locked={ancestor.locked} aria-current="page">{#if ancestor.locked}<FolderLock size={13}/>{/if}<span>{ancestor.title}</span></span>{:else}<button type="button" class:locked={ancestor.locked} onclick={() => openRealFolder(projectId, ancestor.id)}>{#if ancestor.locked}<FolderLock size={13}/>{/if}<span>{ancestor.title}</span></button>{/if}</li>{/each}</ol></nav>{/if}<h1 bind:this={projectHeading} tabindex="-1">{locationName}</h1>{#if project.archived || project.clientName || project.description}<p class="subtitle" class:subtitle-placeholder={!isProjectRoot} aria-hidden={!isProjectRoot} title={project.description}>{project.archived ? "Archived project" : project.clientName || project.description}</p>{/if}</div><div class="project-tools"><ImportQueue persistent={live} jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} folderLabels={folderDestinations} onMoveFolder={moveFolder} onCopy={live ? () => beginCopy(checked.ids.filter(id => visibleIds.includes(id))) : undefined} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}</div></section>
       {#if feedback}<div class="notice" role="status">{feedback}<button class="icon-button" aria-label="Dismiss message" onclick={() => feedback = ''}><X size={16}/></button></div>{/if}
       {#if project.archived}<section class="archived-project-state" aria-label="Archived project">
         <h2>This project is archived.</h2><p>Your media, folders and feedback are retained.</p>
@@ -1105,11 +1145,11 @@
         <button class="library-filter" class:chosen={filter === 'selected'} aria-pressed={filter === 'selected'} onclick={() => openScopedCollection('selected')}><Bookmark size={14}/>Shortlist<span>{directAssets.filter(asset => asset.shortlisted).length}</span></button>
         {#if childFolders.length}<span class="library-divider" aria-hidden="true"></span>{/if}
         {#each childFolders as folder (folder.id)}
-          <button class="library-folder" title={folder.title} onclick={() => openRealFolder(projectId, folder.id)}><Folder size={14}/><span class="library-folder-name">{folder.title}</span><span class="library-folder-count">{assets.filter(asset => asset.folderId === folder.id).length}</span></button>
+          <button class="library-folder" class:locked={folder.locked} class:connected={folder.connected && !folder.locked} title={folder.locked ? `${folder.title} · Locked, managed by Creative Studio Pro` : folder.connected ? `${folder.title} · Connected to Trailer Feed` : folder.title} onclick={() => openRealFolder(projectId, folder.id)}>{#if folder.locked}<FolderLock size={14}/>{:else if folder.connected}<FolderSync size={14}/>{:else}<Folder size={14}/>{/if}<span class="library-folder-name">{folder.title}</span><span class="library-folder-count">{assets.filter(asset => asset.folderId === folder.id).length}</span></button>
         {/each}
       </nav>{/if}
       {#snippet explorer()}
-      <div class="collection-bar"><div class="collection-title"><h2 bind:this={explorerHeading} tabindex="-1">Media</h2><span class="count">{visible.length}</span></div><CollectionActions {activeCollection} folders={projectFolders} canEdit={true} onCreate={createCollection} onRename={(collectionId, title) => changeCollections({ type: 'rename', collectionId, title })} onRemove={removeCollection} onSave={saveCollection}/></div>
+      <div class="collection-bar"><div class="collection-title"><h2 bind:this={explorerHeading} tabindex="-1">Media</h2><span class="count">{visible.length}</span>{#if showCodeLegend}<CodeLegend/>{/if}</div><CollectionActions {activeCollection} folders={projectFolders} canEdit={true} onCreate={createCollection} onRename={(collectionId, title) => changeCollections({ type: 'rename', collectionId, title })} onRemove={removeCollection} onSave={saveCollection}/></div>
       <div class="toolbar explorer-toolbar"><label class="search" class:has-query={!!query} title={query ? `Search media: ${query}` : "Search media"}><Search size={16}/><input aria-label="Search media" placeholder="Find a clip or image…" bind:value={query} onkeydown={event => { if (event.key === "Escape") { event.stopPropagation(); event.currentTarget.blur(); } }}/><kbd>⌕</kbd></label>
         <WorkspaceFilters value={filters} onChange={values => { filters = values; }}/>
 
@@ -1152,15 +1192,15 @@
             {#each groups as group (group.id)}
               <section class="media-group" aria-label={filters.groupBy === 'none' ? 'Assets' : group.label}>
                 {#if filters.groupBy !== 'none'}<h3 class="group-heading">{group.label}<span>{group.assets.length}</span></h3>{/if}
-                {#if view === 'table'}<AssetTable onDragStart={startAssetDrag} onDragEnd={endAssetDrag} assets={group.assets} {activeId} checkedIds={checked.ids} onSelect={openReview} onCheck={checkAsset} onReview={review}/>
-                {:else}<MediaCards onDragStart={startAssetDrag} onDragEnd={endAssetDrag} access={localAccess} onReview={review} assets={group.assets} {activeId} checkedIds={checked.ids} {appearance} {view} onOpen={openReview} onCheck={checkAsset}/>{/if}
+                {#if view === 'table'}<AssetTable onFixMisfiled={live ? id => { misfiledAssetId = id; misfiledOpen = true; } : undefined} onDragStart={startAssetDrag} onDragEnd={endAssetDrag} assets={group.assets} {activeId} checkedIds={checked.ids} onSelect={openReview} onCheck={checkAsset} onReview={review}/>
+                {:else}<MediaCards onFixMisfiled={live ? id => { misfiledAssetId = id; misfiledOpen = true; } : undefined} onDragStart={startAssetDrag} onDragEnd={endAssetDrag} access={localAccess} onReview={review} assets={group.assets} {activeId} checkedIds={checked.ids} {appearance} {view} onOpen={openReview} onCheck={checkAsset}/>{/if}
               </section>
             {/each}
           {/if}
         </section>
       {/snippet}
       {#snippet viewer()}
-        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><div class="review-view-controls">{#if live && active.versionId}<select aria-label="Asset version" value={selectedVersions[active.id] ?? "__current__"} onchange={event => selectAssetVersion(active.id, event.currentTarget.value)}><option value="__current__">Latest version</option>{#each knownVersions.filter(version => version.assetId === active.id).sort((a, b) => a.version - b.version) as version (version.id)}<option value={version.id}>V{version.version}</option>{/each}</select>{/if}{#if focusedReview}<button class="icon-button" aria-label="Notes & info" title="Notes & info" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={18}/></button>{/if}<button class="icon-button" aria-label={focusedReview ? "Return to folder" : "Expand review"} title={focusedReview ? "Return to folder (Esc)" : "Expand review"} onclick={() => focusedReview ? void returnToFolder() : focusedReview = true}>{#if focusedReview}<Minimize2 size={18}/>{:else}<Maximize2 size={18}/>{/if}</button><button class="icon-button" aria-label="Close review" title="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div></div>
+        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><div class="review-view-controls">{#if live && active.versionId}<select aria-label="Asset version" value={selectedVersions[active.id] ?? "__current__"} onchange={event => selectAssetVersion(active.id, event.currentTarget.value)}><option value="__current__">Latest version</option>{#each knownVersions.filter(version => version.assetId === active.id).sort((a, b) => a.version - b.version) as version (version.id)}<option value={version.id}>V{version.version}</option>{/each}</select>{#if selectedVersions[active.id] && selectedVersions[active.id] !== "__current__" && selectedVersions[active.id] !== savedPicks.get(active.id)}<button class="secondary-button make-current" title="Make this version the current version (the pick)" onclick={() => makeCurrentVersion(active.id, selectedVersions[active.id])}>Make current</button>{/if}<button class="secondary-button make-current" title="Copy this asset (the selected version) to an ordinary folder" onclick={() => beginCopy([active.id])}>Copy to folder</button>{/if}{#if focusedReview}<button class="icon-button" aria-label="Notes & info" title="Notes & info" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={18}/></button>{/if}<button class="icon-button" aria-label={focusedReview ? "Return to folder" : "Expand review"} title={focusedReview ? "Return to folder (Esc)" : "Expand review"} onclick={() => focusedReview ? void returnToFolder() : focusedReview = true}>{#if focusedReview}<Minimize2 size={18}/>{:else}<Maximize2 size={18}/>{/if}</button><button class="icon-button" aria-label="Close review" title="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div></div>
           {#if activeMediaJob}<div class="media-job" role="status"><span>Processing: {activeMediaJob.status === 'ready' ? 'Ready' : activeMediaJob.status === 'error' ? 'Needs attention' : activeMediaJob.status === 'queued' ? 'Queued' : `${activeMediaJob.stage} in progress`}</span>{#if activeMediaJob.runId}<a href={`https://trigger.v1su4.dev/orgs/v1su4-91d9/projects/review-room-YXaz/env/prod/runs/${activeMediaJob.runId}`} target="_blank" rel="noopener noreferrer">Run {activeMediaJob.runId.slice(-8)}</a>{/if}{#if activeMediaJob.status === 'error' || (activeMediaJob.status === 'queued' && !activeMediaJob.runId)}<button onclick={() => retryMediaJob(activeMediaJob._id)}>{activeMediaJob.status === 'error' ? 'Retry' : 'Start processing'}</button>{:else if activeMediaJob.status === 'running'}<button onclick={() => processingObserver?.refresh()}>Refresh</button>{/if}</div>{/if}
           {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={reviewEnded} loop={!preview && reviewPlaybackMode === 'loop'} onfailure={previewFailed} sourceBlob={active.sourceFile instanceof File ? active.sourceFile : undefined} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} poster={active.poster} availability={active.availability ?? 'ready'} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
               canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => { updateAsset(active.id, info); readySource = active.url; }}/>{/if}
@@ -1187,6 +1227,8 @@
   </main>
 </div>
 
+{#if live}<CopyToFolderDialog bind:open={copyOpen} count={copyIds.length} folders={copyFolders} onCopy={copyToFolder}/>{/if}
+{#if misfiledAsset}<MisfiledDialog bind:open={misfiledOpen} assetName={misfiledAsset.name} filename={misfiledAsset.sourceFile.name} shots={misfiledShots} folders={misfiledFolders} onFileAsTake={shotId => ownerAction('fileMisfiledAsTake', { assetId: misfiledAsset.id, shotId })} onMove={folderId => ownerAction('moveMisfiledAsset', { assetId: misfiledAsset.id, folderId: folderId ?? '' })}/>{/if}
 {#if live && projectId !== "__empty__"}<DestinationSyncDialog bind:open={destinationDialogOpen} {projectId} folderId={activeFolderId} selectedVersionIds={destinationSelection}/>{/if}
 <Dialog.Root bind:open={projectDialog}>
   <Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="filter-sheet">
@@ -1201,6 +1243,19 @@
 
 <style>
   .library-navigation { display: flex; align-items: center; flex-wrap: nowrap; gap: 6px; min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; padding: 0 0 8px; margin: 0 0 10px; scrollbar-width: thin; }
+  .folder-path { margin: 0 0 6px 0; overflow-x: auto; scrollbar-width: none; }
+  .folder-path::-webkit-scrollbar { display: none; }
+  .folder-path ol { display: flex; align-items: center; gap: 2px; width: max-content; margin: 0; padding: 0; list-style: none; white-space: nowrap; }
+  .folder-path li { display: flex; flex-shrink: 0; align-items: center; gap: 2px; }
+  .folder-path button, .folder-path-current { display: inline-flex; align-items: center; gap: 5px; max-width: 280px; padding: 2px 5px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+  .folder-path button span, .folder-path-current span { overflow: hidden; text-overflow: ellipsis; }
+  .folder-path button:hover { background: var(--raised); color: var(--ink); }
+  .folder-path button:focus-visible { outline: 1px solid var(--focus-ring); outline-offset: 1px; }
+  .folder-path-current { color: var(--ink); cursor: default; }
+  .folder-path .locked { color: var(--folder-locked); }
+  .folder-path-separator { color: #ffffff2e; font-size: 12px; }
+  .library-folder.locked { color: var(--folder-locked); border-color: color-mix(in srgb, var(--folder-locked) 28%, transparent); }
+  .library-folder.connected { color: var(--folder-connected); border-color: color-mix(in srgb, var(--folder-connected) 24%, transparent); }
   .library-filter, .library-folder { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; white-space: nowrap; cursor: pointer; }
   .library-filter { border:0; }
   .library-filter.chosen { background: var(--raised); color: var(--ink); }

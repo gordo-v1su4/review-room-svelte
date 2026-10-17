@@ -6,6 +6,7 @@ import type { Id } from './_generated/dataModel';
 import { owner } from './personal';
 import { issueGrant, confirmGrantAgain } from './publicationGrants';
 import { randomSecret } from './lib/reviewAccess';
+import { isLockedFolder } from './lib/folderLock';
 import { internal } from './_generated/api';
 
 async function ownedProject(ctx: MutationCtx | QueryCtx, projectId: Id<'projects'>) {
@@ -22,6 +23,7 @@ export const saveConnection = internalMutation({
     const { profile } = await ownedProject(ctx, args.projectId);
     const folder = args.folderId && await ctx.db.get(args.folderId);
     if (args.folderId && (!folder || folder.projectId !== args.projectId)) throw new ConvexError({ code: 'SYNC_FOLDER_UNAVAILABLE' });
+    if (folder && isLockedFolder(folder)) throw new ConvexError({ code: 'SYNC_FOLDER_LOCKED' });
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(args.targetRunId)) throw new ConvexError({ code: 'SYNC_TARGET_INVALID' });
     const history = await ctx.db.query('destinationConnections').withIndex('by_source_folder', q => q.eq('destinationKey', args.destinationKey).eq('projectId', args.projectId).eq('folderId', args.folderId)).collect();
     const existing = history.find(item => !item.replacedByConnectionId);
@@ -66,6 +68,7 @@ export const prepareConnection = internalQuery({
     const { project } = await ownedProject(ctx, projectId);
     const folder = folderId && await ctx.db.get(folderId);
     if (args.folderId && (!folder || folder.projectId !== project._id)) throw new ConvexError({ code: 'SYNC_FOLDER_UNAVAILABLE' });
+    if (folder && isLockedFolder(folder)) throw new ConvexError({ code: 'SYNC_FOLDER_LOCKED' });
     const oldId = args.replacesConnectionId && ctx.db.normalizeId('destinationConnections', args.replacesConnectionId);
     const old = oldId && await ctx.db.get(oldId);
     if (args.replacesConnectionId && (!old || old.projectId !== project._id || old.folderId !== (folderId ?? undefined))) throw new ConvexError({ code: 'SYNC_CONNECTION_UNAVAILABLE' });
@@ -106,7 +109,7 @@ export const workspace = internalQuery({
       }
     }
     options.sort((a, b) => a.sourceCreatedAt - b.sourceCreatedAt || a.versionId.localeCompare(b.versionId));
-    return { projectTitle: project.title, folders: folders.map(folder => ({ id: folder._id, title: folder.title })), versions: options };
+    return { projectTitle: project.title, folders: folders.map(folder => ({ id: folder._id, title: folder.title, locked: isLockedFolder(folder) })), versions: options };
   },
 });
 

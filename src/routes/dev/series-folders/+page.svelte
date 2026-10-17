@@ -1,0 +1,74 @@
+<script lang="ts">
+  import { browser } from '$app/environment';
+  import Workspace from '../../+page.svelte';
+  import type { Doc, Id } from '../../../../convex/_generated/dataModel';
+  import type { PageData } from '../../$types';
+
+  // Dev-only seed: a Creative Studio Pro series tree (locked) beside ordinary and Trailer Feed-connected folders.
+  const projectId = 'blood-rush' as Id<'projects'>;
+  const ownerId = 'owner' as Id<'appUsers'>;
+  const credentialId = 'csp-credential' as Id<'automationCredentials'>;
+  type Folder = Doc<'projectFolders'>;
+  const folder = (id: string, title: string, order: number, parent?: string, locked = false): Folder => ({
+    _id: id as Id<'projectFolders'>, _creationTime: 1, projectId, title, order, createdBy: ownerId, createdAt: 1, updatedAt: 1,
+    ...(parent ? { parentFolderId: parent as Id<'projectFolders'> } : {}),
+    ...(locked ? { ownerApp: 'creative-studio-pro' as const, ownerCredentialId: credentialId } : {}),
+  });
+  const seed: Folder[] = [
+    folder('ep101', 'EP101 — The Late Shift', 1, undefined, true),
+    folder('ep101-010', '010 PAR — Parking Lot', 1, 'ep101', true),
+    folder('ep101-010-plates', 'Plates', 1, 'ep101-010', true),
+    folder('ep101-020', '020 INT — Diner', 2, 'ep101', true),
+    folder('ep101-deliverables', '_Deliverables', 3, 'ep101', true),
+    folder('series-deliverables', '_Deliverables', 2, undefined, true),
+    folder('selects', 'Selects', 3),
+    folder('pickups', 'Pickups', 1, 'selects'),
+    folder('trailer-cuts', 'Trailer cuts', 4),
+    folder('loose-refs', 'Loose references', 5),
+  ];
+  const key = 'review-room.dev.series-folders';
+  function load(): Folder[] { try { return JSON.parse(sessionStorage.getItem(key) ?? '') as Folder[]; } catch { return seed; } }
+  const folders = browser ? load() : seed;
+
+  if (browser) {
+    // Stand-in for the owner `moveFolder` action so a tree drag survives the workspace's reload.
+    const realFetch = window.fetch.bind(window);
+    window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('/studio?/moveFolder') && init?.body instanceof FormData) {
+        const moving = String(init.body.get('folderId'));
+        const parent = String(init.body.get('parentFolderId') ?? '');
+        const next = folders.map(item => item._id !== moving ? item : { ...item, parentFolderId: (parent || undefined) as Id<'projectFolders'> | undefined, order: 99 });
+        sessionStorage.setItem(key, JSON.stringify(next));
+        return new Response('{}', { status: 200 });
+      }
+      return realFetch(input, init);
+    }) as typeof window.fetch;
+  }
+
+  // Takes named by shot code (several versions each), a misfiled drop, a deliverable and its Trailer Feed copy.
+  type Asset = Doc<'videos'>; type Version = Doc<'assetVersions'>;
+  const assets: Asset[] = [], versions: Version[] = [];
+  function asset(id: string, folderId: string, code: string, takes: number, extra: Partial<Asset> = {}) {
+    for (let take = 1; take <= takes; take += 1) versions.push({ _id: `${id}-v${take}` as Id<'assetVersions'>, _creationTime: 1, assetId: id as Id<'videos'>,
+      version: take, originalKey: `assets/${id}/${take}/original.mp4`, mimeType: 'video/mp4', sizeBytes: 100, processingState: 'ready', createdAt: take });
+    assets.push({ _id: id as Id<'videos'>, _creationTime: 1, projectId, folderId: folderId as Id<'projectFolders'>, assetClass: 'VID', assetCode: code, title: code,
+      originalFilename: `${code}.mp4`, storageKey: `assets/${id}/${takes}/original.mp4`, mimeType: 'video/mp4', status: 'awaiting_review', viewed: false, rating: 0,
+      isSelect: false, commentCount: 0, tags: [], downloadEnabled: false, order: assets.length, uploadedBy: ownerId, uploadedAt: assets.length + 1, updatedAt: 1,
+      processingStatus: 'ready', currentVersionId: `${id}-v${takes}` as Id<'assetVersions'>, durationSec: 4, width: 1920, height: 1080, ...extra });
+  }
+  asset('par-0100', 'ep101-010', 'BLR_EP101_PAR_0100', 1);
+  asset('par-0020', 'ep101-010', 'BLR_EP101_PAR_0020', 3);
+  asset('par-0010', 'ep101-010', 'BLR_EP101_PAR_0010', 2);
+  asset('stray', 'ep101-010', 'VID_20261017_00042', 1, { originalFilename: 'outside render FINAL.mov', misfiled: true });
+  asset('trl01', 'series-deliverables', 'BLR_S1_TRL01', 2);
+  asset('trl01-copy', 'trailer-cuts', 'BLR_S1_TRL01', 1, { copiedFromAssetId: 'trl01' as Id<'videos'>, copiedFromVersionId: 'trl01-v2' as Id<'assetVersions'> });
+
+  const snapshot: NonNullable<PageData['snapshot']> = {
+    projects: [{ _id: projectId, _creationTime: 1, title: 'Blood Rush', slug: 'blood-rush', clientName: 'Series · Creative Studio Pro',
+      downloadEnabledByDefault: false, createdBy: ownerId, createdAt: 1, updatedAt: 1 }],
+    folders, connectedFolderIds: ['trailer-cuts' as Id<'projectFolders'>],
+    assets, versions, mediaJobs: [], comments: [], publications: [], showcases: [], links: [], importedMetadata: [], projectIds: [projectId],
+  };
+</script>
+
+<Workspace data={{ snapshot }}/>

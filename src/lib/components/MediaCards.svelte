@@ -6,13 +6,16 @@
   import type { AssetReview, ReviewAccess, ReviewAction } from '$lib/review-session';
   import type { AppearanceValue } from '$lib/appearance';
   import { CARD_FIELD_DEFINITIONS, type CardFieldId } from '$lib/cardFields';
+  import { formatVersion } from '../../../convex/lib/shotCode';
 
   type Asset = ReviewAsset & AssetReview;
-  let { assets, activeId, checkedIds = [], appearance, view, onOpen, onCheck, busyIds = [], access = { kind: 'none' }, onReview, onDragStart, onDragEnd }: {
+  let { assets, activeId, checkedIds = [], appearance, view, onOpen, onCheck, busyIds = [], access = { kind: 'none' }, onReview, onDragStart, onDragEnd, onFixMisfiled }: {
     assets: readonly Asset[]; activeId: string | null; checkedIds?: readonly string[];
     busyIds?: readonly string[];
     access?: ReviewAccess; onReview: (action: ReviewAction) => void;
     onDragStart?: (event: DragEvent, id: string) => void; onDragEnd?: () => void;
+    /** Opens the fix-up for a file dropped into a locked folder without a matching shot code. */
+    onFixMisfiled?: (id: string) => void;
     appearance: AppearanceValue; view: 'grid' | 'list';
     onOpen: (id: string, event: MouseEvent) => void; onCheck?: (id: string, event: MouseEvent, toggle?: boolean) => void;
   } = $props();
@@ -41,7 +44,7 @@
   style:--card-fit={appearance.fit === 'fit' ? 'contain' : 'cover'}
   style:--card-width={appearance.size === 'small' ? '130px' : appearance.size === 'large' ? '280px' : '190px'}>
   {#each assets as asset (asset.id)}
-    <article aria-busy={busyIds.includes(asset.id)} class="media-card" class:active-card={activeId === asset.id} class:checked-card={checkedIds.includes(asset.id)}>
+    <article aria-busy={busyIds.includes(asset.id)} class="media-card" class:active-card={activeId === asset.id} class:checked-card={checkedIds.includes(asset.id)} class:misfiled-card={asset.misfiled}>
       <button type="button" class="card-open" data-asset-id={asset.id} draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} aria-label={`Open ${asset.name}`} aria-current={activeId === asset.id ? 'true' : undefined}
         onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id, event)}>
         <div class="thumbnail">
@@ -51,8 +54,8 @@
         </div>
       </button>
       {#if appearance.showInfo}<div class="card-body">
-        <button class="card-name" type="button" draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} title={asset.name} onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id, event)}>{asset.name}</button>
-        {#if fields.length}<div class="card-fields">{#each fields as field (field)}
+        <button class="card-name" type="button" draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} title={asset.name} onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id, event)}>{asset.name}{#if asset.versionNumber}<span class="version-tag">{formatVersion(asset.versionNumber)}</span>{/if}</button>
+  {#if fields.length}<div class="card-fields">{#each fields as field (field)}
           {#if field === 'status'}<AssetStatusMenu status={asset.status} name={asset.name} access={busyIds.includes(asset.id) ? { kind: 'none' } : access} onChange={status => onReview({ type: 'status', assetId: asset.id, status })}/>
           {:else if field === 'rating'}<div class="card-rating" role="group" aria-label={`Rating for ${asset.name}`}>
             {#each [1, 2, 3, 4, 5] as rating (rating)}<button type="button" class="card-star" class:filled={asset.rating >= rating} aria-label={`Rate ${asset.name} ${rating} stars`} aria-pressed={asset.rating === rating} title={asset.rating === rating ? 'Clear rating' : `${rating} stars`} disabled={access.kind === 'none' || busyIds.includes(asset.id) || asset.status === 'archived'} onclick={() => onReview({ type: 'rate', assetId: asset.id, rating: asset.rating === rating ? 0 : rating })}><Star size={14} fill={asset.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}
@@ -60,6 +63,7 @@
           {:else}<span title={`${labels[field]}: ${fieldValue(asset, field)}`} aria-label={`${labels[field]}: ${fieldValue(asset, field)}`}>{fieldValue(asset, field)}</span>{/if}
         {/each}</div>{/if}
       </div>{/if}
+      {#if asset.misfiled}{#if onFixMisfiled}<button type="button" class="misfiled-badge" title="Dropped without a matching shot code. File it as a take or move it." onclick={() => onFixMisfiled(asset.id)}>Misfiled · File…</button>{:else}<span class="misfiled-badge">Misfiled</span>{/if}{/if}
       {#if onCheck}<button type="button" class="card-check" role="checkbox" aria-checked={checkedIds.includes(asset.id)} aria-label={`Select ${asset.name}`} title={`Select ${asset.name}`} onclick={event => onCheck(asset.id, event, true)}>
         {#if checkedIds.includes(asset.id)}<Check size={12}/>{/if}
       </button>{/if}
@@ -83,6 +87,12 @@
   .card-check:focus-visible { outline:2px solid var(--teal); outline-offset:3px; }
   .card-body { min-width: 0; padding: 8px 10px; }
   .card-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 12px; font-weight: 550; text-align: left; }
+  .misfiled-card { box-shadow: 0 0 0 1px color-mix(in srgb, var(--status-needs-changes) 70%, transparent); border-radius: 6px; }
+  .misfiled-badge { position: absolute; top: 6px; right: 6px; z-index: 2; padding: 1px 6px; border: 0; border-radius: 4px; background: #3a1d1d; color: var(--status-needs-changes); font: inherit; font-size: 10px; font-weight: 600; }
+  button.misfiled-badge { cursor: pointer; }
+  button.misfiled-badge:hover { background: #4a2323; }
+  button.misfiled-badge:focus-visible { outline: 1px solid var(--status-needs-changes); outline-offset: 2px; }
+  .version-tag { margin-left: 6px; color: var(--muted); font-size: .86em; font-variant-numeric: tabular-nums; }
   .card-name:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }
   .card-rating { display: flex; flex: 0 0 100%; min-width: 0; }
   .card-star { display: grid; place-items: center; flex: 0 1 24px; min-width: 0; height: 28px; padding: 0; background: transparent; color: var(--muted); border-radius: 3px; }

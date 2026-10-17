@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getProjectForAdmin, getProjectForEditor } from "./lib/access";
 import { validateFolderParent, disposeFolder, folderNameKey } from './lib/folderTree';
+import { assertFolderChangeable } from './lib/folderLock';
 
 const folderRemovalDisposition = v.union(
   v.literal("move_to_root"),
@@ -40,6 +41,8 @@ export const create = mutation({
       .withIndex("by_project", (q) => q.eq("projectId", project._id))
       .collect();
     await validateFolderParent(ctx, project._id, args.parentFolderId);
+    const parent = siblings.find(folder => folder._id === args.parentFolderId);
+    if (parent) assertFolderChangeable(parent, {}, 'given new subfolders');
     if (siblings.some(folder => folder.parentFolderId === args.parentFolderId && folderNameKey(folder.title) === folderNameKey(title))) throw new Error('A folder with that name already exists');
     const maxOrder = siblings.filter(folder => folder.parentFolderId === args.parentFolderId).reduce((max, folder) => Math.max(max, folder.order), 0);
     const now = Date.now();
@@ -70,6 +73,7 @@ export const rename = mutation({
     if (admin.role !== "admin") throw new Error("Admin required");
     const title = args.title.trim();
     if (!title) throw new Error("Folder name is required");
+    assertFolderChangeable(folder, {}, 'renamed');
 
     const siblings = await ctx.db
       .query("projectFolders")

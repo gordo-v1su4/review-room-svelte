@@ -116,6 +116,9 @@ const applicationTables = {
     parentFolderId: v.optional(v.id("projectFolders")),
     title: v.string(),
     coverImageKey: v.optional(v.string()),
+    // An owned folder is locked: only the owning automation credential may rename, move or delete it.
+    ownerApp: v.optional(v.literal("creative-studio-pro")),
+    ownerCredentialId: v.optional(v.id("automationCredentials")),
     order: v.number(),
     createdBy: v.id("appUsers"),
     createdAt: v.number(),
@@ -132,6 +135,16 @@ const applicationTables = {
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index('by_source', ['sourceApp', 'sourceProjectId']).index('by_project', ['projectId']),
+
+  // Assets removed in a way an integration must hear about (a misfiled drop filed as another shot's take).
+  removedAssets: defineTable({
+    projectId: v.id("projects"),
+    assetId: v.id("videos"),
+    folderId: v.optional(v.id("projectFolders")),
+    mergedIntoAssetId: v.optional(v.id("videos")),
+    reason: v.literal("filed_as_take"),
+    removedAt: v.number(),
+  }).index("by_project_removed", ["projectId", "removedAt"]),
 
   automationCredentials: defineTable({
     name: v.string(),
@@ -206,12 +219,21 @@ const applicationTables = {
       ),
     ),
     currentVersionId: v.optional(v.id("assetVersions")),
+    // Dropped into a locked folder without a matching shot code; awaiting fix-up.
+    misfiled: v.optional(v.boolean()),
+    // Latest change to any of this asset's versions; lets the changes feed skip unchanged take histories.
+    versionsUpdatedAt: v.optional(v.number()),
+    // A copy (for Trailer Feed submission) shares the source version's stored files and keeps its code.
+    copiedFromAssetId: v.optional(v.id("videos")),
+    copiedFromVersionId: v.optional(v.id("assetVersions")),
+    copiedAt: v.optional(v.number()),
   })
     .index("by_project", ["projectId"])
     .index("by_project_folder", ["projectId", "folderId"])
     .index("by_project_status", ["projectId", "status"])
     .index("by_project_uploadedAt", ["projectId", "uploadedAt"])
-    .index("by_project_processing", ["projectId", "processingStatus"]),
+    .index("by_project_processing", ["projectId", "processingStatus"])
+    .index("by_project_code", ["projectId", "assetCode"]),
 
   comments: defineTable({
     videoId: v.id("videos"),
@@ -277,14 +299,26 @@ const applicationTables = {
     processingState: v.union(v.literal("processing"), v.literal("ready"), v.literal("error")),
     creativeMetadata: v.optional(creativeMetadata),
     metadataUpdatedAt: v.optional(v.number()),
+    // Last change to processing state, asset membership or number; the changes feed reads it.
+    updatedAt: v.optional(v.number()),
+    // This version's own media dimensions, so picking an older take restores them.
+    durationSec: v.optional(v.number()),
+    width: v.optional(v.number()),
+    height: v.optional(v.number()),
     createdAt: v.number(),
-  }).index("by_asset", ["assetId"]),
+  }).index("by_asset", ["assetId"]).index("by_original_key", ["originalKey"]).index("by_poster_key", ["posterKey"]),
 
   uploadSessions: defineTable({
     projectId: v.id("projects"),
     folderId: v.optional(v.id("projectFolders")),
     automationCredentialId: v.optional(v.id("automationCredentials")),
     assetId: v.optional(v.id("videos")),
+    // Creative Studio Pro shot/deliverable code requested for a new asset.
+    assetCode: v.optional(v.string()),
+    // assetId was resolved from assetCode: a take for that shot, whatever its review status.
+    takeOfCode: v.optional(v.boolean()),
+    // Add the version without changing the asset's current version (the pick).
+    keepCurrentVersion: v.optional(v.boolean()),
     completedAssetId: v.optional(v.id("videos")),
     completedJobId: v.optional(v.id("mediaJobs")),
     objectKey: v.string(),
@@ -313,7 +347,8 @@ const applicationTables = {
     spriteKey: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_asset", ["assetId"]).index("by_version", ["versionId"]),
+  }).index("by_asset", ["assetId"]).index("by_version", ["versionId"])
+    .index("by_thumbnail_key", ["thumbnailKey"]).index("by_sprite_key", ["spriteKey"]),
 
   storageDeletionJobs: defineTable({
     keys: v.array(v.string()),

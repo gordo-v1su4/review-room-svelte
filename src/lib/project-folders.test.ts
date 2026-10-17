@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { transitionFolderState, folderCoverUrl, type FolderState } from './project-folders';
+import { transitionFolderState, folderCoverUrl, canRestructureFolder, type FolderState } from './project-folders';
 const admin = { isAdmin: true, editableProjectIds: ['p'] };
 const empty: FolderState = { folders: [], placements: {} };
 test('admin creates a flat folder and members register imports without folder management access', () => {
@@ -100,4 +100,28 @@ test('automatic cover prefers the newest image in the folder, then video posters
   expect(folderCoverUrl(folder, [video])).toBe('blob:poster');
   expect(folderCoverUrl(folder, [{ ...video, poster: undefined }])).toBeUndefined();
   expect(folderCoverUrl(folder, [])).toBeUndefined();
+});
+
+const series: FolderState = { folders: [
+  { id: 'ep', projectId: 'p', title: 'EP101 — The Late Shift', order: 1, locked: true },
+  { id: 'sc', projectId: 'p', title: '010 PAR — Parking Lot', order: 1, parentFolderId: 'ep', locked: true },
+  { id: 'n', projectId: 'p', title: 'Selects', order: 2 },
+  { id: 'holder', projectId: 'p', title: 'Holder', order: 3 },
+  { id: 'del', projectId: 'p', title: '_Deliverables', order: 1, parentFolderId: 'holder', locked: true },
+], placements: { a: { projectId: 'p' } } };
+test('locked folders refuse rename, move, delete and new subfolders but accept media', () => {
+  expect(() => transitionFolderState(series, { type: 'rename', folderId: 'ep', title: 'X' }, admin)).toThrow('locked');
+  expect(() => transitionFolderState(series, { type: 'reparent', folderId: 'sc', parentFolderId: 'n' }, admin)).toThrow('locked');
+  expect(() => transitionFolderState(series, { type: 'remove', folderId: 'sc', disposition: 'move_to_root' }, admin)).toThrow('locked');
+  expect(() => transitionFolderState(series, { type: 'create', id: 'x', projectId: 'p', title: 'Stray', parentFolderId: 'sc' }, admin)).toThrow('locked');
+  expect(() => transitionFolderState(series, { type: 'reparent', folderId: 'n', parentFolderId: 'ep' }, admin)).toThrow('locked');
+  expect(() => transitionFolderState(series, { type: 'reparent', folderId: 'holder', parentFolderId: 'n' }, admin)).toThrow('locked');
+  expect(transitionFolderState(series, { type: 'move', projectId: 'p', assetIds: ['a'], folderId: 'sc' }, admin).placements.a?.folderId).toBe('sc');
+  expect(transitionFolderState(series, { type: 'reparent', folderId: 'n', parentFolderId: 'holder' }, admin).folders.find(f => f.id === 'n')?.parentFolderId).toBe('holder');
+});
+test('only unlocked folders without locked descendants can be restructured', () => {
+  expect(canRestructureFolder(series.folders, 'ep')).toBe(false);
+  expect(canRestructureFolder(series.folders, 'holder')).toBe(false);
+  expect(canRestructureFolder(series.folders, 'n')).toBe(true);
+  expect(canRestructureFolder(series.folders, 'missing')).toBe(false);
 });

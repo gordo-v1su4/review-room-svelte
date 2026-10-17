@@ -1,5 +1,6 @@
 import type { MutationCtx } from '../_generated/server';
 import type { Doc, Id } from '../_generated/dataModel';
+import { assertFolderChangeable, type FolderActor } from './folderLock';
 
 export function folderNameKey(value: string) { return value.trim().toLowerCase(); }
 
@@ -20,7 +21,8 @@ export async function requireEmptyChildFolders(ctx: MutationCtx, folderId: Id<'p
   if (folders.some(folder => folder.parentFolderId === folderId)) throw new Error('Move or remove subfolders first');
 }
 
-export async function disposeFolder(ctx: MutationCtx, folder: Doc<'projectFolders'>, disposition: 'move_to_root' | 'archive_assets') {
+export async function disposeFolder(ctx: MutationCtx, folder: Doc<'projectFolders'>, disposition: 'move_to_root' | 'archive_assets', actor: FolderActor = {}) {
+  assertFolderChangeable(folder, actor, 'deleted');
   await requireEmptyChildFolders(ctx, folder._id, folder.projectId);
   const sessions = await ctx.db.query('uploadSessions').withIndex('by_project', q => q.eq('projectId', folder.projectId)).collect();
   const now = Date.now();
