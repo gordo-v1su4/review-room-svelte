@@ -4,6 +4,8 @@ import { randomSecret } from './reviewAccess';
 import { reserveAssetNumber } from './assetNumber';
 import { validateFolderParent, folderNameKey } from './folderTree';
 import { parseProductionCode } from './shotCode';
+import { shotForDroppedFile } from './misfiled';
+import { isLockedFolder } from './folderLock';
 import { assertFolderChangeable, assertSubtreeChangeable, type FolderActor, type FolderOwnerApp } from './folderLock';
 
 function title(value: string, kind: string) {
@@ -130,10 +132,8 @@ export async function beginPersonalUpload(ctx: MutationCtx, ownerId: Id<'appUser
     if (!asset || asset.projectId !== project._id || asset.status !== 'approved') throw new Error('Approved asset unavailable');
     requireUploadFamily(asset, input.mimeType);
   }
-  if (input.folderId) {
-    const folder = await ctx.db.get(input.folderId);
-    if (!folder || folder.projectId !== project._id) throw new Error('Folder unavailable');
-  }
+  const folder = input.folderId ? await ctx.db.get(input.folderId) : null;
+  if (input.folderId && (!folder || folder.projectId !== project._id)) throw new Error('Folder unavailable');
   if (input.assetCode !== undefined && input.assetId) throw new Error('Asset code applies only to new assets');
   // Upload by code: an existing shot in this folder takes the upload as its next version; otherwise a new asset gets the code.
   let assetId = input.assetId, assetCode: string | undefined, takeOfCode = false;
@@ -142,6 +142,10 @@ export async function beginPersonalUpload(ctx: MutationCtx, ownerId: Id<'appUser
     const existing = await findAssetByCode(ctx, project._id, code);
     if (existing && (existing.folderId ?? null) !== (input.folderId ?? null)) throw new Error('Asset code already exists in another folder of this project');
     if (existing) { requireUploadFamily(existing, input.mimeType); assetId = existing._id; takeOfCode = true; } else assetCode = code;
+  } else if (!assetId && folder) {
+    // A file dropped into a locked folder by hand: its filename's shot code picks the shot.
+    const shot = await shotForDroppedFile(ctx, project._id, folder, input.originalFilename);
+    if (shot && shot.mimeType.startsWith('video/') === input.mimeType.startsWith('video/')) { assetId = shot._id; takeOfCode = true; }
   }
   const extensions: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
   const extension = input.originalFilename.match(/\.([a-zA-Z0-9]{1,8})$/)?.[1]?.toLowerCase() ?? extensions[input.mimeType] ?? 'bin';
@@ -176,10 +180,10 @@ export async function finalizePersonalUpload(ctx: MutationCtx, ownerId: Id<'appU
   }
   if (session.status !== 'finalizing' || session.expiresAt <= Date.now() ||
     session.sizeBytes !== args.verifiedSizeBytes) throw new Error('Upload verification failed');
-  if (session.folderId) {
-    const folder = await ctx.db.get(session.folderId);
-    if (!folder || folder.projectId !== project._id) throw new Error('Folder unavailable');
-  }
+  const folder = session.folderId ? await ctx.db.get(session.folderId) : null;
+  if (session.folderId && (!folder || folder.projectId !== project._id)) throw new Error('Folder unavailable');
+  // Without a code, a new asset in a locked folder is misfiled until someone files it.
+  const misfiled = !!folder && isLockedFolder(folder) && !session.assetCode;
   const isImage = session.mimeType.startsWith('image/');
   const processing = !!args.processWithTrigger && !isImage;
   if (args.posterKey !== `${session.objectKey.slice(0, session.objectKey.lastIndexOf('/'))}/poster.jpg` ||
@@ -209,6 +213,7 @@ export async function finalizePersonalUpload(ctx: MutationCtx, ownerId: Id<'appU
       status: 'awaiting_review', viewed: false, rating: 0, isSelect: false, commentCount: 0,
       tags: [], downloadEnabled: false, order: number, uploadedBy: ownerId,
       uploadedAt: now, updatedAt: now, processingStatus: processing ? 'processing' : 'ready',
+      ...(misfiled ? { misfiled: true } : {}),
     });
     await ctx.db.patch(project._id, { nextAssetNumber: number + 1, updatedAt: now });
   }

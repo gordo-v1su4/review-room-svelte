@@ -11,6 +11,7 @@ import { getReviewLink, passcodeDigest, randomSecret } from "./lib/reviewAccess"
 import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, movePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
 import { validateFolderParent, disposeFolder } from './lib/folderTree';
 import { setCurrentAssetVersion } from './lib/seriesAssets';
+import { fileAsTake, moveMisfiled } from './lib/misfiled';
 
 const OWNER_EMAIL = "owner@review-room.invalid";
 type Ctx = QueryCtx | MutationCtx;
@@ -293,6 +294,22 @@ export const setCurrentVersion = internalMutation({
   handler: async (ctx, args) => {
     const profile = await owner(ctx);
     return await setCurrentAssetVersion(ctx, profile._id, args.assetId, args.versionId);
+  },
+});
+
+export const fileMisfiledAsTake = internalMutation({
+  args: { assetId: v.id('videos'), shotId: v.id('videos') },
+  handler: async (ctx, args) => {
+    const profile = await owner(ctx);
+    return await fileAsTake(ctx, profile._id, args.assetId, args.shotId);
+  },
+});
+
+export const moveMisfiledAsset = internalMutation({
+  args: { assetId: v.id('videos'), folderId: v.optional(v.id('projectFolders')) },
+  handler: async (ctx, args) => {
+    const profile = await owner(ctx);
+    return await moveMisfiled(ctx, profile._id, args.assetId, args.folderId);
   },
 });
 

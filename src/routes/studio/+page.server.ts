@@ -51,6 +51,15 @@ export const actions: Actions = {
     requireOwner(cookies); const form = await request.formData();
     await db().mutation(personal.setCurrentVersion, { assetId: value(form, 'assetId') as Id<'videos'>, versionId: value(form, 'versionId') as Id<'assetVersions'> }); done();
   },
+  fileMisfiledAsTake: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    await db().mutation(personal.fileMisfiledAsTake, { assetId: value(form, 'assetId') as Id<'videos'>, shotId: value(form, 'shotId') as Id<'videos'> }); done();
+  },
+  moveMisfiledAsset: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    await db().mutation(personal.moveMisfiledAsset, { assetId: value(form, 'assetId') as Id<'videos'>,
+      folderId: value(form, 'folderId') ? value(form, 'folderId') as Id<'projectFolders'> : undefined }); done();
+  },
   removeFolder: async ({ cookies, request }) => {
     requireOwner(cookies); const form = await request.formData();
     const assetDisposition = value(form, 'assetDisposition');

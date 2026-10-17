@@ -136,6 +136,16 @@ const applicationTables = {
     updatedAt: v.number(),
   }).index('by_source', ['sourceApp', 'sourceProjectId']).index('by_project', ['projectId']),
 
+  // Assets removed in a way an integration must hear about (a misfiled drop filed as another shot's take).
+  removedAssets: defineTable({
+    projectId: v.id("projects"),
+    assetId: v.id("videos"),
+    folderId: v.optional(v.id("projectFolders")),
+    mergedIntoAssetId: v.optional(v.id("videos")),
+    reason: v.literal("filed_as_take"),
+    removedAt: v.number(),
+  }).index("by_project_removed", ["projectId", "removedAt"]),
+
   automationCredentials: defineTable({
     name: v.string(),
     keyDigest: v.string(),

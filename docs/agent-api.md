@@ -30,7 +30,7 @@ Issue Creative Studio Pro one credential per series, restricted to that Review R
 - **Upload a take by code.** Begin-upload with `folderId` and `assetCode`. If that shot already exists in the folder, the upload becomes its next version (the response carries its `assetId`); otherwise a new asset is created with the code. A code living in another folder is `409`. Add `"keepCurrentVersion": true` to add a take without changing the pick.
 - **Set the pick.** `PUT /api/v1/assets/{assetId}/current-version` with `{"versionId":"…"}` (Idempotency-Key). The pick is Review Room's current version; people can also change it in the workspace (Make current).
 - **Version metadata.** `PUT /api/v1/versions/{versionId}/metadata` with `{"metadata":{…},"expectedUpdatedAt":<revision or null>}` writes model, prompt, references and `gridImageVersionId`; `GET` on the same path reads it back. A stale revision is `409`.
-- **Changes since a cursor.** `GET /api/v1/projects/{projectId}/changes?since=0[&folderId=…]` lists changed assets (code, status, `currentVersionId`, `misfiled`) and their changed versions. Store the returned `cursor` and pass it next time; items near the cursor may repeat, so upsert by ID. Deletions are not reported.
+- **Changes since a cursor.** `GET /api/v1/projects/{projectId}/changes?since=0[&folderId=…]` lists changed assets (code, status, `currentVersionId`, `misfiled`) and their changed versions. Store the returned `cursor` and pass it next time; items near the cursor may repeat, so upsert by ID. `removedAssets` lists misfiled drops that were filed as another shot's take (`mergedIntoAssetId`); other deletions are not reported.
 
 ## Locked folders (Creative Studio Pro)
 
@@ -39,6 +39,7 @@ A folder created with `{"title":"EP101 — The Late Shift","ownerApp":"creative-
 - Only the owning credential may rename, move or delete a locked folder, or create subfolders inside it. Anyone else — Review Room users in the workspace and every other credential — gets `403` with a message naming the folder and its owner app. Moving an ordinary folder that contains someone else's locked folder is refused the same way.
 - `DELETE /api/v1/projects/{projectId}/folders/{folderId}?assets=move_to_root|archive_assets` (with `Idempotency-Key`) deletes a locked folder the caller owns. Automation never deletes ordinary folders (`403`). Remove subfolders first (`409`).
 - Adding media inside a locked folder is allowed for everyone who can upload to the project.
+- Files dropped into a locked folder by hand (workspace upload, no `assetCode`) are matched by filename: `BLR_EP101_PAR_0020.mp4` or `…_v007.mov` becomes the next version of that shot if it already lives in the folder (the file's own `_v###` is ignored). Anything else is kept but flagged `misfiled: true` until someone files it as a take or moves it to the right folder in the workspace.
 - Locked folders cannot be connected to Trailer Feed. Copy deliverables into an ordinary folder first and connect that folder.
 - Ownership is tied to the credential ID, so revoking the owning credential leaves its folders locked. Keep the Creative Studio Pro credential long-lived.
 

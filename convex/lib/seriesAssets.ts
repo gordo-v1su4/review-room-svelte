@@ -33,6 +33,8 @@ export type ChangeFeed = {
     currentVersionId: Id<'assetVersions'> | null; misfiled: boolean; updatedAt: number }[];
   versions: { versionId: Id<'assetVersions'>; assetId: Id<'videos'>; version: number; isCurrent: boolean; processingState: Doc<'assetVersions'>['processingState'];
     mimeType: string; createdAt: number; metadataUpdatedAt: number | null }[];
+  /** Assets that no longer exist, e.g. a misfiled drop that became another shot's take. */
+  removedAssets: { assetId: Id<'videos'>; folderId: Id<'projectFolders'> | null; mergedIntoAssetId: Id<'videos'> | null; reason: string; removedAt: number }[];
 };
 
 /** Assets (and their versions) in a project or one folder that changed after `since`. Items near the cursor may repeat: treat it as an upsert feed. */
@@ -42,7 +44,12 @@ export async function changesSince(ctx: QueryCtx | MutationCtx, projectId: Id<'p
     : await ctx.db.query('videos').withIndex('by_project', q => q.eq('projectId', projectId)).collect();
   const after = since - CURSOR_OVERLAP_MS;
   let cursor = since;
-  const feed: ChangeFeed = { cursor: '', assets: [], versions: [] };
+  const feed: ChangeFeed = { cursor: '', assets: [], versions: [], removedAssets: [] };
+  for (const removed of await ctx.db.query('removedAssets').withIndex('by_project_removed', q => q.eq('projectId', projectId).gt('removedAt', after)).collect()) {
+    if (folderId && removed.folderId !== folderId) continue;
+    cursor = Math.max(cursor, removed.removedAt);
+    feed.removedAssets.push({ assetId: removed.assetId, folderId: removed.folderId ?? null, mergedIntoAssetId: removed.mergedIntoAssetId ?? null, reason: removed.reason, removedAt: removed.removedAt });
+  }
   for (const asset of assets) {
     if (asset.updatedAt <= after) continue;
     cursor = Math.max(cursor, asset.updatedAt);

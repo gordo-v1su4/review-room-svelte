@@ -43,7 +43,8 @@
   import ImportOptions from '$lib/components/ImportOptions.svelte';
   import FolderActions from '$lib/components/FolderActions.svelte';
   import CodeLegend from '$lib/components/CodeLegend.svelte';
-  import { parseProductionCode } from '../../convex/lib/shotCode';
+  import MisfiledDialog from '$lib/components/MisfiledDialog.svelte';
+  import { compareCodes, parseProductionCode } from '../../convex/lib/shotCode';
   import ProjectIdentityDialog from '$lib/components/ProjectIdentityDialog.svelte';
   import ShareDialog from '$lib/components/ShareDialog.svelte';
   import DestinationSyncDialog from '$lib/components/DestinationSyncDialog.svelte';
@@ -330,6 +331,11 @@
       if (discardDraft && metadataSaves[versionId]?.busy) metadataSaves[versionId] = previousSaveState ?? { busy: false, message: '' };
     }
   }
+  let misfiledAssetId = $state<string | null>(null), misfiledOpen = $state(false);
+  const misfiledAsset = $derived(misfiledAssetId ? allAssets.find(asset => asset.id === misfiledAssetId) : undefined);
+  const misfiledShots = $derived(misfiledAsset ? allAssets.filter(asset => asset.projectId === misfiledAsset.projectId && asset.folderId === misfiledAsset.folderId && !asset.misfiled && !!parseProductionCode(asset.assetCode) && asset.type === misfiledAsset.type)
+    .sort((a, b) => compareCodes(a.assetCode, b.assetCode)).map(asset => ({ value: asset.id, label: asset.assetCode })) : []);
+  const misfiledFolders = $derived(misfiledAsset ? [{ value: '__root__', label: 'Project root' }, ...folderDestinations.filter(folder => folder.id !== misfiledAsset.folderId).map(folder => ({ value: folder.id, label: folder.title }))] : []);
   async function makeCurrentVersion(assetId: string, versionId: string) {
     try { await ownerAction('setCurrentVersion', { assetId, versionId }); }
     catch (cause) { feedback = cause instanceof Error ? cause.message : 'Could not change the current version.'; }
@@ -979,6 +985,7 @@
         size: item.sizeBytes ?? 0, sourceFile: { name: item.originalFilename ?? item.title, type: item.mimeType ?? 'video/mp4' },
         assetClass: item.mimeType?.startsWith('image/') ? 'IMG' as const : 'VID' as const, importedAt: item.uploadedAt,
         tags: item.tags, assetCode: item.assetCode ?? '',
+        ...(item.misfiled ? { misfiled: true } : {}),
         versionId: item.currentVersionId, versionNumber: data.snapshot.versions.find(version => version._id === item.currentVersionId)?.version, metadataUpdatedAt: data.snapshot.versions.find(version => version._id === item.currentVersionId)?.metadataUpdatedAt ?? null,
         metadata: displayVersionMetadata(
           data.snapshot.versions.find(version => version._id === item.currentVersionId)?.creativeMetadata ?? null,
@@ -1175,7 +1182,7 @@
               <section class="media-group" aria-label={filters.groupBy === 'none' ? 'Assets' : group.label}>
                 {#if filters.groupBy !== 'none'}<h3 class="group-heading">{group.label}<span>{group.assets.length}</span></h3>{/if}
                 {#if view === 'table'}<AssetTable onDragStart={startAssetDrag} onDragEnd={endAssetDrag} assets={group.assets} {activeId} checkedIds={checked.ids} onSelect={openReview} onCheck={checkAsset} onReview={review}/>
-                {:else}<MediaCards onDragStart={startAssetDrag} onDragEnd={endAssetDrag} access={localAccess} onReview={review} assets={group.assets} {activeId} checkedIds={checked.ids} {appearance} {view} onOpen={openReview} onCheck={checkAsset}/>{/if}
+                {:else}<MediaCards onFixMisfiled={live ? id => { misfiledAssetId = id; misfiledOpen = true; } : undefined} onDragStart={startAssetDrag} onDragEnd={endAssetDrag} access={localAccess} onReview={review} assets={group.assets} {activeId} checkedIds={checked.ids} {appearance} {view} onOpen={openReview} onCheck={checkAsset}/>{/if}
               </section>
             {/each}
           {/if}
@@ -1209,6 +1216,7 @@
   </main>
 </div>
 
+{#if misfiledAsset}<MisfiledDialog bind:open={misfiledOpen} assetName={misfiledAsset.name} filename={misfiledAsset.sourceFile.name} shots={misfiledShots} folders={misfiledFolders} onFileAsTake={shotId => ownerAction('fileMisfiledAsTake', { assetId: misfiledAsset.id, shotId })} onMove={folderId => ownerAction('moveMisfiledAsset', { assetId: misfiledAsset.id, folderId: folderId ?? '' })}/>{/if}
 {#if live && projectId !== "__empty__"}<DestinationSyncDialog bind:open={destinationDialogOpen} {projectId} folderId={activeFolderId} selectedVersionIds={destinationSelection}/>{/if}
 <Dialog.Root bind:open={projectDialog}>
   <Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="filter-sheet">
