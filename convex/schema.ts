@@ -297,6 +297,12 @@ const applicationTables = {
     processingState: v.union(v.literal("processing"), v.literal("ready"), v.literal("error")),
     creativeMetadata: v.optional(creativeMetadata),
     metadataUpdatedAt: v.optional(v.number()),
+    // Last change to processing state, asset membership or number; the changes feed reads it.
+    updatedAt: v.optional(v.number()),
+    // This version's own media dimensions, so picking an older take restores them.
+    durationSec: v.optional(v.number()),
+    width: v.optional(v.number()),
+    height: v.optional(v.number()),
     createdAt: v.number(),
   }).index("by_asset", ["assetId"]).index("by_original_key", ["originalKey"]).index("by_poster_key", ["posterKey"]),
 

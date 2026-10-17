@@ -51,3 +51,11 @@ test('code sort orders shot codes naturally', () => {
   const sorted = queryWorkspace([asset('a', 'BLR_EP101_PAR_0100'), asset('b', 'BLR_EP101_PAR_0020'), asset('c', 'BLR_EP101_DIN_0010')], { sort: 'code' });
   expect(sorted.map(item => item.assetCode)).toEqual(['BLR_EP101_DIN_0010', 'BLR_EP101_PAR_0020', 'BLR_EP101_PAR_0100']);
 });
+
+test('default sort is newest outside folders; an explicit newest stays newest', () => {
+  const asset = (id: string, assetCode: string, importedAt: number) => ({ id, name: assetCode, assetCode, importedAt, status: 'awaiting_review' as const, rating: 0, shortlisted: false, type: 'video' as const });
+  const items = [asset('a', 'BLR_EP101_PAR_0020', 1), asset('b', 'BLR_EP101_PAR_0010', 2)];
+  expect(queryWorkspace(items, { sort: 'default' }).map(item => item.id)).toEqual(['b', 'a']);
+  expect(queryWorkspace(items, { sort: 'newest' }).map(item => item.id)).toEqual(['b', 'a']);
+  expect(queryWorkspace(items, { sort: 'code' }).map(item => item.id)).toEqual(['b', 'a']);
+});

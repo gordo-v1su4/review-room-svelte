@@ -221,7 +221,8 @@ export async function finalizePersonalUpload(ctx: MutationCtx, ownerId: Id<'appU
   const versionId = await ctx.db.insert('assetVersions', {
     assetId, version, originalKey: session.objectKey, posterKey: args.posterKey,
     mimeType: session.mimeType, sizeBytes: session.sizeBytes, etag: args.etag,
-    processingState: processing ? 'processing' : 'ready', createdAt: now,
+    processingState: processing ? 'processing' : 'ready', createdAt: now, updatedAt: now,
+    ...(isImage ? {} : { durationSec: args.durationSec }), width: args.width, height: args.height,
   });
   const keepPick = !!session.keepCurrentVersion && !!session.assetId && !!(await ctx.db.get(assetId))?.currentVersionId;
   if (keepPick) await ctx.db.patch(assetId, { updatedAt: now });

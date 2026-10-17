@@ -77,7 +77,7 @@ export const complete = internalMutation({
     const version = await ctx.db.get(job.versionId);
     const asset = await ctx.db.get(job.assetId);
     if (!version || !asset || version.assetId !== asset._id) throw new Error('Media job asset unavailable');
-    await ctx.db.patch(version._id, { processingState: 'ready' });
+    await ctx.db.patch(version._id, { processingState: 'ready', durationSec: args.durationSec, width: args.width, height: args.height, updatedAt: Date.now() });
     // A newer upload can supersede this run. Never point the asset back to an older version.
     if (asset.currentVersionId === version._id) {
       await ctx.db.patch(asset._id, {
@@ -108,7 +108,7 @@ export const fail = internalMutation({
       await ctx.db.patch(asset._id, { processingStatus: 'error', updatedAt: Date.now() });
     }
     const version = await ctx.db.get(job.versionId);
-    if (version) await ctx.db.patch(version._id, { processingState: 'error' });
+    if (version) await ctx.db.patch(version._id, { processingState: 'error', updatedAt: Date.now() });
     return true;
   },
 });
@@ -122,7 +122,7 @@ export const retry = internalMutation({
     await ctx.db.patch(jobId, { status: 'queued', stage: 'verify', attempt,
       runId: undefined, error: undefined, updatedAt: Date.now() });
     const version = await ctx.db.get(job.versionId);
-    if (version) await ctx.db.patch(version._id, { processingState: 'processing' });
+    if (version) await ctx.db.patch(version._id, { processingState: 'processing', updatedAt: Date.now() });
     const asset = await ctx.db.get(job.assetId);
     if (asset?.currentVersionId === job.versionId) {
       await ctx.db.patch(asset._id, { processingStatus: 'processing', updatedAt: Date.now() });

@@ -34,7 +34,7 @@ export async function fileAsTake(ctx: MutationCtx, ownerId: Id<'appUsers'>, asse
   const existing = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', shot._id)).collect();
   const moving = (await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', stray._id)).collect()).sort((a, b) => a.version - b.version);
   let next = Math.max(0, ...existing.map(version => version.version));
-  for (const version of moving) await ctx.db.patch(version._id, { assetId: shot._id, version: ++next });
+  for (const version of moving) await ctx.db.patch(version._id, { assetId: shot._id, version: ++next, updatedAt: Date.now() });
   for (const job of await ctx.db.query('mediaJobs').withIndex('by_asset', q => q.eq('assetId', stray._id)).collect()) await ctx.db.patch(job._id, { assetId: shot._id });
   for (const comment of await ctx.db.query('comments').withIndex('by_video', q => q.eq('videoId', stray._id)).collect()) {
     await ctx.db.patch(comment._id, { videoId: shot._id });

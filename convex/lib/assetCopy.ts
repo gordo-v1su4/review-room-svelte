@@ -2,6 +2,7 @@ import type { MutationCtx } from '../_generated/server';
 import type { Id } from '../_generated/dataModel';
 import { reserveAssetNumber } from './assetNumber';
 import { isLockedFolder } from './folderLock';
+import { versionDimensions } from './seriesAssets';
 
 /**
  * Storage keys still used by assets outside `deletingAssetIds`. A copy shares its original's
@@ -48,14 +49,15 @@ export async function copyAssetsToFolder(ctx: MutationCtx, ownerId: Id<'appUsers
     const copyId = await ctx.db.insert('videos', {
       projectId, folderId, assetClass: asset.assetClass, assetNumber: number, assetCode: asset.assetCode, title: asset.title,
       originalFilename: asset.originalFilename, storageKey: version.originalKey, thumbnailKey: job?.thumbnailKey ?? version.posterKey, spriteKey: job?.spriteKey,
-      mimeType: version.mimeType, sizeBytes: version.sizeBytes, durationSec: job?.durationSec ?? asset.durationSec, width: job?.width ?? asset.width, height: job?.height ?? asset.height,
+      mimeType: version.mimeType, sizeBytes: version.sizeBytes, ...versionDimensions(version, job?.status === 'ready' ? job : null),
       status: 'awaiting_review', viewed: false, rating: 0, isSelect: false, commentCount: 0, tags: [...asset.tags], downloadEnabled: false,
       order: number, uploadedBy: ownerId, uploadedAt: now, updatedAt: now, processingStatus: 'ready',
       copiedFromAssetId: asset._id, copiedFromVersionId: version._id, copiedAt: now,
     });
     const copyVersion = await ctx.db.insert('assetVersions', {
       assetId: copyId, version: version.version, originalKey: version.originalKey, posterKey: version.posterKey, mimeType: version.mimeType,
-      sizeBytes: version.sizeBytes, etag: version.etag, processingState: 'ready',
+      sizeBytes: version.sizeBytes, etag: version.etag, processingState: 'ready', updatedAt: now,
+      ...versionDimensions(version, job?.status === 'ready' ? job : null),
       ...(version.creativeMetadata ? { creativeMetadata: version.creativeMetadata, metadataUpdatedAt: now } : {}), createdAt: now,
     });
     if (job?.status === 'ready') await ctx.db.insert('mediaJobs', { assetId: copyId, versionId: copyVersion, status: 'ready', stage: 'finalize', attempt: job.attempt,

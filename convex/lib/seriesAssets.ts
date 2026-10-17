@@ -17,11 +17,19 @@ export async function setCurrentAssetVersion(ctx: MutationCtx, ownerId: Id<'appU
   await ctx.db.patch(asset._id, {
     currentVersionId: version._id, storageKey: version.originalKey, mimeType: version.mimeType, sizeBytes: version.sizeBytes,
     thumbnailKey: (ready ? job.thumbnailKey : undefined) ?? version.posterKey, spriteKey: ready ? job.spriteKey : undefined,
-    ...(ready && job.durationSec !== undefined ? { durationSec: job.durationSec } : {}),
-    ...(ready && job.width !== undefined ? { width: job.width } : {}), ...(ready && job.height !== undefined ? { height: job.height } : {}),
+    ...versionDimensions(version, ready ? job : null),
     processingStatus: version.processingState, updatedAt: Date.now(),
   });
   return { assetId, currentVersionId: versionId };
+}
+
+/** The chosen version's own duration and size; images never carry a duration. Legacy versions fall back to their ready job. */
+export function versionDimensions(version: Doc<'assetVersions'>, job: Pick<Doc<'mediaJobs'>, 'durationSec' | 'width' | 'height'> | null) {
+  const width = version.width ?? job?.width, height = version.height ?? job?.height;
+  return {
+    durationSec: version.mimeType.startsWith('image/') ? undefined : version.durationSec ?? job?.durationSec,
+    ...(width !== undefined ? { width } : {}), ...(height !== undefined ? { height } : {}),
+  };
 }
 
 /** Writes that land in the same millisecond as a read can commit after it; repeat that window rather than miss a change. */
@@ -37,6 +45,8 @@ export type ChangeFeed = {
   removedAssets: { assetId: Id<'videos'>; folderId: Id<'projectFolders'> | null; mergedIntoAssetId: Id<'videos'> | null; reason: string; removedAt: number }[];
 };
 
+const versionChangedAt = (version: Doc<'assetVersions'>) => Math.max(version.createdAt, version.metadataUpdatedAt ?? 0, version.updatedAt ?? 0);
+
 /** Assets (and their versions) in a project or one folder that changed after `since`. Items near the cursor may repeat: treat it as an upsert feed. */
 export async function changesSince(ctx: QueryCtx | MutationCtx, projectId: Id<'projects'>, since: number, folderId?: Id<'projectFolders'>): Promise<ChangeFeed> {
   const assets = folderId
@@ -51,14 +61,14 @@ export async function changesSince(ctx: QueryCtx | MutationCtx, projectId: Id<'p
     feed.removedAssets.push({ assetId: removed.assetId, folderId: removed.folderId ?? null, mergedIntoAssetId: removed.mergedIntoAssetId ?? null, reason: removed.reason, removedAt: removed.removedAt });
   }
   for (const asset of assets) {
-    if (asset.updatedAt <= after) continue;
-    cursor = Math.max(cursor, asset.updatedAt);
+    // Every version change counts (processing, filing a take), even when the asset itself did not change.
+    const versions = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', asset._id)).collect();
+    const changed = versions.filter(version => versionChangedAt(version) > after);
+    if (asset.updatedAt <= after && !changed.length) continue;
+    cursor = Math.max(cursor, asset.updatedAt, ...changed.map(versionChangedAt));
     feed.assets.push({ assetId: asset._id, folderId: asset.folderId ?? null, assetCode: asset.assetCode ?? null, title: asset.title, status: asset.status,
       currentVersionId: asset.currentVersionId ?? null, misfiled: !!asset.misfiled, copiedFromAssetId: asset.copiedFromAssetId ?? null, updatedAt: asset.updatedAt });
-    const versions = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', asset._id)).collect();
-    for (const version of versions) {
-      const changedAt = Math.max(version.createdAt, version.metadataUpdatedAt ?? 0);
-      if (changedAt <= after) continue;
+    for (const version of changed) {
       feed.versions.push({ versionId: version._id, assetId: asset._id, version: version.version, isCurrent: version._id === asset.currentVersionId,
         processingState: version.processingState, mimeType: version.mimeType, createdAt: version.createdAt, metadataUpdatedAt: version.metadataUpdatedAt ?? null });
     }

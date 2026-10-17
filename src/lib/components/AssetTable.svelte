@@ -4,10 +4,11 @@
   import type { ReviewAsset } from '$lib/review';
   import type { AssetReview, ReviewAction } from '$lib/review-session';
 
-  let { assets, activeId, checkedIds = [], onSelect, onCheck, onReview, onDragStart, onDragEnd }: {
+  let { assets, activeId, checkedIds = [], onSelect, onCheck, onReview, onDragStart, onDragEnd, onFixMisfiled }: {
     assets: readonly (ReviewAsset & AssetReview)[];
     activeId: string | null;
     onDragStart?: (event: DragEvent, id: string) => void; onDragEnd?: () => void;
+    onFixMisfiled?: (id: string) => void;
     checkedIds?: readonly string[];
     onCheck: (id: string, event: MouseEvent, toggle?: boolean) => void;
     onSelect: (id: string, event: MouseEvent) => void;
@@ -38,13 +39,14 @@
     <thead><tr><th scope="col"><span class="visually-hidden">Selection</span></th><th scope="col">Asset</th><th scope="col">Status</th><th scope="col">Rating</th><th scope="col">Shortlist</th><th scope="col">Notes</th></tr></thead>
     <tbody>
       {#each assets as asset (asset.id)}
-        <tr class:active-row={activeId === asset.id}>
+        <tr class:active-row={activeId === asset.id} class:misfiled-row={asset.misfiled}>
           <td><input type="checkbox" aria-label={`Select ${asset.name}`} checked={checkedIds.includes(asset.id)} onclick={event => onCheck(asset.id, event, true)}/></td>
           <th scope="row">
             <button type="button" class="asset-title" data-asset-id={asset.id} draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} aria-current={activeId === asset.id ? 'true' : undefined} onclick={event => event.metaKey || event.ctrlKey || event.shiftKey ? onCheck(asset.id, event) : onSelect(asset.id, event)} title={asset.name}>
               {#if asset.type === 'video'}<Film size={15}/>{:else}<Image size={15}/>{/if}
               <span class="asset-name">{asset.name}</span>{#if asset.versionNumber}<span class="version-tag">{formatVersion(asset.versionNumber)}</span>{/if}<span class="media-kind">{asset.assetClass}</span>
             </button>
+            {#if asset.misfiled}{#if onFixMisfiled}<button type="button" class="misfiled-tag" title="Dropped without a matching shot code. File it as a take or move it." onclick={() => onFixMisfiled(asset.id)}>Misfiled · File…</button>{:else}<span class="misfiled-tag">Misfiled</span>{/if}{/if}
           </th>
           <td>
             <select class="asset-status-select" data-status={asset.status} aria-label={`Status for ${asset.name}`} value={asset.status} onchange={event => changeStatus(asset.id, event.currentTarget.value)}>
@@ -75,6 +77,10 @@
   tr:last-child th, tr:last-child td { border-bottom: 0; }
   .active-row { background: color-mix(in srgb, var(--accent) 16%, var(--panel)); }
   .asset-title { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; background: transparent; text-align: left; }
+  .misfiled-row th { box-shadow: inset 2px 0 0 var(--status-needs-changes); }
+  .misfiled-tag { margin-left: 6px; padding: 1px 6px; border: 0; border-radius: 4px; background: #3a1d1d; color: var(--status-needs-changes); font: inherit; font-size: 10px; font-weight: 600; white-space: nowrap; }
+  button.misfiled-tag { cursor: pointer; }
+  button.misfiled-tag:focus-visible { outline: 1px solid var(--status-needs-changes); outline-offset: 2px; }
   .version-tag { flex-shrink: 0; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
   .asset-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .media-kind { font-size: 9px; color: var(--muted); margin-left: auto; }

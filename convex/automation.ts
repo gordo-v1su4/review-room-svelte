@@ -181,15 +181,17 @@ export const deleteFolder = internalMutation({
   args: { ...request, projectId: v.id('projects'), folderId: v.id('projectFolders'),
     assetDisposition: v.union(v.literal('move_to_root'), v.literal('archive_assets')) },
   handler: async (ctx, args) => {
-    const folder = await ctx.db.get(args.folderId);
-    if (!folder || folder.projectId !== args.projectId) throw new Error('Folder unavailable');
-    const credential = await authorize(ctx, args.keyDigest, 'folders:write', folder.projectId);
-    const project = await ctx.db.get(folder.projectId);
-    if (!project || project.createdBy !== credential.createdBy || project.archived) throw new Error('Project unavailable');
-    // Automation never deletes ordinary folders; it may only remove locked folders it owns.
-    if (folder.ownerCredentialId !== credential._id) throw new Error('Automation scope denied');
-    return await idempotent(ctx, credential, args, 'folders:delete',
-      () => disposeFolder(ctx, folder, args.assetDisposition, { credentialId: credential._id }));
+    const credential = await authorize(ctx, args.keyDigest, 'folders:write', args.projectId);
+    // Lookups run inside the idempotent step so a retry after success replays the saved result.
+    return await idempotent(ctx, credential, args, 'folders:delete', async () => {
+      const folder = await ctx.db.get(args.folderId);
+      if (!folder || folder.projectId !== args.projectId) throw new Error('Folder unavailable');
+      const project = await ctx.db.get(folder.projectId);
+      if (!project || project.createdBy !== credential.createdBy || project.archived) throw new Error('Project unavailable');
+      // Automation never deletes ordinary folders; it may only remove locked folders it owns.
+      if (folder.ownerCredentialId !== credential._id) throw new Error('Automation scope denied');
+      return await disposeFolder(ctx, folder, args.assetDisposition, { credentialId: credential._id });
+    });
   },
 });
 

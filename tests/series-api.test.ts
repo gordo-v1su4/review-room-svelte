@@ -68,7 +68,10 @@ test('changes since a cursor report new takes, pick changes and metadata edits',
   expect(first.versions[0]).toMatchObject({ assetId, version: 1, isCurrent: true });
   expect(Number(first.cursor)).toBeGreaterThan(0);
   // Long after the cursor nothing is reported; a later change is.
-  await f.t.run(ctx => ctx.db.patch(assetId, { updatedAt: 1 }));
+  await f.t.run(async ctx => {
+    await ctx.db.patch(assetId, { updatedAt: 1 });
+    for (const version of await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', assetId)).collect()) await ctx.db.patch(version._id, { createdAt: 1, updatedAt: 1 });
+  });
   const quiet = await f.t.mutation(internal.automation.changes, { keyDigest: cspDigest, projectId: f.project, since: Number(first.cursor) });
   expect(quiet.assets).toEqual([]);
   await automationUpload(f, { folderId: f.scene, assetCode: 'BLR_EP101_PAR_0020' });
