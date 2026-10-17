@@ -1653,6 +1653,8 @@ button {
 
 /* Workspace chrome: same header baseline, retracting navigation, compact pane tools. */
 .app-shell { --nav-width: 220px; grid-template-columns: var(--nav-width) minmax(0, 1fr); }
+/* Wide screens give nested folder titles (episode → scene) room to read. */
+@media (min-width: 1360px) { .app-shell { --nav-width: 264px; } }
 .app-shell.nav-collapsed { grid-template-columns: 0 minmax(0,1fr); }
 .sidebar { width: var(--nav-width); padding: 0 12px 16px; overflow-x: hidden; }
 .sidebar .brand { height: 58px; min-height: 58px; margin: 0 8px 18px; }

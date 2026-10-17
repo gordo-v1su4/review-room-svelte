@@ -1,5 +1,10 @@
 <script lang="ts">
   import { ChevronDown, ChevronRight, Folder, FolderLock, FolderSync, Image, Plus, Video, Bookmark, Archive, Layers, ListFilter, Pencil } from 'lucide-svelte';
+  import { untrack } from 'svelte';
+  import { folderTreeRows, loadCollapsed, revealFolder, saveCollapsed } from '$lib/folder-tree';
+  import type { ProjectFolder } from '$lib/project-folders';
+
+  const FOLDER_DRAG_TYPE = 'application/x-review-room-folder';
 
   export type ProjectTreeCollection = 'all' | 'video' | 'image' | 'selected';
   export type ProjectTreeProject = Readonly<{
@@ -32,6 +37,9 @@
     onProject,
     onEditProject,
     canEditProject = () => false,
+    canDragFolder = () => false,
+    canDropFolder = () => false,
+    onMoveFolder,
   }: {
     projects: readonly ProjectTreeProject[];
     dragActive?: boolean;
@@ -51,35 +59,48 @@
     onProject?: (projectId: string) => void;
     onEditProject?: (projectId: string) => void;
     canEditProject?: (projectId: string) => boolean;
+    /** Folder drag in the tree: nest under another folder or drop on the project to move to its root. */
+    canDragFolder?: (projectId: string, folderId: string) => boolean;
+    canDropFolder?: (projectId: string, folderId: string, parentFolderId: string | null) => boolean;
+    onMoveFolder?: (projectId: string, folderId: string, parentFolderId: string | null) => void;
   } = $props();
 
   let collapsed = $state<Set<string>>(new Set());
-
-  function folderRows(project: ProjectTreeProject) {
-    type FolderRow = NonNullable<ProjectTreeProject['folders']>[number];
-    const rows: { folder: FolderRow; depth: number; hasChildren: boolean }[] = [];
-    const children = new Map<string | undefined, FolderRow[]>();
-    for (const folder of project.folders ?? []) {
-      const siblings = children.get(folder.parentFolderId) ?? [];
-      siblings.push(folder); children.set(folder.parentFolderId, siblings);
-    }
-    const seen = new Set<string>();
-    function visit(folder: FolderRow, depth: number, visible: boolean) {
-      if (seen.has(folder.id)) return;
-      seen.add(folder.id);
-      const descendants = children.get(folder.id) ?? [];
-      if (visible) rows.push({ folder, depth, hasChildren: !!descendants.length });
-      for (const child of descendants) visit(child, depth + 1, visible && !collapsed.has(folder.id));
-    }
-    for (const root of children.get(undefined) ?? []) visit(root, 0, true);
-    // Keep legacy orphan/cyclic folders reachable without revealing collapsed descendants.
-    for (const folder of project.folders ?? []) if (!seen.has(folder.id)) visit(folder, 0, true);
-    return rows;
+  const loadedProjects = new Set<string>();
+  const browserStore = () => { try { return globalThis.localStorage; } catch { return undefined; } };
+  // Expand/collapse is remembered per project in this browser; IDs from one project never leak into another's key.
+  $effect(() => {
+    const fresh = projects.filter(project => !loadedProjects.has(project.id));
+    if (!fresh.length) return;
+    const next = new Set(collapsed);
+    for (const project of fresh) { loadedProjects.add(project.id); for (const id of loadCollapsed(browserStore(), project.id)) next.add(id); }
+    collapsed = next;
+  });
+  // Opening a folder from elsewhere (breadcrumb, search, import) reveals it once; collapsing it again afterwards sticks.
+  $effect(() => {
+    const folderId = selectedFolderId;
+    const project = untrack(() => projects.find(item => item.id === selectedProjectId));
+    if (!project || !folderId) return;
+    untrack(() => reveal(project, folderId));
+  });
+  function reveal(project: ProjectTreeProject, selectedFolderId: string) {
+    const revealed = revealFolder(collapsed, (project.folders ?? []) as unknown as ProjectFolder[], selectedFolderId);
+    revealed.delete(project.id);
+    if (revealed.size !== collapsed.size) { collapsed = revealed; persist(project); }
   }
+  function persist(project: ProjectTreeProject) {
+    const ids = new Set([project.id, ...(project.folders ?? []).map(folder => folder.id)]);
+    saveCollapsed(browserStore(), project.id, [...collapsed].filter(id => ids.has(id)));
+  }
+
   let dropHover = $state<string | null>(null);
-  $effect(() => { if (!dragActive) dropHover = null; });
+  let draggedFolder = $state<{ projectId: string; folderId: string } | null>(null);
+  $effect(() => { if (!dragActive && !draggedFolder) dropHover = null; });
+  const canDrop = (projectId: string, folderId: string | null) => draggedFolder
+    ? draggedFolder.projectId === projectId && canDropFolder(projectId, draggedFolder.folderId, folderId)
+    : canDropAssets(projectId, folderId);
   function dragOver(event: DragEvent, projectId: string, folderId: string | null) {
-    if (!canDropAssets(projectId, folderId)) return;
+    if (!canDrop(projectId, folderId)) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
     dropHover = folderId ?? projectId;
@@ -89,18 +110,27 @@
   }
   function drop(event: DragEvent, projectId: string, folderId: string | null) {
     dropHover = null;
-    if (!canDropAssets(projectId, folderId)) return;
+    if (!canDrop(projectId, folderId)) return;
     event.preventDefault();
+    if (draggedFolder) { const moving = draggedFolder.folderId; draggedFolder = null; onMoveFolder?.(projectId, moving, folderId); return; }
     onDropAssets?.(event, projectId, folderId);
   }
-  function toggle(projectId: string) {
+  function startFolderDrag(event: DragEvent, projectId: string, folderId: string) {
+    if (!event.dataTransfer || !canDragFolder(projectId, folderId)) { event.preventDefault(); return; }
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(FOLDER_DRAG_TYPE, folderId);
+    draggedFolder = { projectId, folderId };
+  }
+  function toggle(project: ProjectTreeProject, id: string) {
     const next = new Set(collapsed);
-    if (next.has(projectId)) next.delete(projectId); else next.add(projectId);
+    if (next.has(id)) next.delete(id); else next.add(id);
     collapsed = next;
+    persist(project);
   }
 </script>
 
-<nav class="project-tree" aria-label="Projects" data-drag-active={dragActive}>
+<nav class="project-tree" aria-label="Projects" data-drag-active={dragActive || !!draggedFolder}>
   <div class="tree-heading">
     <span>Projects</span>
     <button class="add-project btn preset-tonal-surface" type="button" onclick={onCreate}>
@@ -122,7 +152,7 @@
               aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${project.name}`}
               title={`${isExpanded ? 'Collapse' : 'Expand'} ${project.name}`}
               aria-expanded={isExpanded}
-              onclick={() => toggle(project.id)}
+              onclick={() => toggle(project, project.id)}
             >
               {#if isExpanded}<ChevronDown size={14} />{:else}<ChevronRight size={14} />{/if}
             </button>
@@ -137,11 +167,12 @@
           {#if isExpanded}
             <ul class="collection-list" aria-label={`${project.name} collections`}>
               <li><button class="collection-link" class:drop-hover={dropHover === project.id} ondragover={event => dragOver(event, project.id, null)} ondragleave={dragLeave} ondrop={event => drop(event, project.id, null)} class:selected={isSelected && !selectedCustomCollectionId && !overview && !selectedFolderId && !archived && selectedCollection === 'all'} type="button" onclick={() => onOpen(project.id, 'all')}><Layers size={14}/><span>All media</span></button></li>
-              {#each folderRows(project) as row (row.folder.id)}
+              {#each folderTreeRows(project.folders ?? [], collapsed) as row (row.folder.id)}
                 {@const folder = row.folder}
-                <li><div class="folder-tree-row" style:padding-left={row.depth * 15 + 'px'}>
-                  {#if row.hasChildren}<button class="disclosure" type="button" aria-label={`${collapsed.has(folder.id) ? 'Expand' : 'Collapse'} ${folder.title}`} aria-expanded={!collapsed.has(folder.id)} onclick={() => toggle(folder.id)}>{#if collapsed.has(folder.id)}<ChevronRight size={12}/>{:else}<ChevronDown size={12}/>{/if}</button>{:else}<span class="folder-disclosure-spacer"></span>{/if}
-                  <button class="collection-link" class:drop-hover={dropHover === folder.id} ondragover={event => dragOver(event, project.id, folder.id)} ondragleave={dragLeave} ondrop={event => drop(event, project.id, folder.id)} class:selected={isSelected && selectedFolderId === folder.id} class:locked={folder.locked} class:connected={folder.connected && !folder.locked} title={folder.locked ? `${folder.title} · Locked, managed by Creative Studio Pro` : folder.connected ? `${folder.title} · Connected to Trailer Feed` : folder.title} type="button" onclick={() => onFolder?.(project.id, folder.id)}>{#if folder.locked}<FolderLock size={14} class="folder-kind-icon"/>{:else if folder.connected}<FolderSync size={14} class="folder-kind-icon"/>{:else}<Folder size={14}/>{/if}<span>{folder.title}</span>{#if folder.locked}<span class="visually-hidden">(locked)</span>{:else if folder.connected}<span class="visually-hidden">(connected to Trailer Feed)</span>{/if}<span class="count">{folder.count}</span></button>
+                {@const draggable = canDragFolder(project.id, folder.id)}
+                <li><div class="folder-tree-row" class:dragging={draggedFolder?.folderId === folder.id} style:--depth={row.depth}>
+                  {#if row.hasChildren}<button class="disclosure" type="button" aria-label={`${row.expanded ? 'Collapse' : 'Expand'} ${folder.title}`} aria-expanded={row.expanded} onclick={() => toggle(project, folder.id)}>{#if row.expanded}<ChevronDown size={12}/>{:else}<ChevronRight size={12}/>{/if}</button>{:else}<span class="folder-disclosure-spacer"></span>{/if}
+                  <button class="collection-link" {draggable} ondragstart={event => startFolderDrag(event, project.id, folder.id)} ondragend={() => { draggedFolder = null; dropHover = null; }} class:drop-hover={dropHover === folder.id} ondragover={event => dragOver(event, project.id, folder.id)} ondragleave={dragLeave} ondrop={event => drop(event, project.id, folder.id)} class:selected={isSelected && selectedFolderId === folder.id} aria-current={isSelected && selectedFolderId === folder.id ? 'page' : undefined} class:locked={folder.locked} class:connected={folder.connected && !folder.locked} title={folder.locked ? `${folder.title} · Locked, managed by Creative Studio Pro` : folder.connected ? `${folder.title} · Connected to Trailer Feed` : folder.title} type="button" onclick={() => onFolder?.(project.id, folder.id)}>{#if folder.locked}<FolderLock size={14} class="folder-kind-icon"/>{:else if folder.connected}<FolderSync size={14} class="folder-kind-icon"/>{:else}<Folder size={14}/>{/if}<span>{folder.title}</span>{#if folder.locked}<span class="visually-hidden">(locked)</span>{:else if folder.connected}<span class="visually-hidden">(connected to Trailer Feed)</span>{/if}<span class="count">{folder.count}</span></button>
                 </div></li>
               {/each}
               <li>
@@ -203,9 +234,14 @@
   .collection-link.connected.selected { background: color-mix(in srgb, var(--folder-connected) 10%, transparent); color: var(--folder-connected); }
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .project-link.drop-hover, .collection-link.drop-hover { background: #15362e; box-shadow: inset 0 0 0 1px var(--teal); color: var(--ink); border-radius: 6px; }
-  .folder-tree-row { display: flex; align-items: center; }
+  /* Deep trees keep indenting up to six levels, then flatten so titles stay readable in the drawer. */
+  .folder-tree-row { display: flex; align-items: center; padding-left: calc(min(var(--depth, 0), 6) * 11px); }
+  .folder-tree-row .collection-link[draggable='true'] { cursor: grab; }
+  .folder-tree-row.dragging { opacity: .45; }
   .folder-tree-row .collection-link { padding-left: 0; }
-  .folder-disclosure-spacer { width: 27px; flex-shrink: 0; }
+  .folder-disclosure-spacer, .folder-tree-row .disclosure { width: 20px; flex-shrink: 0; }
+  .folder-tree-row .collection-link { gap: 7px; }
   .empty { margin: 0 10px; color: var(--muted); font-size: 11px; }
-  @media (pointer: coarse) { .folder-disclosure-spacer { width: 44px; } .project-link, .collection-link, .add-project, .edit-project, .disclosure { min-height: 44px; } .add-project, .edit-project, .disclosure { min-width: 44px; } }
+  @media (max-width: 640px) { .folder-tree-row { padding-left: calc(min(var(--depth, 0), 6) * 9px); } }
+  @media (pointer: coarse) { .folder-disclosure-spacer, .folder-tree-row .disclosure { width: 44px; } .project-link, .collection-link, .add-project, .edit-project, .disclosure { min-height: 44px; } .add-project, .edit-project, .disclosure { min-width: 44px; } }
 </style>
