@@ -1081,6 +1081,11 @@
           "sha256": {
             "type": "string",
             "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "assetCode": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9]{1,5}_(EP[0-9]{3}_([A-Za-z][A-Za-z0-9]{1,5}_[0-9]{4}|(EPC|TSR|TRL)([0-9]{2})?)|S[0-9]{1,2}_(EPC|TSR|TRL)([0-9]{2})?)$",
+            "description": "Name a new asset by its Creative Studio Pro shot or deliverable code (BLR_EP101_PAR_0020, BLR_EP101_EPC, BLR_S1_TRL01) instead of the generated VID_/IMG_ code. Case-insensitive, stored upper-case, unique within the project (409 if taken). Never include the _v### take suffix: versions are numbered by Review Room. Not combined with assetId."
           }
         },
         "required": [

@@ -33,6 +33,9 @@ export function automationError(cause: unknown) {
     ['title must', 400],
     ['Folder already exists', 409],
     ['Folder is locked', 403],
+    ['Asset code must be', 400],
+    ['Asset code already exists', 409],
+    ['Asset code applies only to new assets', 400],
     ['Locked folders can only be created by an automation credential', 403],
     ['Move or remove subfolders first', 409],
     ['Upload in progress in this folder', 409],
@@ -45,7 +48,8 @@ export function automationError(cause: unknown) {
     ['Unexpected end of JSON input', 400],
   ] as const;
   const result = known.find(([fragment]) => message.includes(fragment));
-  const lockDetail = message.match(/Folder is locked: .*? in Review Room/)?.[0];
+  // Messages written for API callers are passed through whole; everything else maps to its fragment.
+  const lockDetail = message.match(/Folder is locked: .*? in Review Room/)?.[0] ?? message.match(/Asset code must be .*?BLR_S1_TRL01/)?.[0];
   const publicMessage = result?.[0] === 'ArgumentValidationError' || result?.[0] === 'InvalidId' ? 'Request contains an invalid ID or argument' : lockDetail ?? result?.[0] ?? 'Automation request failed';
   return json({ error: publicMessage },
     { status: result?.[1] ?? 500, headers: { 'cache-control': 'no-store' } });

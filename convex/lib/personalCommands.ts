@@ -3,6 +3,7 @@ import type { Doc, Id } from '../_generated/dataModel';
 import { randomSecret } from './reviewAccess';
 import { reserveAssetNumber } from './assetNumber';
 import { validateFolderParent, folderNameKey } from './folderTree';
+import { parseProductionCode } from './shotCode';
 import { assertFolderChangeable, assertSubtreeChangeable, type FolderActor, type FolderOwnerApp } from './folderLock';
 
 function title(value: string, kind: string) {
@@ -94,8 +95,17 @@ export async function movePersonalFolder(ctx: MutationCtx, ownerId: Id<'appUsers
   return folderId;
 }
 
+/** Canonical production code, refused when another original asset in the project already uses it. */
+export async function requireFreeAssetCode(ctx: MutationCtx, projectId: Id<'projects'>, value: string) {
+  const parsed = parseProductionCode(value);
+  if (!parsed) throw new Error('Asset code must be a shot or deliverable code such as BLR_EP101_PAR_0020 or BLR_S1_TRL01');
+  const taken = await ctx.db.query('videos').withIndex('by_project_code', q => q.eq('projectId', projectId).eq('assetCode', parsed.code)).first();
+  if (taken) throw new Error('Asset code already exists in this project');
+  return parsed.code;
+}
+
 export async function beginPersonalUpload(ctx: MutationCtx, ownerId: Id<'appUsers'>, input: {
-  projectId: Id<'projects'>; folderId?: Id<'projectFolders'>; assetId?: Id<'videos'>;
+  projectId: Id<'projects'>; folderId?: Id<'projectFolders'>; assetId?: Id<'videos'>; assetCode?: string;
   originalFilename: string; mimeType: string; sizeBytes: number;
   sha256?: string;
   automationCredentialId?: Id<'automationCredentials'>;
@@ -114,12 +124,14 @@ export async function beginPersonalUpload(ctx: MutationCtx, ownerId: Id<'appUser
     const folder = await ctx.db.get(input.folderId);
     if (!folder || folder.projectId !== project._id) throw new Error('Folder unavailable');
   }
+  if (input.assetCode !== undefined && input.assetId) throw new Error('Asset code applies only to new assets');
+  const assetCode = input.assetCode === undefined ? undefined : await requireFreeAssetCode(ctx, project._id, input.assetCode);
   const extensions: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
   const extension = input.originalFilename.match(/\.([a-zA-Z0-9]{1,8})$/)?.[1]?.toLowerCase() ?? extensions[input.mimeType] ?? 'bin';
   const objectKey = `assets/${project._id}/${input.mimeType.startsWith('image/') ? 'images' : 'videos'}/${randomSecret()}/original.${extension}`;
   const now = Date.now();
   const sessionId = await ctx.db.insert('uploadSessions', {
-    projectId: project._id, folderId: input.folderId, assetId: input.assetId,
+    projectId: project._id, folderId: input.folderId, assetId: input.assetId, assetCode,
     automationCredentialId: input.automationCredentialId, objectKey,
     originalFilename: input.originalFilename.slice(0, 240), mimeType: input.mimeType,
     sizeBytes: input.sizeBytes, sha256: input.sha256,
@@ -170,7 +182,8 @@ export async function finalizePersonalUpload(ctx: MutationCtx, ownerId: Id<'appU
   } else {
     const number = await reserveAssetNumber(ctx, project.createdBy);
     const assetClass = isImage ? 'IMG' : 'VID';
-    const assetCode = `${assetClass}_${new Date(now).toISOString().slice(0, 10).replaceAll('-', '')}_${String(number).padStart(5, '0')}`;
+    const assetCode = session.assetCode ? await requireFreeAssetCode(ctx, project._id, session.assetCode)
+      : `${assetClass}_${new Date(now).toISOString().slice(0, 10).replaceAll('-', '')}_${String(number).padStart(5, '0')}`;
     assetId = await ctx.db.insert('videos', {
       projectId: project._id, folderId: session.folderId, assetClass, assetNumber: number,
       assetCode, title: assetCode, originalFilename: session.originalFilename,

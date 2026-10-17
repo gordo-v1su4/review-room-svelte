@@ -1,8 +1,9 @@
+import { compareCodes } from '../../convex/lib/shotCode';
 import type { VideoStatus } from './types';
 
 export type WorkspaceMediaType = 'video' | 'image';
 export type WorkspaceAssetClass = 'VID' | 'IMG' | 'CTX' | 'STB';
-export type WorkspaceSort = 'newest' | 'oldest' | 'comments' | 'name' | 'name-desc' | 'status' | 'rating';
+export type WorkspaceSort = 'newest' | 'oldest' | 'comments' | 'name' | 'name-desc' | 'status' | 'rating' | 'code';
 export type WorkspaceGroupBy = 'none' | 'status' | 'class' | 'folder';
 export type WorkspaceAsset = Readonly<{
   id: string;
@@ -12,6 +13,7 @@ export type WorkspaceAsset = Readonly<{
   shortlisted: boolean;
   type: WorkspaceMediaType;
   assetClass?: WorkspaceAssetClass;
+  assetCode?: string;
   commentsCount?: number;
   uploadedAt?: number;
   folderId?: string | null;
@@ -71,6 +73,7 @@ export function queryWorkspace<T extends WorkspaceAsset>(assets: readonly T[], f
     (!visibleIds || visibleIds.has(asset.id)),
   );
   return [...result].sort((left, right) => {
+    if (filter.sort === 'code') return compareCodes(left.assetCode || left.name, right.assetCode || right.name) || left.id.localeCompare(right.id);
     if (filter.sort === 'name') return left.name.localeCompare(right.name) || left.id.localeCompare(right.id);
     if (filter.sort === 'name-desc') return right.name.localeCompare(left.name) || left.id.localeCompare(right.id);
     if (filter.sort === 'rating') return right.rating - left.rating || left.id.localeCompare(right.id);

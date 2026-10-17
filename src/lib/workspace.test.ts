@@ -45,3 +45,9 @@ test('tag search ignores case and surrounding spaces while requiring all request
   const tagged = [{ ...assets[0], tags: ['Night', 'Teal'] }, { ...assets[1], tags: ['Night'] }];
   expect(queryWorkspace(tagged, { tags: [' night ', 'TEAL'] }).map(asset => asset.id)).toEqual(['b']);
 });
+
+test('code sort orders shot codes naturally', () => {
+  const asset = (id: string, assetCode: string) => ({ id, name: assetCode, assetCode, status: 'awaiting_review' as const, rating: 0, shortlisted: false, type: 'video' as const });
+  const sorted = queryWorkspace([asset('a', 'BLR_EP101_PAR_0100'), asset('b', 'BLR_EP101_PAR_0020'), asset('c', 'BLR_EP101_DIN_0010')], { sort: 'code' });
+  expect(sorted.map(item => item.assetCode)).toEqual(['BLR_EP101_DIN_0010', 'BLR_EP101_PAR_0020', 'BLR_EP101_PAR_0100']);
+});

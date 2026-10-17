@@ -214,7 +214,8 @@ const applicationTables = {
     .index("by_project_folder", ["projectId", "folderId"])
     .index("by_project_status", ["projectId", "status"])
     .index("by_project_uploadedAt", ["projectId", "uploadedAt"])
-    .index("by_project_processing", ["projectId", "processingStatus"]),
+    .index("by_project_processing", ["projectId", "processingStatus"])
+    .index("by_project_code", ["projectId", "assetCode"]),
 
   comments: defineTable({
     videoId: v.id("videos"),
@@ -288,6 +289,8 @@ const applicationTables = {
     folderId: v.optional(v.id("projectFolders")),
     automationCredentialId: v.optional(v.id("automationCredentials")),
     assetId: v.optional(v.id("videos")),
+    // Creative Studio Pro shot/deliverable code requested for a new asset.
+    assetCode: v.optional(v.string()),
     completedAssetId: v.optional(v.id("videos")),
     completedJobId: v.optional(v.id("mediaJobs")),
     objectKey: v.string(),

@@ -15,6 +15,14 @@ Use BWS `REVIEW_ROOM_AGENT_API_KEY` as `Authorization: Bearer …`; inject it in
 
 Project/folder creation, folder edit/delete and begin-upload require an `Idempotency-Key` (8–128 letters/digits/dot/underscore/colon/hyphen). Persist it with the exact request. Retry the same operation with the same key/body; a changed body needs a different key. On timeout after begin, replay it with the same key. Uploading alone never publishes to Trailer Feed.
 
+## Production codes
+
+Begin-upload accepts `assetCode` to name a new asset by its shot or deliverable code instead of the generated `VID_YYYYMMDD_nnnnn`:
+
+- Shot `BLR_EP101_PAR_0020`: show · episode (`EP101` = season 1, episode 01) · scene · shot (steps of 10).
+- Deliverable `BLR_EP101_EPC` or `BLR_S1_TRL01`: kinds `EPC` episode cut, `TSR` teaser, `TRL` trailer, with an optional two-digit index; `S1` is season level.
+- Codes are case-insensitive, stored upper-case and unique within the project (`409` if taken). Never send the take suffix `_v003`; Review Room numbers versions and shows them as `v003`.
+
 ## Locked folders (Creative Studio Pro)
 
 A folder created with `{"title":"EP101 — The Late Shift","ownerApp":"creative-studio-pro"}` is **locked** and owned by the credential that created it. The catalog reports `locked`, `ownerApp` and `ownedByCaller` for every folder.

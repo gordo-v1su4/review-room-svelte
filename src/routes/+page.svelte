@@ -42,6 +42,8 @@
   import { prepareLocalImport } from '$lib/local-import';
   import ImportOptions from '$lib/components/ImportOptions.svelte';
   import FolderActions from '$lib/components/FolderActions.svelte';
+  import CodeLegend from '$lib/components/CodeLegend.svelte';
+  import { parseProductionCode } from '../../convex/lib/shotCode';
   import ProjectIdentityDialog from '$lib/components/ProjectIdentityDialog.svelte';
   import ShareDialog from '$lib/components/ShareDialog.svelte';
   import DestinationSyncDialog from '$lib/components/DestinationSyncDialog.svelte';
@@ -240,11 +242,14 @@
   const scopedAssets = $derived(activeCollection?.sourceFolderId
     ? assets.filter(asset => asset.folderId === activeCollection.sourceFolderId)
     : activeFolderId ? assets.filter(asset => asset.folderId === activeFolderId) : assets);
+  // Inside a folder the default order is by code (natural sort), so shots read in order.
+  const effectiveSort = $derived(activeFolderId && filters.sort === 'newest' ? 'code' as const : filters.sort);
   const visible = $derived(activeCollection && !collectionIsConfigured(activeCollection) ? [] : queryWorkspace(scopedAssets, {
-    ...filters, search: query, shortlisted: filters.selectedOnly ? true : undefined,
+    ...filters, sort: effectiveSort, search: query, shortlisted: filters.selectedOnly ? true : undefined,
     mediaTypes: mediaType === 'all' ? undefined : [mediaType]
   }));
   const groups = $derived(groupWorkspaceAssets(visible, filters.groupBy));
+  const showCodeLegend = $derived(!!activeFolder?.locked || visible.some(asset => !!parseProductionCode(asset.assetCode)));
   const visibleIds = $derived(groups.flatMap(group => group.assets.map(asset => asset.id)));
   $effect(() => {
     const next = transitionSelection(checked, { type: 'reconcile', allIds: visibleIds });
@@ -970,7 +975,7 @@
         size: item.sizeBytes ?? 0, sourceFile: { name: item.originalFilename ?? item.title, type: item.mimeType ?? 'video/mp4' },
         assetClass: item.mimeType?.startsWith('image/') ? 'IMG' as const : 'VID' as const, importedAt: item.uploadedAt,
         tags: item.tags, assetCode: item.assetCode ?? '',
-        versionId: item.currentVersionId, metadataUpdatedAt: data.snapshot.versions.find(version => version._id === item.currentVersionId)?.metadataUpdatedAt ?? null,
+        versionId: item.currentVersionId, versionNumber: data.snapshot.versions.find(version => version._id === item.currentVersionId)?.version, metadataUpdatedAt: data.snapshot.versions.find(version => version._id === item.currentVersionId)?.metadataUpdatedAt ?? null,
         metadata: displayVersionMetadata(
           data.snapshot.versions.find(version => version._id === item.currentVersionId)?.creativeMetadata ?? null,
           importedMetadata,
@@ -1122,7 +1127,7 @@
         {/each}
       </nav>{/if}
       {#snippet explorer()}
-      <div class="collection-bar"><div class="collection-title"><h2 bind:this={explorerHeading} tabindex="-1">Media</h2><span class="count">{visible.length}</span></div><CollectionActions {activeCollection} folders={projectFolders} canEdit={true} onCreate={createCollection} onRename={(collectionId, title) => changeCollections({ type: 'rename', collectionId, title })} onRemove={removeCollection} onSave={saveCollection}/></div>
+      <div class="collection-bar"><div class="collection-title"><h2 bind:this={explorerHeading} tabindex="-1">Media</h2><span class="count">{visible.length}</span>{#if showCodeLegend}<CodeLegend/>{/if}</div><CollectionActions {activeCollection} folders={projectFolders} canEdit={true} onCreate={createCollection} onRename={(collectionId, title) => changeCollections({ type: 'rename', collectionId, title })} onRemove={removeCollection} onSave={saveCollection}/></div>
       <div class="toolbar explorer-toolbar"><label class="search" class:has-query={!!query} title={query ? `Search media: ${query}` : "Search media"}><Search size={16}/><input aria-label="Search media" placeholder="Find a clip or image…" bind:value={query} onkeydown={event => { if (event.key === "Escape") { event.stopPropagation(); event.currentTarget.blur(); } }}/><kbd>⌕</kbd></label>
         <WorkspaceFilters value={filters} onChange={values => { filters = values; }}/>
 

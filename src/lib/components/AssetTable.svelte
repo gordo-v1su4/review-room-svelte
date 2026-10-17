@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatVersion } from '../../../convex/lib/shotCode';
   import { Bookmark, Film, Image } from 'lucide-svelte';
   import type { ReviewAsset } from '$lib/review';
   import type { AssetReview, ReviewAction } from '$lib/review-session';
@@ -42,7 +43,7 @@
           <th scope="row">
             <button type="button" class="asset-title" data-asset-id={asset.id} draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} aria-current={activeId === asset.id ? 'true' : undefined} onclick={event => event.metaKey || event.ctrlKey || event.shiftKey ? onCheck(asset.id, event) : onSelect(asset.id, event)} title={asset.name}>
               {#if asset.type === 'video'}<Film size={15}/>{:else}<Image size={15}/>{/if}
-              <span class="asset-name">{asset.name}</span><span class="media-kind">{asset.assetClass}</span>
+              <span class="asset-name">{asset.name}</span>{#if asset.versionNumber}<span class="version-tag">{formatVersion(asset.versionNumber)}</span>{/if}<span class="media-kind">{asset.assetClass}</span>
             </button>
           </th>
           <td>
@@ -74,6 +75,7 @@
   tr:last-child th, tr:last-child td { border-bottom: 0; }
   .active-row { background: color-mix(in srgb, var(--accent) 16%, var(--panel)); }
   .asset-title { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; background: transparent; text-align: left; }
+  .version-tag { flex-shrink: 0; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
   .asset-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .media-kind { font-size: 9px; color: var(--muted); margin-left: auto; }
   select { min-height: 30px; max-width: 160px; padding: 4px 22px 4px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--canvas); color: var(--ink); font: inherit; cursor: pointer; }

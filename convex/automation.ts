@@ -193,7 +193,7 @@ export const deleteFolder = internalMutation({
 
 export const beginUpload = internalMutation({
   args: { ...request, projectId: v.id('projects'), folderId: v.optional(v.id('projectFolders')),
-    assetId: v.optional(v.id('videos')), originalFilename: v.string(), mimeType: v.string(), sizeBytes: v.number(), sha256: v.optional(v.string()) },
+    assetId: v.optional(v.id('videos')), assetCode: v.optional(v.string()), originalFilename: v.string(), mimeType: v.string(), sizeBytes: v.number(), sha256: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const credential = await authorize(ctx, args.keyDigest, 'media:upload', args.projectId);
     return await idempotent(ctx, credential, args, 'media:upload:begin',

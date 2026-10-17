@@ -6,6 +6,7 @@
   import type { AssetReview, ReviewAccess, ReviewAction } from '$lib/review-session';
   import type { AppearanceValue } from '$lib/appearance';
   import { CARD_FIELD_DEFINITIONS, type CardFieldId } from '$lib/cardFields';
+  import { formatVersion } from '../../../convex/lib/shotCode';
 
   type Asset = ReviewAsset & AssetReview;
   let { assets, activeId, checkedIds = [], appearance, view, onOpen, onCheck, busyIds = [], access = { kind: 'none' }, onReview, onDragStart, onDragEnd }: {
@@ -51,7 +52,7 @@
         </div>
       </button>
       {#if appearance.showInfo}<div class="card-body">
-        <button class="card-name" type="button" draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} title={asset.name} onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id, event)}>{asset.name}</button>
+        <button class="card-name" type="button" draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} title={asset.name} onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id, event)}>{asset.name}{#if asset.versionNumber}<span class="version-tag">{formatVersion(asset.versionNumber)}</span>{/if}</button>
         {#if fields.length}<div class="card-fields">{#each fields as field (field)}
           {#if field === 'status'}<AssetStatusMenu status={asset.status} name={asset.name} access={busyIds.includes(asset.id) ? { kind: 'none' } : access} onChange={status => onReview({ type: 'status', assetId: asset.id, status })}/>
           {:else if field === 'rating'}<div class="card-rating" role="group" aria-label={`Rating for ${asset.name}`}>
@@ -83,6 +84,7 @@
   .card-check:focus-visible { outline:2px solid var(--teal); outline-offset:3px; }
   .card-body { min-width: 0; padding: 8px 10px; }
   .card-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 12px; font-weight: 550; text-align: left; }
+  .version-tag { margin-left: 6px; color: var(--muted); font-size: .86em; font-variant-numeric: tabular-nums; }
   .card-name:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }
   .card-rating { display: flex; flex: 0 0 100%; min-width: 0; }
   .card-star { display: grid; place-items: center; flex: 0 1 24px; min-width: 0; height: 28px; padding: 0; background: transparent; color: var(--muted); border-radius: 3px; }
