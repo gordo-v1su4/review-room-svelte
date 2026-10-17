@@ -23,6 +23,9 @@
     dragActive = false,
     canDropAssets = () => false,
     onDropAssets,
+    scrollElement = $bindable(),
+    scrollable = false,
+    scrollId,
     selectedProjectId,
     selectedCollection = 'all',
     onOpen,
@@ -41,6 +44,9 @@
     canDropFolder = () => false,
     onMoveFolder,
   }: {
+    scrollElement?: HTMLElement;
+    scrollable?: boolean;
+    scrollId?: string;
     projects: readonly ProjectTreeProject[];
     dragActive?: boolean;
     canDropAssets?: (projectId: string, folderId: string | null) => boolean;
@@ -130,7 +136,7 @@
   }
 </script>
 
-<nav class="project-tree" aria-label="Projects" data-drag-active={dragActive || !!draggedFolder}>
+<nav class="project-tree" class:scrollable aria-label="Projects" data-drag-active={dragActive || !!draggedFolder}>
   <div class="tree-heading">
     <span>Projects</span>
     <button class="add-project btn preset-tonal-surface" type="button" onclick={onCreate}>
@@ -138,6 +144,7 @@
     </button>
   </div>
 
+  <div class="tree-scroll" id={scrollId} bind:this={scrollElement}>
   {#if projects.length}
     <ul class="project-list">
       {#each projects as project (project.id)}
@@ -202,11 +209,15 @@
   {:else}
     <p class="empty">No active projects.</p>
   {/if}
+  </div>
 </nav>
 
 <style>
   .project-tree { color: #aeb7b5; font-size: 12px; }
-  .tree-heading { display: flex; align-items: center; justify-content: space-between; margin: 0 8px 9px; color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: .13em; text-transform: uppercase; }
+  .project-tree.scrollable { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
+  .scrollable .tree-scroll { flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; padding-right:12px; }
+  .scrollable .tree-scroll::-webkit-scrollbar { display:none; }
+  .tree-heading { flex-shrink:0; display: flex; align-items: center; justify-content: space-between; margin: 0 8px 9px; color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: .13em; text-transform: uppercase; }
   .disclosure { display: grid; place-items: center; width: 27px; height: 27px; flex-shrink: 0; border-radius: 7px; color: #899491; }
   .add-project, .edit-project { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex-shrink: 0; min-height: 26px; padding: 0 6px; border-radius: 5px; color: var(--muted); font-size: 10px; font-weight: 500; letter-spacing: 0; text-transform: none; white-space: nowrap; }
   .edit-project { margin-right: 4px; background: transparent; }

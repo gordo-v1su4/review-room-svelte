@@ -62,6 +62,7 @@ Svelte 5, SvelteKit, TypeScript, and Bun, with Convex, RustFS, and Trigger.dev s
 
 ## Learn more
 
+- [Media flow and metadata diagrams](docs/media-flow-overview.md)
 - [Product overview and review workflow](init-docs/01-PRD.md)
 - [Deployment and configuration](docs/deploy-app-vm-and-auth.md)
 - [Trailer Feed integration](docs/api/destination-sync.md)

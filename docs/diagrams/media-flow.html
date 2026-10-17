@@ -1,0 +1,422 @@
+<!doctype html><!-- Lucide icon license: ISC License
+
+Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2026 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2026.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+—-
+
+The MIT License (MIT) (for portions derived from Feather)
+
+Copyright (c) 2013-2026 Cole Bemis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ --><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>One media hub, from upload to delivery. · Review Room</title><link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"><style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root {
+      --color-paper: #f5f5f5;
+      --color-ink: #2d3142;
+      --color-muted: #4f5d75;
+      --color-soft: #5a6580;
+      --color-accent: #bf4520;
+      --color-rule: rgba(45,49,66,0.12);
+      --font-sans: 'Geist', system-ui, sans-serif;
+      --font-serif: 'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono: 'Geist Mono', ui-monospace, monospace;
+      --motion-fast: 160ms;
+      --motion-step: 480ms;
+      --motion-hold: 720ms;
+      --motion-total: 3600ms;
+      --motion-ease: cubic-bezier(.2,.8,.2,1);
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 48px 32px;
+      color: var(--color-ink);
+      background: var(--color-paper);
+      font-family: var(--font-sans);
+    }
+    [data-motion-root] { width: min(100%, 1000px); }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--color-muted);
+      font: 500 12px/1.4 var(--font-mono);
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 0 0 24px; font: 400 32px/1.15 var(--font-serif); }
+    svg { display: block; width: 100%; min-width: 960px; }
+    /* The SVG holds its readable width (min-width == the viewBox width, so the
+       type ramp is never silently scaled down). This wrapper lets a narrow
+       screen scroll the diagram instead of the whole page. body is a centred
+       grid, so the root needs max-width/min-width to stop the grid item from
+       sizing itself to the SVG's max-content width. */
+    [data-motion-root] { max-width: 100%; min-width: 0; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    /* Static source is complete. Only an initialized enhancement hides items. */
+    .motion-ready [data-motion-item] {
+      opacity: .12;
+      transform: translateY(8px);
+      transform-box: fill-box;
+      transform-origin: center;
+      transition: opacity var(--motion-step) var(--motion-ease),
+                  transform var(--motion-step) var(--motion-ease);
+    }
+    .motion-ready [data-motion-item].is-visible,
+    .motion-ready[data-frame="end"] [data-motion-item],
+    .motion-ready[data-frame="static"] [data-motion-item] {
+      opacity: 1;
+      transform: none;
+    }
+    .draw-path {
+      fill: none;
+      stroke: var(--color-accent);
+      stroke-width: 3;
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      pointer-events: none;
+    }
+    .motion-ready .draw-path.is-visible {
+      animation: draw-path var(--motion-step) linear forwards;
+    }
+    .flow-token { opacity: 0; pointer-events: none; }
+    .motion-ready.is-playing .flow-token.is-visible {
+      opacity: 1;
+      animation: token-flow 3.2s linear 1 forwards;
+    }
+    .motion-ready[data-motion-mode="loop"].is-playing .flow-token.is-visible {
+      animation-iteration-count: infinite;
+    }
+    @keyframes draw-path { to { stroke-dashoffset: 0; } }
+    @keyframes token-flow {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(240px); }
+    }
+
+    [data-motion-controls] {
+      display: none;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--color-rule);
+    }
+    .motion-ready [data-motion-controls] { display: flex; }
+    [data-motion-controls][hidden] { display: none !important; }
+    [data-motion-controls] button {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 8px 12px;
+      border: 1px solid var(--color-muted);
+      border-radius: 4px;
+      color: var(--color-ink);
+      background: var(--color-paper);
+      font: 600 12px/1 var(--font-sans);
+      cursor: pointer;
+    }
+    [data-motion-controls] button:hover { border-color: var(--color-accent); }
+    [data-motion-controls] button:focus-visible {
+      outline: 3px solid var(--color-accent);
+      outline-offset: 2px;
+    }
+    [data-motion-controls] button:disabled { cursor: not-allowed; opacity: .45; }
+    [data-motion-status-visible] {
+      margin-left: auto;
+      color: var(--color-muted);
+      font: 500 12px/1.4 var(--font-mono);
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+    noscript p {
+      margin: 12px 0 0;
+      color: var(--color-muted);
+      font: 500 12px/1.4 var(--font-mono);
+    }
+
+    html[data-motion="static"] [data-motion-controls],
+    html[data-motion="static"] [data-motion-decorative] { display: none !important; }
+    html[data-motion="static"] [data-motion-item] {
+      opacity: 1 !important;
+      transform: none !important;
+      animation: none !important;
+      transition: none !important;
+    }
+    html[data-motion="step"] [data-motion-controls],
+    html[data-motion="step"] [data-motion-decorative] { display: none !important; }
+    html[data-motion="step"] [data-motion-item] {
+      animation: none !important;
+      transition: none !important;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: .001ms !important;
+      }
+      [data-motion-item] { opacity: 1 !important; transform: none !important; }
+      [data-motion-decorative] { display: none !important; }
+      [data-motion-controls] { display: none !important; }
+    }
+    @media print {
+      /* Paper has no scrollbar, so the local scroller would clip instead of
+         scroll. Let the diagram scale down to the sheet: smaller but whole
+         beats sharp but cut off. */
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+      [data-motion-controls], [data-motion-decorative] { display: none !important; }
+      [data-motion-item] {
+        opacity: 1 !important;
+        transform: none !important;
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+
+:root{color-scheme:dark;--color-paper:#101213;--color-ink:#e8eceb;--color-muted:#a9b1b3;--color-soft:#969c9e;--color-accent:#7dd9c8;--color-rule:#343a3d;--motion-total:5760ms}
+html,.diagram-container{scrollbar-width:thin;scrollbar-color:rgb(77 155 141 / 20%) transparent}::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgb(77 155 141 / 20%);border-radius:4px}body{display:block;padding:40px 24px}main,[data-motion-root]{width:100%;max-width:1000px;margin:auto}h1{font-size:32px;margin-bottom:12px}.intro,.notes{max-width:980px;color:#a9b1b3;font-size:13px;line-height:1.65}.intro{margin-bottom:24px}svg{min-width:960px;background:#101213}.diagram-container{border:1px solid #343a3d;border-radius:8px}a{color:#7dd9c8}.zone{fill:#141819;stroke:#343a3d}.box{fill:#181a1c;stroke:#596266;stroke-width:1}.focal{fill:#18342e;stroke:#7dd9c8}.label{font:600 14px var(--font-sans);fill:#e8eceb}.sub{font:400 10px var(--font-mono);fill:#a9b1b3}.small{font:400 10px var(--font-sans);fill:#a9b1b3}.zone-label{font:500 8px var(--font-mono);letter-spacing:1.5px;fill:#969c9e}.tag{font:500 8px var(--font-mono);letter-spacing:1px;fill:#7dd9c8}.field{font:400 10px var(--font-mono);fill:#a9b1b3}.wire{fill:none;stroke:#969c9e;stroke-width:1.2}.icon{fill:none;stroke:#a9b1b3;stroke-width:1;stroke-linecap:round;stroke-linejoin:round}.cardinality{font:500 10px var(--font-mono);fill:#e8eceb}.notes{margin-top:20px}nav{display:flex;gap:24px;margin-bottom:24px;font-size:14px}footer{border-top:1px solid #343a3d;padding-top:16px;margin-top:28px;color:#969c9e;font:12px var(--font-mono)}
+[data-motion-controls]{margin-top:12px;padding-top:8px;gap:6px}[data-motion-controls] button{min-height:28px;min-width:0;padding:4px 10px;border-color:#ffffff20;font-weight:400;font-size:11px;line-height:1.2}[data-motion-controls] button:focus-visible{outline-width:1px;outline-offset:2px}@media(pointer:coarse){[data-motion-controls] button{min-height:44px}}svg[aria-labelledby^="media-flow"] .label{font-size:12px}svg[aria-labelledby^="media-flow"] .sub{font-size:8px}svg[aria-labelledby^="metadata-model"] .wire{stroke-width:1}.zone{stroke-width:.8}.eyebrow{font-size:10.56px}.small{font-size:9px}nav{font-size:12px}footer{font-size:10px}@media print{body{padding:0}svg{min-width:0}.diagram-container{overflow:visible}nav{display:none}}
+</style></head><body><main data-motion-root data-motion-mode="reveal" data-step-count="8" data-step-current="8" data-frame="static" data-static-frame="complete"><nav><a href="media-flow.html">Media flow</a><a href="metadata-model.html">Metadata model</a></nav><p class="eyebrow">Review Room · Media architecture</p><h1>One media hub, from upload to delivery.</h1><p class="intro">Originals stay in RustFS. Convex keeps the catalog and review state; background jobs prepare video previews. Publishing is a separate, deliberate action.</p><div class="diagram-container"><svg viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="media-flow-title media-flow-desc"><title id="media-flow-title">Review Room media flow</title><desc id="media-flow-desc">Uploads retain canonical files in RustFS while Convex tracks assets and versions, Trigger processes video derivatives, reviewers inspect the results, and explicit version consent publishes references to Trailer Feed.</desc><defs><marker id="media-flow-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0 0L8 3L0 6" fill="#969c9e"/></marker></defs><rect width="960" height="540" fill="#101213"/><g transform="scale(.75)"><rect class="zone" x="40" y="84" width="1200" height="180" rx="8"/><text class="zone-label" x="64" y="111">01 / INGEST · ORIGINAL FILES</text><rect class="zone" x="40" y="294" width="1200" height="180" rx="8"/><text class="zone-label" x="64" y="321">02 / PROCESS · CATALOG · REVIEW</text><rect class="zone" x="40" y="504" width="1200" height="180" rx="8"/><text class="zone-label" x="64" y="531">03 / PUBLISH</text><path class="wire" d="M370 192H490" marker-end="url(#media-flow-arrow)" /><path class="wire" d="M790 192H910" marker-end="url(#media-flow-arrow)" /><path class="wire" d="M1060 252V334" marker-end="url(#media-flow-arrow)" /><path class="wire" d="M910 394H790" marker-end="url(#media-flow-arrow)" /><path class="wire" d="M490 394H370" marker-end="url(#media-flow-arrow)" /><path class="wire" d="M220 454V534" marker-end="url(#media-flow-arrow)" /><path class="wire" d="M370 594H490" marker-end="url(#media-flow-arrow)" /><path class="wire" d="M790 594H910" marker-end="url(#media-flow-arrow)" /><g data-motion-item data-step="1" aria-label="Existing media"><rect class="box " x="70" y="132" width="300" height="120" rx="6"/><g class="icon" transform="translate(90 152)" aria-hidden="true"><path d="M15 2h-4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/><path d="M16.706 2.706A2.4 2.4 0 0 0 15 2v5a1 1 0 0 0 1 1h5a2.4 2.4 0 0 0-.706-1.706z"/><path d="M5 7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8a2 2 0 0 0 1.732-1"/></g><text class="label" x="130" y="171">Existing media</text><text class="sub" x="90" y="208">Local upload / scoped API</text><text class="small" x="90" y="233">Creative Studio Pro can add takes</text></g><g data-motion-item data-step="2" aria-label="Upload API"><rect class="box " x="490" y="132" width="300" height="120" rx="6"/><g class="icon" transform="translate(510 152)" aria-hidden="true"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></g><text class="label" x="550" y="171">Upload API</text><text class="sub" x="510" y="208">Authorize → upload → finalize</text><text class="small" x="510" y="233">Verify the upload before cataloging</text></g><g data-motion-item data-step="3" aria-label="RustFS"><rect class="box " x="910" y="132" width="300" height="120" rx="6"/><g class="icon" transform="translate(930 152)" aria-hidden="true"><path d="M10 16h.01"/><path d="M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><path d="M21.946 12.013H2.054"/><path d="M6 16h.01"/></g><text class="label" x="970" y="171">RustFS</text><text class="sub" x="930" y="208">Original media + derivatives</text><text class="small" x="930" y="233">Canonical files stay in object storage</text></g><g data-motion-item data-step="4" aria-label="Trigger.dev + FFmpeg"><rect class="box " x="910" y="334" width="300" height="120" rx="6"/><g class="icon" transform="translate(930 354)" aria-hidden="true"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></g><text class="label" x="970" y="373">Trigger.dev + FFmpeg</text><text class="sub" x="930" y="410">Verify → derivatives → finalize</text><text class="small" x="930" y="435">Video thumbnails and scrub sprites</text></g><g data-motion-item data-step="5" aria-label="Convex catalog"><rect class="box focal" x="490" y="334" width="300" height="120" rx="6"/><g class="icon" transform="translate(510 354)" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></g><text class="label" x="550" y="373">Convex catalog</text><text class="sub" x="510" y="410">Assets · versions · job states</text><text class="small" x="510" y="435">Worker results update exact versions</text></g><g data-motion-item data-step="6" aria-label="Review workspace"><rect class="box " x="70" y="334" width="300" height="120" rx="6"/><g class="icon" transform="translate(90 354)" aria-hidden="true"><path d="M15.033 9.44a.647.647 0 0 1 0 1.12l-4.065 2.352a.645.645 0 0 1-.968-.56V7.648a.645.645 0 0 1 .967-.56z"/><path d="M12 17v4"/><path d="M8 21h8"/><rect x="2" y="3" width="20" height="14" rx="2"/></g><text class="label" x="130" y="373">Review workspace</text><text class="sub" x="90" y="410">Inspect · comment · choose</text><text class="small" x="90" y="435">Original media uses authorized delivery</text></g><g data-motion-item data-step="7" aria-label="Select versions"><rect class="box " x="70" y="534" width="300" height="120" rx="6"/><g class="icon" transform="translate(90 554)" aria-hidden="true"><path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/></g><text class="label" x="130" y="573">Select versions</text><text class="sub" x="90" y="610">Explicit publish action</text><text class="small" x="90" y="635">Uploading does not publish</text></g><g data-motion-item data-step="8" aria-label="Grants + sync outbox"><rect class="box focal" x="490" y="534" width="300" height="120" rx="6"/><g class="icon" transform="translate(510 554)" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></g><text class="label" x="550" y="573">Grants + sync outbox</text><text class="sub" x="510" y="610">Consent · durable retries</text><text class="small" x="510" y="635">Controlled access; no source move</text></g><g data-motion-item data-step="8" aria-label="Trailer Feed"><rect class="box " x="910" y="534" width="300" height="120" rx="6"/><g class="icon" transform="translate(930 554)" aria-hidden="true"><path d="m12.296 3.464 3.02 3.956"/><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m6.18 5.276 3.1 3.899"/></g><text class="label" x="970" y="573">Trailer Feed</text><text class="sub" x="930" y="610">Published version references</text><text class="small" x="930" y="635">Refresh / unsync remain explicit</text></g><text class="small" x="64" y="700">Arrows trace the main handoffs. Catalog creation and authorized playback requests are summarized, not every HTTP call.</text></g></svg></div><div data-motion-controls role="group" aria-label="Diagram playback controls">
+      <button type="button" data-motion-action="prev">Previous</button>
+      <button type="button" data-motion-action="play" aria-pressed="false">Play</button>
+      <button type="button" data-motion-action="pause" aria-pressed="true">Pause</button>
+      <button type="button" data-motion-action="next">Next</button>
+      <button type="button" data-motion-action="replay">Replay</button>
+      <span class="keyboard-help">←/→ step · Space play/pause · R replay · Home/End jump</span>
+      <span data-motion-status-visible aria-hidden="true">Step <span data-motion-step-label>8</span> of 8</span>
+    </div><p class="sr-only" data-motion-status role="status" aria-live="polite" aria-atomic="true"></p><noscript><p>The complete diagram is visible. Playback requires JavaScript.</p></noscript><div class="notes"><p><strong>Two paths, one catalog.</strong> Browser uploads and scoped automation APIs both create reviewable assets and versions. The illustrated worker path is for video; still images do not require video-derivative jobs.</p><p><strong>Sources remain intact.</strong> Trailer Feed receives version references and authorized media access. Sync, refresh and unsync have explicit state; uploading alone never makes an asset public.</p><p>Use Play or Replay to trace the handoffs. The sequence plays once and finishes complete; reduced-motion, print and no-JavaScript views stay complete.</p></div><footer>Review Room · Source-checked 17 October 2026 · Conceptual overview, not a deployment inventory</footer></main><script data-diagram-controls>
+    (() => {
+      const params = new URLSearchParams(location.search);
+      const staticOverride = params.get('motion') === 'static' || document.documentElement.dataset.motion === 'static';
+      const requestedStep = params.get('step');
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+      document.fonts.ready.then(() => { document.documentElement.dataset.fontsReady = 'true'; });
+
+      document.querySelectorAll('[data-motion-root]').forEach((root) => {
+        const count = Number(root.dataset.stepCount);
+        const hold = parseFloat(getComputedStyle(root).getPropertyValue('--motion-hold')) || 720;
+        const parsedStep = requestedStep !== null && /^\d+$/.test(requestedStep) ? Number(requestedStep) : null;
+        const exactStep = params.get('motion') === 'step' && Number.isSafeInteger(parsedStep) && parsedStep >= 0 && parsedStep <= count ? parsedStep : null;
+        const items = [...root.querySelectorAll('[data-motion-item]')];
+        const labels = Array.from({ length: count + 1 }, (_, index) => index === 0
+          ? 'Ready'
+          : items.filter((item) => !item.hasAttribute('data-motion-decorative') && Number(item.dataset.step) === index)
+              .map((item) => item.getAttribute('aria-label')).join('; '));
+        const controls = root.querySelector('[data-motion-controls]');
+        const status = root.querySelector('[data-motion-status]');
+        const visibleStep = root.querySelector('[data-motion-step-label]');
+        let step = count;
+        let timer = 0;
+        let playing = false;
+        let stepBeforeReduce = 0;
+        let resumeAfterReduce = root.dataset.motionMode === 'reveal';
+
+        const buttons = (action) => controls.querySelector(`[data-motion-action="${action}"]`);
+        const clearClock = () => { window.clearTimeout(timer); timer = 0; };
+        const announce = () => { status.textContent = `Step ${step} of ${count}: ${labels[step] || 'Complete'}`; };
+        const setControlsAvailable = (available) => {
+          controls.hidden = !available;
+          controls.setAttribute('aria-hidden', String(!available));
+          controls.dataset.playbackDisabled = String(!available);
+          controls.querySelectorAll('button').forEach((control) => { control.disabled = !available; });
+        };
+
+        function render(next, userInitiated = false) {
+          step = Math.max(0, Math.min(count, next));
+          root.dataset.stepCurrent = String(step);
+          root.dataset.frame = step === count ? 'end' : step === 0 ? 'start' : 'step';
+          items.forEach((item) => {
+            const itemStep = Number(item.dataset.step);
+            item.classList.toggle('is-visible', itemStep <= step);
+            item.classList.toggle('is-current', itemStep === step);
+          });
+          if (visibleStep) visibleStep.textContent = String(step);
+          const unavailable = controls.dataset.playbackDisabled === 'true';
+          buttons('prev').disabled = unavailable || step === 0;
+          buttons('next').disabled = unavailable || step === count;
+          if (userInitiated) announce();
+        }
+
+        function pause(userInitiated = false) {
+          clearClock();
+          playing = false;
+          root.classList.remove('is-playing');
+          buttons('play').setAttribute('aria-pressed', 'false');
+          buttons('pause').setAttribute('aria-pressed', 'true');
+          if (userInitiated) status.textContent = `Paused at step ${step} of ${count}`;
+        }
+
+        function finish() {
+          pause(false);
+          root.dataset.frame = 'end';
+          status.textContent = `Complete · step ${count} of ${count}`;
+        }
+
+        function tick() {
+          if (!playing) return;
+          if (step >= count) { finish(); return; }
+          render(step + 1, false);
+          if (step >= count) { finish(); return; }
+          timer = window.setTimeout(tick, hold);
+        }
+
+        function play(fromStart = false, userInitiated = false) {
+          clearClock();
+          if (fromStart || step >= count) render(0, userInitiated);
+          playing = true;
+          root.classList.add('is-playing');
+          buttons('play').setAttribute('aria-pressed', 'true');
+          buttons('pause').setAttribute('aria-pressed', 'false');
+          timer = window.setTimeout(tick, hold);
+        }
+
+        controls.addEventListener('click', (event) => {
+          const button = event.target.closest('[data-motion-action]');
+          if (!button) return;
+          const action = button.dataset.motionAction;
+          if (action === 'play') play(false, true);
+          if (action === 'pause') pause(true);
+          if (action === 'replay') play(true, true);
+          if (action === 'prev') { pause(false); render(step - 1, true); }
+          if (action === 'next') { pause(false); render(step + 1, true); }
+        });
+
+        root.addEventListener('keydown', (event) => {
+          if (event.target.matches('input, textarea, select, a[href]')) return;
+          const keys = { ArrowLeft: step - 1, ArrowRight: step + 1, Home: 0, End: count };
+          if (event.code === 'Space' && !event.target.closest('button')) {
+            event.preventDefault();
+            playing ? pause(true) : play(false, true);
+            return;
+          }
+          if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === 'r') {
+            event.preventDefault();
+            play(true, true);
+            return;
+          }
+          if (!(event.key in keys)) return;
+          event.preventDefault();
+          pause(false);
+          render(keys[event.key], true);
+        });
+
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'hidden' && playing) pause(false);
+        });
+        reduce.addEventListener('change', (event) => {
+          if (event.matches && root.dataset.motionState !== 'reduced') {
+            stepBeforeReduce = step;
+            resumeAfterReduce = playing;
+          }
+          pause(false);
+          if (event.matches) {
+            setControlsAvailable(false);
+            render(count, false);
+            root.dataset.frame = 'static';
+            root.dataset.motionState = 'reduced';
+            status.textContent = 'Reduced motion · complete static frame · playback controls unavailable';
+          } else if (staticOverride || root.dataset.motionMode === 'none') {
+            setControlsAvailable(false);
+            render(count, false);
+            root.dataset.frame = 'static';
+            root.dataset.motionState = 'static';
+            status.textContent = 'Static frame · complete diagram · playback controls unavailable';
+          } else {
+            delete root.dataset.motionState;
+            if (exactStep !== null) {
+              setControlsAvailable(false);
+              render(exactStep, false);
+              root.dataset.frame = 'step';
+              root.dataset.motionState = 'test';
+              status.textContent = `Test frame · step ${step} of ${count} · playback controls unavailable`;
+            } else {
+              setControlsAvailable(true);
+              render(stepBeforeReduce, false);
+              status.textContent = `Ready · step ${step} of ${count}`;
+              if (resumeAfterReduce && root.dataset.motionMode === 'reveal') {
+                play(false, false);
+              }
+            }
+            resumeAfterReduce = false;
+          }
+        });
+
+        if (staticOverride) {
+          document.documentElement.dataset.motion = 'static';
+          pause(false);
+          setControlsAvailable(false);
+          render(count, false);
+          root.dataset.frame = 'static';
+          root.dataset.motionState = 'static';
+          status.textContent = 'Static frame · complete diagram · playback controls unavailable';
+        } else if (reduce.matches || root.dataset.motionMode === 'none') {
+          pause(false);
+          setControlsAvailable(false);
+          render(count, false);
+          root.dataset.frame = 'static';
+          root.dataset.motionState = reduce.matches ? 'reduced' : 'static';
+          status.textContent = reduce.matches
+            ? 'Reduced motion · complete static frame · playback controls unavailable'
+            : 'Static frame · complete diagram · playback controls unavailable';
+        } else if (exactStep !== null) {
+          document.documentElement.dataset.motion = 'step';
+          pause(false);
+          setControlsAvailable(false);
+          render(exactStep, false);
+          root.dataset.frame = 'step';
+          root.dataset.motionState = 'test';
+          status.textContent = `Test frame · step ${step} of ${count} · playback controls unavailable`;
+        } else if (root.dataset.motionMode === 'reveal') {
+          setControlsAvailable(true);
+          render(0, false);
+          play(false, false);
+        } else {
+          pause(false);
+          setControlsAvailable(true);
+          render(0, false);
+          status.textContent = `Ready · step 0 of ${count}`;
+        }
+        root.classList.add('motion-ready');
+      });
+    })();
+  </script></body></html>

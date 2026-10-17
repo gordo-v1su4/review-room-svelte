@@ -18,6 +18,7 @@
   let available = $state(1000);
   let drag: { pointer: number; divider: 0 | 1; startX: number; sizes: PaneSizes; node: HTMLElement } | undefined;
   let dragging = $state(false);
+  let pointerFocus = $state(false);
   let compactPercent = $state<number>();
   let focusPercent = $state(72);
   let gripY = $state<(number | undefined)[]>([undefined, undefined]);
@@ -41,8 +42,9 @@
   function start(event: PointerEvent, divider: 0 | 1) {
     if (event.button !== 0 || !event.isPrimary || drag) return;
     const node = event.currentTarget as HTMLElement;
+    pointerFocus = true;
     hover(event, divider);
-    node.focus();
+    node.focus({ preventScroll: true });
     node.setPointerCapture(event.pointerId);
     drag = { pointer: event.pointerId, divider, startX: event.clientX, sizes: [...displayed], node };
     dragging = true;
@@ -64,6 +66,7 @@
     release(); persist();
   }
   function keyboard(event: KeyboardEvent, divider: 0 | 1) {
+    pointerFocus = false;
     let target = displayed[divider];
     if (event.key === 'ArrowLeft') target -= event.shiftKey ? 5 : 1;
     else if (event.key === 'ArrowRight') target += event.shiftKey ? 5 : 1;
@@ -98,7 +101,7 @@
       <!-- WAI-ARIA window splitter: focusable separator with range values and arrow-key controls. -->
       <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
       <div
-        class="pane-divider" class:first-divider={divider === 0} class:second-divider={divider === 1}
+        class="pane-divider" class:pointer-focus={pointerFocus} class:first-divider={divider === 0} class:second-divider={divider === 1}
         role="separator" aria-orientation="vertical" tabindex="0"
         aria-label={divider === 0 ? 'Resize explorer and viewer' : 'Resize viewer and feedback'}
         aria-controls={divider === 0 ? `${uid}-explorer ${uid}-viewer` : `${uid}-viewer ${uid}-inspector`}
@@ -108,7 +111,7 @@
         aria-valuetext={`${Math.round(displayed[divider])} percent`}
         onpointerdown={event => start(event, divider)} onpointermove={event => { hover(event, divider); move(event); }}
         onpointerup={finish} onpointercancel={finish} onlostpointercapture={finish}
-        onkeydown={event => keyboard(event, divider)}
+        onkeydown={event => keyboard(event, divider)} onblur={() => pointerFocus = false}
       ><span style:top={gripY[divider] === undefined ? undefined : `${gripY[divider]}px`} class:tracking={gripY[divider] !== undefined}></span></div>
     {/each}
     <section class="pane viewer-pane" id={`${uid}-viewer`} aria-label="Media viewer">{@render viewer()}</section>
@@ -117,6 +120,7 @@
 </div>
 
 <style>
+  :global(html:has(.pane-host)) { overflow-anchor: none; }
   .pane-host { min-width: 0; width: 100%; container-type: inline-size; }
   .workspace-panes { display: grid; min-width: 0; align-items: start; gap: 14px; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'explorer'; }
   .workspace-panes.has-active { grid-template-areas: 'viewer' 'inspector' 'explorer'; }
@@ -135,9 +139,10 @@
   .pane-divider::before { content:''; position:absolute; inset:0 -3px; }
   .pane-divider span { position:absolute; top:clamp(100px,90%,calc(100% - 60px)); display:block; width:4px; height:48px; border-radius:4px; background:var(--muted); opacity:.65; }
   .pane-divider span.tracking { transform:translateY(-50%); }
-  .pane-divider:hover::before, .pane-divider:focus-visible::before { background:color-mix(in srgb,var(--teal) 7%,transparent); }
+  .pane-divider:hover::before, .pane-divider:focus-visible::before { background:transparent; }
   .pane-divider:hover span, .pane-divider:focus-visible span, .dragging .pane-divider span { background:var(--selection-accent); }
-  .pane-divider:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+  .pane-divider:focus-visible { outline: none; }
+  .pane-divider:not(.pointer-focus):focus-visible span { outline: 1px solid var(--teal); outline-offset: 3px; }
   .dragging { user-select: none; }
   @media (min-width: 1100px) {
     @container (min-width: 548px) {
@@ -152,7 +157,7 @@
       .first-divider { grid-area: first; }
       .second-divider { grid-area: second; }
       .pane-divider:hover span, .pane-divider:focus-visible span, .dragging .pane-divider span { background:var(--selection-accent); }
-      .pane-divider:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+      .pane-divider:focus-visible { outline: none; }
       .workspace-panes.has-active.focused { grid-template-columns:minmax(0,var(--viewer-size)) 8px minmax(0,var(--inspector-size)); grid-template-areas:'viewer second inspector'; }
       .workspace-panes.has-active.focused.inspector-hidden { grid-template-columns:minmax(0,1fr); grid-template-areas:'viewer'; }
     }
