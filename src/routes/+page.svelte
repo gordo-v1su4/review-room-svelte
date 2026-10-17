@@ -117,7 +117,9 @@
   let importOptions = $state<{ folderId: string | null; assetClass: 'VID' | 'IMG' | 'CTX' | 'STB' }>({ folderId: null, assetClass: 'VID' });
   let archived = $state(false);
   const folderAccess = $derived({ isAdmin: true, editableProjectIds: activeProjects.map(project => project.id) });
-  const projectFolders = $derived(organization.folders.filter(folder => folder.projectId === projectId));
+  const connectedFolderIds = $derived(new Set<string>(data.snapshot?.connectedFolderIds ?? []));
+  const foldersWithConnections = $derived(organization.folders.map(folder => ({ ...folder, connected: data.snapshot ? connectedFolderIds.has(folder.id) : folder.connected })));
+  const projectFolders = $derived(foldersWithConnections.filter(folder => folder.projectId === projectId));
   const activeFolder = $derived(projectFolders.find(folder => folder.id === activeFolderId));
   const ancestors = $derived(folderAncestors(projectFolders, activeFolderId));
   let folderPathBar = $state<HTMLElement>();
@@ -144,7 +146,7 @@
   let inboxSeek = $state<{ assetId: string; time: number } | null>(null);
   const treeProjects = $derived(activeProjects.map(project => {
     const items = allAssets.filter(asset => asset.projectId === project.id && !asset.archived);
-    return { ...project, collections: collections.collections.filter(collection => collection.projectId === project.id).map(collection => ({ ...collection, count: queryCollectionAssets(collection, allAssets).length })), folders: organization.folders.filter(folder => folder.projectId === project.id).map(folder => ({ ...folder, count: items.filter(asset => asset.folderId === folder.id).length })), archivedCount: allAssets.filter(asset => asset.projectId === project.id && asset.archived).length, videoCount: items.filter(asset => asset.type === 'video').length, imageCount: items.filter(asset => asset.type === 'image').length, shortlistCount: items.filter(asset => asset.shortlisted).length };
+    return { ...project, collections: collections.collections.filter(collection => collection.projectId === project.id).map(collection => ({ ...collection, count: queryCollectionAssets(collection, allAssets).length })), folders: foldersWithConnections.filter(folder => folder.projectId === project.id).map(folder => ({ ...folder, count: items.filter(asset => asset.folderId === folder.id).length })), archivedCount: allAssets.filter(asset => asset.projectId === project.id && asset.archived).length, videoCount: items.filter(asset => asset.type === 'video').length, imageCount: items.filter(asset => asset.type === 'image').length, shortlistCount: items.filter(asset => asset.shortlisted).length };
   }));
   const activeId = $derived(session.activeAssetId);
   function review(action: ReviewAction) {

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
+  import { invalidate } from '$app/navigation';
   import { Dialog } from 'bits-ui';
   import Stage1Select from './Stage1Select.svelte';
   import { RefreshCw, X } from 'lucide-svelte';
@@ -88,7 +89,7 @@
     if (replacing && (!connection || !replacementConsent)) return;
     busy = true; message = ''; existingRunId = '';
     if (replacing) replacementId ||= crypto.randomUUID();
-    try { await post({action:'connect',projectId,...(scope ? {folderId:scope} : {}),mode,...(mode === 'create' ? {targetTitle:targetTitle.trim()} : {targetRunId:targetRunId.trim()}),...(replacing && connection ? {replacesConnectionId:connection._id,replacementId,replacementConsent:true} : {})}); replacing = false; replacementConsent = false; replacementId = ''; changed(); await load(); }
+    try { await post({action:'connect',projectId,...(scope ? {folderId:scope} : {}),mode,...(mode === 'create' ? {targetTitle:targetTitle.trim()} : {targetRunId:targetRunId.trim()}),...(replacing && connection ? {replacesConnectionId:connection._id,replacementId,replacementConsent:true} : {})}); replacing = false; replacementConsent = false; replacementId = ''; changed(); await Promise.all([load(), invalidate('app:workspace')]); }
     catch (cause) { message = cause instanceof Error ? cause.message : 'Connection failed.'; }
     finally { busy = false; }
   }
