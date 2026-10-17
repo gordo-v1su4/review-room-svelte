@@ -45,11 +45,29 @@
     }) as typeof window.fetch;
   }
 
+  // Takes named by shot code (several versions each), a misfiled drop, a deliverable and its Trailer Feed copy.
+  type Asset = Doc<'videos'>; type Version = Doc<'assetVersions'>;
+  const assets: Asset[] = [], versions: Version[] = [];
+  function asset(id: string, folderId: string, code: string, takes: number, extra: Partial<Asset> = {}) {
+    for (let take = 1; take <= takes; take += 1) versions.push({ _id: `${id}-v${take}` as Id<'assetVersions'>, _creationTime: 1, assetId: id as Id<'videos'>,
+      version: take, originalKey: `assets/${id}/${take}/original.mp4`, mimeType: 'video/mp4', sizeBytes: 100, processingState: 'ready', createdAt: take });
+    assets.push({ _id: id as Id<'videos'>, _creationTime: 1, projectId, folderId: folderId as Id<'projectFolders'>, assetClass: 'VID', assetCode: code, title: code,
+      originalFilename: `${code}.mp4`, storageKey: `assets/${id}/${takes}/original.mp4`, mimeType: 'video/mp4', status: 'awaiting_review', viewed: false, rating: 0,
+      isSelect: false, commentCount: 0, tags: [], downloadEnabled: false, order: assets.length, uploadedBy: ownerId, uploadedAt: assets.length + 1, updatedAt: 1,
+      processingStatus: 'ready', currentVersionId: `${id}-v${takes}` as Id<'assetVersions'>, durationSec: 4, width: 1920, height: 1080, ...extra });
+  }
+  asset('par-0100', 'ep101-010', 'BLR_EP101_PAR_0100', 1);
+  asset('par-0020', 'ep101-010', 'BLR_EP101_PAR_0020', 3);
+  asset('par-0010', 'ep101-010', 'BLR_EP101_PAR_0010', 2);
+  asset('stray', 'ep101-010', 'VID_20261017_00042', 1, { originalFilename: 'outside render FINAL.mov', misfiled: true });
+  asset('trl01', 'series-deliverables', 'BLR_S1_TRL01', 2);
+  asset('trl01-copy', 'trailer-cuts', 'BLR_S1_TRL01', 1, { copiedFromAssetId: 'trl01' as Id<'videos'>, copiedFromVersionId: 'trl01-v2' as Id<'assetVersions'> });
+
   const snapshot: NonNullable<PageData['snapshot']> = {
     projects: [{ _id: projectId, _creationTime: 1, title: 'Blood Rush', slug: 'blood-rush', clientName: 'Series · Creative Studio Pro',
       downloadEnabledByDefault: false, createdBy: ownerId, createdAt: 1, updatedAt: 1 }],
     folders, connectedFolderIds: ['trailer-cuts' as Id<'projectFolders'>],
-    assets: [], versions: [], mediaJobs: [], comments: [], publications: [], showcases: [], links: [], importedMetadata: [], projectIds: [projectId],
+    assets, versions, mediaJobs: [], comments: [], publications: [], showcases: [], links: [], importedMetadata: [], projectIds: [projectId],
   };
 </script>
 
