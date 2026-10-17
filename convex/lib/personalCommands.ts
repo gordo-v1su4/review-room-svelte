@@ -3,6 +3,7 @@ import type { Doc, Id } from '../_generated/dataModel';
 import { randomSecret } from './reviewAccess';
 import { reserveAssetNumber } from './assetNumber';
 import { validateFolderParent, folderNameKey } from './folderTree';
+import { assertFolderChangeable, assertSubtreeChangeable, type FolderActor, type FolderOwnerApp } from './folderLock';
 
 function title(value: string, kind: string) {
   const normalized = value.trim();
@@ -42,29 +43,54 @@ export async function updatePersonalProject(ctx: MutationCtx, ownerId: Id<'appUs
   return projectId;
 }
 
-export async function createPersonalFolder(ctx: MutationCtx, ownerId: Id<'appUsers'>, projectId: Id<'projects'>, name: string, parentFolderId?: Id<'projectFolders'>) {
+export async function createPersonalFolder(ctx: MutationCtx, ownerId: Id<'appUsers'>, projectId: Id<'projects'>, name: string, parentFolderId?: Id<'projectFolders'>,
+  options: { actor?: FolderActor; ownerApp?: FolderOwnerApp } = {}) {
+  const actor = options.actor ?? {};
   const project = await ctx.db.get(projectId);
   if (!project || project.createdBy !== ownerId || project.archived) throw new Error('Project unavailable');
   const normalized = title(name, 'Folder');
+  if (options.ownerApp && !actor.credentialId) throw new Error('Locked folders can only be created by an automation credential');
   const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', projectId)).collect();
   await validateFolderParent(ctx, projectId, parentFolderId);
+  const parent = folders.find(folder => folder._id === parentFolderId);
+  if (parent) assertFolderChangeable(parent, actor, 'given new subfolders');
   if (folders.some(folder => folder.parentFolderId === parentFolderId && folderNameKey(folder.title) === folderNameKey(normalized))) throw new Error('Folder already exists');
   const now = Date.now();
   return await ctx.db.insert('projectFolders', {
     projectId, parentFolderId, title: normalized, order: Math.max(0, ...folders.filter(folder => folder.parentFolderId === parentFolderId).map(folder => folder.order)) + 1,
+    ...(options.ownerApp ? { ownerApp: options.ownerApp, ownerCredentialId: actor.credentialId } : {}),
     createdBy: ownerId, createdAt: now, updatedAt: now,
   });
 }
 
-export async function renamePersonalFolder(ctx: MutationCtx, ownerId: Id<'appUsers'>, folderId: Id<'projectFolders'>, name: string) {
+export async function renamePersonalFolder(ctx: MutationCtx, ownerId: Id<'appUsers'>, folderId: Id<'projectFolders'>, name: string, actor: FolderActor = {}) {
   const folder = await ctx.db.get(folderId);
   if (!folder) throw new Error('Folder unavailable');
   const project = await ctx.db.get(folder.projectId);
   if (!project || project.createdBy !== ownerId || project.archived) throw new Error('Project unavailable');
   const normalized = title(name, 'Folder');
+  assertFolderChangeable(folder, actor, 'renamed');
   const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', folder.projectId)).collect();
   if (folders.some(item => item._id !== folderId && item.parentFolderId === folder.parentFolderId && folderNameKey(item.title) === folderNameKey(normalized))) throw new Error('Folder already exists');
   await ctx.db.patch(folderId, { title: normalized, updatedAt: Date.now() });
+  return folderId;
+}
+
+export async function movePersonalFolder(ctx: MutationCtx, ownerId: Id<'appUsers'>, folderId: Id<'projectFolders'>, parentFolderId: Id<'projectFolders'> | undefined, actor: FolderActor = {}) {
+  const folder = await ctx.db.get(folderId);
+  if (!folder) throw new Error('Folder unavailable');
+  const project = await ctx.db.get(folder.projectId);
+  if (!project || project.createdBy !== ownerId || project.archived) throw new Error('Project unavailable');
+  assertFolderChangeable(folder, actor, 'moved');
+  if (folder.parentFolderId === parentFolderId) return folderId;
+  await validateFolderParent(ctx, folder.projectId, parentFolderId, folder._id);
+  const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', folder.projectId)).collect();
+  assertSubtreeChangeable(folders, folder._id, actor);
+  const parent = folders.find(item => item._id === parentFolderId);
+  if (parent) assertFolderChangeable(parent, actor, 'given new subfolders');
+  if (folders.some(item => item._id !== folder._id && item.parentFolderId === parentFolderId && folderNameKey(item.title) === folderNameKey(folder.title))) throw new Error('Folder already exists');
+  const order = Math.max(0, ...folders.filter(item => item._id !== folder._id && item.parentFolderId === parentFolderId).map(item => item.order)) + 1;
+  await ctx.db.patch(folder._id, { parentFolderId, order, updatedAt: Date.now() });
   return folderId;
 }
 

@@ -36,6 +36,9 @@
   --status-final: #c4a7ed;
   --status-omitted: #bfaa95;
   --status-archived: #838e92;
+  /* Folder kinds: locked (owned by Creative Studio Pro) and Trailer Feed–connected. */
+  --folder-locked: #dba872;
+  --folder-connected: #8fb9f2;
   --radius: 14px;
   background: var(--canvas);
   color: var(--ink);

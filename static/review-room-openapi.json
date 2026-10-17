@@ -209,7 +209,7 @@
     "/api/v1/projects/{projectId}/folders": {
       "post": {
         "operationId": "createFolder",
-        "summary": "Create root folder or subfolder (folders:write). Parent must belong to this project.",
+        "summary": "Create root folder or subfolder (folders:write). Parent must belong to this project. Pass ownerApp to create a locked folder owned by this credential; subfolders of a locked folder can only be created by its owner.",
         "parameters": [
           {
             "name": "projectId",
@@ -318,8 +318,8 @@
     },
     "/api/v1/projects/{projectId}/folders/{folderId}": {
       "patch": {
-        "operationId": "renameFolder",
-        "summary": "Rename folder without changing files or media links (folders:write).",
+        "operationId": "editFolder",
+        "summary": "Rename or move a folder without changing files or media links (folders:write). Locked folders: owning credential only.",
         "parameters": [
           {
             "name": "projectId",
@@ -362,6 +362,128 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteFolder",
+        "summary": "Delete a locked folder owned by this credential (folders:write). Ordinary folders are never deleted through automation (403). Subfolders must be removed first (409).",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque Convex ID; resolve from catalog or create response."
+            }
+          },
+          {
+            "name": "folderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque Convex ID; resolve from catalog or create response."
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9._:-]{8,128}$"
+            },
+            "description": "Persist and reuse for retries of the same body; a different body requires a new key."
+          },
+          {
+            "name": "assets",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "move_to_root",
+                "archive_assets"
+              ],
+              "default": "move_to_root"
+            },
+            "description": "What happens to media in the folder."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -895,6 +1017,13 @@
             "type": "string",
             "minLength": 1,
             "description": "Opaque Convex ID; resolve from catalog or create response."
+          },
+          "ownerApp": {
+            "type": "string",
+            "enum": [
+              "creative-studio-pro"
+            ],
+            "description": "Create a locked folder owned by the calling credential. Only that credential may rename, move or delete it; Review Room users and other credentials are refused. Media can still be added inside. Locked folders cannot be connected to Trailer Feed."
           }
         },
         "required": [
@@ -909,12 +1038,19 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 120
+          },
+          "parentFolderId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Move under this folder in the same project; null moves to the project root."
           }
         },
-        "required": [
-          "title"
-        ],
-        "additionalProperties": false
+        "minProperties": 1,
+        "additionalProperties": false,
+        "description": "Rename and/or move. A locked folder (or a move that would carry one along, or a move/create into one) is refused with 403 unless the caller owns it."
       },
       "UploadBegin": {
         "type": "object",

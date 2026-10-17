@@ -78,7 +78,7 @@
   import type { VideoStatus } from '$lib/types';
   import { stepInList } from '$lib/mediaNavigation';
   import { Dialog, Tabs, DropdownMenu } from 'bits-ui';
-  import { Play, Square, Repeat, ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, PanelLeft, PanelRightOpen, ChevronRight, Maximize2, Minimize2 } from 'lucide-svelte';
+  import { Play, Square, Repeat, ArrowUpRight, ArrowLeft, ArrowRight, Check, ChevronDown, Film, Folder, FolderLock, FolderSync, Grid2X2, Table2, List, MessageSquare, Menu, Plus, Search, SlidersHorizontal, Star, Upload, X, Bookmark, Clock3, Image, PanelRightClose, PanelLeft, PanelRightOpen, ChevronRight, Maximize2, Minimize2 } from 'lucide-svelte';
   import Player from '$lib/playback/Player.svelte';
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
   import { type LocalAsset, type ReviewAsset } from '$lib/review';
@@ -942,7 +942,8 @@
       });
       organization = {
         folders: data.snapshot.folders.map(folder => ({ id: folder._id, projectId: folder.projectId,
-          title: folder.title, order: folder.order, parentFolderId: folder.parentFolderId })),
+          title: folder.title, order: folder.order, parentFolderId: folder.parentFolderId,
+          ...(folder.ownerApp ? { locked: true } : {}), ...(data.snapshot.connectedFolderIds.includes(folder._id) ? { connected: true } : {}) })),
         placements: Object.fromEntries(data.snapshot.assets.map(asset => [asset._id,
           { projectId: asset.projectId, ...(asset.folderId ? { folderId: asset.folderId } : {}) }]))
       };
@@ -1105,7 +1106,7 @@
         <button class="library-filter" class:chosen={filter === 'selected'} aria-pressed={filter === 'selected'} onclick={() => openScopedCollection('selected')}><Bookmark size={14}/>Shortlist<span>{directAssets.filter(asset => asset.shortlisted).length}</span></button>
         {#if childFolders.length}<span class="library-divider" aria-hidden="true"></span>{/if}
         {#each childFolders as folder (folder.id)}
-          <button class="library-folder" title={folder.title} onclick={() => openRealFolder(projectId, folder.id)}><Folder size={14}/><span class="library-folder-name">{folder.title}</span><span class="library-folder-count">{assets.filter(asset => asset.folderId === folder.id).length}</span></button>
+          <button class="library-folder" class:locked={folder.locked} class:connected={folder.connected && !folder.locked} title={folder.locked ? `${folder.title} · Locked, managed by Creative Studio Pro` : folder.connected ? `${folder.title} · Connected to Trailer Feed` : folder.title} onclick={() => openRealFolder(projectId, folder.id)}>{#if folder.locked}<FolderLock size={14}/>{:else if folder.connected}<FolderSync size={14}/>{:else}<Folder size={14}/>{/if}<span class="library-folder-name">{folder.title}</span><span class="library-folder-count">{assets.filter(asset => asset.folderId === folder.id).length}</span></button>
         {/each}
       </nav>{/if}
       {#snippet explorer()}
@@ -1201,6 +1202,8 @@
 
 <style>
   .library-navigation { display: flex; align-items: center; flex-wrap: nowrap; gap: 6px; min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; padding: 0 0 8px; margin: 0 0 10px; scrollbar-width: thin; }
+  .library-folder.locked { color: var(--folder-locked); border-color: color-mix(in srgb, var(--folder-locked) 28%, transparent); }
+  .library-folder.connected { color: var(--folder-connected); border-color: color-mix(in srgb, var(--folder-connected) 24%, transparent); }
   .library-filter, .library-folder { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; white-space: nowrap; cursor: pointer; }
   .library-filter { border:0; }
   .library-filter.chosen { background: var(--raised); color: var(--ink); }

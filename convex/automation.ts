@@ -3,7 +3,8 @@ import { internalMutation, internalQuery } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import { owner } from './personal';
-import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
+import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, movePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
+import { disposeFolder } from './lib/folderTree';
 
 const actions = ['projects:create', 'projects:edit', 'folders:write', 'media:upload', 'media:read'] as const;
 const request = { keyDigest: v.string(), requestKey: v.string(), bodyDigest: v.string() };
@@ -127,7 +128,8 @@ export const catalog = internalMutation({
     const credential = await authorize(ctx, args.keyDigest, action, projectId);
     const projects = (await ctx.db.query('projects').withIndex('by_creator', q => q.eq('createdBy', credential.createdBy)).collect()).filter(project => !project.archived && (!projectId || project._id === projectId));
     const folders = (await Promise.all(projects.map(project => ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', project._id)).collect()))).flat();
-    return { projects: projects.map(project => ({ id: project._id, title: project.title })), folders: folders.map(folder => ({ id: folder._id, projectId: folder.projectId, parentFolderId: folder.parentFolderId, title: folder.title })) };
+    return { projects: projects.map(project => ({ id: project._id, title: project.title })), folders: folders.map(folder => ({ id: folder._id, projectId: folder.projectId, parentFolderId: folder.parentFolderId, title: folder.title,
+      locked: folder.ownerApp !== undefined, ownerApp: folder.ownerApp ?? null, ownedByCaller: folder.ownerCredentialId === credential._id })) };
   },
 });
 
@@ -146,22 +148,46 @@ export const versionMetadata = internalMutation({
 });
 
 export const createFolder = internalMutation({
-  args: { ...request, projectId: v.id('projects'), title: v.string(), parentFolderId: v.optional(v.id('projectFolders')) },
+  args: { ...request, projectId: v.id('projects'), title: v.string(), parentFolderId: v.optional(v.id('projectFolders')),
+    ownerApp: v.optional(v.literal('creative-studio-pro')) },
   handler: async (ctx, args) => {
     const credential = await authorize(ctx, args.keyDigest, 'folders:write', args.projectId);
     return await idempotent(ctx, credential, args, 'folders:create',
-      () => createPersonalFolder(ctx, credential.createdBy, args.projectId, args.title, args.parentFolderId));
+      () => createPersonalFolder(ctx, credential.createdBy, args.projectId, args.title, args.parentFolderId,
+        { actor: { credentialId: credential._id }, ownerApp: args.ownerApp }));
   },
 });
 
 export const editFolder = internalMutation({
-  args: { ...request, projectId: v.id('projects'), folderId: v.id('projectFolders'), title: v.string() },
+  args: { ...request, projectId: v.id('projects'), folderId: v.id('projectFolders'), title: v.optional(v.string()),
+    parentFolderId: v.optional(v.union(v.id('projectFolders'), v.null())) },
   handler: async (ctx, args) => {
     const folder = await ctx.db.get(args.folderId);
     if (!folder || folder.projectId !== args.projectId) throw new Error('Folder unavailable');
     const credential = await authorize(ctx, args.keyDigest, 'folders:write', folder.projectId);
-    return await idempotent(ctx, credential, args, 'folders:edit',
-      () => renamePersonalFolder(ctx, credential.createdBy, args.folderId, args.title));
+    if (args.title === undefined && args.parentFolderId === undefined) throw new Error('Folder title must be provided, or a parent folder to move into');
+    const actor = { credentialId: credential._id };
+    return await idempotent(ctx, credential, args, 'folders:edit', async () => {
+      if (args.parentFolderId !== undefined) await movePersonalFolder(ctx, credential.createdBy, args.folderId, args.parentFolderId ?? undefined, actor);
+      if (args.title !== undefined) await renamePersonalFolder(ctx, credential.createdBy, args.folderId, args.title, actor);
+      return args.folderId;
+    });
+  },
+});
+
+export const deleteFolder = internalMutation({
+  args: { ...request, projectId: v.id('projects'), folderId: v.id('projectFolders'),
+    assetDisposition: v.union(v.literal('move_to_root'), v.literal('archive_assets')) },
+  handler: async (ctx, args) => {
+    const folder = await ctx.db.get(args.folderId);
+    if (!folder || folder.projectId !== args.projectId) throw new Error('Folder unavailable');
+    const credential = await authorize(ctx, args.keyDigest, 'folders:write', folder.projectId);
+    const project = await ctx.db.get(folder.projectId);
+    if (!project || project.createdBy !== credential.createdBy || project.archived) throw new Error('Project unavailable');
+    // Automation never deletes ordinary folders; it may only remove locked folders it owns.
+    if (folder.ownerCredentialId !== credential._id) throw new Error('Automation scope denied');
+    return await idempotent(ctx, credential, args, 'folders:delete',
+      () => disposeFolder(ctx, folder, args.assetDisposition, { credentialId: credential._id }));
   },
 });
 

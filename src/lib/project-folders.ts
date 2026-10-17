@@ -1,4 +1,5 @@
-export type ProjectFolder = Readonly<{ id: string; projectId: string; title: string; order: number; parentFolderId?: string; coverAssetId?: string; coverImageUrl?: string }>;
+/** `locked`: owned by Creative Studio Pro, structure read-only here. `connected`: a Trailer Feed source folder. */
+export type ProjectFolder = Readonly<{ id: string; projectId: string; title: string; order: number; parentFolderId?: string; coverAssetId?: string; coverImageUrl?: string; locked?: boolean; connected?: boolean }>;
 export function folderAncestors(folders: readonly ProjectFolder[], folderId?: string | null): ProjectFolder[] {
   const result: ProjectFolder[] = [];
   const seen = new Set<string>();
@@ -11,6 +12,23 @@ export function folderAncestors(folders: readonly ProjectFolder[], folderId?: st
 }
 export function folderPath(folders: readonly ProjectFolder[], folderId: string): string {
   return folderAncestors(folders, folderId).map(folder => folder.title).join(' / ');
+}
+export const lockedFolderMessage = 'Folder is locked: it is managed by Creative Studio Pro';
+/** True when moving this folder would also move a locked folder underneath it. */
+export function hasLockedDescendant(folders: readonly ProjectFolder[], folderId: string): boolean {
+  const pending = [folderId]; const seen = new Set<string>();
+  while (pending.length) {
+    const id = pending.pop()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const child of folders.filter(folder => folder.parentFolderId === id)) { if (child.locked) return true; pending.push(child.id); }
+  }
+  return false;
+}
+/** Locked folders and folders carrying locked descendants cannot be dragged or re-parented here. */
+export function canRestructureFolder(folders: readonly ProjectFolder[], folderId: string): boolean {
+  const folder = folders.find(item => item.id === folderId);
+  return !!folder && !folder.locked && !hasLockedDescendant(folders, folderId);
 }
 export type AssetPlacement = Readonly<{ projectId: string; folderId?: string; archived?: boolean }>;
 export type FolderState = Readonly<{ folders: readonly ProjectFolder[]; placements: Readonly<Record<string, AssetPlacement>> }>;
@@ -55,6 +73,9 @@ export function transitionFolderState(state: FolderState, action: FolderAction, 
     if (!parent || parent.projectId !== projectId) throw new Error('Parent folder not found in project');
     if (folder && folderAncestors(state.folders, parentId).some(item => item.id === folder.id)) throw new Error('A folder cannot contain itself');
   }
+  if (folder?.locked && (action.type === 'rename' || action.type === 'reparent' || action.type === 'remove')) throw new Error(lockedFolderMessage);
+  if (action.type === 'reparent' && hasLockedDescendant(state.folders, folder!.id)) throw new Error(lockedFolderMessage);
+  if ((action.type === 'create' || action.type === 'reparent') && parentId !== undefined && state.folders.find(item => item.id === parentId)?.locked) throw new Error(lockedFolderMessage);
   const duplicateSibling = (title: string, parentFolderId?: string) => state.folders.some(item => item.id !== folder?.id && item.projectId === projectId && item.parentFolderId === parentFolderId && item.title.trim().toLowerCase() === title.trim().toLowerCase());
   if (action.type === 'create') {
     validId(action.id);

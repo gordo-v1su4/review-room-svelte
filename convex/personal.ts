@@ -8,8 +8,8 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from './_generated/api';
 import { getReviewLink, passcodeDigest, randomSecret } from "./lib/reviewAccess";
-import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
-import { validateFolderParent, disposeFolder, folderNameKey } from './lib/folderTree';
+import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, movePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
+import { validateFolderParent, disposeFolder } from './lib/folderTree';
 
 const OWNER_EMAIL = "owner@review-room.invalid";
 type Ctx = QueryCtx | MutationCtx;
@@ -49,6 +49,9 @@ export const snapshot = internalQuery({
       .withIndex('by_project', q => q.eq('projectId', project._id)).collect()))).flat();
     const assets = (await Promise.all(projects.map((project) => ctx.db.query("videos")
       .withIndex("by_project", (q) => q.eq("projectId", project._id)).collect()))).flat();
+    const connections = (await Promise.all(projects.map((project) => ctx.db.query('destinationConnections')
+      .withIndex('by_project', q => q.eq('projectId', project._id)).collect()))).flat();
+    const connectedFolderIds = [...new Set(connections.flatMap(connection => connection.folderId && !connection.replacedByConnectionId ? [connection.folderId] : []))];
     const versions = (await Promise.all(assets.map((asset) => ctx.db.query("assetVersions")
       .withIndex("by_asset", (q) => q.eq("assetId", asset._id)).collect()))).flat();
     const mediaJobs = (await Promise.all(assets.map((asset) => ctx.db.query("mediaJobs")
@@ -70,7 +73,7 @@ export const snapshot = internalQuery({
         importedMetadata.push(...importedMediaMetadata(record.sourceDocumentsJson, record.mediaMappingsJson));
       }
     }
-    return { projects, folders, assets, versions, mediaJobs, comments, publications, showcases, links, importedMetadata, projectIds: Array.from(projectIds) };
+    return { projects, folders, connectedFolderIds, assets, versions, mediaJobs, comments, publications, showcases, links, importedMetadata, projectIds: Array.from(projectIds) };
   },
 });
 
@@ -279,14 +282,8 @@ export const renameFolder = internalMutation({
 export const moveFolder = internalMutation({
   args: { folderId: v.id('projectFolders'), parentFolderId: v.optional(v.id('projectFolders')) },
   handler: async (ctx, args) => {
-    const folder = await ctx.db.get(args.folderId);
-    if (!folder) throw new Error('Folder unavailable');
-    await ownedProject(ctx, folder.projectId);
-    await validateFolderParent(ctx, folder.projectId, args.parentFolderId, folder._id);
-    const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', folder.projectId)).collect();
-    if (folders.some(item => item._id !== folder._id && item.parentFolderId === args.parentFolderId && folderNameKey(item.title) === folderNameKey(folder.title))) throw new Error('Folder already exists');
-    const order = Math.max(0, ...folders.filter(item => item._id !== folder._id && item.parentFolderId === args.parentFolderId).map(item => item.order)) + 1;
-    await ctx.db.patch(folder._id, { parentFolderId: args.parentFolderId, order, updatedAt: Date.now() });
+    const profile = await owner(ctx);
+    await movePersonalFolder(ctx, profile._id, args.folderId, args.parentFolderId);
   },
 });
 

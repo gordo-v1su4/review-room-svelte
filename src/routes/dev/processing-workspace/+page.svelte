@@ -11,6 +11,7 @@
       downloadEnabledByDefault: false, createdBy: ownerId, createdAt: 1, updatedAt: 1 }],
     folders: [{ _id: folderId, _creationTime: 1, projectId, title: '20261002', order: 1,
       createdBy: ownerId, createdAt: 1, updatedAt: 1 }],
+    connectedFolderIds: [],
     assets: ['a', 'b'].map((id, index) => ({
       _id: id as Id<'videos'>, _creationTime: 1, projectId, folderId, title: `Clip ${id}`,
       currentVersionId: `version-${id}` as Id<'assetVersions'>, processingStatus: 'processing',

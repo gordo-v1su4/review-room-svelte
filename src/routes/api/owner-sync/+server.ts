@@ -11,6 +11,7 @@ function syncError(cause: unknown): Response | never {
   const code = data && typeof data === 'object' && 'code' in data ? data.code : null;
   if (code === 'SYNC_TARGET_CONFLICT') return json({ message: 'A target with this name already exists. Choose it or change the name.', existingRunId: data && typeof data === 'object' && 'existingRunId' in data ? data.existingRunId : undefined }, { status: 409, headers: { 'cache-control': 'private, no-store' } });
   if (code === 'SYNC_REPLACEMENT_UNAVAILABLE') throw error(409, 'The exact connected target must be deleted before replacement. Reload if the chosen connection has changed.');
+  if (code === 'SYNC_FOLDER_LOCKED') throw error(409, 'This folder is locked by Creative Studio Pro and cannot be connected to Trailer Feed. Copy its deliverables into an ordinary folder and connect that folder instead.');
   if (code === 'SYNC_PROJECT_UNAVAILABLE' || code === 'SYNC_FOLDER_UNAVAILABLE' || code === 'SYNC_CONNECTION_UNAVAILABLE' || code === 'SYNC_BATCH_UNAVAILABLE' || code === 'SYNC_VERSION_UNAVAILABLE') throw error(404, 'Selected source or connection is unavailable');
   if (code === 'SYNC_SELECTION_CHANGED' || code === 'SYNC_CONFIRMATION_CHANGED' || code === 'SYNC_CONNECTION_CHANGED' || code === 'SYNC_REACTIVATION_UNAVAILABLE') throw error(409, 'Selection or destination consent changed. Reload and confirm the exact version again.');
   if (code === 'SYNC_VERSION_ALREADY_SELECTED') throw error(409, 'This version already has a saved sync operation. Retry its failed delivery or use Sync again after disconnection.');

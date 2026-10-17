@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronDown, ChevronRight, Folder, Image, Plus, Video, Bookmark, Archive, Layers, ListFilter, Pencil } from 'lucide-svelte';
+  import { ChevronDown, ChevronRight, Folder, FolderLock, FolderSync, Image, Plus, Video, Bookmark, Archive, Layers, ListFilter, Pencil } from 'lucide-svelte';
 
   export type ProjectTreeCollection = 'all' | 'video' | 'image' | 'selected';
   export type ProjectTreeProject = Readonly<{
@@ -10,7 +10,7 @@
     shortlistCount: number;
     archivedCount?: number;
     collections?: readonly { id: string; title: string; count: number }[];
-    folders?: readonly { id: string; title: string; count: number; parentFolderId?: string }[];
+    folders?: readonly { id: string; title: string; count: number; parentFolderId?: string; locked?: boolean; connected?: boolean }[];
   }>;
 
   let {
@@ -141,7 +141,7 @@
                 {@const folder = row.folder}
                 <li><div class="folder-tree-row" style:padding-left={row.depth * 15 + 'px'}>
                   {#if row.hasChildren}<button class="disclosure" type="button" aria-label={`${collapsed.has(folder.id) ? 'Expand' : 'Collapse'} ${folder.title}`} aria-expanded={!collapsed.has(folder.id)} onclick={() => toggle(folder.id)}>{#if collapsed.has(folder.id)}<ChevronRight size={12}/>{:else}<ChevronDown size={12}/>{/if}</button>{:else}<span class="folder-disclosure-spacer"></span>{/if}
-                  <button class="collection-link" class:drop-hover={dropHover === folder.id} ondragover={event => dragOver(event, project.id, folder.id)} ondragleave={dragLeave} ondrop={event => drop(event, project.id, folder.id)} class:selected={isSelected && selectedFolderId === folder.id} type="button" onclick={() => onFolder?.(project.id, folder.id)}><Folder size={14}/><span>{folder.title}</span><span class="count">{folder.count}</span></button>
+                  <button class="collection-link" class:drop-hover={dropHover === folder.id} ondragover={event => dragOver(event, project.id, folder.id)} ondragleave={dragLeave} ondrop={event => drop(event, project.id, folder.id)} class:selected={isSelected && selectedFolderId === folder.id} class:locked={folder.locked} class:connected={folder.connected && !folder.locked} title={folder.locked ? `${folder.title} · Locked, managed by Creative Studio Pro` : folder.connected ? `${folder.title} · Connected to Trailer Feed` : folder.title} type="button" onclick={() => onFolder?.(project.id, folder.id)}>{#if folder.locked}<FolderLock size={14} class="folder-kind-icon"/>{:else if folder.connected}<FolderSync size={14} class="folder-kind-icon"/>{:else}<Folder size={14}/>{/if}<span>{folder.title}</span>{#if folder.locked}<span class="visually-hidden">(locked)</span>{:else if folder.connected}<span class="visually-hidden">(connected to Trailer Feed)</span>{/if}<span class="count">{folder.count}</span></button>
                 </div></li>
               {/each}
               <li>
@@ -196,6 +196,12 @@
   .collection-list li::before { content: ''; position: absolute; top: 17px; left: -15px; width: 12px; border-top: 1px solid #ffffff12; }
   .collection-link { min-height: 31px; padding-left: 6px; color: #899491; border-radius: 4px; }
   .collection-link.selected { background: #ffffff0a; color: #a8ded2; }
+  .collection-link.locked { color: color-mix(in srgb, var(--folder-locked) 78%, #899491); }
+  .collection-link.locked :global(.folder-kind-icon) { color: var(--folder-locked); }
+  .collection-link.locked.selected { background: color-mix(in srgb, var(--folder-locked) 11%, transparent); color: var(--folder-locked); }
+  .collection-link.connected :global(.folder-kind-icon) { color: var(--folder-connected); }
+  .collection-link.connected.selected { background: color-mix(in srgb, var(--folder-connected) 10%, transparent); color: var(--folder-connected); }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .project-link.drop-hover, .collection-link.drop-hover { background: #15362e; box-shadow: inset 0 0 0 1px var(--teal); color: var(--ink); border-radius: 6px; }
   .folder-tree-row { display: flex; align-items: center; }
   .folder-tree-row .collection-link { padding-left: 0; }
