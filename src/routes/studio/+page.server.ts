@@ -47,6 +47,10 @@ export const actions: Actions = {
       folderId: value(form, 'folderId') ? value(form, 'folderId') as Id<'projectFolders'> : undefined,
       assetIds: form.getAll('assetIds').map(String) as Id<'videos'>[] }); done();
   },
+  setCurrentVersion: async ({ cookies, request }) => {
+    requireOwner(cookies); const form = await request.formData();
+    await db().mutation(personal.setCurrentVersion, { assetId: value(form, 'assetId') as Id<'videos'>, versionId: value(form, 'versionId') as Id<'assetVersions'> }); done();
+  },
   removeFolder: async ({ cookies, request }) => {
     requireOwner(cookies); const form = await request.formData();
     const assetDisposition = value(form, 'assetDisposition');

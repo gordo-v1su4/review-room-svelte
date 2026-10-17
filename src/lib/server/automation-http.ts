@@ -33,6 +33,7 @@ export function automationError(cause: unknown) {
     ['title must', 400],
     ['Folder already exists', 409],
     ['Folder is locked', 403],
+    ['Invalid cursor', 400],
     ['Asset code must be', 400],
     ['Asset code already exists', 409],
     ['Asset code applies only to new assets', 400],

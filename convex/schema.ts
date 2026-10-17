@@ -209,6 +209,8 @@ const applicationTables = {
       ),
     ),
     currentVersionId: v.optional(v.id("assetVersions")),
+    // Dropped into a locked folder without a matching shot code; awaiting fix-up.
+    misfiled: v.optional(v.boolean()),
   })
     .index("by_project", ["projectId"])
     .index("by_project_folder", ["projectId", "folderId"])
@@ -291,6 +293,10 @@ const applicationTables = {
     assetId: v.optional(v.id("videos")),
     // Creative Studio Pro shot/deliverable code requested for a new asset.
     assetCode: v.optional(v.string()),
+    // assetId was resolved from assetCode: a take for that shot, whatever its review status.
+    takeOfCode: v.optional(v.boolean()),
+    // Add the version without changing the asset's current version (the pick).
+    keepCurrentVersion: v.optional(v.boolean()),
     completedAssetId: v.optional(v.id("videos")),
     completedJobId: v.optional(v.id("mediaJobs")),
     objectKey: v.string(),

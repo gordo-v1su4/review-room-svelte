@@ -5,6 +5,8 @@ import type { Doc, Id } from './_generated/dataModel';
 import { owner } from './personal';
 import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, movePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
 import { disposeFolder } from './lib/folderTree';
+import { changesSince, setCurrentAssetVersion } from './lib/seriesAssets';
+import { parseVersionMetadata, writeVersionMetadata } from './lib/versionMetadata';
 
 const actions = ['projects:create', 'projects:edit', 'folders:write', 'media:upload', 'media:read'] as const;
 const request = { keyDigest: v.string(), requestKey: v.string(), bodyDigest: v.string() };
@@ -193,11 +195,49 @@ export const deleteFolder = internalMutation({
 
 export const beginUpload = internalMutation({
   args: { ...request, projectId: v.id('projects'), folderId: v.optional(v.id('projectFolders')),
-    assetId: v.optional(v.id('videos')), assetCode: v.optional(v.string()), originalFilename: v.string(), mimeType: v.string(), sizeBytes: v.number(), sha256: v.optional(v.string()) },
+    assetId: v.optional(v.id('videos')), assetCode: v.optional(v.string()), keepCurrentVersion: v.optional(v.boolean()), originalFilename: v.string(), mimeType: v.string(), sizeBytes: v.number(), sha256: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const credential = await authorize(ctx, args.keyDigest, 'media:upload', args.projectId);
     return await idempotent(ctx, credential, args, 'media:upload:begin',
       () => beginPersonalUpload(ctx, credential.createdBy, { ...args, automationCredentialId: credential._id }));
+  },
+});
+
+export const setCurrentVersion = internalMutation({
+  args: { ...request, assetId: v.id('videos'), versionId: v.id('assetVersions') },
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) throw new Error('Asset unavailable');
+    const credential = await authorize(ctx, args.keyDigest, 'media:upload', asset.projectId);
+    return await idempotent(ctx, credential, args, 'media:current-version',
+      () => setCurrentAssetVersion(ctx, credential.createdBy, args.assetId, args.versionId));
+  },
+});
+
+export const updateVersionMetadata = internalMutation({
+  args: { ...request, versionId: v.id('assetVersions'), metadata: v.any(), expectedUpdatedAt: v.optional(v.union(v.number(), v.null())) },
+  handler: async (ctx, args) => {
+    const version = await ctx.db.get(args.versionId);
+    const asset = version && await ctx.db.get(version.assetId);
+    const credential = await authorize(ctx, args.keyDigest, 'media:upload', asset?.projectId);
+    if (!version || !asset) throw new Error('Version unavailable');
+    return await idempotent(ctx, credential, args, 'media:metadata',
+      () => writeVersionMetadata(ctx, credential.createdBy, args.versionId, parseVersionMetadata(ctx, args.metadata), args.expectedUpdatedAt));
+  },
+});
+
+export const changes = internalMutation({
+  args: { keyDigest: v.string(), projectId: v.id('projects'), folderId: v.optional(v.id('projectFolders')), since: v.number() },
+  handler: async (ctx, args) => {
+    const credential = await authorize(ctx, args.keyDigest, 'media:read', args.projectId);
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.createdBy !== credential.createdBy || project.archived) throw new Error('Project unavailable');
+    if (args.folderId) {
+      const folder = await ctx.db.get(args.folderId);
+      if (!folder || folder.projectId !== project._id) throw new Error('Folder unavailable');
+    }
+    if (!Number.isSafeInteger(args.since) || args.since < 0) throw new Error('Invalid cursor');
+    return await changesSince(ctx, project._id, args.since, args.folderId);
   },
 });
 

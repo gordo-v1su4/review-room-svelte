@@ -11,7 +11,7 @@ Use BWS `REVIEW_ROOM_AGENT_API_KEY` as `Authorization: Bearer …`; inject it in
 5. PUT the original bytes to `url` with the declared MIME, then a real JPEG preview to `posterUrl` with `image/jpeg` (maximum 5 MiB). Treat signed URLs as credentials and keep them out of logs. These storage requests do not use the Review bearer header.
 6. `POST /api/v1/uploads/{sessionId}/complete` takes posterSizeBytes, durationSec, width and height. Image duration is zero. Reuse that session when retrying completion; do not begin another upload after an uncertain completion.
 7. For video, poll `GET /api/v1/jobs/{jobId}` until ready or failed. A successful complete response is not proof that video derivatives are ready.
-8. `GET /api/v1/versions/{versionId}/metadata` reads a pinned version's model, prompt, source label/date, production notes and exact grid/reference image-version IDs with `media:read`. Missing creative data remains empty. The response includes a metadata revision and contains no storage keys or signed URLs. Metadata editing is currently an authenticated owner workspace operation: use Fields → Save version metadata. A stale save returns a conflict and retains the draft; reload the workspace to observe edits from another session.
+8. `GET /api/v1/versions/{versionId}/metadata` reads a pinned version's model, prompt, source label/date, production notes and exact grid/reference image-version IDs with `media:read`. Missing creative data remains empty. The response includes a metadata revision and contains no storage keys or signed URLs. Write it with `PUT` on the same path (see Creative Studio Pro series calls), or in the workspace with Fields → Save version metadata. A stale save returns a conflict and retains the draft; reload the workspace to observe edits from another session.
 
 Project/folder creation, folder edit/delete and begin-upload require an `Idempotency-Key` (8–128 letters/digits/dot/underscore/colon/hyphen). Persist it with the exact request. Retry the same operation with the same key/body; a changed body needs a different key. On timeout after begin, replay it with the same key. Uploading alone never publishes to Trailer Feed.
 
@@ -22,6 +22,15 @@ Begin-upload accepts `assetCode` to name a new asset by its shot or deliverable 
 - Shot `BLR_EP101_PAR_0020`: show · episode (`EP101` = season 1, episode 01) · scene · shot (steps of 10).
 - Deliverable `BLR_EP101_EPC` or `BLR_S1_TRL01`: kinds `EPC` episode cut, `TSR` teaser, `TRL` trailer, with an optional two-digit index; `S1` is season level.
 - Codes are case-insensitive, stored upper-case and unique within the project (`409` if taken). Never send the take suffix `_v003`; Review Room numbers versions and shows them as `v003`.
+
+## Creative Studio Pro series calls
+
+Issue Creative Studio Pro one credential per series, restricted to that Review Room project (`projectId` on the credential) with `folders:write`, `media:upload`, `media:read`. Calls for any other project return `403`.
+
+- **Upload a take by code.** Begin-upload with `folderId` and `assetCode`. If that shot already exists in the folder, the upload becomes its next version (the response carries its `assetId`); otherwise a new asset is created with the code. A code living in another folder is `409`. Add `"keepCurrentVersion": true` to add a take without changing the pick.
+- **Set the pick.** `PUT /api/v1/assets/{assetId}/current-version` with `{"versionId":"…"}` (Idempotency-Key). The pick is Review Room's current version; people can also change it in the workspace (Make current).
+- **Version metadata.** `PUT /api/v1/versions/{versionId}/metadata` with `{"metadata":{…},"expectedUpdatedAt":<revision or null>}` writes model, prompt, references and `gridImageVersionId`; `GET` on the same path reads it back. A stale revision is `409`.
+- **Changes since a cursor.** `GET /api/v1/projects/{projectId}/changes?since=0[&folderId=…]` lists changed assets (code, status, `currentVersionId`, `misfiled`) and their changed versions. Store the returned `cursor` and pass it next time; items near the cursor may repeat, so upsert by ID. Deletions are not reported.
 
 ## Locked folders (Creative Studio Pro)
 

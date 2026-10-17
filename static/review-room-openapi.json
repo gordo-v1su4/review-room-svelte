@@ -962,6 +962,361 @@
             "description": "Version unavailable"
           }
         }
+      },
+      "put": {
+        "operationId": "updateVersionMetadata",
+        "summary": "Replace a version's creative metadata: model, prompt, sourceLabel, referenceImageVersionIds, gridImageVersionId, notes, custom fields (media:upload). Reference and grid IDs must be still-image versions in the same project. Pass expectedUpdatedAt (the revision from the last read, or null for never written) to get 409 instead of overwriting a newer edit.",
+        "parameters": [
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque Convex ID; resolve from catalog or create response."
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9._:-]{8,128}$"
+            },
+            "description": "Persist and reuse for retries of the same body; a different body requires a new key."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "metadata": {
+                    "type": "object",
+                    "description": "Same shape the GET returns in metadata."
+                  },
+                  "expectedUpdatedAt": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "metadata"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assets/{assetId}/current-version": {
+      "put": {
+        "operationId": "setCurrentVersion",
+        "summary": "Set the asset's current version, which is Creative Studio Pro's pick (media:upload). The workspace can change it too; read it back through changes.",
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque Convex ID; resolve from catalog or create response."
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9._:-]{8,128}$"
+            },
+            "description": "Persist and reuse for retries of the same body; a different body requires a new key."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "versionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Opaque Convex ID; resolve from catalog or create response."
+                  }
+                },
+                "required": [
+                  "versionId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/changes": {
+      "get": {
+        "operationId": "listChanges",
+        "summary": "Assets and versions changed after a cursor, for one project or one folder (media:read). Start with since=0 and pass back the returned cursor. Items changed within two seconds of the cursor may repeat: treat the feed as upserts keyed by assetId/versionId. Each asset reports currentVersionId (the pick) and misfiled. Deletions are not reported.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque Convex ID; resolve from catalog or create response."
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{1,16}$",
+              "default": "0"
+            }
+          },
+          {
+            "name": "folderId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque Convex ID; resolve from catalog or create response."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See error message; 409 indicates conflict or incomplete upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -1085,7 +1440,12 @@
           "assetCode": {
             "type": "string",
             "pattern": "^[A-Za-z][A-Za-z0-9]{1,5}_(EP[0-9]{3}_([A-Za-z][A-Za-z0-9]{1,5}_[0-9]{4}|(EPC|TSR|TRL)([0-9]{2})?)|S[0-9]{1,2}_(EPC|TSR|TRL)([0-9]{2})?)$",
-            "description": "Name a new asset by its Creative Studio Pro shot or deliverable code (BLR_EP101_PAR_0020, BLR_EP101_EPC, BLR_S1_TRL01) instead of the generated VID_/IMG_ code. Case-insensitive, stored upper-case, unique within the project (409 if taken). Never include the _v### take suffix: versions are numbered by Review Room. Not combined with assetId."
+            "description": "Name a new asset by its Creative Studio Pro shot or deliverable code (BLR_EP101_PAR_0020, BLR_EP101_EPC, BLR_S1_TRL01) instead of the generated VID_/IMG_ code. Case-insensitive, stored upper-case, unique within the project (409 if taken). Never include the _v### take suffix: versions are numbered by Review Room. Not combined with assetId. If an asset with this code already exists in the same folder (or both at project root), the upload becomes its next version and the response includes its assetId; review status does not block takes. A code that exists in another folder is a 409."
+          },
+          "keepCurrentVersion": {
+            "type": "boolean",
+            "default": false,
+            "description": "Add the new version without changing the asset's current version (Creative Studio Pro's pick). Ignored for a brand-new asset."
           }
         },
         "required": [

@@ -95,13 +95,22 @@ export async function movePersonalFolder(ctx: MutationCtx, ownerId: Id<'appUsers
   return folderId;
 }
 
-/** Canonical production code, refused when another original asset in the project already uses it. */
-export async function requireFreeAssetCode(ctx: MutationCtx, projectId: Id<'projects'>, value: string) {
+export function requireProductionCode(value: string) {
   const parsed = parseProductionCode(value);
   if (!parsed) throw new Error('Asset code must be a shot or deliverable code such as BLR_EP101_PAR_0020 or BLR_S1_TRL01');
-  const taken = await ctx.db.query('videos').withIndex('by_project_code', q => q.eq('projectId', projectId).eq('assetCode', parsed.code)).first();
-  if (taken) throw new Error('Asset code already exists in this project');
   return parsed.code;
+}
+
+/** The original asset (not a copy) that owns a production code in this project. */
+export async function findAssetByCode(ctx: MutationCtx, projectId: Id<'projects'>, code: string) {
+  return await ctx.db.query('videos').withIndex('by_project_code', q => q.eq('projectId', projectId).eq('assetCode', code)).first();
+}
+
+/** Canonical production code, refused when another original asset in the project already uses it. */
+export async function requireFreeAssetCode(ctx: MutationCtx, projectId: Id<'projects'>, value: string) {
+  const code = requireProductionCode(value);
+  if (await findAssetByCode(ctx, projectId, code)) throw new Error('Asset code already exists in this project');
+  return code;
 }
 
 export async function beginPersonalUpload(ctx: MutationCtx, ownerId: Id<'appUsers'>, input: {
@@ -109,6 +118,7 @@ export async function beginPersonalUpload(ctx: MutationCtx, ownerId: Id<'appUser
   originalFilename: string; mimeType: string; sizeBytes: number;
   sha256?: string;
   automationCredentialId?: Id<'automationCredentials'>;
+  keepCurrentVersion?: boolean;
 }) {
   const project = await ctx.db.get(input.projectId);
   if (!project || project.createdBy !== ownerId || project.archived) throw new Error('Project unavailable');
@@ -125,19 +135,27 @@ export async function beginPersonalUpload(ctx: MutationCtx, ownerId: Id<'appUser
     if (!folder || folder.projectId !== project._id) throw new Error('Folder unavailable');
   }
   if (input.assetCode !== undefined && input.assetId) throw new Error('Asset code applies only to new assets');
-  const assetCode = input.assetCode === undefined ? undefined : await requireFreeAssetCode(ctx, project._id, input.assetCode);
+  // Upload by code: an existing shot in this folder takes the upload as its next version; otherwise a new asset gets the code.
+  let assetId = input.assetId, assetCode: string | undefined, takeOfCode = false;
+  if (input.assetCode !== undefined) {
+    const code = requireProductionCode(input.assetCode);
+    const existing = await findAssetByCode(ctx, project._id, code);
+    if (existing && (existing.folderId ?? null) !== (input.folderId ?? null)) throw new Error('Asset code already exists in another folder of this project');
+    if (existing) { requireUploadFamily(existing, input.mimeType); assetId = existing._id; takeOfCode = true; } else assetCode = code;
+  }
   const extensions: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
   const extension = input.originalFilename.match(/\.([a-zA-Z0-9]{1,8})$/)?.[1]?.toLowerCase() ?? extensions[input.mimeType] ?? 'bin';
   const objectKey = `assets/${project._id}/${input.mimeType.startsWith('image/') ? 'images' : 'videos'}/${randomSecret()}/original.${extension}`;
   const now = Date.now();
   const sessionId = await ctx.db.insert('uploadSessions', {
-    projectId: project._id, folderId: input.folderId, assetId: input.assetId, assetCode,
+    projectId: project._id, folderId: input.folderId, assetId, assetCode,
+    ...(takeOfCode ? { takeOfCode } : {}), ...(input.keepCurrentVersion ? { keepCurrentVersion: true } : {}),
     automationCredentialId: input.automationCredentialId, objectKey,
     originalFilename: input.originalFilename.slice(0, 240), mimeType: input.mimeType,
     sizeBytes: input.sizeBytes, sha256: input.sha256,
     status: 'pending', expiresAt: now + 60 * 60_000, createdAt: now,
   });
-  return { sessionId, objectKey, expiresAt: now + 60 * 60_000 };
+  return { sessionId, objectKey, expiresAt: now + 60 * 60_000, ...(takeOfCode ? { assetId } : {}) };
 }
 
 export type FinalizeUploadInput = {
@@ -175,7 +193,7 @@ export async function finalizePersonalUpload(ctx: MutationCtx, ownerId: Id<'appU
   let version = 1;
   if (assetId) {
     const existing = await ctx.db.get(assetId);
-    if (!existing || existing.projectId !== project._id || existing.status !== 'approved') throw new Error('Approved asset unavailable');
+    if (!existing || existing.projectId !== project._id || (!session.takeOfCode && existing.status !== 'approved')) throw new Error('Approved asset unavailable');
     requireUploadFamily(existing, session.mimeType);
     const versions = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', assetId!)).collect();
     version = Math.max(0, ...versions.map(item => item.version)) + 1;
@@ -199,7 +217,9 @@ export async function finalizePersonalUpload(ctx: MutationCtx, ownerId: Id<'appU
     mimeType: session.mimeType, sizeBytes: session.sizeBytes, etag: args.etag,
     processingState: processing ? 'processing' : 'ready', createdAt: now,
   });
-  await ctx.db.patch(assetId, {
+  const keepPick = !!session.keepCurrentVersion && !!session.assetId && !!(await ctx.db.get(assetId))?.currentVersionId;
+  if (keepPick) await ctx.db.patch(assetId, { updatedAt: now });
+  else await ctx.db.patch(assetId, {
     currentVersionId: versionId, storageKey: session.objectKey, thumbnailKey: args.posterKey,
     originalFilename: session.originalFilename, mimeType: session.mimeType,
     sizeBytes: session.sizeBytes, processingStatus: processing ? 'processing' : 'ready',

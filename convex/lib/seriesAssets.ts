@@ -1,0 +1,62 @@
+import type { MutationCtx, QueryCtx } from '../_generated/server';
+import type { Doc, Id } from '../_generated/dataModel';
+
+/**
+ * Make one version the asset's current version (Creative Studio Pro's "pick").
+ * The asset's mirrored playback fields follow the chosen version.
+ */
+export async function setCurrentAssetVersion(ctx: MutationCtx, ownerId: Id<'appUsers'>, assetId: Id<'videos'>, versionId: Id<'assetVersions'>) {
+  const asset = await ctx.db.get(assetId);
+  const project = asset && await ctx.db.get(asset.projectId);
+  if (!asset || !project || project.createdBy !== ownerId || project.archived) throw new Error('Asset unavailable');
+  const version = await ctx.db.get(versionId);
+  if (!version || version.assetId !== asset._id) throw new Error('Version unavailable');
+  if (asset.currentVersionId === version._id) return { assetId, currentVersionId: versionId };
+  const job = await ctx.db.query('mediaJobs').withIndex('by_version', q => q.eq('versionId', version._id)).unique();
+  const ready = job?.status === 'ready';
+  await ctx.db.patch(asset._id, {
+    currentVersionId: version._id, storageKey: version.originalKey, mimeType: version.mimeType, sizeBytes: version.sizeBytes,
+    thumbnailKey: (ready ? job.thumbnailKey : undefined) ?? version.posterKey, spriteKey: ready ? job.spriteKey : undefined,
+    ...(ready && job.durationSec !== undefined ? { durationSec: job.durationSec } : {}),
+    ...(ready && job.width !== undefined ? { width: job.width } : {}), ...(ready && job.height !== undefined ? { height: job.height } : {}),
+    processingStatus: version.processingState, updatedAt: Date.now(),
+  });
+  return { assetId, currentVersionId: versionId };
+}
+
+/** Writes that land in the same millisecond as a read can commit after it; repeat that window rather than miss a change. */
+const CURSOR_OVERLAP_MS = 2_000;
+
+export type ChangeFeed = {
+  cursor: string;
+  assets: { assetId: Id<'videos'>; folderId: Id<'projectFolders'> | null; assetCode: string | null; title: string; status: Doc<'videos'>['status'];
+    currentVersionId: Id<'assetVersions'> | null; misfiled: boolean; updatedAt: number }[];
+  versions: { versionId: Id<'assetVersions'>; assetId: Id<'videos'>; version: number; isCurrent: boolean; processingState: Doc<'assetVersions'>['processingState'];
+    mimeType: string; createdAt: number; metadataUpdatedAt: number | null }[];
+};
+
+/** Assets (and their versions) in a project or one folder that changed after `since`. Items near the cursor may repeat: treat it as an upsert feed. */
+export async function changesSince(ctx: QueryCtx | MutationCtx, projectId: Id<'projects'>, since: number, folderId?: Id<'projectFolders'>): Promise<ChangeFeed> {
+  const assets = folderId
+    ? await ctx.db.query('videos').withIndex('by_project_folder', q => q.eq('projectId', projectId).eq('folderId', folderId)).collect()
+    : await ctx.db.query('videos').withIndex('by_project', q => q.eq('projectId', projectId)).collect();
+  const after = since - CURSOR_OVERLAP_MS;
+  let cursor = since;
+  const feed: ChangeFeed = { cursor: '', assets: [], versions: [] };
+  for (const asset of assets) {
+    if (asset.updatedAt <= after) continue;
+    cursor = Math.max(cursor, asset.updatedAt);
+    feed.assets.push({ assetId: asset._id, folderId: asset.folderId ?? null, assetCode: asset.assetCode ?? null, title: asset.title, status: asset.status,
+      currentVersionId: asset.currentVersionId ?? null, misfiled: !!asset.misfiled, updatedAt: asset.updatedAt });
+    const versions = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', asset._id)).collect();
+    for (const version of versions) {
+      const changedAt = Math.max(version.createdAt, version.metadataUpdatedAt ?? 0);
+      if (changedAt <= after) continue;
+      feed.versions.push({ versionId: version._id, assetId: asset._id, version: version.version, isCurrent: version._id === asset.currentVersionId,
+        processingState: version.processingState, mimeType: version.mimeType, createdAt: version.createdAt, metadataUpdatedAt: version.metadataUpdatedAt ?? null });
+    }
+  }
+  feed.assets.sort((a, b) => a.updatedAt - b.updatedAt);
+  feed.cursor = String(cursor);
+  return feed;
+}

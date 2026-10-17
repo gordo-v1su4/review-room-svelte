@@ -10,6 +10,7 @@ import { internal } from './_generated/api';
 import { getReviewLink, passcodeDigest, randomSecret } from "./lib/reviewAccess";
 import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, movePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
 import { validateFolderParent, disposeFolder } from './lib/folderTree';
+import { setCurrentAssetVersion } from './lib/seriesAssets';
 
 const OWNER_EMAIL = "owner@review-room.invalid";
 type Ctx = QueryCtx | MutationCtx;
@@ -284,6 +285,14 @@ export const moveFolder = internalMutation({
   handler: async (ctx, args) => {
     const profile = await owner(ctx);
     await movePersonalFolder(ctx, profile._id, args.folderId, args.parentFolderId);
+  },
+});
+
+export const setCurrentVersion = internalMutation({
+  args: { assetId: v.id('videos'), versionId: v.id('assetVersions') },
+  handler: async (ctx, args) => {
+    const profile = await owner(ctx);
+    return await setCurrentAssetVersion(ctx, profile._id, args.assetId, args.versionId);
   },
 });
 
