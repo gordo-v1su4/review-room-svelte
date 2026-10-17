@@ -16,12 +16,16 @@ async function readyTake() {
   return { ...f, assetId, version: await firstVersion(f, assetId) };
 }
 
-test('a ready version returns its storage keys to the server for signing, and the read is audited', async () => {
+test('a ready version returns its storage keys to the server for signing; the audit records the real outcome afterwards', async () => {
   const f = await readyTake();
+  const reads = () => f.t.run(async ctx => (await ctx.db.query('automationAudit').collect()).filter(entry => entry.action === 'media:read' && entry.targetId === f.version._id).map(entry => entry.outcome));
   const media = await f.t.mutation(internal.automation.versionMedia, { keyDigest: cspDigest, versionId: f.version._id });
   expect(media).toEqual({ versionId: f.version._id, assetId: f.assetId, originalKey: f.version.originalKey, posterKey: f.version.posterKey!, mimeType: 'video/mp4', sizeBytes: 100 });
-  const audit = await f.t.run(ctx => ctx.db.query('automationAudit').collect());
-  expect(audit.some(entry => entry.action === 'media:read' && entry.targetId === f.version._id)).toBe(true);
+  // Nothing is logged until the route knows whether signing worked.
+  expect(await reads()).toEqual([]);
+  await f.t.mutation(internal.automation.auditVersionMediaRead, { keyDigest: cspDigest, versionId: f.version._id, outcome: 'failed' });
+  await f.t.mutation(internal.automation.auditVersionMediaRead, { keyDigest: cspDigest, versionId: f.version._id, outcome: 'succeeded' });
+  expect(await reads()).toEqual(['failed', 'succeeded']);
 });
 
 test('media:read is required', async () => {

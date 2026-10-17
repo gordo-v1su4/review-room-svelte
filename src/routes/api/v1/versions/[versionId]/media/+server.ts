@@ -8,10 +8,15 @@ import { automationBearer, automationError } from '$lib/server/automation-http';
 /** Short-lived signed read URLs for one ready version's original and poster (media:read). */
 export const GET: RequestHandler = async event => {
   try {
-    const media = await db().mutation(internal.automation.versionMedia, {
-      keyDigest: automationBearer(event), versionId: event.params.versionId as Id<'assetVersions'>,
-    });
-    const signed = await versionReadUrls(media);
+    const keyDigest = automationBearer(event);
+    const media = await db().mutation(internal.automation.versionMedia, { keyDigest, versionId: event.params.versionId as Id<'assetVersions'> });
+    let signed;
+    try { signed = await versionReadUrls(media); }
+    catch (cause) {
+      await db().mutation(internal.automation.auditVersionMediaRead, { keyDigest, versionId: media.versionId, outcome: 'failed' }).catch(() => undefined);
+      throw cause;
+    }
+    await db().mutation(internal.automation.auditVersionMediaRead, { keyDigest, versionId: media.versionId, outcome: 'succeeded' });
     return json({ versionId: media.versionId, assetId: media.assetId, ...signed }, { headers: { 'cache-control': 'private, no-store' } });
   } catch (cause) {
     const response = automationError(cause);

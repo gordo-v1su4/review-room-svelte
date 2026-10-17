@@ -160,8 +160,18 @@ export const versionMedia = internalMutation({
     if (!version || !asset || !project || project.archived || project.createdBy !== credential.createdBy) throw new Error('Version unavailable');
     if (asset.status === 'archived') throw new Error('Version unavailable: its asset is archived');
     if (version.processingState !== 'ready') throw new Error(`Version not ready: processing is ${version.processingState}`);
-    await ctx.db.insert('automationAudit', { credentialId: credential._id, action: 'media:read', targetId: version._id, outcome: 'succeeded', createdAt: Date.now() });
     return { versionId, assetId: asset._id, originalKey: version.originalKey, posterKey: version.posterKey ?? null, mimeType: version.mimeType, sizeBytes: version.sizeBytes };
+  },
+});
+
+/** Records a version media read once signing has finished (or failed), so the audit reflects what the caller received. */
+export const auditVersionMediaRead = internalMutation({
+  args: { keyDigest: v.string(), versionId: v.id('assetVersions'), outcome: v.union(v.literal('succeeded'), v.literal('failed')) },
+  handler: async (ctx, { keyDigest, versionId, outcome }) => {
+    const version = await ctx.db.get(versionId);
+    const asset = version && await ctx.db.get(version.assetId);
+    const credential = await authorize(ctx, keyDigest, 'media:read', asset?.projectId);
+    await ctx.db.insert('automationAudit', { credentialId: credential._id, action: 'media:read', targetId: versionId, outcome, createdAt: Date.now() });
   },
 });
 

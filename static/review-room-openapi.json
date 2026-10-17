@@ -1410,10 +1410,13 @@
             "description": "Credential unavailable"
           },
           "403": {
-            "description": "Project or action outside credential scope"
+            "description": "Credential lacks media:read or is restricted to another project."
           },
           "404": {
-            "description": "Version unavailable"
+            "description": "Version unavailable, including when its asset is archived (error: \"Version unavailable: its asset is archived\")."
+          },
+          "409": {
+            "description": "The version is still processing or processing failed; error says which. Retry after the media job is ready."
           }
         }
       }
