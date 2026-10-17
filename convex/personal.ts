@@ -12,6 +12,7 @@ import { createPersonalProject, updatePersonalProject, createPersonalFolder, ren
 import { validateFolderParent, disposeFolder } from './lib/folderTree';
 import { setCurrentAssetVersion } from './lib/seriesAssets';
 import { fileAsTake, moveMisfiled } from './lib/misfiled';
+import { copyAssetsToFolder, sharedStorageKeys } from './lib/assetCopy';
 
 const OWNER_EMAIL = "owner@review-room.invalid";
 type Ctx = QueryCtx | MutationCtx;
@@ -151,6 +152,8 @@ async function deleteOwnedAssets(ctx: MutationCtx, projectId: Id<'projects'>, as
       const showcases=await ctx.db.query('showcases').collect();
       for(const showcase of showcases) if(showcase.publicationIds.some(id=>publicationIds.has(id))) await ctx.db.patch(showcase._id,{publicationIds:showcase.publicationIds.filter(id=>!publicationIds.has(id)),updatedAt:Date.now()});
     }
+    // Copies share stored files with their source; keep any key another asset still uses.
+    for(const key of await sharedStorageKeys(ctx,keys,new Set<string>(ids))) keys.delete(key);
     if([...keys].some(key=>!key.startsWith('assets/'))) throw new Error('Unexpected storage key');
     if(keys.size) {
       const jobId=await ctx.db.insert('storageDeletionJobs',{keys:[...keys],attempt:0,createdAt:Date.now()});
@@ -294,6 +297,17 @@ export const setCurrentVersion = internalMutation({
   handler: async (ctx, args) => {
     const profile = await owner(ctx);
     return await setCurrentAssetVersion(ctx, profile._id, args.assetId, args.versionId);
+  },
+});
+
+export const copyAssets = internalMutation({
+  args: { projectId: v.id('projects'), folderId: v.optional(v.id('projectFolders')), newFolderTitle: v.optional(v.string()),
+    sources: v.array(v.object({ assetId: v.id('videos'), versionId: v.optional(v.id('assetVersions')) })) },
+  handler: async (ctx, args) => {
+    const profile = await owner(ctx);
+    // "Pick or create": a new folder is created under folderId (or at the root) and receives the copies.
+    const folderId = args.newFolderTitle !== undefined ? await createPersonalFolder(ctx, profile._id, args.projectId, args.newFolderTitle, args.folderId) : args.folderId;
+    return { folderId: folderId ?? null, ...(await copyAssetsToFolder(ctx, profile._id, args.projectId, folderId, args.sources)) };
   },
 });
 

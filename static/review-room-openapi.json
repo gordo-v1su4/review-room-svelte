@@ -1212,7 +1212,7 @@
     "/api/v1/projects/{projectId}/changes": {
       "get": {
         "operationId": "listChanges",
-        "summary": "Assets and versions changed after a cursor, for one project or one folder (media:read). Start with since=0 and pass back the returned cursor. Items changed within two seconds of the cursor may repeat: treat the feed as upserts keyed by assetId/versionId. Each asset reports currentVersionId (the pick) and misfiled. removedAssets lists items that no longer exist because a misfiled drop was filed as another shot's take (mergedIntoAssetId). Other deletions are not reported.",
+        "summary": "Assets and versions changed after a cursor, for one project or one folder (media:read). Start with since=0 and pass back the returned cursor. Items changed within two seconds of the cursor may repeat: treat the feed as upserts keyed by assetId/versionId. Each asset reports currentVersionId (the pick), misfiled, and copiedFromAssetId for workspace copies made for Trailer Feed (copies keep the code; ignore them when matching shots). removedAssets lists items that no longer exist because a misfiled drop was filed as another shot's take (mergedIntoAssetId). Other deletions are not reported.",
         "parameters": [
           {
             "name": "projectId",

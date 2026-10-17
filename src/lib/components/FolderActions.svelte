@@ -1,11 +1,13 @@
 <script lang="ts">
   import { Dialog, DropdownMenu } from 'bits-ui';
-  import { FolderInput, FolderPlus, Image, Lock, MoreHorizontal, Pencil, Trash2, X } from 'lucide-svelte';
+  import { Copy, FolderInput, FolderPlus, Image, Lock, MoreHorizontal, Pencil, Trash2, X } from 'lucide-svelte';
 
-  let { folders, folderLabels, onMoveFolder, activeFolderId, canManage = false, selectedCount = 0, coverUrl, hasCustomCover = false, persistent = false, onCreate, onRename, onRemove, onMove, onCover }: {
+  let { folders, folderLabels, onMoveFolder, onCopy, activeFolderId, canManage = false, selectedCount = 0, coverUrl, hasCustomCover = false, persistent = false, onCreate, onRename, onRemove, onMove, onCover }: {
     folders: readonly { id: string; title: string; parentFolderId?: string; locked?: boolean }[];
     folderLabels?: readonly { id: string; title: string }[];
     onMoveFolder?: (folderId: string, parentFolderId: string | null) => void | Promise<void>;
+    /** Opens Copy to folder for the selected assets. */
+    onCopy?: () => void;
     activeFolderId: string | null;
     canManage?: boolean;
     persistent?: boolean;
@@ -117,7 +119,7 @@
 {#if canManage}
   <div class="folder-actions">
     <button type="button" class="folder-button" disabled={activeLocked} title={activeLocked ? lockedNote : undefined} onclick={event => begin('create', event.currentTarget)}><FolderPlus size={14}/>New folder</button>
-    {#if selectedCount > 0}<button type="button" class="folder-button" onclick={event => begin('move', event.currentTarget)}><FolderInput size={14}/>Move {selectedCount}</button>{/if}
+    {#if selectedCount > 0}<button type="button" class="folder-button" onclick={event => begin('move', event.currentTarget)}><FolderInput size={14}/>Move {selectedCount}</button>{#if onCopy}<button type="button" class="folder-button" onclick={onCopy}><Copy size={14}/>Copy {selectedCount}</button>{/if}{/if}
     {#if activeFolder}
       <DropdownMenu.Root bind:open={menuOpen}>
         <DropdownMenu.Trigger bind:ref={menuTrigger} class="folder-button folder-menu-trigger" aria-label={`Folder settings for ${activeFolder.title}`} title="Folder settings"><MoreHorizontal size={16}/></DropdownMenu.Trigger>

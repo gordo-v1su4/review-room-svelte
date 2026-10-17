@@ -30,7 +30,7 @@ const CURSOR_OVERLAP_MS = 2_000;
 export type ChangeFeed = {
   cursor: string;
   assets: { assetId: Id<'videos'>; folderId: Id<'projectFolders'> | null; assetCode: string | null; title: string; status: Doc<'videos'>['status'];
-    currentVersionId: Id<'assetVersions'> | null; misfiled: boolean; updatedAt: number }[];
+    currentVersionId: Id<'assetVersions'> | null; misfiled: boolean; copiedFromAssetId: Id<'videos'> | null; updatedAt: number }[];
   versions: { versionId: Id<'assetVersions'>; assetId: Id<'videos'>; version: number; isCurrent: boolean; processingState: Doc<'assetVersions'>['processingState'];
     mimeType: string; createdAt: number; metadataUpdatedAt: number | null }[];
   /** Assets that no longer exist, e.g. a misfiled drop that became another shot's take. */
@@ -54,7 +54,7 @@ export async function changesSince(ctx: QueryCtx | MutationCtx, projectId: Id<'p
     if (asset.updatedAt <= after) continue;
     cursor = Math.max(cursor, asset.updatedAt);
     feed.assets.push({ assetId: asset._id, folderId: asset.folderId ?? null, assetCode: asset.assetCode ?? null, title: asset.title, status: asset.status,
-      currentVersionId: asset.currentVersionId ?? null, misfiled: !!asset.misfiled, updatedAt: asset.updatedAt });
+      currentVersionId: asset.currentVersionId ?? null, misfiled: !!asset.misfiled, copiedFromAssetId: asset.copiedFromAssetId ?? null, updatedAt: asset.updatedAt });
     const versions = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', asset._id)).collect();
     for (const version of versions) {
       const changedAt = Math.max(version.createdAt, version.metadataUpdatedAt ?? 0);

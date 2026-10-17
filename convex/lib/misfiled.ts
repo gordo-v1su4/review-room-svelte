@@ -2,6 +2,7 @@ import type { MutationCtx } from '../_generated/server';
 import type { Doc, Id } from '../_generated/dataModel';
 import { codeFromFilename } from './shotCode';
 import { isLockedFolder } from './folderLock';
+import { findAssetByCode } from './personalCommands';
 
 /**
  * A hand-dropped file in a locked folder is a take of the shot whose code its filename carries,
@@ -11,7 +12,7 @@ export async function shotForDroppedFile(ctx: MutationCtx, projectId: Id<'projec
   if (!isLockedFolder(folder)) return null;
   const parsed = codeFromFilename(filename);
   if (!parsed) return null;
-  const shot = await ctx.db.query('videos').withIndex('by_project_code', q => q.eq('projectId', projectId).eq('assetCode', parsed.code.code)).first();
+  const shot = await findAssetByCode(ctx, projectId, parsed.code.code);
   return shot && shot.folderId === folder._id && !shot.misfiled ? shot : null;
 }
 

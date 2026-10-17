@@ -221,6 +221,10 @@ const applicationTables = {
     currentVersionId: v.optional(v.id("assetVersions")),
     // Dropped into a locked folder without a matching shot code; awaiting fix-up.
     misfiled: v.optional(v.boolean()),
+    // A copy (for Trailer Feed submission) shares the source version's stored files and keeps its code.
+    copiedFromAssetId: v.optional(v.id("videos")),
+    copiedFromVersionId: v.optional(v.id("assetVersions")),
+    copiedAt: v.optional(v.number()),
   })
     .index("by_project", ["projectId"])
     .index("by_project_folder", ["projectId", "folderId"])
@@ -294,7 +298,7 @@ const applicationTables = {
     creativeMetadata: v.optional(creativeMetadata),
     metadataUpdatedAt: v.optional(v.number()),
     createdAt: v.number(),
-  }).index("by_asset", ["assetId"]),
+  }).index("by_asset", ["assetId"]).index("by_original_key", ["originalKey"]).index("by_poster_key", ["posterKey"]),
 
   uploadSessions: defineTable({
     projectId: v.id("projects"),
@@ -335,7 +339,8 @@ const applicationTables = {
     spriteKey: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_asset", ["assetId"]).index("by_version", ["versionId"]),
+  }).index("by_asset", ["assetId"]).index("by_version", ["versionId"])
+    .index("by_thumbnail_key", ["thumbnailKey"]).index("by_sprite_key", ["spriteKey"]),
 
   storageDeletionJobs: defineTable({
     keys: v.array(v.string()),

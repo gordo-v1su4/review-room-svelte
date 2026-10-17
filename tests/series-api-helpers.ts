@@ -44,3 +44,16 @@ export async function workspaceUpload(f: Pick<Fixture, 't' | 'project'>, input: 
   const dir = session.objectKey.slice(0, session.objectKey.lastIndexOf('/'));
   return await f.t.mutation(internal.personal.finalizeUpload, { sessionId: session.sessionId, verifiedSizeBytes: 100, posterKey: `${dir}/poster.jpg`, durationSec: 4, width: 1920, height: 1080 }) as Id<'videos'>;
 }
+
+/** Finish media processing for every version of an asset, as the media worker would. */
+export async function completeProcessing(f: Pick<Fixture, 't'>, assetId: Id<'videos'>) {
+  await f.t.run(async ctx => {
+    for (const version of await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', assetId)).collect()) {
+      const dir = version.originalKey.slice(0, version.originalKey.lastIndexOf('/'));
+      await ctx.db.patch(version._id, { processingState: 'ready' });
+      const job = await ctx.db.query('mediaJobs').withIndex('by_version', q => q.eq('versionId', version._id)).unique();
+      if (job) await ctx.db.patch(job._id, { status: 'ready', stage: 'finalize', thumbnailKey: `${dir}/thumbnail.jpg`, spriteKey: `${dir}/sprite.jpg`, durationSec: 4, width: 1920, height: 1080 });
+    }
+    await ctx.db.patch(assetId, { processingStatus: 'ready' });
+  });
+}

@@ -105,7 +105,8 @@ export function requireProductionCode(value: string) {
 
 /** The original asset (not a copy) that owns a production code in this project. */
 export async function findAssetByCode(ctx: MutationCtx, projectId: Id<'projects'>, code: string) {
-  return await ctx.db.query('videos').withIndex('by_project_code', q => q.eq('projectId', projectId).eq('assetCode', code)).first();
+  const matches = await ctx.db.query('videos').withIndex('by_project_code', q => q.eq('projectId', projectId).eq('assetCode', code)).collect();
+  return matches.find(asset => !asset.copiedFromAssetId) ?? null;
 }
 
 /** Canonical production code, refused when another original asset in the project already uses it. */
