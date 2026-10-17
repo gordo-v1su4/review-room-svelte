@@ -1962,6 +1962,7 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 
 /* Focused review keeps the persistent viewer and its feedback in the workspace. */
 .review-view-controls { display:flex; flex:0 0 auto; gap:4px; }
+.version-selector { width:142px; flex:0 0 auto; }
 .focused-review .desktop-nav-toggle, .focused-review .mobile-menu { display:none; }
 .focused-review .breadcrumb { min-width:0; }
 .focused-review .breadcrumb strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
