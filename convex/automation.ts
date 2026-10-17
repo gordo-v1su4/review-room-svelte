@@ -149,6 +149,22 @@ export const versionMetadata = internalMutation({
   },
 });
 
+/** Storage keys for one ready version, for the server to sign; never returned to API callers as keys. */
+export const versionMedia = internalMutation({
+  args: { keyDigest: v.string(), versionId: v.id('assetVersions') },
+  handler: async (ctx, { keyDigest, versionId }) => {
+    const version = await ctx.db.get(versionId);
+    const asset = version && await ctx.db.get(version.assetId);
+    const credential = await authorize(ctx, keyDigest, 'media:read', asset?.projectId);
+    const project = asset && await ctx.db.get(asset.projectId);
+    if (!version || !asset || !project || project.archived || project.createdBy !== credential.createdBy) throw new Error('Version unavailable');
+    if (asset.status === 'archived') throw new Error('Version unavailable: its asset is archived');
+    if (version.processingState !== 'ready') throw new Error(`Version not ready: processing is ${version.processingState}`);
+    await ctx.db.insert('automationAudit', { credentialId: credential._id, action: 'media:read', targetId: version._id, outcome: 'succeeded', createdAt: Date.now() });
+    return { versionId, assetId: asset._id, originalKey: version.originalKey, posterKey: version.posterKey ?? null, mimeType: version.mimeType, sizeBytes: version.sizeBytes };
+  },
+});
+
 export const createFolder = internalMutation({
   args: { ...request, projectId: v.id('projects'), title: v.string(), parentFolderId: v.optional(v.id('projectFolders')),
     ownerApp: v.optional(v.literal('creative-studio-pro')) },

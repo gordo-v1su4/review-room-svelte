@@ -1318,6 +1318,105 @@
           }
         }
       }
+    },
+    "/api/v1/versions/{versionId}/media": {
+      "get": {
+        "operationId": "getVersionMedia",
+        "summary": "Short-lived signed GET URLs for one ready version's original and JPEG poster (media:read; a project-restricted credential only reaches its project, other projects are 403). Archived assets are 404 and versions still processing or failed are 409, each with a message. URLs expire after about 10 minutes: request them again rather than storing them, and keep them out of logs. Download them without the Review bearer header.",
+        "parameters": [
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed read URLs. Response is private, no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "versionId",
+                    "assetId",
+                    "original",
+                    "poster"
+                  ],
+                  "properties": {
+                    "versionId": {
+                      "type": "string"
+                    },
+                    "assetId": {
+                      "type": "string"
+                    },
+                    "original": {
+                      "type": "object",
+                      "required": [
+                        "url",
+                        "mimeType",
+                        "sizeBytes",
+                        "expiresAt"
+                      ],
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "mimeType": {
+                          "type": "string"
+                        },
+                        "sizeBytes": {
+                          "type": "integer"
+                        },
+                        "expiresAt": {
+                          "type": "integer",
+                          "description": "Epoch milliseconds; about 10 minutes after the request."
+                        }
+                      }
+                    },
+                    "poster": {
+                      "oneOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "url",
+                            "expiresAt"
+                          ],
+                          "properties": {
+                            "url": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "expiresAt": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credential unavailable"
+          },
+          "403": {
+            "description": "Project or action outside credential scope"
+          },
+          "404": {
+            "description": "Version unavailable"
+          }
+        }
+      }
     }
   },
   "components": {
