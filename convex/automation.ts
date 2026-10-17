@@ -149,6 +149,32 @@ export const versionMetadata = internalMutation({
   },
 });
 
+/** Storage keys for one ready version, for the server to sign; never returned to API callers as keys. */
+export const versionMedia = internalMutation({
+  args: { keyDigest: v.string(), versionId: v.id('assetVersions') },
+  handler: async (ctx, { keyDigest, versionId }) => {
+    const version = await ctx.db.get(versionId);
+    const asset = version && await ctx.db.get(version.assetId);
+    const credential = await authorize(ctx, keyDigest, 'media:read', asset?.projectId);
+    const project = asset && await ctx.db.get(asset.projectId);
+    if (!version || !asset || !project || project.archived || project.createdBy !== credential.createdBy) throw new Error('Version unavailable');
+    if (asset.status === 'archived') throw new Error('Version unavailable: its asset is archived');
+    if (version.processingState !== 'ready') throw new Error(`Version not ready: processing is ${version.processingState}`);
+    return { versionId, assetId: asset._id, originalKey: version.originalKey, posterKey: version.posterKey ?? null, mimeType: version.mimeType, sizeBytes: version.sizeBytes };
+  },
+});
+
+/** Records a version media read once signing has finished (or failed), so the audit reflects what the caller received. */
+export const auditVersionMediaRead = internalMutation({
+  args: { keyDigest: v.string(), versionId: v.id('assetVersions'), outcome: v.union(v.literal('succeeded'), v.literal('failed')) },
+  handler: async (ctx, { keyDigest, versionId, outcome }) => {
+    const version = await ctx.db.get(versionId);
+    const asset = version && await ctx.db.get(version.assetId);
+    const credential = await authorize(ctx, keyDigest, 'media:read', asset?.projectId);
+    await ctx.db.insert('automationAudit', { credentialId: credential._id, action: 'media:read', targetId: versionId, outcome, createdAt: Date.now() });
+  },
+});
+
 export const createFolder = internalMutation({
   args: { ...request, projectId: v.id('projects'), title: v.string(), parentFolderId: v.optional(v.id('projectFolders')),
     ownerApp: v.optional(v.literal('creative-studio-pro')) },

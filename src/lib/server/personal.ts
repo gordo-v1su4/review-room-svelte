@@ -7,6 +7,7 @@ import { env } from '$env/dynamic/private';
 import { error } from '@sveltejs/kit';
 import { createHash } from 'node:crypto';
 import { createMediaDelivery } from './media-delivery';
+import { signVersionMedia, type VersionMediaKeys } from './signed-read';
 let convexClient: ConvexHttpClient | undefined;
 let storageClient: S3Client | undefined;
 
@@ -53,6 +54,11 @@ function bucket() { return env.S3_BUCKET || 'review-room-svelte'; }
 
 export async function uploadUrl(key: string, mimeType: string) {
   return await getSignedUrl(storage(), new PutObjectCommand({ Bucket: bucket(), Key: key, ContentType: mimeType }), { expiresIn: 15 * 60 });
+}
+
+/** Short-lived GET URLs for a version's original and poster (automation media reads). */
+export async function versionReadUrls(media: VersionMediaKeys) {
+  return await signVersionMedia(storage(), bucket(), media);
 }
 
 export function stagingKey(key: string) { return `${key}.pending`; }
