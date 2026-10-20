@@ -99,7 +99,7 @@ export async function movePersonalFolder(ctx: MutationCtx, ownerId: Id<'appUsers
 
 export function requireProductionCode(value: string) {
   const parsed = parseProductionCode(value);
-  if (!parsed) throw new Error('Asset code must be a shot or deliverable code such as BLR_EP101_PAR_0020 or BLR_S1_TRL01');
+  if (!parsed) throw new Error('Asset code must be a shot, deliverable or reference code such as BLR_EP101_PAR_0020, BLR_S1_TRL01 or BLR_REF_CHR_MARA_VOSS');
   return parsed.code;
 }
 

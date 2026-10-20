@@ -8,6 +8,14 @@ test('shot and deliverable codes parse into their parts', () => {
   for (const bad of ['', 'VID_20261017_00001', 'BLR_EP101_PAR_20', 'BLR_EP101_PAR_0020_v003', 'BLR_EP1_PAR_0020', 'BLR_S1_XYZ']) expect(parseProductionCode(bad)).toBeNull();
 });
 
+test('reference codes (character, location, prop) parse; a malformed one does not', () => {
+  expect(parseProductionCode('BLR_REF_CHR_KAI_HOODIE_SANTANA')).toEqual({ kind: 'reference', code: 'BLR_REF_CHR_KAI_HOODIE_SANTANA', show: 'BLR', reference: 'CHR', name: 'KAI_HOODIE_SANTANA' });
+  expect(parseProductionCode('blr_ref_loc_college_quad')?.kind).toBe('reference');
+  expect(parseProductionCode('BLR_REF_PRP_VIAL')).toMatchObject({ reference: 'PRP', name: 'VIAL' });
+  for (const bad of ['BLR_REF_XYZ_KAI', 'BLR_REF_CHR_', 'BLR_REF_CHR_KAI__SANTANA', `BLR_REF_CHR_${'A'.repeat(41)}`]) expect(parseProductionCode(bad)).toBeNull();
+  expect(codeFromFilename('BLR_REF_CHR_MARA_VOSS_v002.png')).toEqual({ code: parseProductionCode('BLR_REF_CHR_MARA_VOSS')!, version: 2 });
+});
+
 test('filenames yield the code and ignore extension case; their own version is reported separately', () => {
   expect(codeFromFilename('blr_ep101_par_0020_v004.mov')).toEqual({ code: parseProductionCode('BLR_EP101_PAR_0020')!, version: 4 });
   expect(codeFromFilename('BLR_EP101_PAR_0020.mp4')?.version).toBeUndefined();

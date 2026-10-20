@@ -2,20 +2,25 @@
  * Creative Studio Pro production codes.
  *   Shot:        BLR_EP101_PAR_0020        show · episode (EP101 = season 1, episode 01) · scene · shot (steps of 10)
  *   Deliverable: BLR_EP101_EPC, BLR_S1_TRL01  show · episode or season · kind (+ optional index)
+ *   Reference:   BLR_REF_CHR_MARA_VOSS        show · REF · kind (CHR character, LOC location, PRP prop) · name
  * A take adds a version suffix, `_v003`; the suffix is never part of the asset code.
  */
 export const deliverableKinds = { EPC: 'Episode cut', TSR: 'Teaser', TRL: 'Trailer' } as const;
+export const referenceKinds = { CHR: 'Character', LOC: 'Location', PRP: 'Prop' } as const;
+export type ReferenceKind = keyof typeof referenceKinds;
 export type DeliverableKind = keyof typeof deliverableKinds;
 
 export type ProductionCode =
   | { kind: 'shot'; code: string; show: string; season: number; episode: number; scene: string; shot: number }
-  | { kind: 'deliverable'; code: string; show: string; season: number; episode?: number; deliverable: DeliverableKind; index?: number };
+  | { kind: 'deliverable'; code: string; show: string; season: number; episode?: number; deliverable: DeliverableKind; index?: number }
+  | { kind: 'reference'; code: string; show: string; reference: ReferenceKind; name: string };
 
 const show = '([A-Z][A-Z0-9]{1,5})';
 const kinds = Object.keys(deliverableKinds).join('|');
 const shotPattern = new RegExp(`^${show}_EP(\\d)(\\d{2})_([A-Z][A-Z0-9]{1,5})_(\\d{4})$`);
 const episodeDeliverable = new RegExp(`^${show}_EP(\\d)(\\d{2})_(${kinds})(\\d{2})?$`);
 const seasonDeliverable = new RegExp(`^${show}_S(\\d{1,2})_(${kinds})(\\d{2})?$`);
+const referencePattern = new RegExp(`^${show}_REF_(${Object.keys(referenceKinds).join('|')})_([A-Z0-9]+(?:_[A-Z0-9]+)*)$`);
 const versionSuffix = /_V(\d{1,4})$/;
 
 /** Parses an asset code (no version suffix). Case-insensitive; returns the canonical upper-case code. */
@@ -27,6 +32,8 @@ export function parseProductionCode(value: string): ProductionCode | null {
   if (match) return { kind: 'shot', code, show: match[1], season: Number(match[2]), episode: Number(match[3]), scene: match[4], shot: Number(match[5]) };
   match = code.match(seasonDeliverable);
   if (match) return { kind: 'deliverable', code, show: match[1], season: Number(match[2]), deliverable: match[3] as DeliverableKind, ...(match[4] ? { index: Number(match[4]) } : {}) };
+  match = code.match(referencePattern);
+  if (match && match[3].length <= 40) return { kind: 'reference', code, show: match[1], reference: match[2] as ReferenceKind, name: match[3] };
   return null;
 }
 
