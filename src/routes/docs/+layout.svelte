@@ -17,7 +17,7 @@
       { href: '/docs/metadata-model.html', title: 'Metadata relationships' },
     ] },
     { title: 'Owner', links: [{ href: '/docs/operations', title: 'Operations', private: true }] },
-  ];
+  ] as const;
 </script>
 <div class="docs-shell">
   <a class="docs-skip" href="#guide">Skip to guide</a>
@@ -27,7 +27,7 @@
     <a class="docs-identity" href={resolve('/docs')}><BookOpen size={19} strokeWidth={1.3} /> Documentation</a>
     <nav id="docs-navigation" aria-label="Documentation sections">
       {#each groups as group (group.title)}<div class="docs-nav-group"><p>{group.title}</p>
-        {#each group.links as link (link.href)}<a href={resolve(link.href as '/docs')} aria-current={page.url.pathname === link.href ? 'page' : undefined} onclick={() => menuOpen = false}>{link.title}{#if 'private' in link}<LockKeyhole size={12} aria-label="Owner access required" />{/if}</a>{/each}
+        {#each group.links as link (link.href)}<a href={resolve(link.href)} aria-current={page.url.pathname === link.href ? 'page' : undefined} onclick={() => menuOpen = false}>{link.title}{#if 'private' in link}<LockKeyhole size={12} aria-label="Owner access required" />{/if}</a>{/each}
       </div>{/each}
     </nav>
     <p class="docs-sidebar-note">A guide to the work,<br />from first upload to delivery.</p>
