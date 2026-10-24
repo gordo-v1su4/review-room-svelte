@@ -21,6 +21,9 @@
         <desc id={`${uid}-${index}-desc`}>{diagram.description}</desc>
         <defs><marker id={`${uid}-${index}-arrow`} markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1L6 4L1 7" fill="none" stroke="currentColor" stroke-width="1.2" /></marker></defs>
         <g class="map-connections">{#each graph.paths as path (path)}<path d={path} marker-end={`url(#${uid}-${index}-arrow)`} />{/each}</g>
+        {#each graph.labels ?? [] as label (label.text)}
+          <g class="map-edge-label"><rect x={label.x-label.text.length*3.5-8} y={label.y-14} width={label.text.length*7+16} height="22" rx="3" /><text x={label.x} y={label.y} text-anchor="middle">{label.text}</text></g>
+        {/each}
         {#each graph.nodes as item (item.id)}
           <g class:map-accent={item.accent} class="map-node">
             {#if item.shape === 'folder'}
@@ -47,6 +50,7 @@
   .map-scroll{width:100%;min-width:0;overflow-x:auto}.map-narrow{display:none}
   .map-canvas{display:block;width:100%;min-width:var(--map-width);color:var(--muted)}
   .map-connections path{fill:none;stroke:#8d9e9b;stroke-width:1.4}.map-shape{fill:var(--canvas);stroke:#4d5957;stroke-width:1}
+  .map-edge-label rect{fill:var(--panel)}.map-edge-label text{fill:#a8b1af;font-size:12px}
   .map-node.map-accent .map-shape{fill:#17342f;stroke:var(--teal)}.map-store-rim{fill:none;stroke:#4d5957;stroke-width:1}
   .map-glyph{fill:none;stroke:var(--muted);stroke-width:1.3;stroke-linejoin:round;stroke-linecap:round}.map-accent .map-glyph{stroke:var(--teal)}
   .map-name{fill:var(--ink);font-size:16px;font-weight:500;letter-spacing:-.2px}.map-name.compact{font-size:15px}.map-detail{fill:#a8b1af;font-size:12px}

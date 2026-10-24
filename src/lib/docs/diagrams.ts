@@ -4,7 +4,7 @@ export type DiagramNode = {
   label: string; detail: string; icon: 'folder' | 'film' | 'check' | 'notes' | 'link' | 'lock' | 'send' | 'code' | 'store' | 'server';
   shape?: 'folder' | 'media' | 'store'; accent?: boolean; takes?: boolean;
 };
-type Graph = { width: number; height: number; nodes: DiagramNode[]; paths: string[] };
+type Graph = { width: number; height: number; nodes: DiagramNode[]; paths: string[]; labels?: { x: number; y: number; text: string }[] };
 type Diagram = { title: string; description: string; wide: Graph; narrow: Graph };
 const node = (id: string, x: number, y: number, w: number, h: number, label: string, detail: string, icon: DiagramNode['icon'], extra: Partial<DiagramNode> = {}): DiagramNode => ({ id, x, y, w, h, label, detail, icon, ...extra });
 
@@ -99,20 +99,20 @@ export const diagrams: Record<DiagramKind, Diagram> = {
   },
   architecture:{
     title:'Where the work happens',
-    description:'The browser talks to SvelteKit. Convex owns catalog records; RustFS owns bytes. Trigger and FFmpeg prepare derivatives and report readiness. Storage and metadata are separate responsibilities.',
-    wide:{width:832,height:464,nodes:[
-      node('browser',24,176,176,104,'Browser','Review & upload','film',{shape:'media'}),
-      node('app',288,176,216,104,'SvelteKit','Authorize each request','server',{accent:true}),
-      node('catalog',600,24,208,112,'Convex','Identity & review state','store',{shape:'store'}),
-      node('storage',600,208,208,112,'RustFS','Originals & previews','store',{shape:'store'}),
-      node('worker',288,368,216,80,'Trigger / FFmpeg','Prepare derivatives','server'),
-    ],paths:['M200 228H280','M504 200H548Q556 200 556 192V88Q556 80 564 80H592','M504 248H592','M396 280V360','M504 408H696Q704 408 704 400V328']},
+    description:'Control and processing map: SvelteKit authorizes requests, Convex owns catalog records, and RustFS owns bytes. Workers store derivatives in RustFS and report readiness to Convex. The separate upload map shows direct signed byte transfers from the uploader to storage.',
+    wide:{width:832,height:576,nodes:[
+      node('browser',24,24,176,104,'Browser','Review & upload','film',{shape:'media'}),
+      node('app',288,24,216,104,'SvelteKit','Authorize each request','server',{accent:true}),
+      node('catalog',24,248,216,112,'Convex','Identity & review state','store',{shape:'store'}),
+      node('storage',584,248,224,112,'RustFS','Originals & previews','store',{shape:'store'}),
+      node('worker',288,440,232,112,'Trigger / FFmpeg','Prepare derivatives','server'),
+    ],paths:['M200 76H280','M344 128V184Q344 192 336 192H140Q132 192 132 200V240','M448 128V184Q448 192 456 192H688Q696 192 696 200V240','M396 128V432','M288 496H272Q264 496 264 488V400Q264 392 256 392H140Q132 392 132 384V368','M520 496H544Q552 496 552 488V400Q552 392 560 392H688Q696 392 696 384V368'],labels:[{x:228,y:176,text:'Read / write'},{x:592,y:176,text:'Authorize'},{x:440,y:320,text:'Video job'},{x:184,y:416,text:'Readiness'},{x:648,y:416,text:'Derivatives'}]},
     narrow:{width:320,height:704,nodes:[
       node('browser',24,24,272,88,'Browser','Review & upload','film',{shape:'media'}),
       node('app',24,176,272,104,'SvelteKit','Authorize each request','server',{accent:true}),
       node('catalog',24,384,128,112,'Convex','Catalog records','store',{shape:'store'}),
       node('storage',168,384,128,112,'RustFS','Media bytes','store',{shape:'store'}),
-      node('worker',24,584,272,88,'Trigger / FFmpeg','Prepare derivatives','server'),
-    ],paths:['M160 112V168','M88 280V376','M232 280V376','M24 228H16Q8 228 8 236V620Q8 628 16 628H24','M232 584V504']},
+      node('worker',24,584,272,104,'Trigger / FFmpeg','Prepare derivatives','server'),
+    ],paths:['M160 112V168','M88 280V376','M232 280V376','M24 228H16Q8 228 8 236V620Q8 628 16 628H24','M232 584V504','M88 584V504'],labels:[{x:88,y:328,text:'Read / write'},{x:232,y:328,text:'Authorize'},{x:88,y:548,text:'Readiness'},{x:232,y:548,text:'Derivatives'}]},
   },
 };
