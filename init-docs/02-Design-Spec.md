@@ -181,7 +181,15 @@ Queued/running media uses a labelled thumbnail placeholder and a waiting/process
 
 When switching ready videos, the active player's correct selected poster stays visible until its decoded media is available, with a small loading status. Only the active player preloads its original; thumbnail hover remains sprite-only. Play can be requested while that active source loads, and Pause, navigation, and close cancel that request. Closing releases the media source. Missing posters retain the explicit preparing state; processing and delivery errors remain prominent.
 
-## 17. Design priorities (if time is short)
+## 17. Application documentation
+
+`/docs` opens with everyday workflow before technical reference. A persistent desktop section sidebar groups usage guides (workflow, naming/organization, review/versions/sharing), agent/API references and owner operations. On phones, a labelled Sections control expands the same navigation in document flow; selecting a destination closes it. Preserve keyboard focus, current-page indication and readable content without page-level horizontal overflow.
+
+Reuse application typography, neutral dark surfaces and restrained teal. Guide visuals explain their subject: an ordered upload-to-delivery flow, a source-name-to-code key and organization tree, or selective current-UI screenshots with explanatory callouts. Reference pages stay compact and link the canonical agent guide/OpenAPI contract rather than copying the endpoint contract. Preserve `/docs/media-flow.html` and `/docs/metadata-model.html`.
+
+Setup-specific operations content is delivered only after server owner authorization, including direct URLs, SvelteKit data requests and runbook downloads. Private content stays out of client bundles and public static files. Authorized and denied operations responses use private, no-store caching; navigation visibility alone is not access control. General usage guides remain accessible without owner sign-in.
+
+## 18. Design priorities (if time is short)
 
 1. Admin workspace → 2. Client review page → 3. Video card system → 4. Right-side viewer panel → 5. Rating/comment/approval interactions → 6. Filters + smart-view tabs → 7. Upload states → 8. Table view → 9. Grouped (stacked) view → 10. Mobile refinements.
 
