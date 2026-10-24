@@ -56,6 +56,10 @@ Slices 2–5 depend on the navigation foundation. Linear tracks these as V1S-363
 - Preserve the canonical `/agent-api`, `/review-room-openapi.json`, `/docs/media-flow.html` and `/docs/metadata-model.html` locations.
 - No changes to media, schema, review actions, metadata writes, rating order or destination behavior are included.
 
+## Visual revision requested October 24
+
+The first deployed pass was too text-heavy. Replace the text-first reading experience with connected diagrams for workflow, project/folder/asset/take hierarchy, asset-level feedback versus version metadata, sharing permissions, API handoffs and system responsibilities. Use actual folder, media and store shapes; keep diagrams under nine nodes, retain accessible titles/descriptions and provide vertical phone layouts rather than shrinking desktop labels. Shorten introductions and place detailed rules in native expandable sections. Keep the existing control screenshots as supporting evidence, not the primary explanation. This remains documentation-only.
+
 ## Verification and boundaries
 
 The owner approved real HTTP access/cache checks and browser navigation/content checks as the test seams. Verify anonymous, collaborator-only, forged, expired and valid owner sessions on operations HTML, SvelteKit data and canonical runbook routes. Check the production client output for private operational text. Verify content against current code and inspect the docs in the native browser at desktop and phone/landscape sizes. Documentation does not alter media, metadata, production behavior or the portfolio. Do not close implementation tickets until the deployed documentation is verified.
