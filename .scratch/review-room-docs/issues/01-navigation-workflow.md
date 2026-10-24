@@ -1,15 +1,15 @@
 # V1S-363: Documentation navigation and everyday workflow
 
-Status: in progress
+Status: completed
 Spec: [Documentation overhaul](../spec.md)
 Foundation for V1S-364–367.
 
 ## Acceptance
 
-- [ ] Responsive docs sidebar, current-page state, skip link and phone Sections disclosure.
-- [ ] Complete workflow overview with useful ordered visual and current upload/readiness guidance.
-- [ ] Preserve both established diagram URLs.
-- [ ] Verify the deployed documentation and record evidence before closing.
+- [x] Responsive docs sidebar, current-page state, skip link and phone Sections disclosure.
+- [x] Complete workflow overview with useful ordered visual and current upload/readiness guidance.
+- [x] Preserve both established diagram URLs.
+- [x] Verify the deployed documentation and record evidence before closing.
 
 ## Verification
 

@@ -1,0 +1,110 @@
+{
+  "checkedAt": "2026-10-24T07:06:23.517Z",
+  "release": "62d90062268f9f5bdcb35e87e1e0f1b89f92fead",
+  "build": "1792825542736",
+  "results": [
+    {
+      "path": "/docs",
+      "status": 200
+    },
+    {
+      "path": "/docs/organization",
+      "status": 200
+    },
+    {
+      "path": "/docs/review",
+      "status": 200
+    },
+    {
+      "path": "/docs/agents",
+      "status": 200
+    },
+    {
+      "path": "/docs/media-flow.html",
+      "status": 200
+    },
+    {
+      "path": "/docs/metadata-model.html",
+      "status": 200
+    },
+    {
+      "path": "/agent-api",
+      "status": 200
+    },
+    {
+      "path": "/review-room-openapi.json",
+      "status": 200
+    },
+    {
+      "path": "/docs/images/review-workspace-20261024.png",
+      "status": 200
+    },
+    {
+      "path": "/docs/images/private-sharing-20261024.png",
+      "status": 200
+    },
+    {
+      "path": "/docs/operations",
+      "session": "anonymous",
+      "status": 303,
+      "privateNoStore": true,
+      "denied": true
+    },
+    {
+      "path": "/docs/operations",
+      "session": "collaborator-only",
+      "status": 303,
+      "privateNoStore": true,
+      "denied": true
+    },
+    {
+      "path": "/docs/operations",
+      "session": "forged-owner",
+      "status": 303,
+      "privateNoStore": true,
+      "denied": true
+    },
+    {
+      "path": "/docs/operations/__data.json",
+      "session": "anonymous",
+      "status": 200,
+      "privateNoStore": true,
+      "denied": true
+    },
+    {
+      "path": "/docs/operations/__data.json",
+      "session": "collaborator-only",
+      "status": 200,
+      "privateNoStore": true,
+      "denied": true
+    },
+    {
+      "path": "/docs/operations/__data.json",
+      "session": "forged-owner",
+      "status": 200,
+      "privateNoStore": true,
+      "denied": true
+    },
+    {
+      "path": "/docs/operations/runbook.md",
+      "session": "anonymous",
+      "status": 303,
+      "privateNoStore": true,
+      "denied": true
+    },
+    {
+      "path": "/docs/operations/runbook.md",
+      "session": "collaborator-only",
+      "status": 303,
+      "privateNoStore": true,
+      "denied": true
+    },
+    {
+      "path": "/docs/operations/runbook.md",
+      "session": "forged-owner",
+      "status": 303,
+      "privateNoStore": true,
+      "denied": true
+    }
+  ]
+}
