@@ -1,43 +1,22 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { ArrowLeft, ArrowUpRight, Network, Workflow } from 'lucide-svelte';
+  import { FolderOpen, Upload, MessageSquare, CheckCheck, Send } from 'lucide-svelte';
+  const steps = [
+    { icon: FolderOpen, title: 'Organize', text: 'Choose a project and folder.' },
+    { icon: Upload, title: 'Upload', text: 'Add media. Wait for Ready.' },
+    { icon: MessageSquare, title: 'Review', text: 'Watch, rate and leave notes.' },
+    { icon: CheckCheck, title: 'Choose', text: 'Keep the take you want current.' },
+    { icon: Send, title: 'Share', text: 'Invite reviewers or publish a take.' },
+  ];
 </script>
-
-<svelte:head>
-  <title>Documentation · Review Room</title>
-  <meta name="description" content="Review Room media flow and metadata relationships." />
-</svelte:head>
-
-<main class="documentation">
-  <a class="back" href={resolve('/')}><ArrowLeft size={14} strokeWidth={1.4} /> Back to workspace</a>
-  <p class="eyebrow">Review Room</p>
-  <h1>Documentation</h1>
-  <p class="intro">How media moves through the system, and how the information around it stays connected.</p>
-  <div class="guides">
-    <a class="guide" href={resolve('/docs/[diagram]', { diagram: 'media-flow.html' })}>
-      <Workflow size={20} strokeWidth={1.2} />
-      <div><h2>Media flow</h2><p>Follow upload, processing, review and publishing. Play the sequence or step through it.</p></div>
-      <ArrowUpRight size={15} strokeWidth={1.4} />
-    </a>
-    <a class="guide" href={resolve('/docs/[diagram]', { diagram: 'metadata-model.html' })}>
-      <Network size={20} strokeWidth={1.2} />
-      <div><h2>Metadata relationships</h2><p>Explore projects, folders, assets, versions, feedback and publication access.</p></div>
-      <ArrowUpRight size={15} strokeWidth={1.4} />
-    </a>
-  </div>
-</main>
-
-<style>
-  .documentation { max-width:880px; margin:0 auto; padding:40px 24px; }
-  .back { display:inline-flex; align-items:center; gap:8px; color:var(--muted); font-size:12px; text-decoration:none; }
-  .back:hover { color:var(--ink); }
-  .eyebrow { margin:48px 0 10px; color:var(--teal); font-size:10px; letter-spacing:.16em; text-transform:uppercase; }
-  h1 { margin:0; font-size:28px; font-weight:450; letter-spacing:-.025em; }
-  .intro { max-width:580px; margin:14px 0 30px; color:var(--muted); font-size:13px; line-height:1.7; }
-  .guides { border-top:1px solid var(--border); }
-  .guide { display:flex; align-items:center; gap:18px; padding:24px 0; border-bottom:1px solid var(--border); text-decoration:none; color:var(--ink); }
-  .guide:hover { color:var(--teal); }
-  .guide div { flex:1; }
-  h2 { margin:0 0 7px; font-size:14px; font-weight:500; }
-  .guide p { max-width:580px; margin:0; color:var(--muted); font-size:12px; line-height:1.7; }
-</style>
+<svelte:head><title>Everyday workflow · Review Room</title><meta name="description" content="Organize media, upload takes, review feedback and share work in Review Room." /></svelte:head>
+<header class="docs-heading"><p class="docs-kicker">Using Review Room</p><h1>From first upload<br />to the right take.</h1><p class="docs-lead">Keep the media, the conversation and the decision together. Start with a project; each revision stays connected to its asset.</p></header>
+<figure class="docs-visual"><ol class="docs-workflow">
+  {#each steps as step (step.title)}<li><step.icon size={22} strokeWidth={1.3} /><strong>{step.title}</strong><span>{step.text}</span></li>{/each}
+</ol><figcaption>Upload and processing come before review. Sharing is an explicit choice; a new upload stays private.</figcaption></figure>
+<section id="organize"><h2>Start with a place for the work</h2><p>Choose an existing project or use <strong>New project</strong>. In an ordinary project, create real folders when they help: a sequence, a delivery or a client review round. Uploading at the project root leaves the media there.</p><p><strong>Videos</strong>, <strong>Images</strong> and <strong>Shortlist</strong> are collections of the same assets. Selecting a collection filters the library; it does not move files. Creative Studio Pro projects have managed, locked folders with their own structure.</p><a class="docs-next" href={resolve('/docs/organization')}>Understand folders and production codes</a></section>
+<section id="upload"><h2>Add media and follow its progress</h2><ol class="docs-steps"><li>Open the intended folder, then choose <strong>Add media</strong>. Check the destination before choosing or dropping files.</li><li>Add videos or still images. The Imports popover tracks each file. Cancel during preparation or transfer; Retry failed or cancelled work.</li><li>Wait for the asset to become <strong>Ready</strong>. Video processing prepares a thumbnail and scrub sprite after upload. An uploaded receipt is not the same as ready-to-review media.</li><li>Open the asset. If a job fails, use its retry control and follow Activity rather than uploading another copy.</li></ol><p>A separate ordinary upload creates a separate asset. To preserve one take history, use the existing publication’s <strong>New version</strong> upload or the managed production/API take workflow described in the review guide.</p></section>
+<section id="review"><h2>Review, then choose what moves forward</h2><p>Open a video to watch it or a still image to inspect it. Add a note, use a timecode when the moment matters, rate the asset or add it to the shortlist. <strong>Request changes</strong> and <strong>Approve</strong> express the review decision; stars and shortlist remain independent.</p><p>Use the version menu to inspect a particular take. Selecting a take to watch does not make it the asset’s current take. Where available, <strong>Make current</strong> changes that pick. Check the selected version before editing its creative metadata or sharing it.</p><a class="docs-next" href={resolve('/docs/review')}>Review, versions and sharing</a></section>
+<section id="delivery"><h2>Choose the right kind of sharing</h2><div class="docs-pair"><div><h3>Private review</h3><p>A scoped review link lets invited reviewers watch and leave feedback. Access, passcode, expiry and download permissions belong to that link.</p></div><div><h3>Publication to Trailer Feed</h3><p>The owner explicitly confirms video versions for a connected destination. Later uploads stay private. Refresh metadata and Unsync are separate actions.</p></div></div></section>
+<aside class="docs-note"><strong>Working locally?</strong><p>An unconfigured checkout is a local preview. It does not prove that uploads, feedback or shared links persist. The owner’s <a href={resolve('/docs/operations')}>operations guide</a> covers the connected setup.</p></aside>
+<footer class="docs-footer"><a href={resolve('/docs/organization')}>Next: Naming & organization</a><a href={resolve('/docs/agents')}>Working with an agent?</a></footer>
