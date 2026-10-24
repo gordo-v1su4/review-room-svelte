@@ -4,12 +4,7 @@ import { requireOwner } from '$lib/server/owner-auth';
 export const load: PageServerLoad = ({ cookies }) => {
   requireOwner(cookies);
   // Private operational content travels only in authorized server responses.
-  return { responsibilities: [
-    { name: 'App VM / SvelteKit', role: 'Owner access, review routes and authorized media delivery.' },
-    { name: 'Convex', role: 'Catalog identity, decisions, version metadata and delivery consent.' },
-    { name: 'RustFS', role: 'Private originals, posters and scrub sprites; no catalog authority.' },
-    { name: 'Trigger.dev / FFmpeg', role: 'Coordinate video jobs, prepare derivatives and report readiness.' },
-  ], sections: [
+  return { sections: [
     { title: 'Connect the dedicated setup', paragraphs: [
       'The frontend runs on App VM at https://review.v1su4.dev. Convex owns the catalog at https://review-convex.v1su4.dev; its site endpoint is https://review-convex-site.v1su4.dev. RustFS stores this application’s bytes in the private review-room-svelte bucket. Trigger.dev coordinates the video jobs; workers run FFmpeg on VM100.',
       'For a connected local workspace, populate the ignored .env.local using this app’s dedicated BWS records and the canonical deployment runbook. Never copy another app’s environment. Restart Vite after configuration changes. Local and production owner sessions are separate, but a local workspace pointed at the production backend changes the same data.',
