@@ -1,4 +1,4 @@
-.docs-shell{min-height:100dvh;display:grid;grid-template-columns:238px minmax(0,1fr);background:var(--canvas);color:var(--ink)}
+.docs-shell{--docs-outline-opacity:.25;--docs-outline-border:rgb(52 58 61 / .25);--docs-outline-accent:rgb(125 217 200 / .25);min-height:100dvh;display:grid;grid-template-columns:238px minmax(0,1fr);background:var(--canvas);color:var(--ink)}
 .docs-shell>aside{position:sticky;top:0;height:100dvh;padding:20px 16px;border-right:1px solid var(--docs-outline-border,var(--border));background:var(--panel);overflow:auto}
 .docs-back,.docs-identity{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--muted);font-size:12px}
 .docs-identity{margin:24px 9px 22px;color:var(--ink);font-size:15px}.docs-back{margin-left:9px}
@@ -16,7 +16,7 @@
 .docs-visual{margin:30px 0 40px;background:var(--panel);border:1px solid var(--docs-outline-border,var(--border));border-radius:6px;overflow:hidden}.docs-visual figcaption{padding:16px 22px;border-top:1px solid var(--docs-outline-border,var(--border));color:var(--muted);font-size:12px;line-height:1.75}
 .docs-workflow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));list-style:none;margin:0;padding:26px 20px;gap:16px}.docs-workflow li{position:relative;display:flex;flex-direction:column;gap:10px;padding:0 8px}.docs-workflow svg{color:var(--teal);margin-bottom:6px}.docs-workflow strong{font-size:13px}.docs-workflow span{color:var(--muted);font-size:12px;line-height:1.6}.docs-workflow li:not(:last-child)::after{content:'›';position:absolute;right:-12px;top:0;color:var(--muted)}
 .docs-steps{padding-left:22px;color:var(--muted)}.docs-steps li{margin:12px 0;padding-left:6px}.docs-next{display:inline-block;margin-top:8px;font-size:12px}.docs-pair{display:grid;grid-template-columns:1fr 1fr;gap:32px}
-.docs-note{margin:30px 0;padding:18px 22px;background:color-mix(in srgb,var(--teal) 5%,var(--canvas));border-left:2px solid var(--accent)}.docs-note p{margin:6px 0 0;color:var(--muted)}.docs-note>strong{font-size:13px}
+.docs-note{margin:30px 0;padding:18px 22px;background:color-mix(in srgb,var(--teal) 5%,var(--canvas));border-left:2px solid var(--docs-outline-accent,var(--accent))}.docs-note p{margin:6px 0 0;color:var(--muted)}.docs-note>strong{font-size:13px}
 .docs-footer{margin-top:48px;padding-top:24px;border-top:1px solid var(--docs-outline-border,var(--border));display:flex;flex-wrap:wrap;justify-content:space-between;gap:20px;font-size:12px}
 .docs-table-wrap{overflow-x:auto;border:1px solid var(--docs-outline-border,var(--border));border-radius:4px}.docs-content table{width:100%;border-collapse:collapse;text-align:left;font-size:12px;line-height:1.7}.docs-content th,.docs-content td{padding:14px 16px;vertical-align:top;border-bottom:1px solid var(--docs-outline-border,var(--border))}.docs-content th{color:var(--ink);font-weight:500;background:var(--panel)}.docs-content td{color:var(--muted)}.docs-content tr:last-child td{border-bottom:0}
 .docs-code-key{display:flex;flex-wrap:wrap;padding:24px;gap:8px}.docs-code-key div{flex:1 1 110px;min-width:0;padding:12px;border-bottom:2px solid var(--docs-outline-accent,var(--accent))}.docs-code-key code{display:block;color:var(--teal);font-size:21px;margin-bottom:12px}.docs-code-key span{display:block;color:var(--muted);font-size:11px;line-height:1.7}
@@ -35,7 +35,7 @@
 .docs-content h1,.docs-content h2{font-family:'Instrument Serif','Noto Serif',Georgia,serif;font-weight:400;letter-spacing:-.025em}
 .docs-content h1{font-size:32px;line-height:1.12}.docs-content h2{font-size:23px}
 .docs-diagram-hint{color:var(--muted);font-size:12px;margin:0 0 14px}
-.docs-reference-canvas{overflow:auto;max-width:100%;border:1px solid #343a3d;border-radius:6px;background:#101213;scrollbar-width:thin;box-shadow:3px 5px 0 #0003}
+.docs-reference-canvas{overflow:auto;max-width:100%;border:1px solid var(--docs-outline-border);border-radius:6px;background:#101213;scrollbar-width:thin;box-shadow:3px 5px 0 #0003}
 .docs-reference-canvas:focus-visible{outline:2px solid var(--teal);outline-offset:4px}
 .docs-reference-canvas>svg{display:block;width:100%;min-width:960px;height:auto;--font-sans:Geist,system-ui,sans-serif;--font-mono:'Geist Mono',ui-monospace,monospace}
 .docs-reference-notes{margin-top:28px;color:var(--muted)}.docs-reference-notes p{max-width:78ch}
