@@ -63,3 +63,13 @@ The first deployed pass was too text-heavy. Replace the text-first reading exper
 ## Verification and boundaries
 
 The owner approved real HTTP access/cache checks and browser navigation/content checks as the test seams. Verify anonymous, collaborator-only, forged, expired and valid owner sessions on operations HTML, SvelteKit data and canonical runbook routes. Check the production client output for private operational text. Verify content against current code and inspect the docs in the native browser at desktop and phone/landscape sizes. Documentation does not alter media, metadata, production behavior or the portfolio. Do not close implementation tickets until the deployed documentation is verified.
+
+
+## Cohesion first slice, October 26
+
+V1S-368 remains open for visual review. The approved first slice keeps every docs page in the shared navigation, including the established .html reference URLs, and removes legacy diagram motion and playback controls. Preserve the metadata diagram's SVG geometry and entity treatments. One new everyday workflow diagram sets the direction: layered charcoal, header bands, fine borders, subtle offset shadows, dotted canvas, restrained teal, serif headings and routed connectors. Use Eraser's architecture examples for grouping discipline without a new dependency. Other diagrams keep their current treatment until review.
+
+The owner requested compact spacing like the app: smaller navigation rows and less vertical padding above/below content and inside diagram cards. Phone navigation links retain 44px touch targets; the owner explicitly requested a shorter 28px Sections button and a compact 43px header. The workflow has a separate vertical phone composition; detailed reference diagrams keep a keyboard-scrollable canvas. Fonts use existing/local stacks with serif fallbacks; no external font dependency is added. Application, API and private operations behavior remain unchanged.
+
+
+During local review, the owner extended this slice to the overview's sharing diagram and upload strip: replace the ambiguous sharing heading with plain audience wording, align the sharing options with the workflow's surfaces and typography, remove misaligned decorative icons, reduce empty canvas space, and use long connecting arrows in the upload sequence. Other guide diagrams remain deferred. Shared diagram CSS keeps both overview maps consistent.

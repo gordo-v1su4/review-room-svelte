@@ -3,6 +3,8 @@
   import { resolve } from '$app/paths';
   import { ArrowLeft, BookOpen, LockKeyhole } from 'lucide-svelte';
   import './docs.css';
+  import '$lib/docs/reference-diagrams.css';
+  import '$lib/docs/diagram.css';
   let { children } = $props();
   let menuOpen = $state(false);
   const groups = [

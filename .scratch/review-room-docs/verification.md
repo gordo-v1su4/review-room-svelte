@@ -30,3 +30,17 @@ Completed V1S-362 and V1S-363–367. Live: https://review.v1su4.dev/docs.
 - Live overview screenshot: evidence/visual-overview-live-20261024.png. Phone screenshot: evidence/visual-naming-live-phone-20261024.png.
 
 No media, schema, metadata writes, rating/sorting or publication behavior was changed. Existing unrelated checkout changes were preserved and excluded from the release.
+
+
+## Cohesion preview, October 26 (V1S-368)
+
+Local preview only at http://127.0.0.1:5178/docs. No production deployment or visual acceptance is claimed; V1S-368 and parent V1S-362 stay open.
+
+- Established media-flow.html and metadata-model.html now render as SvelteKit pages inside the shared docs layout. Complete repository-owned SVGs and notes are retained. Motion CSS, scripts, playback controls and stale playback instructions were removed from the canonical source documents; no external fonts were added.
+- A new workflow composition establishes the metadata-inspired style. During browser review, the owner requested compact spacing and a 28px Sections button (header approximately 43px), then explicitly requested the same treatment for the sharing map and longer upload-strip arrows. These two overview maps now share one scoped stylesheet. The sharing heading explains audience choice in plain language.
+- HTTP regression was observed failing before route migration and passing after: both .html routes expose the same desktop/mobile navigation and active link, contain the static diagrams, and unknown diagrams return 404. Owner access/cache checks remain passing.
+- Full suite: 285 passed, zero failed, 1,574 assertions across 52 files. Svelte check: zero errors and eight pre-existing warnings outside docs. Production build passes. Svelte autofixer reports no issues in the new workflow/sharing maps or modified overview/layout. The reference page's raw-HTML warnings are intentional for two hardcoded repository documents only; it has no user-controlled HTML source. The scroll-region tabindex exception is intentional for keyboard panning.
+- In-app browser: desktop, 393x852 phone and 844x390 landscape checked. Both legacy diagrams remain reachable through Sections; selecting them closes the menu. Phone document width 383px fits 393px viewport. Keyboard ArrowRight pans the metadata canvas (scrollLeft 40). Both visible overview maps have all node text within card bounds. Reference canvases intentionally retain detail width and scroll internally.
+- Local evidence: evidence/cohesion-desktop-20261026.png, evidence/cohesion-phone-20261026.png, evidence/cohesion-sharing-desktop-20261026.png, evidence/cohesion-sharing-phone-20261026.png. Tests/build logs are local evidence/cohesion-tests.log and cohesion-build.log. Physical-phone testing is not claimed.
+
+Application/media behavior, canonical API references and private owner content remain unchanged. Unrelated package, generated Convex and global CSS changes are excluded from this slice.
