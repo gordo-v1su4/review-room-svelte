@@ -88,3 +88,7 @@ Mobile acceptance explicitly reaffirmed: guide diagrams must fit narrow phones w
 Robert requested a clean empty folder icon and one sharp vector library across the guide maps, replacing the paper-filled FolderArtwork choice above. Use Lucide consistently for folders, media and other symbols. Take badges use slightly larger centered labels and a separate status slot. Reduce excess right and bottom card space while keeping comfortable text size and connector lanes. Replace plain numbered screenshot dots with matching semantic vector markers. UI screenshots must be captured at double resolution and displayed within their logical capture width.
 
 The owner explicitly extended the visual scope to Publish & share download checkboxes: dark unchecked surfaces with teal outlines, teal checked fill and a crisp checkmark. Keep the label beside each checkbox and retain a 44px touch label. No permission or form behavior changes are authorized by this appearance change.
+
+## Interactive review screenshot, October 26
+
+The owner requested a wider capture with the full asset title and a specific version selected, markers beside controls instead of overlapping them, and rollover previews containing the same explanation as the captions plus an enlarged icon and actual control detail. Preserve black surface depth; do not outline the screenshot, annotation markers or preview cards with borders. Keep keyboard focus indication. On narrow layouts, move annotation controls into a touch-friendly row. The owner reviewed the new desktop treatment and responded "Much nicer."
