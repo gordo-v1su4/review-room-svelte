@@ -6,9 +6,11 @@
     { id: 'decision', title: 'The decision', Icon: BadgeCheck, copy: 'Shortlist, stars, Request changes and Approve are independent controls.', images: [{ src: 'review-rating-detail-20261026-2x.png', width: 400, height: 88, alt: 'Shortlist and five-star rating controls.' }, { src: 'review-approval-detail-20261026-2x.png', width: 456, height: 88, alt: 'Request changes and Approve controls.' }] },
     { id: 'context', title: 'The context', Icon: MessageSquareText, copy: 'Notes holds feedback; Fields holds version metadata.', images: [{ src: 'review-context-detail-20261026-2x.png', width: 592, height: 524, alt: 'Notes and Fields tabs above the note composer.' }] }
   ];
-  let active = $state<string | null>(null);
+  let hovered = $state<string | null>(null);
+  let focused = $state<string | null>(null);
   let pinned = $state<string | null>(null);
-  function close() { active = null; pinned = null; }
+  const active = $derived(hovered ?? focused ?? pinned);
+  function close() { hovered = null; focused = null; pinned = null; }
 </script>
 
 <svelte:window onclick={(event) => { if (event.target instanceof Element && !event.target.closest('.review-hotspot')) close(); }} onkeydown={(event) => { if (event.key === 'Escape') close(); }} />
@@ -18,12 +20,12 @@
     <img class="review-image" src="/docs/images/review-expanded-20261026-2x.png" width="2128" height="1240" alt="Expanded owner review showing the full title VID_20261005_00023, V1 selected, rating and decision controls below, and Notes and Fields on the right." />
     {#each places as place (place.id)}
       <div class={`review-hotspot hotspot-${place.id}`} role="presentation"
-        onpointerenter={(event) => { if (event.pointerType === 'mouse') active = place.id; }}
-        onpointerleave={() => { if (pinned !== place.id) active = null; }}
-        onfocusin={() => { active = place.id; }}
-        onfocusout={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) close(); }}>
+        onpointerenter={(event) => { if (event.pointerType === 'mouse') hovered = place.id; }}
+        onpointerleave={() => { if (hovered === place.id) hovered = null; }}
+        onfocusin={() => { focused = place.id; }}
+        onfocusout={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null) && focused === place.id) focused = null; }}>
         <button type="button" class="review-marker" aria-label={`Explore ${place.title.toLowerCase()}`} aria-expanded={active === place.id} aria-controls={`review-preview-${place.id}`}
-          onclick={() => { pinned = pinned === place.id ? null : place.id; active = pinned; }}>
+          onclick={() => { if (pinned === place.id) close(); else pinned = place.id; }}>
           <place.Icon size={19} strokeWidth={1.5} aria-hidden="true" />
           <span class="mobile-label">{place.title}</span>
         </button>
