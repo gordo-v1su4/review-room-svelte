@@ -73,3 +73,10 @@ The owner requested compact spacing like the app: smaller navigation rows and le
 
 
 During local review, the owner extended this slice to the overview's sharing diagram and upload strip: replace the ambiguous sharing heading with plain audience wording, align the sharing options with the workflow's surfaces and typography, remove misaligned decorative icons, reduce empty canvas space, and use long connecting arrows in the upload sequence. Other guide diagrams remain deferred. Shared diagram CSS keeps both overview maps consistent.
+
+
+## October 26 feedback revision: Media Flow is the scale reference
+
+Robert rejected the remaining oversized guide diagrams and decorative media-play overlays, including the organization folder diagram and Agents/API maps. Match Media Flow's compact typography, card density, fine connectors and generous routing lanes across all guide diagrams. Use the app's existing FolderArtwork for folder symbols rather than large outlined folder containers. Keep diagram names, metadata and version relationships intact. Bound canvases at their authored width so wide screens do not inflate their text/icons. Use a separate compact phone arrangement. The existing Media Flow and metadata SVGs remain the reference and retain their content/geometry.
+
+Documentation instructions are ordinary visible sections, replacing the earlier expandable-detail decision. Keep the organization visual ahead of its full derivation table. Preserve the compact Sections navigation control. Eraser's Automated Data Analytics example was inspected visually for grouping/connector discipline; no dependency or subscription is added.

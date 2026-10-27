@@ -44,3 +44,18 @@ Local preview only at http://127.0.0.1:5178/docs. No production deployment or vi
 - Local evidence: evidence/cohesion-desktop-20261026.png, evidence/cohesion-phone-20261026.png, evidence/cohesion-sharing-desktop-20261026.png, evidence/cohesion-sharing-phone-20261026.png. Tests/build logs are local evidence/cohesion-tests.log and cohesion-build.log. Physical-phone testing is not claimed.
 
 Application/media behavior, canonical API references and private owner content remain unchanged. Unrelated package, generated Convex and global CSS changes are excluded from this slice.
+
+
+## Media Flow scale revision, October 26
+
+User feedback supersedes the first-slice design: the guide maps were too large, decorative play overlays were confusing and misaligned, and useful instructions should be visible rather than collapsed.
+
+- All six guide diagram kinds now use one compact renderer. The separate workflow/sharing renderers and their broad SVG stylesheet were removed. Cards use Media Flow's neutral surfaces, 12px titles, 9px mono details, fine borders and arrows; canvases are bounded at 960px rather than growing to fill wide pages. Phone compositions remain separate. No decorative play-button overlays or large outline folder containers remain.
+- Folder symbols reuse the existing application FolderArtwork component. Titles, icons, detail text and take badges have distinct aligned positions. API handoffs have two grouped lanes; system-map connectors retain access, job, readiness and derivative relationships without crossing nodes. Existing Media Flow/metadata SVGs were not changed.
+- Converted docs disclosures to ordinary visible sections, including owner-loaded operations prose. The naming hierarchy precedes its longer derivation table. Reduced guide headings and code-key scale; table code identities do not break mid-code.
+- Visually inspected Eraser's Automated Data Analytics example in the native browser for grouping and connector discipline. Reference: https://www.eraser.io/examples/automated-data-analytics. No dependency or subscription added.
+- Full tests: 285 passed, zero failed, 1,574 assertions. Svelte check: zero errors, eight existing warnings outside docs. Autofixer: no issues in renderer and all changed guide pages. Production build passes.
+- In-app checks: API upload/system diagrams, naming/folder hierarchy, separate 393x852 phone compositions and 1920x1080 wide layout. Phone page width is 383px inside 393px viewport. Wide canvas is capped at 960px with 12px title styles. API/system node labels fit within cards. Instructions are visible, with zero details elements in the guide. Original compact 28px Sections control is retained. Default viewport restored after inspection.
+- Evidence: evidence/media-style-agents-phone-20261026.png, media-style-hierarchy-phone-20261026.png, media-style-agents-desktop-20261026.png and media-style-hierarchy-desktop-20261026.png. Logs: media-style-tests.log, media-style-check.log, media-style-build.log.
+
+Local preview only. Visual review and production deployment/verification remain outstanding; V1S-368 and V1S-362 remain open. Unrelated checkout changes remain excluded.

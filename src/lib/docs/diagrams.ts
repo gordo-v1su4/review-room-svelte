@@ -1,118 +1,159 @@
 export type DiagramKind = 'workflow' | 'hierarchy' | 'review' | 'sharing' | 'upload' | 'architecture';
 export type DiagramNode = {
   id: string; x: number; y: number; w: number; h: number;
-  label: string; detail: string; icon: 'folder' | 'film' | 'check' | 'notes' | 'link' | 'lock' | 'send' | 'code' | 'store' | 'server';
-  shape?: 'folder' | 'media' | 'store'; accent?: boolean; takes?: boolean;
+  label: string; detail: string;
+  icon: 'folder' | 'film' | 'check' | 'notes' | 'link' | 'lock' | 'send' | 'code' | 'store' | 'server';
+  accent?: boolean; takes?: boolean;
 };
-type Graph = { width: number; height: number; nodes: DiagramNode[]; paths: string[]; labels?: { x: number; y: number; text: string }[] };
+type Graph = { width: number; height: number; nodes: DiagramNode[]; paths: string[]; labels?: { x: number; y: number; text: string }[]; zones?: { x: number; y: number; w: number; h: number; label: string }[] };
 type Diagram = { title: string; description: string; wide: Graph; narrow: Graph };
-const node = (id: string, x: number, y: number, w: number, h: number, label: string, detail: string, icon: DiagramNode['icon'], extra: Partial<DiagramNode> = {}): DiagramNode => ({ id, x, y, w, h, label, detail, icon, ...extra });
 
 export const diagrams: Record<DiagramKind, Diagram> = {
-  workflow: {
-    title: 'The everyday review flow',
-    description: 'Choose a project and folder, upload media, wait for Ready, review and choose a take, then deliberately share it. Revisions stay with the same asset.',
-    wide: { width: 832, height: 416, nodes: [
-      node('place',24,40,200,120,'Project & folder','Choose the destination','folder',{shape:'folder'}),
-      node('upload',288,40,224,120,'Upload media','Video or still image','film',{shape:'media'}),
-      node('ready',576,40,232,120,'Ready for review','Upload + processing finished','check',{accent:true}),
-      node('review',480,256,328,120,'Review & choose a take','Notes, rating, shortlist and decision','notes',{shape:'media'}),
-      node('share',24,256,328,120,'Share deliberately','Private review or explicit publication','link'),
-    ], paths: ['M224 100H288','M512 100H576','M692 160V248','M480 316H360'] },
-    narrow: { width:320,height:816,nodes: [
-      node('place',24,24,272,112,'Project & folder','Choose the destination','folder',{shape:'folder'}),
-      node('upload',24,184,272,112,'Upload media','Video or still image','film',{shape:'media'}),
-      node('ready',24,344,272,112,'Ready for review','Upload + processing finished','check',{accent:true}),
-      node('review',24,504,272,112,'Review & choose a take','Notes, rating and decision','notes',{shape:'media'}),
-      node('share',24,664,272,112,'Share deliberately','Private link or publish','link'),
-    ],paths:['M160 136V176','M160 296V336','M160 456V496','M160 616V656'] },
-  },
   hierarchy: {
-    title:'A project contains folders; an asset contains takes',
-    description:'Blood Rush is the project. EP101 is an episode folder containing the Parking Lot scene folder. Shot 0020 is one asset with v001, v002 and v003 stored as versions. References are a separate project folder.',
-    wide:{width:832,height:432,nodes:[
-      node('project',24,32,216,104,'Blood Rush','Project · BLR','folder',{shape:'folder'}),
-      node('episode',304,32,232,104,'The Late Shift','Episode folder · EP101','folder',{shape:'folder'}),
-      node('scene',600,32,208,104,'Parking Lot','Scene folder · 010 PRL','folder',{shape:'folder'}),
-      node('references',24,256,216,120,'_References','Supporting images','folder',{shape:'folder'}),
-      node('asset',400,232,408,160,'BLR_EP101_PRL_0020','One asset · shot 20','film',{shape:'media',accent:true,takes:true}),
-    ],paths:['M240 84H296','M536 84H592','M704 136V176Q704 184 696 184H612Q604 184 604 192V224','M132 136V248']},
-    narrow:{width:320,height:824,nodes:[
-      node('project',24,24,272,104,'Blood Rush','Project · BLR','folder',{shape:'folder'}),
-      node('episode',24,184,272,104,'The Late Shift','Episode folder · EP101','folder',{shape:'folder'}),
-      node('scene',24,344,272,104,'Parking Lot','Scene folder · 010 PRL','folder',{shape:'folder'}),
-      node('asset',24,504,272,152,'BLR_EP101_PRL_0020','One asset · shot 20','film',{shape:'media',accent:true,takes:true}),
-      node('references',24,712,272,88,'_References','Separate supporting images','folder',{shape:'folder'}),
-    ],paths:['M160 128V176','M160 288V336','M160 448V496','M24 76H16Q8 76 8 84V748Q8 756 16 756H24']},
+    title: "A project contains folders; an asset contains takes",
+    description: "Blood Rush is the project. EP101 is an episode folder containing the Parking Lot scene folder. Shot 0020 is one asset with v001, v002 and v003 stored as versions. References are a separate project folder.",
+    wide: { width: 960, height: 332,
+      nodes: [
+        {"id":"project","x":32,"y":32,"w":240,"h":88,"label":"Blood Rush","detail":"Project · BLR","icon":"folder"},
+        {"id":"episode","x":360,"y":32,"w":240,"h":88,"label":"The Late Shift","detail":"Episode folder · EP101","icon":"folder"},
+        {"id":"scene","x":688,"y":32,"w":240,"h":88,"label":"Parking Lot","detail":"Scene folder · 010 PRL","icon":"folder"},
+        {"id":"references","x":32,"y":212,"w":240,"h":88,"label":"_References","detail":"Separate supporting images","icon":"folder"},
+        {"id":"asset","x":520,"y":196,"w":408,"h":108,"label":"BLR_EP101_PRL_0020","detail":"One asset · shot 20","icon":"film","accent":true,"takes":true}
+      ],
+      paths: ["M272 76H352","M600 76H680","M808 120V152Q808 160 800 160H732Q724 160 724 168V188","M152 120V204"]
+    },
+    narrow: { width: 360, height: 744,
+      nodes: [
+        {"id":"project","x":48,"y":24,"w":280,"h":88,"label":"Blood Rush","detail":"Project · BLR","icon":"folder"},
+        {"id":"episode","x":48,"y":160,"w":280,"h":88,"label":"The Late Shift","detail":"Episode folder · EP101","icon":"folder"},
+        {"id":"scene","x":48,"y":296,"w":280,"h":88,"label":"Parking Lot","detail":"Scene folder · 010 PRL","icon":"folder"},
+        {"id":"asset","x":48,"y":432,"w":280,"h":108,"label":"BLR_EP101_PRL_0020","detail":"One asset · shot 20","icon":"film","accent":true,"takes":true},
+        {"id":"references","x":48,"y":624,"w":280,"h":88,"label":"_References","detail":"Separate supporting images","icon":"folder"}
+      ],
+      paths: ["M188 112V152","M188 248V288","M188 384V424","M48 68H20Q12 68 12 76V660Q12 668 20 668H40"]
+    }
   },
-  review:{
-    title:'One asset, shared feedback, separate take metadata',
-    description:'Notes, rating and shortlist belong to the asset. Each take has its own prompt, model and references. v003 is the current pick; choosing it preserves v001 and v002.',
-    wide:{width:832,height:400,nodes:[
-      node('asset',24,24,280,112,'The asset','Stable shot / review identity','film',{shape:'media'}),
-      node('feedback',496,24,312,112,'Shared feedback','Notes · rating · shortlist','notes'),
-      node('v1',24,248,224,112,'v001','Its prompt, model & references','film',{shape:'media'}),
-      node('v2',312,248,224,112,'v002','Its prompt, model & references','film',{shape:'media'}),
-      node('v3',600,248,208,112,'v003 · current pick','Its own creative metadata','check',{shape:'media',accent:true}),
-    ],paths:['M304 80H488','M96 136V184Q96 192 104 192H128Q136 192 136 200V240','M164 136V208Q164 216 172 216H416Q424 216 424 224V240','M232 136V160Q232 168 240 168H696Q704 168 704 176V240']},
-    narrow:{width:320,height:544,nodes:[
-      node('asset',24,24,272,112,'The asset','Stable shot / review identity','film',{shape:'media'}),
-      node('feedback',24,192,272,104,'Shared feedback','Notes · rating · shortlist','notes'),
-      node('versions',24,368,272,152,'Stored takes','Each has its own creative metadata','film',{shape:'media',accent:true,takes:true}),
-    ],paths:['M160 136V184','M24 80H16Q8 80 8 88V436Q8 444 16 444H24']},
+  review: {
+    title: "One asset, shared feedback, separate take metadata",
+    description: "Notes, rating and shortlist belong to the asset. Each take has its own prompt, model and references. v003 is the current pick; choosing it preserves v001 and v002.",
+    wide: { width: 960, height: 320,
+      nodes: [
+        {"id":"asset","x":32,"y":32,"w":256,"h":88,"label":"The asset","detail":"Stable shot / review identity","icon":"film"},
+        {"id":"feedback","x":624,"y":32,"w":304,"h":88,"label":"Shared feedback","detail":"Notes · rating · shortlist","icon":"notes"},
+        {"id":"v1","x":32,"y":216,"w":256,"h":80,"label":"v001","detail":"Its prompt, model & references","icon":"film"},
+        {"id":"v2","x":352,"y":216,"w":256,"h":80,"label":"v002","detail":"Its prompt, model & references","icon":"film"},
+        {"id":"v3","x":672,"y":216,"w":256,"h":80,"label":"v003 · current pick","detail":"Its own creative metadata","icon":"check","accent":true}
+      ],
+      paths: ["M288 76H616","M96 120V180Q96 188 104 188H152Q160 188 160 196V208","M160 120V164Q160 172 168 172H472Q480 172 480 180V208","M224 120V148Q224 156 232 156H792Q800 156 800 164V208"]
+    },
+    narrow: { width: 360, height: 432,
+      nodes: [
+        {"id":"asset","x":48,"y":24,"w":280,"h":88,"label":"The asset","detail":"Stable shot / review identity","icon":"film"},
+        {"id":"feedback","x":48,"y":160,"w":280,"h":88,"label":"Shared feedback","detail":"Notes · rating · shortlist","icon":"notes"},
+        {"id":"versions","x":48,"y":296,"w":280,"h":108,"label":"Stored takes","detail":"Each has its own creative metadata","icon":"film","accent":true,"takes":true}
+      ],
+      paths: ["M188 112V152","M48 68H20Q12 68 12 76V342Q12 350 20 350H40"]
+    }
   },
-  sharing:{
-    title:'Three ways to share, three different permissions',
-    description:'A private review link invites feedback on a project. Trailer Feed publication requires explicit ready-version consent. Video embeds require an approved ready version and allowed site origins.',
-    wide:{width:832,height:384,nodes:[
-      node('source',24,136,232,112,'Your media','Stays in Review Room','film',{shape:'media',accent:true}),
-      node('private',440,24,368,88,'Private review link','Invite people to watch and comment','lock'),
-      node('trailer',440,152,368,88,'Trailer Feed','Publish exact ready versions explicitly','send'),
-      node('embed',440,280,368,88,'Video embed / showcase','Approved take + allowed site origins','code'),
-    ],paths:['M256 160H320Q328 160 328 152V76Q328 68 336 68H432','M256 192H432','M256 224H312Q320 224 320 232V316Q320 324 328 324H432']},
-    narrow:{width:320,height:616,nodes:[
-      node('source',48,24,248,112,'Your media','Stays in Review Room','film',{shape:'media',accent:true}),
-      node('private',48,216,248,104,'Private review link','Watch, comment and decide','lock'),
-      node('trailer',48,352,248,104,'Trailer Feed','Explicit ready-version consent','send'),
-      node('embed',48,488,248,104,'Video embed / showcase','Approved take + allowed sites','code'),
-    ],paths:['M48 108H32Q24 108 24 116V260Q24 268 32 268H40','M48 80H24Q16 80 16 88V396Q16 404 24 404H40','M48 52H16Q8 52 8 60V532Q8 540 16 540H40']},
+  upload: {
+    title: "The upload handoffs",
+    description: "Resolve catalog IDs, prepare the original and JPEG preview, begin one upload session, transfer to storage, complete that same session and wait for readiness. Reuse keys and sessions on retries.",
+    wide: { width: 960, height: 368,
+      nodes: [
+        {"id":"ids","x":32,"y":64,"w":248,"h":88,"label":"Resolve IDs","detail":"Project, folder and scope","icon":"folder"},
+        {"id":"prepare","x":356,"y":64,"w":248,"h":88,"label":"Prepare the files","detail":"Original + JPEG + SHA-256","icon":"film"},
+        {"id":"begin","x":680,"y":64,"w":248,"h":88,"label":"Begin session","detail":"Record idempotency key","icon":"code"},
+        {"id":"put","x":680,"y":248,"w":248,"h":88,"label":"Transfer bytes","detail":"Use the signed storage URLs","icon":"store"},
+        {"id":"complete","x":356,"y":248,"w":248,"h":88,"label":"Complete session","detail":"Reuse the same session ID","icon":"check"},
+        {"id":"ready","x":32,"y":248,"w":248,"h":88,"label":"Ready to review","detail":"After processing succeeds","icon":"check","accent":true}
+      ],
+      paths: ["M280 108H348","M604 108H672","M804 152V240","M680 292H612","M356 292H288"],
+      zones: [{"x":16,"y":16,"w":928,"h":152,"label":"01 / PREPARE · AUTHORIZE"},{"x":16,"y":200,"w":928,"h":152,"label":"02 / TRANSFER · COMPLETE · WAIT"}]
+    },
+    narrow: { width: 360, height: 832,
+      nodes: [
+        {"id":"ids","x":32,"y":32,"w":296,"h":88,"label":"Resolve IDs","detail":"Project, folder and scope","icon":"folder"},
+        {"id":"prepare","x":32,"y":168,"w":296,"h":88,"label":"Prepare the files","detail":"Original + JPEG + SHA-256","icon":"film"},
+        {"id":"begin","x":32,"y":304,"w":296,"h":88,"label":"Begin session","detail":"Record idempotency key","icon":"code"},
+        {"id":"put","x":32,"y":440,"w":296,"h":88,"label":"Transfer bytes","detail":"Use the signed storage URLs","icon":"store"},
+        {"id":"complete","x":32,"y":576,"w":296,"h":88,"label":"Complete session","detail":"Reuse the same session ID","icon":"check"},
+        {"id":"ready","x":32,"y":712,"w":296,"h":88,"label":"Ready to review","detail":"After processing succeeds","icon":"check","accent":true}
+      ],
+      paths: ["M180 120V160","M180 256V296","M180 392V432","M180 528V568","M180 664V704"]
+    }
   },
-  upload:{
-    title:'The upload handoffs',
-    description:'Resolve catalog IDs, prepare the original and JPEG preview, begin one upload session, transfer to storage, complete that same session and wait for readiness. Reuse keys and sessions on retries.',
-    wide:{width:832,height:416,nodes:[
-      node('ids',24,32,216,112,'Resolve IDs','Project, folder and scope','folder',{shape:'folder'}),
-      node('prepare',304,32,224,112,'Prepare the files','Original + JPEG + SHA-256','film',{shape:'media'}),
-      node('begin',592,32,216,112,'Begin session','Record idempotency key','code'),
-      node('put',592,264,216,112,'Transfer bytes','Use the signed storage URLs','store',{shape:'store'}),
-      node('complete',304,264,224,112,'Complete session','Reuse the same session ID','check'),
-      node('ready',24,264,216,112,'Ready to review','After processing succeeds','check',{accent:true}),
-    ],paths:['M240 88H296','M528 88H584','M700 144V256','M592 320H536','M304 320H248']},
-    narrow:{width:320,height:984,nodes:[
-      node('ids',24,24,272,104,'Resolve IDs','Project, folder and scope','folder',{shape:'folder'}),
-      node('prepare',24,184,272,104,'Prepare the files','Original + JPEG + SHA-256','film',{shape:'media'}),
-      node('begin',24,344,272,104,'Begin session','Record idempotency key','code'),
-      node('put',24,504,272,104,'Transfer bytes','Signed storage URLs','store',{shape:'store'}),
-      node('complete',24,664,272,104,'Complete session','Reuse the same session ID','check'),
-      node('ready',24,824,272,112,'Ready to review','After processing succeeds','check',{accent:true}),
-    ],paths:['M160 128V176','M160 288V336','M160 448V496','M160 608V656','M160 768V816']},
+  architecture: {
+    title: "Where the work happens",
+    description: "Control and processing map: SvelteKit authorizes requests, Convex owns catalog records, and RustFS owns bytes. Workers store derivatives in RustFS and report readiness to Convex. The separate upload map shows direct signed byte transfers from the uploader to storage.",
+    wide: { width: 960, height: 496,
+      nodes: [
+        {"id":"browser","x":32,"y":32,"w":216,"h":80,"label":"Browser","detail":"Review & upload","icon":"film"},
+        {"id":"app","x":356,"y":32,"w":248,"h":80,"label":"SvelteKit","detail":"Authorize each request","icon":"server","accent":true},
+        {"id":"catalog","x":32,"y":208,"w":248,"h":88,"label":"Convex","detail":"Identity & review state","icon":"store"},
+        {"id":"storage","x":680,"y":208,"w":248,"h":88,"label":"RustFS","detail":"Originals & previews","icon":"store"},
+        {"id":"worker","x":356,"y":384,"w":248,"h":88,"label":"Trigger / FFmpeg","detail":"Prepare derivatives","icon":"server"}
+      ],
+      paths: ["M248 72H348","M400 112V160Q400 168 392 168H164Q156 168 156 176V200","M560 112V160Q560 168 568 168H796Q804 168 804 176V200","M480 112V376","M356 428H320Q312 428 312 420V336Q312 328 304 328H164Q156 328 156 320V304","M604 428H632Q640 428 640 420V336Q640 328 648 328H796Q804 328 804 320V304"],
+      labels: [{"x":280,"y":148,"text":"Read / write"},{"x":680,"y":148,"text":"Authorize"},{"x":520,"y":248,"text":"Video job"},{"x":232,"y":352,"text":"Readiness"},{"x":728,"y":352,"text":"Derivatives"}]
+    },
+    narrow: { width: 360, height: 648,
+      nodes: [
+        {"id":"browser","x":48,"y":24,"w":280,"h":80,"label":"Browser","detail":"Review & upload","icon":"film"},
+        {"id":"app","x":48,"y":152,"w":280,"h":88,"label":"SvelteKit","detail":"Authorize each request","icon":"server","accent":true},
+        {"id":"catalog","x":48,"y":312,"w":128,"h":80,"label":"Convex","detail":"Catalog records","icon":"store"},
+        {"id":"storage","x":200,"y":312,"w":128,"h":80,"label":"RustFS","detail":"Media bytes","icon":"store"},
+        {"id":"worker","x":48,"y":536,"w":280,"h":88,"label":"Trigger / FFmpeg","detail":"Prepare derivatives","icon":"server"}
+      ],
+      paths: ["M188 104V144","M112 240V304","M264 240V304","M48 196H20Q12 196 12 204V572Q12 580 20 580H40","M112 536V400","M264 536V400"],
+      labels: [{"x":112,"y":280,"text":"Read / write"},{"x":264,"y":280,"text":"Authorize"},{"x":112,"y":476,"text":"Readiness"},{"x":264,"y":476,"text":"Derivatives"}]
+    }
   },
-  architecture:{
-    title:'Where the work happens',
-    description:'Control and processing map: SvelteKit authorizes requests, Convex owns catalog records, and RustFS owns bytes. Workers store derivatives in RustFS and report readiness to Convex. The separate upload map shows direct signed byte transfers from the uploader to storage.',
-    wide:{width:832,height:576,nodes:[
-      node('browser',24,24,176,104,'Browser','Review & upload','film',{shape:'media'}),
-      node('app',288,24,216,104,'SvelteKit','Authorize each request','server',{accent:true}),
-      node('catalog',24,248,216,112,'Convex','Identity & review state','store',{shape:'store'}),
-      node('storage',584,248,224,112,'RustFS','Originals & previews','store',{shape:'store'}),
-      node('worker',288,440,232,112,'Trigger / FFmpeg','Prepare derivatives','server'),
-    ],paths:['M200 76H280','M344 128V184Q344 192 336 192H140Q132 192 132 200V240','M448 128V184Q448 192 456 192H688Q696 192 696 200V240','M396 128V432','M288 496H272Q264 496 264 488V400Q264 392 256 392H140Q132 392 132 384V368','M520 496H544Q552 496 552 488V400Q552 392 560 392H688Q696 392 696 384V368'],labels:[{x:228,y:176,text:'Read / write'},{x:592,y:176,text:'Authorize'},{x:440,y:320,text:'Video job'},{x:184,y:416,text:'Readiness'},{x:648,y:416,text:'Derivatives'}]},
-    narrow:{width:320,height:704,nodes:[
-      node('browser',24,24,272,88,'Browser','Review & upload','film',{shape:'media'}),
-      node('app',24,176,272,104,'SvelteKit','Authorize each request','server',{accent:true}),
-      node('catalog',24,384,128,112,'Convex','Catalog records','store',{shape:'store'}),
-      node('storage',168,384,128,112,'RustFS','Media bytes','store',{shape:'store'}),
-      node('worker',24,584,272,104,'Trigger / FFmpeg','Prepare derivatives','server'),
-    ],paths:['M160 112V168','M88 280V376','M232 280V376','M24 228H16Q8 228 8 236V620Q8 628 16 628H24','M232 584V504','M88 584V504'],labels:[{x:88,y:328,text:'Read / write'},{x:232,y:328,text:'Authorize'},{x:88,y:548,text:'Readiness'},{x:232,y:548,text:'Derivatives'}]},
+  workflow: {
+    title: "The everyday review flow",
+    description: "Choose a project and folder, upload media, wait for Ready, review and choose a take, then deliberately share it. Revisions stay with the same asset.",
+    wide: { width: 960, height: 368,
+      nodes: [
+        {"id":"place","x":32,"y":64,"w":248,"h":88,"label":"Project & folder","detail":"Choose the destination","icon":"folder"},
+        {"id":"upload","x":356,"y":64,"w":248,"h":88,"label":"Upload media","detail":"Video, image or reference sheet","icon":"film"},
+        {"id":"ready","x":680,"y":64,"w":248,"h":88,"label":"Ready for review","detail":"Transfer and processing finished","icon":"check","accent":true},
+        {"id":"review","x":568,"y":248,"w":360,"h":88,"label":"Review & choose a take","detail":"Asset feedback · exact take metadata","icon":"notes"},
+        {"id":"share","x":32,"y":248,"w":360,"h":88,"label":"Share deliberately","detail":"Private review or explicit publication","icon":"link"}
+      ],
+      paths: ["M280 108H348","M604 108H672","M804 152V240","M568 292H400","M600 248V192Q600 184 592 184H488Q480 184 480 176V160"],
+      labels: [{"x":536,"y":204,"text":"New version"}],
+      zones: [{"x":16,"y":16,"w":928,"h":152,"label":"01 / DESTINATION · UPLOAD · READINESS"},{"x":16,"y":200,"w":928,"h":152,"label":"02 / REVIEW · CHOOSE · SHARE"}]
+    },
+    narrow: { width: 360, height: 696,
+      nodes: [
+        {"id":"place","x":32,"y":32,"w":296,"h":88,"label":"Project & folder","detail":"Choose the destination","icon":"folder"},
+        {"id":"upload","x":32,"y":168,"w":296,"h":88,"label":"Upload media","detail":"Video, image or reference sheet","icon":"film"},
+        {"id":"ready","x":32,"y":304,"w":296,"h":88,"label":"Ready for review","detail":"Transfer and processing finished","icon":"check","accent":true},
+        {"id":"review","x":32,"y":440,"w":296,"h":88,"label":"Review & choose a take","detail":"Asset feedback · exact take metadata","icon":"notes"},
+        {"id":"share","x":32,"y":576,"w":296,"h":88,"label":"Share deliberately","detail":"Private review or explicit publication","icon":"link"}
+      ],
+      paths: ["M180 120V160","M180 256V296","M180 392V432","M180 528V568"]
+    }
   },
+  sharing: {
+    title: "Three ways to share, three different permissions",
+    description: "A private review link invites feedback on a project. Trailer Feed publication requires explicit ready-version consent. Video embeds require an approved ready version and allowed site origins.",
+    wide: { width: 960, height: 320,
+      nodes: [
+        {"id":"source","x":320,"y":24,"w":320,"h":88,"label":"Media in Review Room","detail":"Originals and takes stay private","icon":"film","accent":true},
+        {"id":"private","x":32,"y":200,"w":248,"h":88,"label":"Private review link","detail":"Invite people to watch and comment","icon":"lock"},
+        {"id":"trailer","x":356,"y":200,"w":248,"h":88,"label":"Trailer Feed","detail":"Explicit ready-version publication","icon":"send"},
+        {"id":"embed","x":680,"y":200,"w":248,"h":88,"label":"Embed / showcase","detail":"Approved take + allowed site origins","icon":"code"}
+      ],
+      paths: ["M400 112V152Q400 160 392 160H164Q156 160 156 168V192","M480 112V192","M560 112V152Q560 160 568 160H796Q804 160 804 168V192"]
+    },
+    narrow: { width: 360, height: 584,
+      nodes: [
+        {"id":"source","x":48,"y":24,"w":280,"h":88,"label":"Media in Review Room","detail":"Originals and takes stay private","icon":"film","accent":true},
+        {"id":"private","x":48,"y":192,"w":280,"h":88,"label":"Private review link","detail":"Invite people to watch and comment","icon":"lock"},
+        {"id":"trailer","x":48,"y":328,"w":280,"h":88,"label":"Trailer Feed","detail":"Explicit ready-version publication","icon":"send"},
+        {"id":"embed","x":48,"y":464,"w":280,"h":88,"label":"Embed / showcase","detail":"Approved take + allowed site origins","icon":"code"}
+      ],
+      paths: ["M48 88H44Q36 88 36 96V228Q36 236 44 236H48","M48 68H32Q24 68 24 76V364Q24 372 32 372H40","M48 48H20Q12 48 12 56V500Q12 508 20 508H40"]
+    }
+  }
 };
