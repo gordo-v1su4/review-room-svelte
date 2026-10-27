@@ -63,3 +63,36 @@ The first deployed pass was too text-heavy. Replace the text-first reading exper
 ## Verification and boundaries
 
 The owner approved real HTTP access/cache checks and browser navigation/content checks as the test seams. Verify anonymous, collaborator-only, forged, expired and valid owner sessions on operations HTML, SvelteKit data and canonical runbook routes. Check the production client output for private operational text. Verify content against current code and inspect the docs in the native browser at desktop and phone/landscape sizes. Documentation does not alter media, metadata, production behavior or the portfolio. Do not close implementation tickets until the deployed documentation is verified.
+
+
+## Cohesion first slice, October 26
+
+V1S-368 remains open for visual review. The approved first slice keeps every docs page in the shared navigation, including the established .html reference URLs, and removes legacy diagram motion and playback controls. Preserve the metadata diagram's SVG geometry and entity treatments. One new everyday workflow diagram sets the direction: layered charcoal, header bands, fine borders, subtle offset shadows, dotted canvas, restrained teal, serif headings and routed connectors. Use Eraser's architecture examples for grouping discipline without a new dependency. Other diagrams keep their current treatment until review.
+
+The owner requested compact spacing like the app: smaller navigation rows and less vertical padding above/below content and inside diagram cards. Phone navigation links retain 44px touch targets; the owner explicitly requested a shorter 28px Sections button and a compact 43px header. The workflow has a separate vertical phone composition; detailed reference diagrams keep a keyboard-scrollable canvas. Fonts use existing/local stacks with serif fallbacks; no external font dependency is added. Application, API and private operations behavior remain unchanged.
+
+
+During local review, the owner extended this slice to the overview's sharing diagram and upload strip: replace the ambiguous sharing heading with plain audience wording, align the sharing options with the workflow's surfaces and typography, remove misaligned decorative icons, reduce empty canvas space, and use long connecting arrows in the upload sequence. Other guide diagrams remain deferred. Shared diagram CSS keeps both overview maps consistent.
+
+
+## October 26 feedback revision: Media Flow is the scale reference
+
+Robert rejected the remaining oversized guide diagrams and decorative media-play overlays, including the organization folder diagram and Agents/API maps. Match Media Flow's compact typography, card density, fine connectors and generous routing lanes across all guide diagrams. Use the app's existing FolderArtwork for folder symbols rather than large outlined folder containers. Keep diagram names, metadata and version relationships intact. Bound canvases at their authored width so wide screens do not inflate their text/icons. Use a separate compact phone arrangement. The existing Media Flow and metadata SVGs remain the reference and retain their content/geometry.
+
+Documentation instructions are ordinary visible sections, replacing the earlier expandable-detail decision. Keep the organization visual ahead of its full derivation table. Preserve the compact Sections navigation control. Eraser's Automated Data Analytics example was inspected visually for grouping/connector discipline; no dependency or subscription is added.
+
+Mobile acceptance explicitly reaffirmed: guide diagrams must fit narrow phones with readable typography, separate vertical layouts, usable navigation and no page-level horizontal overflow. Detailed reference canvases and tables may scroll within their own containers.
+
+## October 26 refinement: clean icons and balanced spacing
+
+Robert requested a clean empty folder icon and one sharp vector library across the guide maps, replacing the paper-filled FolderArtwork choice above. Use Lucide consistently for folders, media and other symbols. Take badges use slightly larger centered labels and a separate status slot. Reduce excess right and bottom card space while keeping comfortable text size and connector lanes. Replace plain numbered screenshot dots with matching semantic vector markers. UI screenshots must be captured at double resolution and displayed within their logical capture width.
+
+The owner explicitly extended the visual scope to Publish & share download checkboxes: dark unchecked surfaces with teal outlines, teal checked fill and a crisp checkmark. Keep the label beside each checkbox and retain a 44px touch label. No permission or form behavior changes are authorized by this appearance change.
+
+## Interactive review screenshot, October 26
+
+The owner requested a wider capture with the full asset title and a specific version selected, markers beside controls instead of overlapping them, and rollover previews containing the same explanation as the captions plus an enlarged icon and actual control detail. Preserve black surface depth; do not outline the screenshot, annotation markers or preview cards with borders. Keep keyboard focus indication. On narrow layouts, move annotation controls into a touch-friendly row. The owner reviewed the new desktop treatment and responded "Much nicer."
+
+October 27 outline convention: retain outlines at 25% opacity across the organization page, including gray and teal card strokes, take badges, containers and separators. Text, icons, connectors and fills remain crisp. This page-specific choice supersedes the earlier full-strength diagram outline treatment here.
+
+October 27 default: the owner extended 25% outline opacity to all documentation. Define it once at the docs shell; guide diagrams, reference diagrams, containers, separators and compact controls inherit it. Preserve borderless screenshot/tooltips and full-opacity icons, text, connectors and keyboard focus indicators.

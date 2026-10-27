@@ -71,3 +71,22 @@ test('public guides and both established diagram URLs remain readable without ow
     expect(await response.text()).not.toContain('/opt/review-room');
   }
 }, 30000);
+
+
+test('established diagram pages keep navigation and a complete static diagram', async () => {
+  for (const [path, title] of [
+    ['/docs/media-flow.html', 'Review Room media flow'],
+    ['/docs/metadata-model.html', 'Review Room core metadata relationships'],
+  ]) {
+    const response = await get(path);
+    const body = await response.text();
+    expect(response.status).toBe(200);
+    expect(body).toContain('aria-label="Documentation sections"');
+    expect(body).toContain('aria-controls="docs-navigation"');
+    expect(body).toMatch(new RegExp('href="[^"]*' + path.slice(1).replaceAll('.', '\\.') + '"[^>]*aria-current="page"'));
+    expect(body).toContain(title);
+    expect(body).not.toContain('data-motion-controls');
+    expect(body).not.toContain('data-motion-root');
+  }
+  expect((await get('/docs/unknown.html')).status).toBe(404);
+}, 30000);
