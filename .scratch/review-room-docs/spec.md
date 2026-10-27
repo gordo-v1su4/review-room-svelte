@@ -82,3 +82,9 @@ Robert rejected the remaining oversized guide diagrams and decorative media-play
 Documentation instructions are ordinary visible sections, replacing the earlier expandable-detail decision. Keep the organization visual ahead of its full derivation table. Preserve the compact Sections navigation control. Eraser's Automated Data Analytics example was inspected visually for grouping/connector discipline; no dependency or subscription is added.
 
 Mobile acceptance explicitly reaffirmed: guide diagrams must fit narrow phones with readable typography, separate vertical layouts, usable navigation and no page-level horizontal overflow. Detailed reference canvases and tables may scroll within their own containers.
+
+## October 26 refinement: clean icons and balanced spacing
+
+Robert requested a clean empty folder icon and one sharp vector library across the guide maps, replacing the paper-filled FolderArtwork choice above. Use Lucide consistently for folders, media and other symbols. Take badges use slightly larger centered labels and a separate status slot. Reduce excess right and bottom card space while keeping comfortable text size and connector lanes. Replace plain numbered screenshot dots with matching semantic vector markers. UI screenshots must be captured at double resolution and displayed within their logical capture width.
+
+The owner explicitly extended the visual scope to Publish & share download checkboxes: dark unchecked surfaces with teal outlines, teal checked fill and a crisp checkmark. Keep the label beside each checkbox and retain a 44px touch label. No permission or form behavior changes are authorized by this appearance change.
