@@ -22,7 +22,7 @@
       <div class={`review-hotspot hotspot-${place.id}`} role="presentation"
         onpointerenter={(event) => { if (event.pointerType === 'mouse') hovered = place.id; }}
         onpointerleave={() => { if (hovered === place.id) hovered = null; }}
-        onfocusin={() => { focused = place.id; }}
+        onfocusin={() => { hovered = null; focused = place.id; }}
         onfocusout={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null) && focused === place.id) focused = null; }}>
         <button type="button" class="review-marker" aria-label={`Explore ${place.title.toLowerCase()}`} aria-expanded={active === place.id} aria-controls={`review-preview-${place.id}`}
           onclick={() => { if (pinned === place.id) close(); else pinned = place.id; }}>
