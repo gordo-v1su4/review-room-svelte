@@ -59,3 +59,8 @@ User feedback supersedes the first-slice design: the guide maps were too large, 
 - Evidence: evidence/media-style-agents-phone-20261026.png, media-style-hierarchy-phone-20261026.png, media-style-agents-desktop-20261026.png and media-style-hierarchy-desktop-20261026.png. Logs: media-style-tests.log, media-style-check.log, media-style-build.log.
 
 Local preview only. Visual review and production deployment/verification remain outstanding; V1S-368 and V1S-362 remain open. Unrelated checkout changes remain excluded.
+
+### Responsive follow-up
+
+The owner explicitly required mobile-friendly responsive behavior. Narrow diagrams now use 320px authored compositions with larger phone-only title/detail text; 320px screens get tighter page gutters and smaller headings. Verified every public docs route at 320x740: document width 310px, no clipped guide-node labels. Rechecked folder/system maps at 393x852 (383px document width) and 844x390 landscape (834px document width), with no clipped node labels. Sections opens and closes after selecting Agents & API. Detailed reference canvases and tables scroll inside their wrappers. Screenshot: evidence/media-style-agents-320-20261026.png. Default viewport restored.
+Final responsive sweep: all six public docs pages checked at all three widths (320, 393, 844), 18 route/viewport checks total; no page overflow and no clipped guide labels. Machine-readable evidence: evidence/media-style-responsive-20261026.json. Final type check and production build pass after phone refinements.

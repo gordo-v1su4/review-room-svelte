@@ -63,6 +63,6 @@
   .map-name{fill:#e8eceb;font-size:12px;font-weight:600}.map-detail{fill:#a9b1b3;font:9px 'Geist Mono',ui-monospace,monospace}
   .map-takes rect{fill:#222527;stroke:#596266;stroke-width:.8}.map-takes text{fill:#a9b1b3;font:9px 'Geist Mono',ui-monospace,monospace}.map-takes rect.chosen{fill:#29433c;stroke:#7dd9c8}.map-takes text.chosen-text{fill:#7dd9c8}
   figcaption{padding:12px 16px;border-top:1px solid #343a3d;font-size:12px;line-height:1.75;color:#a9b1b3}
-  @media(max-width:1100px){.map-wide{display:none}.map-narrow{display:block}.map-canvas{width:min(100%,var(--map-width));max-width:var(--map-width)}}
+  @media(max-width:1100px){.map-narrow .map-name{font-size:13px}.map-narrow .map-detail{font-size:11px}.map-wide{display:none}.map-narrow{display:block}.map-canvas{width:min(100%,var(--map-width));max-width:var(--map-width)}}
   @media print{.map-canvas{max-width:100%}.map-scroll{overflow:visible}}
 </style>

@@ -46,3 +46,5 @@
 .docs-content .docs-guide-index a{padding:16px 0}.docs-content .docs-guide-index a>svg:first-child{width:24px;height:24px}.docs-content .docs-code-key{padding:16px}.docs-content .docs-code-key code{font-size:17px;margin-bottom:8px}
 
 .docs-table-wrap code{white-space:nowrap;overflow-wrap:normal}
+
+@media(max-width:360px){.docs-content{padding:24px 16px}.docs-content h1{font-size:28px}.docs-content h2{font-size:21px}}
