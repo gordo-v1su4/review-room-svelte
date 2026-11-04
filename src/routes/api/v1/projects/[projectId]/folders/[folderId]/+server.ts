@@ -10,14 +10,18 @@ export const PATCH: RequestHandler = async (event) => {
     const body = await event.request.json();
     if (body?.title !== undefined && typeof body.title !== 'string') return json({ error: 'Folder title must be a string' }, { status: 400 });
     if (body?.parentFolderId !== undefined && body.parentFolderId !== null && (typeof body.parentFolderId !== 'string' || !body.parentFolderId.trim())) return json({ error: 'Parent folder ID must be a nonempty string or null' }, { status: 400 });
-    if (body?.title === undefined && body?.parentFolderId === undefined) return json({ error: 'Folder title must be provided, or a parent folder to move into' }, { status: 400 });
+    if (body?.ownerApp !== undefined && body.ownerApp !== 'creative-studio-pro') return json({ error: 'Unsupported folder owner app' }, { status: 400 });
+    if (body?.ownerApp !== undefined && (body.title !== undefined || body.parentFolderId !== undefined)) return json({ error: 'Folder adoption must be a separate request' }, { status: 400 });
+    if (body?.title === undefined && body?.parentFolderId === undefined && body?.ownerApp === undefined) return json({ error: 'Folder title, parent folder, or owner app must be provided' }, { status: 400 });
     // Unchanged body shape for rename-only calls keeps existing idempotency digests stable.
     const auth = automationRequest(event, { projectId: event.params.projectId, folderId: event.params.folderId,
-      ...(body.title !== undefined ? { title: body.title } : {}), ...(body.parentFolderId !== undefined ? { parentFolderId: body.parentFolderId } : {}) });
+      ...(body.title !== undefined ? { title: body.title } : {}), ...(body.parentFolderId !== undefined ? { parentFolderId: body.parentFolderId } : {}),
+      ...(body.ownerApp !== undefined ? { ownerApp: body.ownerApp } : {}) });
     const folderId = await db().mutation(internal.automation.editFolder,
       { ...auth, projectId: event.params.projectId as Id<'projects'>, folderId: event.params.folderId as Id<'projectFolders'>,
         ...(body.title !== undefined ? { title: body.title as string } : {}),
-        ...(body.parentFolderId !== undefined ? { parentFolderId: body.parentFolderId as Id<'projectFolders'> | null } : {}) });
+        ...(body.parentFolderId !== undefined ? { parentFolderId: body.parentFolderId as Id<'projectFolders'> | null } : {}),
+        ...(body.ownerApp !== undefined ? { ownerApp: body.ownerApp as 'creative-studio-pro' } : {}) });
     return json({ folderId }, { headers: { 'cache-control': 'no-store' } });
   } catch (cause) { return automationError(cause); }
 };

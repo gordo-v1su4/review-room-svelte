@@ -37,6 +37,8 @@ Issue Creative Studio Pro one credential per series, restricted to that Review R
 
 A folder created with `{"title":"EP101 — The Late Shift","ownerApp":"creative-studio-pro"}` is **locked** and owned by the credential that created it. The catalog reports `locked`, `ownerApp` and `ownedByCaller` for every folder.
 
+To connect an existing empty folder, the Creative Studio Pro credential sends `PATCH /api/v1/projects/{projectId}/folders/{folderId}` with `{"ownerApp":"creative-studio-pro"}` and an `Idempotency-Key`. This adopts the folder in place, preserving its ID, title and parent. Send `ownerApp` alone. A folder with assets, subfolders, an active upload, or a Trailer Feed connection returns `409`; a folder owned by another credential returns `403`. Repeating the same request is safe.
+
 - Only the owning credential may rename, move or delete a locked folder, or create subfolders inside it. Anyone else — Review Room users in the workspace and every other credential — gets `403` with a message naming the folder and its owner app. Moving an ordinary folder that contains someone else's locked folder is refused the same way.
 - `DELETE /api/v1/projects/{projectId}/folders/{folderId}?assets=move_to_root|archive_assets` (with `Idempotency-Key`) deletes a locked folder the caller owns. Automation never deletes ordinary folders (`403`). Remove subfolders first (`409`).
 - Adding media inside a locked folder is allowed for everyone who can upload to the project.

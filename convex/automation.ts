@@ -188,14 +188,34 @@ export const createFolder = internalMutation({
 
 export const editFolder = internalMutation({
   args: { ...request, projectId: v.id('projects'), folderId: v.id('projectFolders'), title: v.optional(v.string()),
-    parentFolderId: v.optional(v.union(v.id('projectFolders'), v.null())) },
+    parentFolderId: v.optional(v.union(v.id('projectFolders'), v.null())), ownerApp: v.optional(v.literal('creative-studio-pro')) },
   handler: async (ctx, args) => {
     const folder = await ctx.db.get(args.folderId);
     if (!folder || folder.projectId !== args.projectId) throw new Error('Folder unavailable');
     const credential = await authorize(ctx, args.keyDigest, 'folders:write', folder.projectId);
-    if (args.title === undefined && args.parentFolderId === undefined) throw new Error('Folder title must be provided, or a parent folder to move into');
+    if (args.title === undefined && args.parentFolderId === undefined && args.ownerApp === undefined) throw new Error('Folder title, parent folder, or owner app must be provided');
+    if (args.ownerApp !== undefined && (args.title !== undefined || args.parentFolderId !== undefined)) throw new Error('Folder adoption must be a separate request');
     const actor = { credentialId: credential._id };
     return await idempotent(ctx, credential, args, 'folders:edit', async () => {
+      if (args.ownerApp !== undefined) {
+        const project = await ctx.db.get(folder.projectId);
+        if (!project || project.createdBy !== credential.createdBy || project.archived) throw new Error('Project unavailable');
+        if (folder.ownerApp !== undefined) {
+          if (folder.ownerApp !== args.ownerApp || folder.ownerCredentialId !== credential._id) throw new Error('Folder is locked');
+          return args.folderId;
+        }
+        const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', args.projectId)).collect();
+        const asset = await ctx.db.query('videos').withIndex('by_project_folder', q => q.eq('projectId', args.projectId).eq('folderId', args.folderId)).first();
+        const uploads = await ctx.db.query('uploadSessions').withIndex('by_project', q => q.eq('projectId', args.projectId)).collect();
+        const imports = await ctx.db.query('sourceImports').withIndex('by_project', q => q.eq('projectId', args.projectId)).collect();
+        const connections = await ctx.db.query('destinationConnections').withIndex('by_project', q => q.eq('projectId', args.projectId)).collect();
+        if (folders.some(item => item.parentFolderId === args.folderId) || asset ||
+          uploads.some(item => item.folderId === args.folderId && (item.status === 'pending' || item.status === 'finalizing')) ||
+          imports.some(item => item.folderId === args.folderId) ||
+          connections.some(item => item.folderId === args.folderId && !item.replacedByConnectionId)) throw new Error('Folder must be empty and disconnected before adoption');
+        await ctx.db.patch(args.folderId, { ownerApp: args.ownerApp, ownerCredentialId: credential._id, updatedAt: Date.now() });
+        return args.folderId;
+      }
       if (args.parentFolderId !== undefined) await movePersonalFolder(ctx, credential.createdBy, args.folderId, args.parentFolderId ?? undefined, actor);
       if (args.title !== undefined) await renamePersonalFolder(ctx, credential.createdBy, args.folderId, args.title, actor);
       return args.folderId;
