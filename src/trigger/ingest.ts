@@ -3,13 +3,14 @@ import { ConvexHttpClient } from 'convex/browser';
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server';
 import { internal } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { retryStorage } from './storageRetry';
 import { getObjectMetadata } from './storageMetadata';
+import { GPU_WORKER_URL, requestGpuDerivatives } from './gpuWorker';
 
 type JobId = Id<'mediaJobs'>;
 type Probe = { durationSec: number; width: number; height: number };
@@ -116,24 +117,11 @@ const makeDerivatives = task({
     const base = version.originalKey.slice(0, version.originalKey.lastIndexOf('/'));
     const thumbnailKey = `${base}/versions/${version._id}/thumbnail.jpg`;
     const spriteKey = `${base}/versions/${version._id}/sprite.jpg`;
-    const client = storage();
-    // Scoped credentials can return an opaque 403 for absent derivatives; regenerate safely on retries.
-    return await withOriginal(version.originalKey, version.sizeBytes, async (input, s3) => {
-      const dir = input.slice(0, input.lastIndexOf('/'));
-      const thumbnail = join(dir, 'thumbnail.jpg');
-      const sprite = join(dir, 'sprite.jpg');
-      const ffmpeg = process.env.FFMPEG_PATH ?? 'ffmpeg';
-      await runCommand(ffmpeg, ['-nostdin', '-y', '-threads', '2', '-ss', String(Math.min(1, probe.durationSec / 2)),
-        '-i', input, '-frames:v', '1', '-q:v', '3', thumbnail]);
-      await runCommand(ffmpeg, ['-nostdin', '-y', '-threads', '2', '-i', input,
-        '-vf', `fps=${Math.max(0.1, 10 / probe.durationSec)},scale=320:-1,tile=10x1`, '-frames:v', '1', sprite]);
-      for (const [key, path] of [[thumbnailKey, thumbnail], [spriteKey, sprite]]) {
-        const body = await readFile(path);
-        if (body.byteLength < 1) throw new Error('Empty derivative');
-        await retryStorage((signal) => s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: 'image/jpeg' }), { abortSignal: signal }));
-      }
-      return { thumbnailKey, spriteKey };
+    await requestGpuDerivatives({ originalKey: version.originalKey, thumbnailKey, spriteKey,
+      durationSec: probe.durationSec, sizeBytes: version.sizeBytes }, {
+      url: GPU_WORKER_URL, secret: required('REVIEW_ROOM_GPU_WORKER_SECRET'),
     });
+    return { thumbnailKey, spriteKey };
   },
 });
 
