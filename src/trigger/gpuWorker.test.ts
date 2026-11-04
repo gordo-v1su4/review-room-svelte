@@ -12,10 +12,10 @@ const request = {
 test('sends one authenticated derivative job to the serial GPU worker', async () => {
   let calls = 0;
   await requestGpuDerivatives(request, {
-    url: 'https://app-vm.tail7fdbe2.ts.net:18098/derivatives', secret: 'test-secret',
+    url: 'https://review.v1su4.dev/internal-gpu/derivatives', secret: 'test-secret',
     fetcher: async (url, init) => {
       calls++;
-      expect(url).toBe('https://app-vm.tail7fdbe2.ts.net:18098/derivatives');
+      expect(url).toBe('https://review.v1su4.dev/internal-gpu/derivatives');
       expect(init?.method).toBe('POST');
       expect(new Headers(init.headers).get('authorization')).toBe('Bearer test-secret');
       expect(Number(new Headers(init.headers).get('x-review-room-deadline'))).toBeGreaterThan(Date.now());
@@ -29,7 +29,7 @@ test('sends one authenticated derivative job to the serial GPU worker', async ()
 
 test('GPU worker failures end the derivative stage without CPU fallback', async () => {
   await expect(requestGpuDerivatives(request, {
-    url: 'https://app-vm.tail7fdbe2.ts.net:18098/derivatives', secret: 'test-secret',
+    url: 'https://review.v1su4.dev/internal-gpu/derivatives', secret: 'test-secret',
     fetcher: async () => new Response('GPU unavailable', { status: 503 }),
   })).rejects.toThrow('GPU worker returned 503');
 });
