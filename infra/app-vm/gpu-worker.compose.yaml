@@ -1,0 +1,29 @@
+services:
+  review-room-svelte-gpu-worker:
+    build:
+      context: ./repo
+      dockerfile: services/gpu-derivative-worker/Dockerfile
+    container_name: review-room-svelte-gpu-worker
+    labels:
+      dockhand.update: "false"
+    env_file:
+      - .env
+    ports:
+      - "192.168.8.222:18098:8787"
+    restart: unless-stopped
+    cpus: "1.0"
+    gpus: all
+    devices:
+      - /dev/nvidia0:/dev/nvidia0
+      - /dev/nvidiactl:/dev/nvidiactl
+      - /dev/nvidia-uvm:/dev/nvidia-uvm
+      - /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools
+      - /dev/nvidia-modeset:/dev/nvidia-modeset
+    volumes:
+      - /var/lock/stack-structure-gpu:/gpu-lock
+    healthcheck:
+      test: ["CMD", "bun", "-e", "const r = await fetch('http://127.0.0.1:8787/health'); process.exit(r.ok ? 0 : 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
