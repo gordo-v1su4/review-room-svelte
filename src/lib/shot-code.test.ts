@@ -3,9 +3,10 @@ import { codeFromFilename, compareCodes, formatVersion, parseProductionCode } fr
 
 test('shot and deliverable codes parse into their parts', () => {
   expect(parseProductionCode('BLR_EP101_PAR_0020')).toEqual({ kind: 'shot', code: 'BLR_EP101_PAR_0020', show: 'BLR', season: 1, episode: 1, scene: 'PAR', shot: 20 });
+  expect(parseProductionCode('blr_tr100_sht_0010')).toEqual({ kind: 'shot', code: 'BLR_TR100_SHT_0010', show: 'BLR', trailer: 100, scene: 'SHT', shot: 10 });
   expect(parseProductionCode('blr_ep101_epc')).toEqual({ kind: 'deliverable', code: 'BLR_EP101_EPC', show: 'BLR', season: 1, episode: 1, deliverable: 'EPC' });
   expect(parseProductionCode('BLR_S1_TRL01')).toEqual({ kind: 'deliverable', code: 'BLR_S1_TRL01', show: 'BLR', season: 1, deliverable: 'TRL', index: 1 });
-  for (const bad of ['', 'VID_20261017_00001', 'BLR_EP101_PAR_20', 'BLR_EP101_PAR_0020_v003', 'BLR_EP1_PAR_0020', 'BLR_S1_XYZ']) expect(parseProductionCode(bad)).toBeNull();
+  for (const bad of ['', 'VID_20261017_00001', 'BLR_EP101_PAR_20', 'BLR_EP101_PAR_0020_v003', 'BLR_EP1_PAR_0020', 'BLR_TR10_SHT_0010', 'BLR_TR100_SHT_010', 'BLR_S1_XYZ']) expect(parseProductionCode(bad)).toBeNull();
 });
 
 test('reference codes (character, location, prop) parse; a malformed one does not', () => {
@@ -18,6 +19,7 @@ test('reference codes (character, location, prop) parse; a malformed one does no
 
 test('filenames yield the code and ignore extension case; their own version is reported separately', () => {
   expect(codeFromFilename('blr_ep101_par_0020_v004.mov')).toEqual({ code: parseProductionCode('BLR_EP101_PAR_0020')!, version: 4 });
+  expect(codeFromFilename('blr_tr100_sht_0010_v002.mov')).toEqual({ code: parseProductionCode('BLR_TR100_SHT_0010')!, version: 2 });
   expect(codeFromFilename('BLR_EP101_PAR_0020.mp4')?.version).toBeUndefined();
   expect(codeFromFilename('BLR_S1_TRL01_v003.mp4')?.code.code).toBe('BLR_S1_TRL01');
   expect(codeFromFilename('render final.mp4')).toBeNull();

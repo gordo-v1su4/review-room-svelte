@@ -18,6 +18,15 @@ test('uploading by code into the same folder adds the next take to the existing 
   expect((await f.t.run(ctx => ctx.db.get(first.assetId)))?.currentVersionId).toBe(versions.find(version => version.version === 2)!._id);
 });
 
+test('trailer shot codes pass upload validation and address later takes', async () => {
+  const f = await seriesFixture();
+  const first = await automationUpload(f, { folderId: f.scene, assetCode: 'BLR_TR100_SHT_0010' });
+  expect((await f.t.run(ctx => ctx.db.get(first.assetId)))?.assetCode).toBe('BLR_TR100_SHT_0010');
+  const second = await automationUpload(f, { folderId: f.scene, assetCode: 'blr_tr100_sht_0010' });
+  expect(second.assetId).toBe(first.assetId);
+  expect((await versionsOf(f, first.assetId)).map(version => version.version).sort()).toEqual([1, 2]);
+});
+
 test('a take can be added without changing the pick, and the pick can be set by the API', async () => {
   const f = await seriesFixture();
   const { assetId } = await automationUpload(f, { folderId: f.scene, assetCode: 'BLR_EP101_PAR_0030' });
