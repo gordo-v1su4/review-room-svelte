@@ -20,6 +20,7 @@ Project/folder creation, folder edit/delete and begin-upload require an `Idempot
 Begin-upload accepts `assetCode` to name a new asset by its shot or deliverable code instead of the generated `VID_YYYYMMDD_nnnnn`:
 
 - Shot `BLR_EP101_PAR_0020`: show · episode (`EP101` = season 1, episode 01) · scene · shot (steps of 10).
+- Trailer shot `BLR_TR100_SHT_0010`: show · trailer (`TR` followed by three digits) · scene · shot (four digits). Uploading another take with the same code in the same folder adds a version.
 - Deliverable `BLR_EP101_EPC` or `BLR_S1_TRL01`: kinds `EPC` episode cut, `TSR` teaser, `TRL` trailer, with an optional two-digit index; `S1` is season level.
 - Codes are case-insensitive, stored upper-case and unique within the project (`409` if taken). Never send the take suffix `_v003`; Review Room numbers versions and shows them as `v003`.
 
