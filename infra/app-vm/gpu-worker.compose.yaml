@@ -1,13 +1,14 @@
 services:
   review-room-svelte-gpu-worker:
     build:
-      context: ./repo
+      context: ../..
       dockerfile: services/gpu-derivative-worker/Dockerfile
     container_name: review-room-svelte-gpu-worker
     labels:
       dockhand.update: "false"
     env_file:
-      - .env
+      - path: /opt/review-room-svelte-gpu-worker/private.env
+        format: raw
     ports:
       - "192.168.8.222:18098:8787"
     restart: unless-stopped
