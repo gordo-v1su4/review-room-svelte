@@ -5,7 +5,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { owner } from './personal';
 import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, movePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
 import { disposeFolder } from './lib/folderTree';
-import { changesSince, setCurrentAssetVersion } from './lib/seriesAssets';
+import { changesSince, setCurrentAssetVersion, setVersionExclusion } from './lib/seriesAssets';
 import { parseVersionMetadata, writeVersionMetadata } from './lib/versionMetadata';
 
 const actions = ['projects:create', 'projects:edit', 'folders:write', 'media:upload', 'media:read'] as const;
@@ -259,6 +259,36 @@ export const setCurrentVersion = internalMutation({
     const credential = await authorize(ctx, args.keyDigest, 'media:upload', asset.projectId);
     return await idempotent(ctx, credential, args, 'media:current-version',
       () => setCurrentAssetVersion(ctx, credential.createdBy, args.assetId, args.versionId));
+  },
+});
+
+const reviewStatus = v.union(v.literal('awaiting_review'), v.literal('in_progress'), v.literal('needs_changes'), v.literal('approved'));
+
+export const setAssetReviewStatus = internalMutation({
+  args: { ...request, assetId: v.id('videos'), status: reviewStatus },
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) throw new Error('Asset unavailable');
+    const credential = await authorize(ctx, args.keyDigest, 'media:upload', asset.projectId);
+    return await idempotent(ctx, credential, args, 'media:review-status', async () => {
+      const current = await ctx.db.get(args.assetId);
+      if (!current) throw new Error('Asset unavailable');
+      if (args.status === 'approved' && (current.processingStatus !== 'ready' || !current.currentVersionId)) throw new Error('Asset is not ready');
+      if (current.status !== args.status) await ctx.db.patch(args.assetId, { status: args.status, updatedAt: Math.max(Date.now(), current.updatedAt + 1) });
+      return { assetId: args.assetId, status: args.status };
+    });
+  },
+});
+
+export const setVersionExcluded = internalMutation({
+  args: { ...request, versionId: v.id('assetVersions'), excluded: v.boolean() },
+  handler: async (ctx, args) => {
+    const version = await ctx.db.get(args.versionId);
+    const asset = version && await ctx.db.get(version.assetId);
+    if (!version || !asset) throw new Error('Version unavailable');
+    const credential = await authorize(ctx, args.keyDigest, 'media:upload', asset.projectId);
+    return await idempotent(ctx, credential, args, 'media:version-exclusion',
+      () => setVersionExclusion(ctx, credential.createdBy, args.versionId, args.excluded));
   },
 });
 

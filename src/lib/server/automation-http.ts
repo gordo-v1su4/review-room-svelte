@@ -36,6 +36,7 @@ export function automationError(cause: unknown) {
     ['Folder adoption must be a separate request', 400],
     ['Folder is locked', 403],
     ['Version not ready', 409],
+    ['Asset is not ready', 409],
     ['Invalid cursor', 400],
     ['Asset code must be', 400],
     ['Asset code already exists', 409],

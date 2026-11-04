@@ -10,7 +10,7 @@ import { internal } from './_generated/api';
 import { getReviewLink, passcodeDigest, randomSecret } from "./lib/reviewAccess";
 import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, movePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
 import { validateFolderParent, disposeFolder } from './lib/folderTree';
-import { setCurrentAssetVersion } from './lib/seriesAssets';
+import { setCurrentAssetVersion, setVersionExclusion } from './lib/seriesAssets';
 import { fileAsTake, moveMisfiled } from './lib/misfiled';
 import { copyAssetsToFolder, sharedStorageKeys } from './lib/assetCopy';
 
@@ -300,6 +300,14 @@ export const setCurrentVersion = internalMutation({
   },
 });
 
+export const setVersionExcluded = internalMutation({
+  args: { versionId: v.id('assetVersions'), excluded: v.boolean() },
+  handler: async (ctx, args) => {
+    const profile = await owner(ctx);
+    return await setVersionExclusion(ctx, profile._id, args.versionId, args.excluded);
+  },
+});
+
 export const copyAssets = internalMutation({
   args: { projectId: v.id('projects'), folderId: v.optional(v.id('projectFolders')), newFolderTitle: v.optional(v.string()),
     sources: v.array(v.object({ assetId: v.id('videos'), versionId: v.optional(v.id('assetVersions')) })) },
@@ -436,7 +444,7 @@ export const versionDetails = internalQuery({
     const job = await ctx.db.query("mediaJobs").withIndex("by_version", q => q.eq("versionId", version._id)).unique();
     return { id: version._id, assetId: asset._id, version: version.version,
       processingState: version.processingState, hasPoster: !!version.posterKey, hasSprite: !!(job?.status === "ready" && job.spriteKey),
-      sizeBytes: version.sizeBytes, mimeType: version.mimeType,
+      sizeBytes: version.sizeBytes, mimeType: version.mimeType, excluded: !!version.excluded,
       metadata: version.creativeMetadata ?? null, metadataUpdatedAt: version.metadataUpdatedAt ?? null };
   },
 });

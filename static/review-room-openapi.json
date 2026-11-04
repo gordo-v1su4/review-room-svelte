@@ -1088,6 +1088,30 @@
         }
       }
     },
+    "/api/v1/assets/{assetId}/review-status": {
+      "put": {
+        "operationId": "setAssetReviewStatus",
+        "summary": "Set one shot asset's review status (media:upload). All its take versions share this status. Approval requires a ready current version.",
+        "parameters": [
+          { "name": "assetId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "pattern": "^[a-zA-Z0-9._:-]{8,128}$" } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["status"], "additionalProperties": false, "properties": { "status": { "type": "string", "enum": ["awaiting_review", "in_progress", "needs_changes", "approved"] } } } } } },
+        "responses": { "200": { "description": "Returns assetId and status; changes feed also reports the new status." }, "400": { "description": "Invalid status or request" }, "401": { "description": "Credential required" }, "403": { "description": "Scope denied" }, "404": { "description": "Asset unavailable" }, "409": { "description": "Approval requires a ready current version or idempotency conflict" } }
+      }
+    },
+    "/api/v1/versions/{versionId}/exclusion": {
+      "put": {
+        "operationId": "setVersionExcluded",
+        "summary": "Exclude or restore one take version without deleting media, changing the asset status, or changing the current version (media:upload).",
+        "parameters": [
+          { "name": "versionId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "pattern": "^[a-zA-Z0-9._:-]{8,128}$" } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["excluded"], "additionalProperties": false, "properties": { "excluded": { "type": "boolean" } } } } } },
+        "responses": { "200": { "description": "Returns versionId, assetId and excluded; changes feed reports versions[].excluded." }, "400": { "description": "Invalid request" }, "401": { "description": "Credential required" }, "403": { "description": "Scope denied" }, "404": { "description": "Version unavailable" }, "409": { "description": "Idempotency conflict" } }
+      }
+    },
     "/api/v1/assets/{assetId}/current-version": {
       "put": {
         "operationId": "setCurrentVersion",
@@ -1212,7 +1236,7 @@
     "/api/v1/projects/{projectId}/changes": {
       "get": {
         "operationId": "listChanges",
-        "summary": "Assets and versions changed after a cursor, for one project or one folder (media:read). Start with since=0 and pass back the returned cursor. Items changed within two seconds of the cursor may repeat: treat the feed as upserts keyed by assetId/versionId. Each asset reports currentVersionId (the pick), misfiled, and copiedFromAssetId for workspace copies made for Trailer Feed (copies keep the code; ignore them when matching shots). removedAssets lists items that no longer exist because a misfiled drop was filed as another shot's take (mergedIntoAssetId). Other deletions are not reported.",
+        "summary": "Assets and versions changed after a cursor, for one project or one folder (media:read). Start with since=0 and pass back the returned cursor. Items changed within two seconds of the cursor may repeat: treat the feed as upserts keyed by assetId/versionId. Each asset reports status, currentVersionId (the pick), misfiled, and copiedFromAssetId for workspace copies made for Trailer Feed (copies keep the code; ignore them when matching shots). Each version reports excluded (false for legacy takes). An exclusion or restore returns that old version again after the stored cursor. removedAssets lists items that no longer exist because a misfiled drop was filed as another shot's take (mergedIntoAssetId). Other deletions are not reported.",
         "parameters": [
           {
             "name": "projectId",
