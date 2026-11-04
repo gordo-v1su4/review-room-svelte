@@ -58,21 +58,23 @@ async function runCommand(command: string, args: string[]) {
   });
 }
 
-async function download(client: S3Client, key: string, path: string) {
-  const bytes = await retryStorage(async () => {
-    const object = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+async function download(client: S3Client, key: string, path: string, sizeBytes: number) {
+  // Originals may be large; allow roughly two seconds per MiB, up to thirty minutes.
+  const timeoutMs = Math.min(1_800_000, 60_000 + Math.ceil(sizeBytes / 1_048_576) * 2_000);
+  const bytes = await retryStorage(async (signal) => {
+    const object = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: signal });
     if (!object.Body) throw new Error('Original object has no body');
     return Buffer.from(await object.Body.transformToByteArray());
-  });
+  }, { timeoutMs });
   await writeFile(path, bytes);
 }
 
-async function withOriginal<T>(key: string, run: (path: string, client: S3Client) => Promise<T>) {
+async function withOriginal<T>(key: string, sizeBytes: number, run: (path: string, client: S3Client) => Promise<T>) {
   const dir = await mkdtemp(join(tmpdir(), 'review-room-ingest-'));
   try {
     const client = storage();
     const path = join(dir, 'original');
-    await download(client, key, path);
+    await download(client, key, path, sizeBytes);
     return await run(path, client);
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -86,10 +88,10 @@ const verifyMedia = task({
   run: async ({ jobId }: { jobId: JobId }): Promise<Probe> => {
     const { version } = await convex().query(internal.mediaJobs.get, { jobId });
     const client = storage();
-    const head = await retryStorage(() => client.send(new HeadObjectCommand({ Bucket: bucket, Key: version.originalKey })));
+    const head = await retryStorage((signal) => client.send(new HeadObjectCommand({ Bucket: bucket, Key: version.originalKey }), { abortSignal: signal }));
     if (head.ContentLength !== version.sizeBytes || head.ContentType !== version.mimeType ||
         (version.etag && head.ETag !== version.etag)) throw new Error('Original object verification failed');
-    return await withOriginal(version.originalKey, async (path) => {
+    return await withOriginal(version.originalKey, version.sizeBytes, async (path) => {
       const raw = await runCommand(process.env.FFPROBE_PATH ?? 'ffprobe', [
         '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height:format=duration', '-of', 'json', path,
       ]);
@@ -115,7 +117,7 @@ const makeDerivatives = task({
     const spriteKey = `${base}/versions/${version._id}/sprite.jpg`;
     const client = storage();
     // Scoped credentials can return an opaque 403 for absent derivatives; regenerate safely on retries.
-    return await withOriginal(version.originalKey, async (input, s3) => {
+    return await withOriginal(version.originalKey, version.sizeBytes, async (input, s3) => {
       const dir = input.slice(0, input.lastIndexOf('/'));
       const thumbnail = join(dir, 'thumbnail.jpg');
       const sprite = join(dir, 'sprite.jpg');
@@ -127,7 +129,7 @@ const makeDerivatives = task({
       for (const [key, path] of [[thumbnailKey, thumbnail], [spriteKey, sprite]]) {
         const body = await readFile(path);
         if (body.byteLength < 1) throw new Error('Empty derivative');
-        await retryStorage(() => s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: 'image/jpeg' })));
+        await retryStorage((signal) => s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: 'image/jpeg' }), { abortSignal: signal }));
       }
       return { thumbnailKey, spriteKey };
     });
@@ -143,7 +145,7 @@ const finalizeMedia = task({
   }) => {
     const client = storage();
     for (const key of [thumbnailKey, spriteKey]) {
-      const head = await retryStorage(() => client.send(new HeadObjectCommand({ Bucket: bucket, Key: key })));
+      const head = await retryStorage((signal) => client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: signal }));
       if (!head.ContentLength) throw new Error('Derivative not durable');
     }
     const applied = await convex().mutation(internal.mediaJobs.complete, {

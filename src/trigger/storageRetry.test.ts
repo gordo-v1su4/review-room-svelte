@@ -25,3 +25,15 @@ test('permanent authorization errors are not retried and opaque errors are bound
   }, { wait: async () => {} })).rejects.toThrow('UnknownError');
   expect(attempts).toBe(5);
 });
+
+test('a hung storage operation is aborted, retried, and bounded', async () => {
+  let attempts = 0;
+  await expect(retryStorage(async (signal) => {
+    attempts++;
+    await new Promise<void>((_, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    });
+    return 'unreachable';
+  }, { wait: async () => {}, timeoutMs: 1 })).rejects.toThrow('Storage operation timed out');
+  expect(attempts).toBe(5);
+});
