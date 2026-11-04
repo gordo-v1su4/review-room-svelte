@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { retryStorage } from './storageRetry';
 import { getObjectMetadata } from './storageMetadata';
-import { requestGpuDerivatives } from './gpuWorker';
+import { GPU_WORKER_URL, requestGpuDerivatives } from './gpuWorker';
 
 type JobId = Id<'mediaJobs'>;
 type Probe = { durationSec: number; width: number; height: number };
@@ -119,7 +119,7 @@ const makeDerivatives = task({
     const spriteKey = `${base}/versions/${version._id}/sprite.jpg`;
     await requestGpuDerivatives({ originalKey: version.originalKey, thumbnailKey, spriteKey,
       durationSec: probe.durationSec, sizeBytes: version.sizeBytes }, {
-      url: 'http://192.168.8.222:18098/derivatives', secret: required('REVIEW_ROOM_GPU_WORKER_SECRET'),
+      url: GPU_WORKER_URL, secret: required('REVIEW_ROOM_GPU_WORKER_SECRET'),
     });
     return { thumbnailKey, spriteKey };
   },

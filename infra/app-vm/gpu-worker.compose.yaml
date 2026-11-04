@@ -10,9 +10,11 @@ services:
       - path: /opt/review-room-svelte-gpu-worker/private.env
         format: raw
     ports:
-      - "192.168.8.222:18098:8787"
+      - "127.0.0.1:18098:8787"
     restart: unless-stopped
     cpus: "1.0"
+    environment:
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
     gpus: all
     devices:
       - /dev/nvidia0:/dev/nvidia0
