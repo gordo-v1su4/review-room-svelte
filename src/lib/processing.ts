@@ -1,6 +1,6 @@
 export type ProcessingJob = {
   _id: string; assetId: string; versionId: string; attempt: number;
-  status: 'queued' | 'running' | 'ready' | 'error'; stage: string;
+  status: 'queued' | 'running' | 'ready' | 'error' | 'cancelled'; stage: string;
   runId?: string; createdAt: number; updatedAt: number;
 };
 export type ProcessingUpdate = {
@@ -51,7 +51,7 @@ export function processingSource(update: ProcessingUpdate) {
   return update.ready ? `/api/owner-media/${update.assetId}?versionId=${encodeURIComponent(update.versionId ?? '')}&attempt=${update.job?.attempt ?? 0}` : '';
 }
 export function processingAvailability(update: ProcessingUpdate): 'queued' | 'running' | 'error' | 'ready' {
-  return update.ready ? 'ready' : update.job?.status === 'error' ? 'error' : update.job?.status === 'running' ? 'running' : 'queued';
+  return update.ready ? 'ready' : update.job?.status === 'error' || update.job?.status === 'cancelled' ? 'error' : update.job?.status === 'running' ? 'running' : 'queued';
 }
 export function processingPoster(update: ProcessingUpdate) {
   return update.ready && update.hasPoster

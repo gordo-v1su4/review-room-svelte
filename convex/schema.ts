@@ -335,7 +335,7 @@ const applicationTables = {
   mediaJobs: defineTable({
     assetId: v.id("videos"),
     versionId: v.id("assetVersions"),
-    status: v.union(v.literal("queued"), v.literal("running"), v.literal("ready"), v.literal("error")),
+    status: v.union(v.literal("queued"), v.literal("running"), v.literal("ready"), v.literal("error"), v.literal("cancelled")),
     stage: v.union(v.literal("verify"), v.literal("derivatives"), v.literal("finalize")),
     attempt: v.number(),
     runId: v.optional(v.string()),
