@@ -34,7 +34,7 @@ export const recordDispatch = internalMutation({
   args: jobArgs,
   handler: async (ctx, { jobId, attempt, runId }) => {
     const job = await ctx.db.get(jobId);
-    if (!job || job.attempt !== attempt || job.status === 'ready') return false;
+    if (!job || job.attempt !== attempt || job.status === 'ready' || job.status === 'cancelled') return false;
     if (job.runId && job.runId !== runId) return false;
     await ctx.db.patch(jobId, { runId, updatedAt: Date.now() });
     return true;
@@ -47,7 +47,7 @@ export const markStage = internalMutation({
     thumbnailKey: v.optional(v.string()), spriteKey: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
-    if (!job || job.attempt !== args.attempt || job.status === 'ready' ||
+    if (!job || job.attempt !== args.attempt || job.status === 'ready' || job.status === 'cancelled' ||
         (job.runId && job.runId !== args.runId)) return false;
     await ctx.db.patch(job._id, {
       status: 'running', stage: args.stage, runId: args.runId, error: undefined,
@@ -100,7 +100,7 @@ export const fail = internalMutation({
   args: { ...jobArgs, error: v.string() },
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
-    if (!job || job.attempt !== args.attempt || job.status === 'ready' ||
+    if (!job || job.attempt !== args.attempt || job.status === 'ready' || job.status === 'cancelled' ||
         (job.runId && job.runId !== args.runId)) return false;
     await ctx.db.patch(job._id, { status: 'error', runId: args.runId,
       error: args.error.slice(0, 500), updatedAt: Date.now() });
@@ -115,11 +115,31 @@ export const fail = internalMutation({
   },
 });
 
+/** Retire an attempt only after its Trigger run has reached a terminal state. */
+export const cancel = internalMutation({
+  args: jobArgs,
+  handler: async (ctx, { jobId, attempt, runId }) => {
+    const job = await ctx.db.get(jobId);
+    if (!job || job.attempt !== attempt || job.runId !== runId || job.status === 'ready') return false;
+    if (job.status === 'cancelled') return true;
+    const now = Date.now();
+    await ctx.db.patch(jobId, { status: 'cancelled', error: undefined, updatedAt: now });
+    const version = await ctx.db.get(job.versionId);
+    if (version) await ctx.db.patch(version._id, { processingState: 'error', updatedAt: now });
+    const asset = await ctx.db.get(job.assetId);
+    if (asset) await ctx.db.patch(asset._id, {
+      versionsUpdatedAt: now,
+      ...(asset.currentVersionId === job.versionId ? { processingStatus: 'error', updatedAt: now } : {}),
+    });
+    return true;
+  },
+});
+
 export const retry = internalMutation({
   args: { jobId: v.id('mediaJobs') },
   handler: async (ctx, { jobId }) => {
     const job = await ctx.db.get(jobId);
-    if (!job || job.status !== 'error') throw new Error('Media job is not retryable');
+    if (!job || (job.status !== 'error' && job.status !== 'cancelled')) throw new Error('Media job is not retryable');
     const attempt = job.attempt + 1;
     await ctx.db.patch(jobId, { status: 'queued', stage: 'verify', attempt,
       runId: undefined, error: undefined, updatedAt: Date.now() });

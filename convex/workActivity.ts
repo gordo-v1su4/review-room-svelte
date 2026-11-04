@@ -22,8 +22,8 @@ export const list = internalQuery({
       if (!job || job.versionId !== asset.currentVersionId) return;
       rows.set('ingest:' + job._id, { id: 'ingest:' + job._id, kind: 'ingest', label: asset.assetCode ?? asset.title,
         assetId: asset._id, projectId: project._id, project: project.title, updatedAt: job.updatedAt,
-        state: job.status === 'ready' ? 'complete' : job.status === 'error' ? 'failed' : job.status === 'queued' ? 'queued' : 'running',
-        stage: job.status === 'ready' ? 'Ready to review' : job.status === 'error' ? 'Processing needs attention' : job.status === 'queued' ? 'Queued for processing' : job.stage === 'verify' ? 'Checking media' : job.stage === 'derivatives' ? 'Preparing previews' : 'Finishing ingest' });
+        state: job.status === 'ready' ? 'complete' : job.status === 'cancelled' ? 'cancelled' : job.status === 'error' ? 'failed' : job.status === 'queued' ? 'queued' : 'running',
+        stage: job.status === 'ready' ? 'Ready to review' : job.status === 'cancelled' ? 'Processing cancelled' : job.status === 'error' ? 'Processing needs attention' : job.status === 'queued' ? 'Queued for processing' : job.stage === 'verify' ? 'Checking media' : job.stage === 'derivatives' ? 'Preparing previews' : 'Finishing ingest' });
     };
     const addTransfer = async (job: Doc<'syncOutbox'>, project: Doc<'projects'>) => {
       // Older generations are history, not new errors or active work.

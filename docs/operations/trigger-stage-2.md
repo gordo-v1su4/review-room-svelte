@@ -10,6 +10,8 @@ The Review Room production Trigger environment has seven redacted variables. Its
 
 The canonical upload session seals the original and poster before creating one Convex `mediaJobs` record for the version. The Svelte server dispatches `review-room-ingest` with only the job ID and attempt. Trigger runs verify/inspect, derivative generation, and finalization as bounded child tasks. A deterministic version path in RustFS holds the thumbnail and sprite; Convex records their keys before the job becomes ready. The job's run ID, stage, status, and safe retry action appear in Review Room. An unavailable Trigger service leaves the sealed asset and queued job intact.
 
+Owner activity polling checks up to five ingest jobs that have stayed queued or running for two minutes. If Trigger reports a terminal run that ended at least 30 seconds ago but Convex never reached ready, the job becomes an error (or cancelled when Trigger reports cancellation). A cancelled job retains the original and poster, leaves the asset unavailable for review, and may be retried as a new attempt. An operator may use the internal `mediaJobs:cancel` mutation only after independently confirming the exact Trigger run is terminal; its job ID, attempt, and run ID must match the current record. This retires obsolete activity without deleting media.
+
 The authenticated HTTP contract lives at `/api/v1`: create or edit projects and
 folders, `POST /uploads` with `projectId`, `name`, `type`, integer `size`, and
 the original file's hexadecimal `sha256` for an idempotent presigned session.

@@ -12,7 +12,7 @@ export const POST: RequestHandler = async ({ cookies, params }) => {
   const { job } = await db().query(internal.mediaJobs.get, { jobId });
   if (job.status === 'ready') return json({ jobId, status: 'ready' });
   if (job.status === 'running') return json({ jobId, status: 'running', runId: job.runId });
-  const attempt = job.status === 'error'
+  const attempt = job.status === 'error' || job.status === 'cancelled'
     ? (await db().mutation(internal.mediaJobs.retry, { jobId })).attempt
     : job.attempt;
   const dispatch = await dispatchMediaJob(jobId, attempt);
