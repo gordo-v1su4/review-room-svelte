@@ -3,12 +3,13 @@ import { ConvexHttpClient } from 'convex/browser';
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server';
 import { internal } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
-import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { retryStorage } from './storageRetry';
+import { getObjectMetadata } from './storageMetadata';
 
 type JobId = Id<'mediaJobs'>;
 type Probe = { durationSec: number; width: number; height: number };
@@ -88,9 +89,9 @@ const verifyMedia = task({
   run: async ({ jobId }: { jobId: JobId }): Promise<Probe> => {
     const { version } = await convex().query(internal.mediaJobs.get, { jobId });
     const client = storage();
-    const head = await retryStorage((signal) => client.send(new HeadObjectCommand({ Bucket: bucket, Key: version.originalKey }), { abortSignal: signal }));
-    if (head.ContentLength !== version.sizeBytes || head.ContentType !== version.mimeType ||
-        (version.etag && head.ETag !== version.etag)) throw new Error('Original object verification failed');
+    const metadata = await getObjectMetadata(client, bucket, version.originalKey);
+    if (metadata.ContentLength !== version.sizeBytes || metadata.ContentType !== version.mimeType ||
+        (version.etag && metadata.ETag !== version.etag)) throw new Error('Original object verification failed');
     return await withOriginal(version.originalKey, version.sizeBytes, async (path) => {
       const raw = await runCommand(process.env.FFPROBE_PATH ?? 'ffprobe', [
         '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height:format=duration', '-of', 'json', path,
@@ -145,8 +146,8 @@ const finalizeMedia = task({
   }) => {
     const client = storage();
     for (const key of [thumbnailKey, spriteKey]) {
-      const head = await retryStorage((signal) => client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: signal }));
-      if (!head.ContentLength) throw new Error('Derivative not durable');
+      const metadata = await getObjectMetadata(client, bucket, key);
+      if (!metadata.ContentLength) throw new Error('Derivative not durable');
     }
     const applied = await convex().mutation(internal.mediaJobs.complete, {
       jobId, attempt, runId, ...probe, thumbnailKey, spriteKey,
