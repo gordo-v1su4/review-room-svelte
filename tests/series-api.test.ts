@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { internal } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
-import { automationUpload, call, cspDigest, seriesFixture } from './series-api-helpers';
+import { automationUpload, call, completeProcessing, cspDigest, seriesFixture } from './series-api-helpers';
 
 const versionsOf = (f: Awaited<ReturnType<typeof seriesFixture>>, assetId: Id<'videos'>) =>
   f.t.run(ctx => ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', assetId)).collect());
@@ -25,6 +25,41 @@ test('trailer shot codes pass upload validation and address later takes', async 
   const second = await automationUpload(f, { folderId: f.scene, assetCode: 'blr_tr100_sht_0010' });
   expect(second.assetId).toBe(first.assetId);
   expect((await versionsOf(f, first.assetId)).map(version => version.version).sort()).toEqual([1, 2]);
+});
+
+test('owner review status writes appear in the changes feed and respect approval readiness', async () => {
+  const f = await seriesFixture();
+  const { assetId } = await automationUpload(f, { folderId: f.scene, assetCode: 'BLR_TR100_SHT_0010' });
+  const before = await f.t.mutation(internal.automation.changes, { keyDigest: cspDigest, projectId: f.project, since: 0 });
+  const request = { ...call(), assetId, status: 'in_progress' as const };
+  await f.t.mutation(internal.automation.setAssetReviewStatus, request);
+  await f.t.mutation(internal.automation.setAssetReviewStatus, request);
+  expect((await f.t.mutation(internal.automation.changes, { keyDigest: cspDigest, projectId: f.project, since: Number(before.cursor) })).assets.find(item => item.assetId === assetId)?.status).toBe('in_progress');
+  await expect(f.t.mutation(internal.automation.setAssetReviewStatus, { ...call(), assetId, status: 'approved' })).rejects.toThrow('Asset is not ready');
+  await completeProcessing(f, assetId);
+  await f.t.mutation(internal.automation.setAssetReviewStatus, { ...call(), assetId, status: 'needs_changes' });
+  await f.t.mutation(internal.automation.setAssetReviewStatus, { ...call(), assetId, status: 'approved' });
+  expect((await f.t.run(ctx => ctx.db.get(assetId)))?.status).toBe('approved');
+});
+
+test('one bad take can be excluded and restored without excluding its sibling or deleting media', async () => {
+  const f = await seriesFixture();
+  const { assetId } = await automationUpload(f, { folderId: f.scene, assetCode: 'BLR_TR100_SHT_0010' });
+  await automationUpload(f, { folderId: f.scene, assetCode: 'BLR_TR100_SHT_0010' });
+  const [first, second] = (await versionsOf(f, assetId)).sort((a, b) => a.version - b.version);
+  const before = await f.t.mutation(internal.automation.changes, { keyDigest: cspDigest, projectId: f.project, since: 0 });
+  await f.t.mutation(internal.automation.setVersionExcluded, { ...call(), versionId: first._id, excluded: true });
+  const changed = await f.t.mutation(internal.automation.changes, { keyDigest: cspDigest, projectId: f.project, since: Number(before.cursor) });
+  expect(changed.versions.find(item => item.versionId === first._id)?.excluded).toBe(true);
+  expect(changed.versions.find(item => item.versionId === second._id)?.excluded).toBe(false);
+  expect((await f.t.run(ctx => ctx.db.get(first._id)))?.originalKey).toBe(first.originalKey);
+  expect((await f.t.run(ctx => ctx.db.get(assetId)))?.status).toBe('awaiting_review');
+  await f.t.mutation(internal.automation.setVersionExcluded, { ...call(), versionId: first._id, excluded: false });
+  expect((await f.t.run(ctx => ctx.db.get(first._id)))?.excluded).toBe(false);
+  const restored = await f.t.mutation(internal.automation.changes, { keyDigest: cspDigest, projectId: f.project, since: Number(changed.cursor) });
+  expect(restored.versions.find(item => item.versionId === first._id)).toMatchObject({ assetId, excluded: false });
+  await f.t.mutation(internal.personal.setVersionExcluded, { versionId: second._id, excluded: true });
+  expect((await f.t.mutation(internal.automation.changes, { keyDigest: cspDigest, projectId: f.project, since: Number(restored.cursor) })).versions.find(item => item.versionId === second._id)?.excluded).toBe(true);
 });
 
 test('a take can be added without changing the pick, and the pick can be set by the API', async () => {
@@ -92,7 +127,11 @@ test('changes since a cursor report new takes, pick changes and metadata edits',
 test('a credential restricted to one project cannot read or write another', async () => {
   const f = await seriesFixture();
   const other = await f.t.run(ctx => ctx.db.insert('projects', { title: 'Other series', slug: 'other', createdBy: f.owner, createdAt: 1, updatedAt: 1, downloadEnabledByDefault: false }));
+  const foreignAsset = await f.t.run(ctx => ctx.db.insert('videos', { projectId: other, title: 'Foreign', originalFilename: 'foreign.mp4', storageKey: 'foreign.mp4', mimeType: 'video/mp4', status: 'awaiting_review', viewed: false, rating: 0, isSelect: false, commentCount: 0, tags: [], downloadEnabled: false, order: 0, uploadedBy: f.owner, uploadedAt: 1, updatedAt: 1 }));
+  const foreignVersion = await f.t.run(ctx => ctx.db.insert('assetVersions', { assetId: foreignAsset, version: 1, originalKey: 'foreign.mp4', mimeType: 'video/mp4', sizeBytes: 100, processingState: 'ready', createdAt: 1 }));
   await expect(f.t.mutation(internal.automation.changes, { keyDigest: cspDigest, projectId: other, since: 0 })).rejects.toThrow('Automation scope denied');
+  await expect(f.t.mutation(internal.automation.setAssetReviewStatus, { ...call(), assetId: foreignAsset, status: 'needs_changes' })).rejects.toThrow('Automation scope denied');
+  await expect(f.t.mutation(internal.automation.setVersionExcluded, { ...call(), versionId: foreignVersion, excluded: true })).rejects.toThrow('Automation scope denied');
   await expect(f.t.mutation(internal.automation.beginUpload, { ...call(), projectId: other, assetCode: 'OTH_EP101_PAR_0010', originalFilename: 'take.mp4', mimeType: 'video/mp4', sizeBytes: 100 })).rejects.toThrow('Automation scope denied');
   await expect(f.t.mutation(internal.automation.createFolder, { ...call(), projectId: other, title: 'EP101', ownerApp: 'creative-studio-pro' })).rejects.toThrow('Automation scope denied');
 });

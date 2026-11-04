@@ -297,6 +297,8 @@ const applicationTables = {
     sizeBytes: v.number(),
     etag: v.optional(v.string()),
     processingState: v.union(v.literal("processing"), v.literal("ready"), v.literal("error")),
+    // A reversible per-take decision; the original and sibling versions remain untouched.
+    excluded: v.optional(v.boolean()),
     creativeMetadata: v.optional(creativeMetadata),
     metadataUpdatedAt: v.optional(v.number()),
     // Last change to processing state, asset membership or number; the changes feed reads it.

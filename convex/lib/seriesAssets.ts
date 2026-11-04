@@ -23,6 +23,20 @@ export async function setCurrentAssetVersion(ctx: MutationCtx, ownerId: Id<'appU
   return { assetId, currentVersionId: versionId };
 }
 
+/** Mark one take as excluded or restore it without changing the shot, pick, or stored media. */
+export async function setVersionExclusion(ctx: MutationCtx, ownerId: Id<'appUsers'>, versionId: Id<'assetVersions'>, excluded: boolean) {
+  const version = await ctx.db.get(versionId);
+  const asset = version && await ctx.db.get(version.assetId);
+  const project = asset && await ctx.db.get(asset.projectId);
+  if (!version || !asset || !project || project.createdBy !== ownerId || project.archived) throw new Error('Version unavailable');
+  if (!!version.excluded !== excluded) {
+    const changedAt = Math.max(Date.now(), (version.updatedAt ?? version.createdAt) + 1, (asset.versionsUpdatedAt ?? 0) + 1);
+    await ctx.db.patch(versionId, { excluded, updatedAt: changedAt });
+    await ctx.db.patch(asset._id, { versionsUpdatedAt: changedAt });
+  }
+  return { versionId, assetId: asset._id, excluded };
+}
+
 /** The chosen version's own duration and size; images never carry a duration. Legacy versions fall back to their ready job. */
 export function versionDimensions(version: Doc<'assetVersions'>, job: Pick<Doc<'mediaJobs'>, 'durationSec' | 'width' | 'height'> | null) {
   const width = version.width ?? job?.width, height = version.height ?? job?.height;
@@ -40,7 +54,7 @@ export type ChangeFeed = {
   assets: { assetId: Id<'videos'>; folderId: Id<'projectFolders'> | null; assetCode: string | null; title: string; status: Doc<'videos'>['status'];
     currentVersionId: Id<'assetVersions'> | null; misfiled: boolean; copiedFromAssetId: Id<'videos'> | null; updatedAt: number }[];
   versions: { versionId: Id<'assetVersions'>; assetId: Id<'videos'>; version: number; isCurrent: boolean; processingState: Doc<'assetVersions'>['processingState'];
-    mimeType: string; createdAt: number; metadataUpdatedAt: number | null }[];
+    mimeType: string; createdAt: number; metadataUpdatedAt: number | null; excluded: boolean }[];
   /** Assets that no longer exist, e.g. a misfiled drop that became another shot's take. */
   removedAssets: { assetId: Id<'videos'>; folderId: Id<'projectFolders'> | null; mergedIntoAssetId: Id<'videos'> | null; reason: string; removedAt: number }[];
 };
@@ -71,7 +85,8 @@ export async function changesSince(ctx: QueryCtx | MutationCtx, projectId: Id<'p
       currentVersionId: asset.currentVersionId ?? null, misfiled: !!asset.misfiled, copiedFromAssetId: asset.copiedFromAssetId ?? null, updatedAt: asset.updatedAt });
     for (const version of changed) {
       feed.versions.push({ versionId: version._id, assetId: asset._id, version: version.version, isCurrent: version._id === asset.currentVersionId,
-        processingState: version.processingState, mimeType: version.mimeType, createdAt: version.createdAt, metadataUpdatedAt: version.metadataUpdatedAt ?? null });
+        processingState: version.processingState, mimeType: version.mimeType, createdAt: version.createdAt, metadataUpdatedAt: version.metadataUpdatedAt ?? null,
+        excluded: !!version.excluded });
     }
   }
   feed.assets.sort((a, b) => a.updatedAt - b.updatedAt);
