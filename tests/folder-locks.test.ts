@@ -41,6 +41,29 @@ test('folders created with ownerApp are locked and owned by the calling credenti
   expect(catalog.folders.find(item => item.id === normal)).toMatchObject({ locked: false, ownerApp: null, ownedByCaller: false });
 });
 
+test('the owning credential can adopt an existing empty folder in place', async () => {
+  const { t, project, normal } = await fixture();
+  const before = await folder(t, normal);
+  const request = { ...call(ownerDigest), projectId: project, folderId: normal, ownerApp: 'creative-studio-pro' as const };
+  expect(await t.mutation(internal.automation.editFolder, request)).toBe(normal);
+  expect(await t.mutation(internal.automation.editFolder, request)).toBe(normal);
+  expect(await folder(t, normal)).toMatchObject({ title: before!.title, order: before!.order, ownerApp: 'creative-studio-pro' });
+  const catalog = await t.mutation(internal.automation.catalog, { keyDigest: ownerDigest, projectId: project });
+  expect(catalog.folders.find(item => item.id === normal)).toMatchObject({ locked: true, ownerApp: 'creative-studio-pro', ownedByCaller: true });
+  await expect(t.mutation(internal.personal.renameFolder, { folderId: normal, title: 'Renamed' })).rejects.toThrow('Folder is locked');
+});
+
+test('adoption refuses folders with assets or child folders', async () => {
+  const { t, project, owner, normal } = await fixture();
+  const asset = await t.run(ctx => ctx.db.insert('videos', { projectId: project, folderId: normal, title: 'Take', originalFilename: 'take.mp4', storageKey: 'private/take.mp4', mimeType: 'video/mp4', status: 'awaiting_review', viewed: false, rating: 0, isSelect: false, commentCount: 0, tags: [], downloadEnabled: false, order: 0, uploadedBy: owner, uploadedAt: 1, updatedAt: 1 }));
+  await expect(t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: normal, ownerApp: 'creative-studio-pro' })).rejects.toThrow('Folder must be empty');
+  expect((await folder(t, normal))?.ownerApp).toBeUndefined();
+  await t.run(ctx => ctx.db.delete(asset));
+  await t.mutation(internal.personal.createFolder, { projectId: project, title: 'Child', parentFolderId: normal });
+  await expect(t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: normal, ownerApp: 'creative-studio-pro' })).rejects.toThrow('Folder must be empty');
+  expect((await folder(t, normal))?.ownerApp).toBeUndefined();
+});
+
 test('workspace users cannot rename, move, delete or add subfolders to a locked folder', async () => {
   const { t, project, episode, scene, normal } = await fixture();
   await expect(t.mutation(internal.personal.renameFolder, { folderId: episode, title: 'Renamed' })).rejects.toThrow('Folder is locked');

@@ -32,6 +32,8 @@ export function automationError(cause: unknown) {
     ['Poster size is invalid', 400],
     ['title must', 400],
     ['Folder already exists', 409],
+    ['Folder must be empty and disconnected before adoption', 409],
+    ['Folder adoption must be a separate request', 400],
     ['Folder is locked', 403],
     ['Version not ready', 409],
     ['Invalid cursor', 400],

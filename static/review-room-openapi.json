@@ -319,7 +319,7 @@
     "/api/v1/projects/{projectId}/folders/{folderId}": {
       "patch": {
         "operationId": "editFolder",
-        "summary": "Rename or move a folder without changing files or media links (folders:write). Locked folders: owning credential only.",
+        "summary": "Rename, move, or adopt an empty folder in place (folders:write). Locked folders: owning credential only.",
         "parameters": [
           {
             "name": "projectId",
@@ -1503,11 +1503,16 @@
             ],
             "minLength": 1,
             "description": "Move under this folder in the same project; null moves to the project root."
+          },
+          "ownerApp": {
+            "type": "string",
+            "enum": ["creative-studio-pro"],
+            "description": "Adopt an existing empty, disconnected folder in place for the calling credential. Send alone, without title or parentFolderId."
           }
         },
         "minProperties": 1,
         "additionalProperties": false,
-        "description": "Rename and/or move. A locked folder (or a move that would carry one along, or a move/create into one) is refused with 403 unless the caller owns it."
+        "description": "Rename and/or move, or adopt an existing empty folder with ownerApp alone. Adoption preserves the folder ID, title and parent, and rejects folders containing assets, subfolders, active uploads, or a Trailer Feed connection with 409. A locked folder (or a move that would carry one along, or a move/create into one) is refused with 403 unless the caller owns it."
       },
       "UploadBegin": {
         "type": "object",
