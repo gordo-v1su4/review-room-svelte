@@ -1,5 +1,25 @@
 # Review Room Trigger deployment
 
+## Bun 1.4 and Trigger 4.8.5 - November 17, 2026
+
+The task runtime is explicitly `bun-1.4`; the plain `bun` alias selects
+Trigger's deprecated Node+Bun image. SDK, build package and deployment CLI are
+pinned to 4.8.5. The deployment account and package-manager pin use Bun 1.4.4,
+and the frontend dependency/build stage uses the digest-pinned official 1.4.4
+image. The frontend server remains Node-based.
+
+Production task deployment `20261117.1` has five tasks and reports runtime
+`bun-1.4`, version `1.4.4`. Real health run
+`run_cmwl74w9b000b3irv220whi1w` completed and returned Bun 1.4.4 after checking
+the dedicated Convex endpoint. This is a runtime/health check, not a new
+publication or full media-ingest acceptance test. The previous deployment is
+`20261104.3`, `deployment_k2a4dmiu45g5gf39q4g8o`, retained for task rollback.
+
+The shared Trigger platform was upgraded separately with a verified
+stopped-state database/configuration/volume backup. Its rollback instructions
+and the weekly maintenance schedule remain in
+`proxmox-home/docs/triggerdev-vm100-runbook.md`.
+
 Review Room has a separate Trigger.dev project, `proj_gtqdmodtodgdpjlpbpkr`, in the V1su4 organization at `https://trigger.v1su4.dev`. Its health and ingest queues are bounded to two concurrent runs; FFmpeg derivatives are capped at one. Payloads contain job/asset IDs and stage metadata; media bytes stay in RustFS.
 
 The production application key is BWS `hermes_keys` / `REVIEW_ROOM_TRIGGER_SECRET_KEY` (expires 2026-12-28). Trigger labels it Full access within this Review Room project. Retrieve it with `agent-secrets run --secret=REVIEW_ROOM_TRIGGER_SECRET_KEY -- <command>`; do not copy its value into Git, the Hermes notebook, or command output. It is installed in the App VM frontend's root-owned private environment.

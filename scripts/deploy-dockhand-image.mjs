@@ -26,7 +26,25 @@ const saved = await fetch(base + path, { method: 'PUT', headers: { 'content-type
 assert(saved.ok && (await saved.json()).success, 'Managed compose save failed');
 const result = await fetch(base + '/api/stacks/review-room-svelte-app/deploy?env=3', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json', origin: base }, body: JSON.stringify({ pull: false, build: false, forceRecreate: true }) });
 assert(result.ok, `Managed deploy failed (${result.status})`);
-assert((await result.json()).success === true, 'Managed deploy did not report success');
+let deployment = await result.json();
+if (deployment.jobId) {
+  const jobId = encodeURIComponent(deployment.jobId);
+  let finished = false;
+  for (let attempt = 0; attempt < 120; attempt++) {
+    const response = await fetch(`${base}/api/jobs/${jobId}`);
+    assert(response.ok, `Managed deployment job unavailable (${response.status})`);
+    const job = await response.json();
+    if (job.status === 'done') {
+      deployment = job.result;
+      finished = true;
+      break;
+    }
+    assert(!['failed', 'error', 'cancelled', 'canceled'].includes(job.status), 'Managed deployment job failed');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+  assert(finished, 'Managed deployment job timed out');
+}
+assert(deployment?.success === true, 'Managed deploy did not report success');
 const after = await (await fetch(base + path)).json();
 assert(after.content === content, 'Managed compose did not retain exact image change');
 console.log(JSON.stringify({ image, managed: true, applied: true, environment: 'app-vm', composeMatches: true }));

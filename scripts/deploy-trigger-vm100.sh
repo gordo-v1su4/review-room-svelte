@@ -41,7 +41,7 @@ deploy_log="$(mktemp)"
 trap 'rm -f "$deploy_log"' EXIT
 set +e
 CI=1 TRIGGER_API_URL=https://trigger.v1su4.dev \
-  bunx trigger.dev@4.6.3 deploy \
+  bunx trigger.dev@4.8.5 deploy \
     --api-url https://trigger.v1su4.dev \
     --skip-update-check \
     --local-build \
