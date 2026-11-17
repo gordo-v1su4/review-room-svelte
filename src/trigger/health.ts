@@ -10,6 +10,6 @@ export const reviewRoomHealth = task({
     const response = await fetch(new URL('/version', url), { signal: AbortSignal.timeout(10_000) });
     if (!response.ok) throw new Error(`Review Room Convex health check failed (${response.status})`);
     if (payload.simulateFailure) throw new Error('Review Room smoke failure injection');
-    return { assetId: payload.assetId, convexHealthy: true };
+    return { assetId: payload.assetId, convexHealthy: true, bunVersion: process.versions.bun ?? null };
   },
 });
