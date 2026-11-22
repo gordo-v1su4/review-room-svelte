@@ -380,7 +380,6 @@
     try {
       await ownerAction('setCurrentVersion', { assetId, versionId }, false);
       currentOverrides[assetId] = versionId;
-      selectedVersions[assetId] = versionId;
       const number = knownVersions.find(version => version.id === versionId)?.version;
       feedback = number ? `${formatVersion(number)} is now the current version.` : 'Current version changed.';
     }

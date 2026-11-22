@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, type Snippet } from 'svelte';
-  import { DEFAULT_PANE_SIZES, normalizePaneSizes, paneMinimums, resizePanePair, twoPaneSizes, type PaneSizes } from '$lib/workspace-panes';
+  import { DEFAULT_PANE_SIZES, PANE_MIN_WIDTHS, normalizePaneSizes, paneMinimums, resizePanePair, twoPaneSizes, type PaneSizes } from '$lib/workspace-panes';
 
   let { explorer, viewer, inspector, hasActive, focused = false, showInspector = true, storageKey = 'review-room.workspace-panes' }: {
     explorer: Snippet;
@@ -23,8 +23,9 @@
   let focusPercent = $state(72);
   let gripY = $state<(number | undefined)[]>([undefined, undefined]);
   const contentWidth = $derived(available + (focused ? (showInspector ? 8 : 16) : showInspector ? 0 : 8));
-  const displayed = $derived(focused ? [0, focusPercent, 100 - focusPercent] as PaneSizes : showInspector ? sizes : twoPaneSizes(compactPercent ?? sizes[0] / (sizes[0] + sizes[1]) * 100, contentWidth));
-  const minimums = $derived(focused ? [0, 320 / Math.max(560, contentWidth) * 100, 240 / Math.max(560, contentWidth) * 100] : showInspector ? paneMinimums(available) : [220 / Math.max(540, contentWidth) * 100, 320 / Math.max(540, contentWidth) * 100, 0]);
+  const minimums = $derived(focused ? [0, PANE_MIN_WIDTHS[1] / Math.max(900, contentWidth) * 100, PANE_MIN_WIDTHS[2] / Math.max(900, contentWidth) * 100] : showInspector ? paneMinimums(available) : [PANE_MIN_WIDTHS[0] / Math.max(880, contentWidth) * 100, PANE_MIN_WIDTHS[1] / Math.max(880, contentWidth) * 100, 0]);
+  const focusedSize = $derived(Math.max(minimums[1], Math.min(100 - minimums[2], focusPercent)));
+  const displayed = $derived(focused ? [0, focusedSize, 100 - focusedSize] as PaneSizes : showInspector ? sizes : twoPaneSizes(compactPercent ?? sizes[0] / (sizes[0] + sizes[1]) * 100, contentWidth));
   function applySize(divider: 0 | 1, target: number, source: PaneSizes = sizes) {
     if (focused) focusPercent = Math.max(minimums[1], Math.min(100 - minimums[2], target));
     else if (showInspector) sizes = resizePanePair(source, divider, target, available);
@@ -78,7 +79,7 @@
   }
   onMount(() => {
     available = Math.max(1, host.clientWidth - 16);
-    const restoreWidth = host.clientWidth >= 796 && window.innerWidth >= 1100 ? available : 1000;
+    const restoreWidth = host.clientWidth >= 1136 && window.innerWidth >= 1100 ? available : 1120;
     try { sizes = normalizePaneSizes(JSON.parse(localStorage.getItem(storageKey) ?? 'null'), restoreWidth); } catch { sizes = normalizePaneSizes(DEFAULT_PANE_SIZES, restoreWidth); }
     const observer = new ResizeObserver(() => {
       const nextWidth = Math.max(1, host.clientWidth - 16);
@@ -86,7 +87,7 @@
       release();
       available = nextWidth;
       // Preserve desktop preferences while the responsive stack is showing.
-      if (showInspector && host.clientWidth >= 796 && window.innerWidth >= 1100) sizes = normalizePaneSizes(sizes, available);
+      if (showInspector && host.clientWidth >= 1136 && window.innerWidth >= 1100) sizes = normalizePaneSizes(sizes, available);
     });
     observer.observe(host);
     return () => { release(); observer.disconnect(); };
@@ -145,20 +146,20 @@
   .pane-divider:not(.pointer-focus):focus-visible span { outline: 1px solid var(--teal); outline-offset: 3px; }
   .dragging { user-select: none; }
   @media (min-width: 1100px) {
-    @container (min-width: 548px) {
+    @container (min-width: 888px) {
       .workspace-panes.has-active.inspector-hidden .viewer-pane { position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; }
-      .workspace-panes.has-active.inspector-hidden { gap: 0; grid-template-columns: minmax(0, var(--explorer-size)) 8px minmax(0, var(--viewer-size)); grid-template-areas: 'explorer first viewer'; }
+      .workspace-panes.has-active.inspector-hidden { gap: 0; grid-template-columns: minmax(220px, var(--explorer-size)) 8px minmax(660px, var(--viewer-size)); grid-template-areas: 'explorer first viewer'; }
       .has-active.inspector-hidden .first-divider { display: flex; align-items: center; justify-content: center; align-self: stretch; min-height: 160px; cursor: col-resize; touch-action: none; grid-area: first; }
     }
-    @container (min-width: 796px) {
+    @container (min-width: 1136px) {
       .workspace-panes.has-active .viewer-pane { position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; }
-      .workspace-panes.has-active { gap: 0; grid-template-columns: minmax(0, var(--explorer-size)) 8px minmax(0, var(--viewer-size)) 8px minmax(0, var(--inspector-size)); grid-template-areas: 'explorer first viewer second inspector'; }
+      .workspace-panes.has-active { gap: 0; grid-template-columns: minmax(220px, var(--explorer-size)) 8px minmax(660px, var(--viewer-size)) 8px minmax(240px, var(--inspector-size)); grid-template-areas: 'explorer first viewer second inspector'; }
       .has-active .pane-divider { display: flex; align-items: center; justify-content: center; align-self: stretch; min-height: 160px; cursor: col-resize; touch-action: none; }
       .first-divider { grid-area: first; }
       .second-divider { grid-area: second; }
       .pane-divider:hover span, .pane-divider:focus-visible span, .dragging .pane-divider span { background:var(--selection-accent); }
       .pane-divider:focus-visible { outline: none; }
-      .workspace-panes.has-active.focused { grid-template-columns:minmax(0,var(--viewer-size)) 8px minmax(0,var(--inspector-size)); grid-template-areas:'viewer second inspector'; }
+      .workspace-panes.has-active.focused { grid-template-columns:minmax(660px,var(--viewer-size)) 8px minmax(240px,var(--inspector-size)); grid-template-areas:'viewer second inspector'; }
       .workspace-panes.has-active.focused.inspector-hidden { grid-template-columns:minmax(0,1fr); grid-template-areas:'viewer'; }
     }
   }
