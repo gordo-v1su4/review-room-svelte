@@ -23,12 +23,13 @@ test('field preferences preserve hiding all fields and sanitize duplicate, obsol
   expect(result.visibleFields).toEqual([]);
   expect(result.fieldOrder.slice(0, 4)).toEqual(['tags', 'status', 'version', 'rating']);
   expect(result.fieldOrder.length).toBe(13);
-  expect(normalizeAppearance({ visibleFields: ['filename', 5, 'filename', 'obsolete'] }).visibleFields).toEqual(['filename']);
+  expect(normalizeAppearance({ visibleFields: ['filename', 5, 'filename', 'obsolete'] }).visibleFields).toEqual(['version', 'filename']);
 });
 
 test('original workspace preferences migrate without losing card visibility', () => {
   const result = normalizeAppearance({ gridSize: 'sm', aspectRatio: 'video', thumbnailScale: 'fit', showCardInfo: false, visibleCardFields: ['tags', 'status'] });
-  expect(result).toMatchObject({ size: 'small', aspect: 'landscape', fit: 'fit', showInfo: false, visibleFields: ['tags', 'status'] });
+  expect(result).toMatchObject({ size: 'small', aspect: 'landscape', fit: 'fit', showInfo: false, visibleFields: ['version', 'tags', 'status'] });
+  expect(normalizeAppearance(result).visibleFields).toEqual(['version', 'tags', 'status']);
   expect(normalizeAppearance(null)).toMatchObject({ size: 'medium', aspect: 'landscape', showInfo: true });
 });
 

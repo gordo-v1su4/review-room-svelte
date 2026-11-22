@@ -52,9 +52,9 @@
 </Select.Root>
 
 <style>
-  :global(.version-picker-trigger) { display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 8px 0 9px;border:1px solid var(--border);border-radius:5px;background:var(--canvas);color:var(--ink);font:inherit;font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer; }
+  :global(.version-picker-trigger) { display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 8px 0 9px;border:0;border-radius:5px;background:transparent;color:var(--ink);font:inherit;font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer; }
   :global(.version-picker-trigger svg) { flex:none;color:var(--muted); }
-  :global(.version-picker-trigger:hover:not(:disabled)) { border-color:color-mix(in srgb,var(--teal) 35%,transparent); }
+  :global(.version-picker-trigger:hover:not(:disabled)) { background:var(--raised); }
   :global(.version-picker-trigger:focus-visible) { outline:1px solid var(--teal);outline-offset:2px; }
   :global(.version-picker-trigger:disabled) { opacity:.45;cursor:default; }
   :global(.version-picker-trigger.compact) { flex:none;gap:3px;height:18px;padding:0 3px 0 5px;border-color:transparent;border-radius:4px;background:transparent;color:var(--muted);font-size:10.5px;font-weight:500; }

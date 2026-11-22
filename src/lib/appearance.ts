@@ -29,7 +29,7 @@ export function normalizeAppearance(value: unknown): AppearanceValue {
   const order = Array.isArray(input.fieldOrder) ? sanitize(input.fieldOrder) : [];
   const visible = Array.isArray(visibleFields) ? sanitize(visibleFields) : [...DEFAULT_VISIBLE_CARD_FIELDS];
   // Preferences saved before the Version field existed always showed the version next to the name; keep it on.
-  if (Array.isArray(visibleFields) && Array.isArray(input.fieldOrder) && !input.fieldOrder.includes('version') && visible.length && !visible.includes('version')) visible.unshift('version');
+  if (Array.isArray(visibleFields) && (!Array.isArray(input.fieldOrder) || !input.fieldOrder.includes('version')) && visible.length && !visible.includes('version')) visible.unshift('version');
   return {
     aspect: aspect === 'square' || aspect === 'portrait' || aspect === 'landscape' ? aspect : DEFAULT_APPEARANCE.aspect,
     fit: fit === 'fit' ? 'fit' : 'fill',

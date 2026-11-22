@@ -9,6 +9,13 @@ export type ProcessingUpdate = {
   duration?: number; width?: number; height?: number; job?: ProcessingJob;
 };
 
+/** Current picks follow server recency, even when the owner chooses an older take. */
+export function acceptsProcessingUpdate(previous: ProcessingUpdate, update: ProcessingUpdate) {
+  return update.updatedAt >= previous.updatedAt &&
+    !(update.versionId !== previous.versionId && update.versionNumber <= previous.versionNumber && update.updatedAt === previous.updatedAt) &&
+    !(previous.job?._id === update.job?._id && (update.job?.attempt ?? 0) < (previous.job?.attempt ?? 0));
+}
+
 /** Bounded batches, no overlapping polls, and recoverable transport failures. */
 export function observeProcessing(assetIds: () => readonly string[], apply: (updates: ProcessingUpdate[]) => void) {
   let stopped = false, generation = 0;

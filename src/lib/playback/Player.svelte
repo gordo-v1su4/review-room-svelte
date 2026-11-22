@@ -13,6 +13,21 @@
   let video: HTMLVideoElement;
   let surface: HTMLDivElement;
   let paused = $state(true), muted = $state(false), time = $state(0), duration = $state(0);
+  let volume = $state(1);
+  let lastAudibleVolume = 1;
+  const silent = $derived(muted || volume === 0);
+  function setVolume(event: Event) {
+    const level = Number((event.currentTarget as HTMLInputElement).value) / 100;
+    video.volume = level;
+    video.muted = level === 0;
+    if (level > 0) lastAudibleVolume = level;
+  }
+  function toggleMute() {
+    if (video.muted || video.volume === 0) {
+      if (video.volume === 0) video.volume = lastAudibleVolume;
+      video.muted = false;
+    } else video.muted = true;
+  }
   let mediaWidth = $state(0), mediaHeight = $state(0), sourceInfo = $state<PreviewInfo>();
   const codecLabel = (codec: string) => codec.startsWith('avc') ? 'H.264' : /^(hvc|hev)/.test(codec) ? 'HEVC' : codec.startsWith('av01') ? 'AV1' : codec.startsWith('vp09') ? 'VP9' : codec;
   let showFrames = $state(false);
@@ -277,7 +292,7 @@
       onloadeddata={() => { if (!matchesSource(src)) return; recovery.loaded(); error = ''; ready = true; if (retryTime !== null) { seek(retryTime); retryTime = null; } onready(video.currentSrc); }}
       ontimeupdate={() => { if (!scrubbing) { time = video.currentTime; ontime(time); } }}
       onplay={() => { paused = false; error = ''; onViewed(); }} onpause={() => paused = true} onended={ended}
-      onvolumechange={() => muted = video.muted}
+      onvolumechange={() => { muted = video.muted; volume = video.volume; if (volume > 0) lastAudibleVolume = volume; }}
       onerror={mediaFailed}></video>
     {#if !ready && availability === 'ready' && poster && failedPoster !== poster}
       {#key poster}<img class="loading-poster" src={poster} alt="" aria-hidden="true" onerror={event => failedPoster = event.currentTarget.getAttribute('src') ?? undefined}/>{/key}
@@ -306,7 +321,10 @@
         </DropdownMenu.Content></DropdownMenu.Portal>
       </DropdownMenu.Root>
 
-      <button class="icon-button" aria-label={muted ? 'Unmute' : 'Mute'} title={muted ? 'Unmute' : 'Mute'} onclick={() => video.muted = !video.muted}>{#if muted}<VolumeX size={18}/>{:else}<Volume2 size={18}/>{/if}</button>
+      <div class="volume-control">
+        <button class="icon-button" aria-label={silent ? 'Unmute' : 'Mute'} title={silent ? 'Unmute' : 'Mute'} onclick={toggleMute}>{#if silent}<VolumeX size={18}/>{:else}<Volume2 size={18}/>{/if}</button>
+        <input class="volume-slider" type="range" min="0" max="100" step="1" value={silent ? 0 : Math.round(volume * 100)} style:--volume-level={`${silent ? 0 : Math.round(volume * 100)}%`} aria-label="Volume" aria-valuetext={`${silent ? 0 : Math.round(volume * 100)} percent`} title={`Volume: ${silent ? 0 : Math.round(volume * 100)}%`} oninput={setVolume}/>
+      </div>
       <button class="icon-button" aria-label="Fullscreen" title="Fullscreen" onclick={() => surface.requestFullscreen?.().catch(() => { error = 'Fullscreen is unavailable in this browser.'; })}><Maximize size={17}/></button>
     </div>
   </div>
@@ -326,6 +344,16 @@
   .player-message.poster-loading { inset:auto 8px 8px auto; padding:4px 7px; min-height:0; width:auto; background:rgb(0 0 0 / .65); border-radius:4px; font-size:10px; }
   .player { container-name:player; container-type:inline-size; }
   .transport { flex-wrap:nowrap; gap:3px; }
+  .volume-control { display:flex; align-items:center; gap:4px; flex:none; }
+  .volume-slider { appearance:none; -webkit-appearance:none; width:72px; min-width:0; height:28px; margin:0; padding:0; border:0; border-radius:0; background:transparent; cursor:pointer; }
+  .volume-slider::-webkit-slider-runnable-track { height:2px; border-radius:0; background:linear-gradient(to right,color-mix(in srgb,var(--accent) 18%,transparent),var(--accent)) left / var(--volume-level) 100% no-repeat,var(--border); }
+  .volume-slider::-webkit-slider-thumb { appearance:none; -webkit-appearance:none; width:5px; height:16px; margin-top:-7px; border:1px solid var(--muted); border-radius:1px; background:var(--raised); box-shadow:0 0 0 1px var(--canvas); }
+  .volume-slider::-moz-range-track { height:2px; border-radius:0; background:var(--border); }
+  .volume-slider::-moz-range-progress { height:2px; border-radius:0; background:linear-gradient(to right,color-mix(in srgb,var(--accent) 18%,transparent),var(--accent)); }
+  .volume-slider::-moz-range-thumb { width:5px; height:16px; border:1px solid var(--muted); border-radius:1px; background:var(--raised); box-shadow:0 0 0 1px var(--canvas); }
+  .volume-slider:focus-visible { outline:none; }
+  .volume-slider:focus-visible::-webkit-slider-thumb { background:var(--ink); }
+  .volume-slider:focus-visible::-moz-range-thumb { background:var(--ink); }
   .transport :global(.compact-transport) { display:none; }
   .transport .icon-button { flex: 0 0 28px; min-width: 28px; width: 28px; min-height: 28px; height: 28px; padding: 0; border-radius: 4px; }
   .transport .play-button { flex-basis: 36px; width: 36px; min-width: 36px; background: var(--raised); color: var(--ink); }
@@ -335,10 +363,12 @@
   .transport .timecode:disabled { opacity: 1; cursor: default; }
   .transport button:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
   @container player (max-width:480px) {
+    .volume-slider { width:52px; }
     .transport .secondary-transport { display:none; }
     .transport :global(.compact-transport) { display:inline-flex; align-items:center; justify-content:center; flex:0 0 28px; width:28px; height:28px; padding:0; }
   }
   @media (pointer: coarse) {
+    .volume-slider { height:44px; }
     .transport .icon-button { flex-basis: 44px; min-width: 44px; width: 44px; min-height: 44px; height: 44px; }
     .transport .play-button { flex-basis: 48px; width: 48px; }
     .transport .timecode { min-height: 44px; }

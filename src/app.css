@@ -1961,13 +1961,44 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 }
 
 /* Focused review keeps the persistent viewer and its feedback in the workspace. */
-.review-view-controls { display:flex; flex:0 0 auto; gap:4px; }
+.review-title { flex-wrap:wrap; height:auto; padding-block:4px; }
+.review-view-controls { display:flex; flex:0 1 auto; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:4px; max-width:100%; }
 .version-selector { min-width:142px; flex:0 0 auto; display:flex; }
 .version-selector .version-picker-trigger { width:100%; height:32px; justify-content:flex-start; }
 .version-selector .version-picker-trigger > svg:last-child { margin-left:auto; }
 /* The current-version slot never disappears: it reads "Current" or offers "Make current" at the same width. */
-.review-view-controls .make-current { min-width:112px; justify-content:center; }
+.review-view-controls .current-version-slot { min-width:112px; justify-content:center; }
 .review-view-controls .current-state, .review-view-controls .current-state:hover { gap:5px; color:var(--teal); background:color-mix(in srgb, var(--teal) 12%, var(--panel)); border-color:color-mix(in srgb, var(--teal) 28%, transparent); box-shadow:none; cursor:default; }
+.review-pane { container-type:inline-size; container-name:review; }
+.review-view-controls .compact-version-actions { display:none; }
+.review-outcome > :is(.primary-button, .secondary-button) { height:var(--control-height); min-height:var(--control-height); border-radius:var(--control-radius); font-size:11px; }
+@container review (max-width:520px) {
+  .review-title { padding-inline:0; gap:6px; }
+  .review-title > div:first-child { flex:1 1 100%; }
+  .review-view-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)) 44px 44px; flex:1 1 100%; justify-content:flex-start; gap:6px; padding-bottom:8px; }
+  .review-view-controls .version-selector { grid-column:span 2; min-width:0; }
+  .review-view-controls .current-version-slot { grid-column:span 2; min-width:0; }
+  .review-view-controls .secondary-version-action { display:none; }
+  .review-view-controls .compact-version-actions { display:inline-flex; grid-column:span 2; justify-content:center; }
+  .review-view-controls :is(.secondary-button,.icon-button,.version-picker-trigger) { height:44px; min-height:44px; border-radius:4px; }
+  .review-view-controls .icon-button { width:44px; min-width:44px; }
+  .review-actions { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; padding:10px 0; }
+  .review-feedback { display:grid; grid-template-columns:44px minmax(0,1fr); gap:6px; width:100%; }
+  .review-feedback .rating { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); }
+  .review-feedback :is(.shortlist-toggle,.rating button) { width:100%; min-width:0; height:44px; min-height:44px; border-radius:4px; background:var(--panel); }
+  .review-outcome { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; width:100%; margin:0; }
+  .review-outcome > :is(.primary-button,.secondary-button) { height:44px; min-height:44px; padding:0 8px; font-size:11px; justify-content:center; }
+  .review-outcome .asset-nav { grid-column:1 / -1; display:flex; width:100%; margin:0; height:44px; border-radius:4px; }
+  .review-actions .asset-nav .playback-mode { flex:1; width:auto; height:44px; min-height:44px; justify-content:center; font-size:11px; }
+  .review-actions .asset-nav .playback-mode span { display:inline; }
+  .asset-nav .asset-step-pair { flex:2; }
+  .asset-nav .asset-step { flex:1; width:auto; min-width:44px; height:44px; min-height:44px; }
+}
+@media (max-width:480px) {
+  .app-shell .topbar { height:auto; min-height:54px; flex-wrap:wrap; gap:6px; padding-block:6px; }
+  .app-shell .topbar .breadcrumb { flex:1 1 100px; min-width:0; }
+  .app-shell .header-account-tools { margin-left:auto; }
+}
 .focused-review .desktop-nav-toggle, .focused-review .mobile-menu { display:none; }
 .focused-review .breadcrumb { min-width:0; }
 .focused-review .breadcrumb strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
