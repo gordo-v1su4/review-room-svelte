@@ -4,6 +4,15 @@ type TreeFolder = Pick<ProjectFolder, 'id' | 'title' | 'parentFolderId' | 'locke
 export type FolderTreeRow<F extends TreeFolder> = Readonly<{ folder: F; depth: number; hasChildren: boolean; expanded: boolean }>;
 
 /**
+ * File-browser order: folders whose names start with "_" (e.g. "_Deliverables") come first,
+ * then the rest. Within each group the existing order is kept (the sort is stable).
+ */
+export function underscoreFoldersFirst<F extends Pick<ProjectFolder, 'title'>>(folders: readonly F[]): F[] {
+  const pinned = (folder: F) => folder.title.trimStart().startsWith('_');
+  return [...folders].sort((a, b) => Number(pinned(b)) - Number(pinned(a)));
+}
+
+/**
  * Flattens a project's folders into visible sidebar rows, depth-first in sibling order.
  * Collapsed folders hide their descendants; orphaned or cyclic legacy folders stay reachable at the root.
  */

@@ -61,7 +61,7 @@
   import ArchivedProjects from '$lib/components/ArchivedProjects.svelte';
   import { updateProjectIdentity, setProjectArchived, prepareProjectBanner, type ProjectIdentity, type ProjectIdentityDraft } from '$lib/project-identity';
   import { transitionFolderState, folderCoverUrl, folderAncestors, folderPath, canRestructureFolder, type FolderState, type FolderAction } from '$lib/project-folders';
-  import { canDropFolder } from '$lib/folder-tree';
+  import { canDropFolder, underscoreFoldersFirst } from '$lib/folder-tree';
   import { updateTags } from '$lib/bulk-tags';
   import StillViewer from '$lib/components/StillViewer.svelte';
   import { annotationsEqual } from '$lib/annotations';
@@ -119,7 +119,7 @@
   let archived = $state(false);
   const folderAccess = $derived({ isAdmin: true, editableProjectIds: activeProjects.map(project => project.id) });
   const connectedFolderIds = $derived(new Set<string>(data.snapshot?.connectedFolderIds ?? []));
-  const foldersWithConnections = $derived(organization.folders.map(folder => ({ ...folder, connected: data.snapshot ? connectedFolderIds.has(folder.id) : folder.connected })));
+  const foldersWithConnections = $derived(underscoreFoldersFirst(organization.folders).map(folder => ({ ...folder, connected: data.snapshot ? connectedFolderIds.has(folder.id) : folder.connected })));
   const projectFolders = $derived(foldersWithConnections.filter(folder => folder.projectId === projectId));
   const activeFolder = $derived(projectFolders.find(folder => folder.id === activeFolderId));
   const ancestors = $derived(folderAncestors(projectFolders, activeFolderId));
