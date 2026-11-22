@@ -1,5 +1,33 @@
 # Review Room Trigger deployment
 
+## Security runtime maintenance - November 22, 2026
+
+SDK/build/CLI are pinned to **4.8.8**; package manager and digest-pinned
+frontend dependency stage use **Bun 1.4.5**. Trigger 4.8.8's stock `bun-1.4`
+image still provides 1.4.4: initial deployment 20261122.1 demonstrated that
+the local CLI's version does not upgrade the deployed runtime. The build now
+copies the 1.4.5 binary from its exact official image digest through a supported
+build extension and verifies its version. `bunBytecode: false` prevents the
+older base compiler from embedding its runtime; no Node executable is added.
+Keep the explicit pin until a qualified upstream base incorporates the fix.
+
+Deployment **20261122.2**, `deployment_6w7or8eus3fh2j3bpadjm`, contains five tasks.
+Real health run `run_cmwrz8aof000h3iqpxcs0gcmy` completed, verified dedicated
+Convex and returned `bunVersion: 1.4.5`. Exact task image:
+`localhost:5000/trigger/proj_gtqdmodtodgdpjlpbpkr:20261122.2.production.1agjbmm8@sha256:5629327eadaa08c919b488ddcaf55e1f4139260b85df52c9b4f87f5b36b4dcf6`.
+A synthetic three-frame FFmpeg check in that image passed without media writes.
+Prior qualified deployment **20261117.1** is retained for task rollback.
+
+Linux Bun 1.4.5 qualification passed 294 tests/1,616 assertions, Svelte check
+with zero errors/eight existing warnings, and production build. The frontend
+remains Node-based; its normal main deployment must pass independently.
+Frontend configuration/private settings and a complete dedicated Convex export
+including file storage are retained under
+`/var/backups/review-room/20261122-bun145`; checksums and ZIP integrity pass.
+No schema, Convex function, project or media source changed. Shared Trigger
+state has its own full cold backup and off-host copy documented in
+`proxmox-home/docs/triggerdev-vm100-runbook.md`. Rollback was prepared, not rehearsed.
+
 ## Bun 1.4 and Trigger 4.8.5 - November 17, 2026
 
 The task runtime is explicitly `bun-1.4`; the plain `bun` alias selects
