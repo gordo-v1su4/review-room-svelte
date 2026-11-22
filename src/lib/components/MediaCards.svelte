@@ -7,9 +7,14 @@
   import type { AppearanceValue } from '$lib/appearance';
   import { CARD_FIELD_DEFINITIONS, type CardFieldId } from '$lib/cardFields';
   import { formatVersion } from '../../../convex/lib/shotCode';
+  import VersionPicker, { type VersionOption } from './VersionPicker.svelte';
 
   type Asset = ReviewAsset & AssetReview;
-  let { assets, activeId, checkedIds = [], appearance, view, onOpen, onCheck, busyIds = [], access = { kind: 'none' }, onReview, onDragStart, onDragEnd, onFixMisfiled }: {
+  let { assets, activeId, checkedIds = [], appearance, view, onOpen, onCheck, busyIds = [], access = { kind: 'none' }, onReview, onDragStart, onDragEnd, onFixMisfiled, versionsFor, currentVersionFor, onSelectVersion }: {
+    /** Signed-in views: every take of an asset, the saved current take, and switching the displayed take. */
+    versionsFor?: (assetId: string) => readonly VersionOption[];
+    currentVersionFor?: (assetId: string) => string | undefined;
+    onSelectVersion?: (assetId: string, versionId: string) => void;
     assets: readonly Asset[]; activeId: string | null; checkedIds?: readonly string[];
     busyIds?: readonly string[];
     access?: ReviewAccess; onReview: (action: ReviewAction) => void;
@@ -19,10 +24,12 @@
     appearance: AppearanceValue; view: 'grid' | 'list';
     onOpen: (id: string, event: MouseEvent) => void; onCheck?: (id: string, event: MouseEvent, toggle?: boolean) => void;
   } = $props();
-  const fields = $derived(appearance.fieldOrder.filter(id => appearance.visibleFields.includes(id)));
+  const showVersion = $derived(appearance.visibleFields.includes('version'));
+  const fields = $derived(appearance.fieldOrder.filter(id => id !== 'version' && appearance.visibleFields.includes(id)));
   const labels = Object.fromEntries(CARD_FIELD_DEFINITIONS.map(field => [field.id, field.label]));
   function fieldValue(asset: Asset, field: CardFieldId): string {
     switch (field) {
+      case 'version': return asset.versionNumber ? formatVersion(asset.versionNumber) : '—';
       case 'status': return asset.status.replaceAll('_', ' ');
       case 'rating': return String(asset.rating);
       case 'shortlist': return asset.shortlisted ? 'Shortlisted' : 'Not shortlisted';
@@ -54,7 +61,7 @@
         </div>
       </button>
       {#if appearance.showInfo}<div class="card-body">
-        <button class="card-name" type="button" draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} title={asset.name} onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id, event)}>{asset.name}{#if asset.versionNumber}<span class="version-tag">{formatVersion(asset.versionNumber)}</span>{/if}</button>
+        <div class="card-title"><button class="card-name" type="button" draggable={!!onDragStart && asset.status !== 'archived'} ondragstart={event => onDragStart?.(event, asset.id)} ondragend={onDragEnd} title={asset.name} onclick={event => (event.metaKey || event.ctrlKey || event.shiftKey) && onCheck ? onCheck(asset.id, event) : onOpen(asset.id, event)}>{asset.name}</button>{#if showVersion}{#if onSelectVersion && versionsFor && asset.versionId && versionsFor(asset.id).length}<VersionPicker compact label={`Version of ${asset.name}`} versions={versionsFor(asset.id)} value={asset.versionId} currentId={currentVersionFor?.(asset.id)} onChange={versionId => onSelectVersion(asset.id, versionId)}/>{:else if asset.versionNumber}<span class="version-tag">{formatVersion(asset.versionNumber)}</span>{/if}{/if}</div>
   {#if fields.length}<div class="card-fields">{#each fields as field (field)}
           {#if field === 'status'}<AssetStatusMenu status={asset.status} name={asset.name} access={busyIds.includes(asset.id) ? { kind: 'none' } : access} onChange={status => onReview({ type: 'status', assetId: asset.id, status })}/>
           {:else if field === 'rating'}<div class="card-rating" role="group" aria-label={`Rating for ${asset.name}`}>
@@ -86,13 +93,14 @@
   .card-check[aria-checked='true'] { background:#18332e; border-color:var(--selection-accent); }
   .card-check:focus-visible { outline:2px solid var(--teal); outline-offset:3px; }
   .card-body { min-width: 0; padding: 8px 10px; }
-  .card-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 12px; font-weight: 550; text-align: left; }
+  .card-title { display: flex; align-items: center; gap: 2px; min-width: 0; }
+  .card-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 12px; font-weight: 550; text-align: left; }
   .misfiled-card { box-shadow: 0 0 0 1px color-mix(in srgb, var(--status-needs-changes) 70%, transparent); border-radius: 6px; }
   .misfiled-badge { position: absolute; top: 6px; right: 6px; z-index: 2; padding: 1px 6px; border: 0; border-radius: 4px; background: #3a1d1d; color: var(--status-needs-changes); font: inherit; font-size: 10px; font-weight: 600; }
   button.misfiled-badge { cursor: pointer; }
   button.misfiled-badge:hover { background: #4a2323; }
   button.misfiled-badge:focus-visible { outline: 1px solid var(--status-needs-changes); outline-offset: 2px; }
-  .version-tag { margin-left: 6px; color: var(--muted); font-size: .86em; font-variant-numeric: tabular-nums; }
+  .version-tag { flex: none; margin-left: 4px; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
   .card-name:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }
   .card-rating { display: flex; flex: 0 0 100%; min-width: 0; }
   .card-star { display: grid; place-items: center; flex: 0 1 24px; min-width: 0; height: 28px; padding: 0; background: transparent; color: var(--muted); border-radius: 3px; }

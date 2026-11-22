@@ -1962,7 +1962,12 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 
 /* Focused review keeps the persistent viewer and its feedback in the workspace. */
 .review-view-controls { display:flex; flex:0 0 auto; gap:4px; }
-.version-selector { width:142px; flex:0 0 auto; }
+.version-selector { min-width:142px; flex:0 0 auto; display:flex; }
+.version-selector .version-picker-trigger { width:100%; height:32px; justify-content:flex-start; }
+.version-selector .version-picker-trigger > svg:last-child { margin-left:auto; }
+/* The current-version slot never disappears: it reads "Current" or offers "Make current" at the same width. */
+.review-view-controls .make-current { min-width:112px; justify-content:center; }
+.review-view-controls .current-state, .review-view-controls .current-state:hover { gap:5px; color:var(--teal); background:color-mix(in srgb, var(--teal) 12%, var(--panel)); border-color:color-mix(in srgb, var(--teal) 28%, transparent); box-shadow:none; cursor:default; }
 .focused-review .desktop-nav-toggle, .focused-review .mobile-menu { display:none; }
 .focused-review .breadcrumb { min-width:0; }
 .focused-review .breadcrumb strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

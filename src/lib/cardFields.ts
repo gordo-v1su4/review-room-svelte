@@ -1,4 +1,5 @@
 export type CardFieldId =
+  | "version"
   | "status"
   | "rating"
   | "shortlist"
@@ -17,6 +18,8 @@ export const CARD_FIELD_DEFINITIONS: Array<{
   label: string;
   defaultVisible: boolean;
 }> = [
+  // Shown as a version dropdown right next to the asset name, not in the field row.
+  { id: "version", label: "Version", defaultVisible: true },
   { id: "status", label: "Status", defaultVisible: true },
   { id: "rating", label: "Rating", defaultVisible: true },
   { id: "shortlist", label: "Shortlist", defaultVisible: false },
