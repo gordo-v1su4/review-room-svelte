@@ -1,10 +1,10 @@
 export type PaneSizes = [number, number, number];
 export const DEFAULT_PANE_SIZES: PaneSizes = [27, 43, 30];
-const MINIMUMS = [220, 320, 240] as const;
+export const PANE_MIN_WIDTHS = [220, 660, 240] as const;
 
 export function paneMinimums(width: number): PaneSizes {
-  const available = Math.max(780, Number.isFinite(width) ? width : 780);
-  return MINIMUMS.map(value => value / available * 100) as PaneSizes;
+  const available = Math.max(1120, Number.isFinite(width) ? width : 1120);
+  return PANE_MIN_WIDTHS.map(value => value / available * 100) as PaneSizes;
 }
 
 /** Width excludes the two divider tracks. */
@@ -34,7 +34,7 @@ export function resizePanePair(value: PaneSizes, divider: 0 | 1, targetPercent: 
 
 /** Separate two-pane proportions leave saved three-pane preferences untouched. */
 export function twoPaneSizes(explorerPercent: number, width: number): PaneSizes {
-  const available = Math.max(540, Number.isFinite(width) ? width : 540);
-  const first = Math.max(220 / available * 100, Math.min(100 - 320 / available * 100, Number.isFinite(explorerPercent) ? explorerPercent : 40));
+  const available = Math.max(880, Number.isFinite(width) ? width : 880);
+  const first = Math.max(220 / available * 100, Math.min(100 - 660 / available * 100, Number.isFinite(explorerPercent) ? explorerPercent : 40));
   return [first, 100 - first, 0];
 }

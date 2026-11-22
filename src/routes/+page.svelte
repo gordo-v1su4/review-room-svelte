@@ -66,6 +66,8 @@
   import StillViewer from '$lib/components/StillViewer.svelte';
   import { annotationsEqual } from '$lib/annotations';
   import MediaCards from '$lib/components/MediaCards.svelte';
+  import VersionPicker from '$lib/components/VersionPicker.svelte';
+  import { formatVersion } from '../../convex/lib/shotCode';
   import { normalizeCreativeMetadata, type MetadataSaveState } from '$lib/asset-metadata';
   import { displayVersionMetadata, versionedSourceFile, type ImportedVersionMetadata } from '$lib/version-metadata-display';
   import MetadataSheet from '$lib/components/MetadataSheet.svelte';
@@ -92,7 +94,7 @@
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
   import { type LocalAsset, type ReviewAsset } from '$lib/review';
   import { createReviewSession, transitionReviewSession, type ReviewAction, type ReviewAccess } from '$lib/review-session';
-  import { observeProcessing, processingSource, processingPoster, processingSprite, processingAvailability, type ProcessingUpdate } from '$lib/processing';
+  import { observeProcessing, acceptsProcessingUpdate, processingSource, processingPoster, processingSprite, processingAvailability, type ProcessingUpdate } from '$lib/processing';
   let { data } = $props();
   const live = !!data.snapshot;
   let media = $state<ReviewAsset[]>([]);
@@ -340,6 +342,27 @@
   }
   // The saved current version (the pick); the displayed version follows whatever take is being reviewed.
   const savedPicks = $derived(new Map((data.snapshot?.assets ?? []).map(item => [item._id as string, item.currentVersionId as string | undefined])));
+  // Make current is applied in place (no reload); a newer server update replaces the override.
+  let currentOverrides = $state<Record<string, string>>({});
+  function currentVersionOf(assetId: string) {
+    return currentOverrides[assetId] ?? processing.find(item => item.assetId === assetId)?.versionId ?? savedPicks.get(assetId);
+  }
+  const versionOptions = $derived.by(() => {
+    const byAsset = new Map<string, { id: string; version: number; excluded: boolean }[]>();
+    for (const version of knownVersions) {
+      const list = byAsset.get(version.assetId) ?? [];
+      list.push({ id: version.id, version: version.version, excluded: version.excluded });
+      byAsset.set(version.assetId, list);
+    }
+    for (const list of byAsset.values()) list.sort((a, b) => a.version - b.version);
+    return byAsset;
+  });
+  const noVersions: { id: string; version: number; excluded: boolean }[] = [];
+  function versionsOf(assetId: string) { return versionOptions.get(assetId) ?? noVersions; }
+  function chooseCardVersion(assetId: string, versionId: string) {
+    if (activeId !== assetId) select(assetId);
+    selectAssetVersion(assetId, versionId);
+  }
   let misfiledAssetId = $state<string | null>(null), misfiledOpen = $state(false);
   const misfiledAsset = $derived(misfiledAssetId ? allAssets.find(asset => asset.id === misfiledAssetId) : undefined);
   const misfiledShots = $derived(misfiledAsset ? allAssets.filter(asset => asset.projectId === misfiledAsset.projectId && asset.folderId === misfiledAsset.folderId && !asset.misfiled && !!parseProductionCode(asset.assetCode) && asset.type === misfiledAsset.type)
@@ -354,7 +377,12 @@
     await ownerAction('copyAssets', { projectId, folderId: target.folderId ?? '', assetIds: copyIds, versionIds, ...(target.newFolderTitle !== undefined ? { newFolderTitle: target.newFolderTitle } : {}) });
   }
   async function makeCurrentVersion(assetId: string, versionId: string) {
-    try { await ownerAction('setCurrentVersion', { assetId, versionId }); }
+    try {
+      await ownerAction('setCurrentVersion', { assetId, versionId }, false);
+      currentOverrides[assetId] = versionId;
+      const number = knownVersions.find(version => version.id === versionId)?.version;
+      feedback = number ? `${formatVersion(number)} is now the current version.` : 'Current version changed.';
+    }
     catch (cause) { feedback = cause instanceof Error ? cause.message : 'Could not change the current version.'; }
   }
   async function toggleVersionExcluded(versionId: string, excluded: boolean) {
@@ -377,7 +405,7 @@
     player?.pause();
     const draft = versionDrafts.get(versionId);
     media = media.map(item => item.id === id ? { ...item,
-      versionId, metadataUpdatedAt: draft ? draft.metadataUpdatedAt : version.metadataUpdatedAt ?? null,
+      versionId, versionNumber: version.version, metadataUpdatedAt: draft ? draft.metadataUpdatedAt : version.metadataUpdatedAt ?? null,
       metadata: draft ? draft.metadata : metadataForVersion(version),
       url: version.processingState === 'ready' ? '/api/owner-media/' + id + '?versionId=' + versionId : '',
       poster: version.hasPoster && version.processingState === 'ready' ? '/api/owner-poster/' + id + '?versionId=' + versionId : undefined,
@@ -1043,14 +1071,12 @@
   function applyProcessing(updates: ProcessingUpdate[]) {
     for (const update of updates) {
       const previous = processing.find(item => item.assetId === update.assetId);
-      if (!previous || update.versionNumber < previous.versionNumber ||
-          (update.versionId !== previous.versionId && update.versionNumber <= previous.versionNumber) ||
-          (update.versionId === previous.versionId && update.updatedAt < previous.updatedAt) ||
-          (previous.job?._id === update.job?._id && (update.job?.attempt ?? 0) < (previous.job?.attempt ?? 0))) continue;
+      if (!previous || !acceptsProcessingUpdate(previous, update)) continue;
       processing = processing.map(item => item.assetId === update.assetId ? update : item);
+      if (update.versionId !== previous.versionId) delete currentOverrides[update.assetId];
       const displayed = media.find(item => item.id === update.assetId);
       if ((!selectedVersions[update.assetId] || selectedVersions[update.assetId] === '__current__') && (displayed?.versionId ?? null) !== update.versionId) {
-        media = media.map(item => item.id === update.assetId ? { ...item, versionId: update.versionId ?? undefined, metadata: undefined,
+        media = media.map(item => item.id === update.assetId ? { ...item, versionId: update.versionId ?? undefined, versionNumber: update.versionNumber || undefined, metadata: undefined,
           metadataUpdatedAt: null, duration: undefined, width: undefined, height: undefined, fps: undefined, codec: undefined } : item);
       }
       media = media.map(item => item.id === update.assetId ? { ...item,
@@ -1223,14 +1249,14 @@
               <section class="media-group" aria-label={filters.groupBy === 'none' ? 'Assets' : group.label}>
                 {#if filters.groupBy !== 'none'}<h3 class="group-heading">{group.label}<span>{group.assets.length}</span></h3>{/if}
                 {#if view === 'table'}<AssetTable onFixMisfiled={live ? id => { misfiledAssetId = id; misfiledOpen = true; } : undefined} onDragStart={startAssetDrag} onDragEnd={endAssetDrag} assets={group.assets} {activeId} checkedIds={checked.ids} onSelect={openReview} onCheck={checkAsset} onReview={review}/>
-                {:else}<MediaCards onFixMisfiled={live ? id => { misfiledAssetId = id; misfiledOpen = true; } : undefined} onDragStart={startAssetDrag} onDragEnd={endAssetDrag} access={localAccess} onReview={review} assets={group.assets} {activeId} checkedIds={checked.ids} {appearance} {view} onOpen={openReview} onCheck={checkAsset}/>{/if}
+                {:else}<MediaCards onFixMisfiled={live ? id => { misfiledAssetId = id; misfiledOpen = true; } : undefined} onDragStart={startAssetDrag} onDragEnd={endAssetDrag} access={localAccess} onReview={review} assets={group.assets} {activeId} checkedIds={checked.ids} {appearance} {view} onOpen={openReview} onCheck={checkAsset} versionsFor={live ? versionsOf : undefined} currentVersionFor={currentVersionOf} onSelectVersion={live ? chooseCardVersion : undefined}/>{/if}
               </section>
             {/each}
           {/if}
         </section>
       {/snippet}
       {#snippet viewer()}
-        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><div class="review-view-controls">{#if live && active.versionId}<div class="version-selector"><Stage1Select label="Asset version" value={selectedVersions[active.id] ?? "__current__"} items={[{ value: "__current__", label: "Latest version" }, ...knownVersions.filter(version => version.assetId === active.id).sort((a, b) => a.version - b.version).map(version => ({ value: version.id, label: `V${version.version}${version.excluded ? " · Excluded" : ""}` }))]} onValueChange={value => { if (active) selectAssetVersion(active.id, value); }}/></div>{#if selectedVersions[active.id] && selectedVersions[active.id] !== "__current__" && selectedVersions[active.id] !== savedPicks.get(active.id)}<button class="secondary-button make-current" title="Make this version the current version (the pick)" onclick={() => makeCurrentVersion(active.id, selectedVersions[active.id])}>Make current</button>{/if}{#if knownVersions.find(version => version.id === active.versionId)?.excluded}<button class="secondary-button make-current" title="Restore this take to Creative Studio Pro selections" onclick={() => toggleVersionExcluded(active.versionId!, false)}>Restore take</button>{:else}<button class="secondary-button make-current" title="Exclude this take from Creative Studio Pro selections without deleting it" onclick={() => toggleVersionExcluded(active.versionId!, true)}>Exclude take</button>{/if}<button class="secondary-button make-current" title="Copy this asset (the selected version) to an ordinary folder" onclick={() => beginCopy([active.id])}>Copy to folder</button>{/if}{#if focusedReview}<button class="icon-button" aria-label="Notes & info" title="Notes & info" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={18}/></button>{/if}<button class="icon-button" aria-label={focusedReview ? "Return to folder" : "Expand review"} title={focusedReview ? "Return to folder (Esc)" : "Expand review"} onclick={() => focusedReview ? void returnToFolder() : focusedReview = true}>{#if focusedReview}<Minimize2 size={18}/>{:else}<Maximize2 size={18}/>{/if}</button><button class="icon-button" aria-label="Close review" title="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div></div>
+        {#if active}<section class="review-pane" aria-label="Asset review"><div class="review-title"><div><h2 bind:this={reviewHeading} tabindex="-1" aria-live="polite">{active.name}</h2></div><div class="review-view-controls">{#if live && active.versionId}<div class="version-selector"><VersionPicker label="Asset version" versions={versionsOf(active.id)} value={active.versionId} currentId={currentVersionOf(active.id)} onChange={versionId => { if (active) selectAssetVersion(active.id, versionId); }}/></div>{#if active.versionId === currentVersionOf(active.id)}<span class="secondary-button make-current current-version-slot current-state" role="status" title="This version is the current version (the pick)"><Check size={14}/>Current</span>{:else}<button class="secondary-button make-current current-version-slot" title="Make this version the current version (the pick)" onclick={() => { if (active?.versionId) void makeCurrentVersion(active.id, active.versionId); }}>Make current</button>{/if}{#if knownVersions.find(version => version.id === active.versionId)?.excluded}<button class="secondary-button make-current secondary-version-action" title="Restore this take to Creative Studio Pro selections" onclick={() => toggleVersionExcluded(active.versionId!, false)}>Restore take</button>{:else}<button class="secondary-button make-current secondary-version-action" title="Exclude this take from Creative Studio Pro selections without deleting it" onclick={() => toggleVersionExcluded(active.versionId!, true)}>Exclude take</button>{/if}<button class="secondary-button make-current secondary-version-action" title="Copy this asset (the selected version) to an ordinary folder" onclick={() => beginCopy([active.id])}>Copy to folder</button><DropdownMenu.Root><DropdownMenu.Trigger class="secondary-button compact-version-actions" aria-label="More asset actions">Actions<ChevronDown size={13}/></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content class="selection-menu" align="end" sideOffset={6} collisionPadding={12}><DropdownMenu.Item onSelect={() => { if (active?.versionId) toggleVersionExcluded(active.versionId, !knownVersions.find(version => version.id === active.versionId)?.excluded); }}>{knownVersions.find(version => version.id === active.versionId)?.excluded ? 'Restore take' : 'Exclude take'}</DropdownMenu.Item><DropdownMenu.Item onSelect={() => { if (active) beginCopy([active.id]); }}>Copy to folder</DropdownMenu.Item></DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>{/if}{#if focusedReview}<button class="icon-button" aria-label="Notes & info" title="Notes & info" aria-pressed={showInspector} onclick={() => showInspector = !showInspector}><PanelRightOpen size={18}/></button>{/if}<button class="icon-button" aria-label={focusedReview ? "Return to folder" : "Expand review"} title={focusedReview ? "Return to folder (Esc)" : "Expand review"} onclick={() => focusedReview ? void returnToFolder() : focusedReview = true}>{#if focusedReview}<Minimize2 size={18}/>{:else}<Maximize2 size={18}/>{/if}</button><button class="icon-button" aria-label="Close review" title="Close review" onclick={closeReview}><PanelRightClose size={18}/></button></div></div>
           {#if activeMediaJob}<div class="media-job" role="status"><span>Processing: {activeMediaJob.status === 'ready' ? 'Ready' : activeMediaJob.status === 'cancelled' ? 'Cancelled' : activeMediaJob.status === 'error' ? 'Needs attention' : activeMediaJob.status === 'queued' ? 'Queued' : `${activeMediaJob.stage} in progress`}</span>{#if activeMediaJob.runId}<a href={`https://trigger.v1su4.dev/orgs/v1su4-91d9/projects/review-room-YXaz/env/prod/runs/${activeMediaJob.runId}`} target="_blank" rel="noopener noreferrer">Run {activeMediaJob.runId.slice(-8)}</a>{/if}{#if activeMediaJob.status === 'error' || activeMediaJob.status === 'cancelled' || (activeMediaJob.status === 'queued' && !activeMediaJob.runId)}<button onclick={() => retryMediaJob(activeMediaJob._id)}>{activeMediaJob.status === 'queued' ? 'Start processing' : 'Retry'}</button>{:else if activeMediaJob.status === 'running'}<button onclick={() => processingObserver?.refresh()}>Refresh</button>{/if}</div>{/if}
           {#if active.type === 'video'}<Player bind:this={player} onready={mediaReady} onended={reviewEnded} loop={!preview && reviewPlaybackMode === 'loop'} onfailure={previewFailed} sourceBlob={active.sourceFile instanceof File ? active.sourceFile : undefined} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} diagnostics={false} src={active.url} poster={active.poster} availability={active.availability ?? 'ready'} name={active.name} onmetadata={info => updateAsset(active.id, { duration: info.duration, width: info.width, height: info.height, fps: info.estimatedFps, codec: info.codec })} ontime={t => currentTime = t}/>{:else}<StillViewer onfailure={previewFailed} assetId={active.id} src={active.url} name={active.name} strokes={active.annotations.draft} dirty={!annotationsEqual(active.annotations.draft, active.annotations.saved)} canAnnotate={!preview}
               canDownload={true} onChange={strokes => review({ type: 'annotate', assetId: active.id, action: { type: 'replace', strokes } })} onSave={() => review({ type: 'annotate', assetId: active.id, action: { type: 'save' } })} onViewed={() => { if (!active.viewed) review({ type: 'mark-viewed', assetId: active.id }); }} onmetadata={info => { updateAsset(active.id, info); readySource = active.url; }}/>{/if}

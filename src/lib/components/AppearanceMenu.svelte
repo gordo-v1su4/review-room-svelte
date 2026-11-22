@@ -17,15 +17,18 @@
   let announcement = $state('');
   const preferences = $derived(normalizeAppearance(value));
   const fields = $derived(preferences.fieldOrder.map(id => CARD_FIELD_DEFINITIONS.find(field => field.id === id)!).filter(field => field.label.toLowerCase().includes(search.trim().toLowerCase())));
+  const movableFields = $derived(preferences.fieldOrder.filter(id => id !== 'version'));
   function toggleField(id: CardFieldId) {
     const visibleFields = preferences.visibleFields.includes(id) ? preferences.visibleFields.filter(field => field !== id) : [...preferences.visibleFields, id];
     onChange({ ...preferences, visibleFields });
   }
   function moveField(id: CardFieldId, direction: -1 | 1) {
+    if (id === 'version') return;
     const fieldOrder = [...preferences.fieldOrder];
-    const index = fieldOrder.indexOf(id), target = index + direction;
-    if (target < 0 || target >= fieldOrder.length) return;
-    [fieldOrder[index], fieldOrder[target]] = [fieldOrder[target], fieldOrder[index]];
+    const index = movableFields.indexOf(id), target = index + direction;
+    if (target < 0 || target >= movableFields.length) return;
+    const from = fieldOrder.indexOf(id), to = fieldOrder.indexOf(movableFields[target]);
+    [fieldOrder[from], fieldOrder[to]] = [fieldOrder[to], fieldOrder[from]];
     onChange({ ...preferences, fieldOrder });
     announcement = `${CARD_FIELD_DEFINITIONS.find(field => field.id === id)?.label} moved to position ${target + 1}`;
   }
@@ -73,11 +76,13 @@
         <input class="field-search" type="search" aria-label="Search card fields" placeholder="Find a field…" bind:value={search}/>
         <div class="field-list">
           {#each fields as field (field.id)}
-            {@const index = preferences.fieldOrder.indexOf(field.id)}
+            {@const index = field.id === 'version' ? -1 : movableFields.indexOf(field.id)}
             <div class="field-row">
               <label class="field-toggle"><input type="checkbox" checked={preferences.visibleFields.includes(field.id)} onchange={() => toggleField(field.id)}/><span>{field.label}</span></label>
-              <button type="button" class="field-move" aria-label={`Move ${field.label} up`} disabled={index === 0} onclick={() => moveField(field.id, -1)}><ArrowUp size={12}/></button>
-              <button type="button" class="field-move" aria-label={`Move ${field.label} down`} disabled={index === preferences.fieldOrder.length - 1} onclick={() => moveField(field.id, 1)}><ArrowDown size={12}/></button>
+              {#if field.id !== 'version'}
+                <button type="button" class="field-move" aria-label={`Move ${field.label} up`} disabled={index === 0} onclick={() => moveField(field.id, -1)}><ArrowUp size={12}/></button>
+                <button type="button" class="field-move" aria-label={`Move ${field.label} down`} disabled={index === movableFields.length - 1} onclick={() => moveField(field.id, 1)}><ArrowDown size={12}/></button>
+              {/if}
             </div>
           {:else}<p class="field-note">No matching fields.</p>{/each}
         </div>

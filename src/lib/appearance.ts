@@ -27,12 +27,15 @@ export function normalizeAppearance(value: unknown): AppearanceValue {
   const allFields = CARD_FIELD_DEFINITIONS.map(field => field.id);
   const sanitize = (items: unknown[]): CardFieldId[] => [...new Set(items.filter((id): id is CardFieldId => typeof id === 'string' && allFields.includes(id as CardFieldId)))];
   const order = Array.isArray(input.fieldOrder) ? sanitize(input.fieldOrder) : [];
+  const visible = Array.isArray(visibleFields) ? sanitize(visibleFields) : [...DEFAULT_VISIBLE_CARD_FIELDS];
+  // Preferences saved before the Version field existed always showed the version next to the name; keep it on.
+  if (Array.isArray(visibleFields) && (!Array.isArray(input.fieldOrder) || !input.fieldOrder.includes('version')) && visible.length && !visible.includes('version')) visible.unshift('version');
   return {
     aspect: aspect === 'square' || aspect === 'portrait' || aspect === 'landscape' ? aspect : DEFAULT_APPEARANCE.aspect,
     fit: fit === 'fit' ? 'fit' : 'fill',
     size: size === 'small' || size === 'large' ? size : 'medium',
     showInfo: typeof showInfo === 'boolean' ? showInfo : true,
-    visibleFields: Array.isArray(visibleFields) ? sanitize(visibleFields) : [...DEFAULT_VISIBLE_CARD_FIELDS],
+    visibleFields: visible,
     fieldOrder: [...order, ...allFields.filter(id => !order.includes(id))]
   };
 }
