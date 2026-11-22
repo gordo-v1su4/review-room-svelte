@@ -342,7 +342,7 @@
   }
   // The saved current version (the pick); the displayed version follows whatever take is being reviewed.
   const savedPicks = $derived(new Map((data.snapshot?.assets ?? []).map(item => [item._id as string, item.currentVersionId as string | undefined])));
-  // Make current is applied in place (no reload); a newer take arriving from the server replaces the override.
+  // Make current is applied in place (no reload); a newer server update replaces the override.
   let currentOverrides = $state<Record<string, string>>({});
   function currentVersionOf(assetId: string) {
     return currentOverrides[assetId] ?? processing.find(item => item.assetId === assetId)?.versionId ?? savedPicks.get(assetId);
@@ -1072,9 +1072,8 @@
   function applyProcessing(updates: ProcessingUpdate[]) {
     for (const update of updates) {
       const previous = processing.find(item => item.assetId === update.assetId);
-      if (!previous || update.versionNumber < previous.versionNumber ||
-          (update.versionId !== previous.versionId && update.versionNumber <= previous.versionNumber) ||
-          (update.versionId === previous.versionId && update.updatedAt < previous.updatedAt) ||
+      if (!previous || update.updatedAt < previous.updatedAt ||
+          (update.versionId !== previous.versionId && update.versionNumber <= previous.versionNumber && update.updatedAt === previous.updatedAt) ||
           (previous.job?._id === update.job?._id && (update.job?.attempt ?? 0) < (previous.job?.attempt ?? 0))) continue;
       processing = processing.map(item => item.assetId === update.assetId ? update : item);
       if (update.versionId !== previous.versionId) delete currentOverrides[update.assetId];
