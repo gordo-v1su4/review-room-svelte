@@ -1,8 +1,11 @@
 <script lang="ts">
   import BrandLogo from '$lib/components/BrandLogo.svelte';
+  import KeepSignedIn from '$lib/components/KeepSignedIn.svelte';
+  import type { KeepSignedIn as Keep } from '$lib/session-lifetime';
   import { resolve } from '$app/paths';
   let { data, form } = $props();
   let setup = $state(false);
+  let keep = $state<Keep>('session');
   let showSetup = $derived(setup || Boolean(form?.setupInvalid));
 </script>
 
@@ -17,6 +20,7 @@
       <label for="password">Password</label><input id="password" type="password" name="password" autocomplete="current-password" required />
       {#if form?.invalid}<p class="error" role="alert">Email or password was not accepted.</p>{/if}
       {#if form?.unauthorized}<p class="error" role="alert">This account does not have owner access.</p>{/if}
+      <KeepSignedIn bind:value={keep}/>
       <button class="primary" type="submit">Sign in</button>
     </form>
   {:else}
@@ -26,12 +30,13 @@
       <label for="setup-password">New password</label><input id="setup-password" type="password" name="password" autocomplete="new-password" minlength="8" required />
       <label for="owner-password">Current owner password</label><input id="owner-password" type="password" name="ownerPassword" autocomplete="current-password" required />
       {#if form?.setupInvalid}<p class="error" role="alert">Account setup was not completed. Check the owner email and passwords.</p>{/if}
+      <KeepSignedIn bind:value={keep}/>
       <button class="primary" type="submit">Create owner account</button>
     </form>
   {/if}
 
   {#if !data.ownerReady || showSetup}<button class="mode" type="button" onclick={() => showSetup ? location.assign('/studio/sign-in') : setup = true}>{showSetup ? 'Back to sign in' : 'Set up owner account'}</button>{/if}
-  <details class="legacy"><summary>Use current owner password</summary><form method="POST" action="?/legacy" class="fields"><label for="legacy-password">Owner password</label><input id="legacy-password" type="password" name="password" autocomplete="current-password" required />{#if form?.legacyInvalid}<p class="error" role="alert">Password not accepted.</p>{/if}<button type="submit">Continue</button></form></details>
+  <details class="legacy"><summary>Use current owner password</summary><form method="POST" action="?/legacy" class="fields"><label for="legacy-password">Owner password</label><input id="legacy-password" type="password" name="password" autocomplete="current-password" required />{#if form?.legacyInvalid}<p class="error" role="alert">Password not accepted.</p>{/if}<KeepSignedIn bind:value={keep}/><button type="submit">Continue</button></form></details>
 </main>
 
 <style>

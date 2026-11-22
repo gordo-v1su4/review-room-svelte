@@ -3,9 +3,9 @@ import { env } from '$env/dynamic/private';
 import { dev } from '$app/environment';
 import { error, redirect } from '@sveltejs/kit';
 import type { Cookies } from '@sveltejs/kit';
+import { ownerSessionCookie, ownerSessionValid, type KeepSignedIn } from '$lib/session-lifetime';
 
 const COOKIE = 'rr_owner';
-const LIFETIME = 7 * 24 * 60 * 60;
 
 function secret() {
   if (!env.REVIEW_ROOM_SESSION_SECRET) throw error(503, 'Owner session is not configured');
@@ -18,27 +18,24 @@ function equal(a: string, b: string) {
   const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
 }
+const now = () => Date.now() / 1000;
 
 export function passwordMatches(password: string) {
   if (!env.REVIEW_ROOM_OWNER_PASSWORD) throw error(503, 'Owner access is not configured');
   return equal(signature(password), signature(env.REVIEW_ROOM_OWNER_PASSWORD));
 }
 
-export function startOwnerSession(cookies: Cookies) {
-  const expiry = Math.floor(Date.now() / 1000) + LIFETIME;
-  const value = `${expiry}.${signature(String(expiry))}`;
-  cookies.set(COOKIE, value, { path: '/', httpOnly: true, secure: !dev, sameSite: 'lax', maxAge: LIFETIME });
+export function startOwnerSession(cookies: Cookies, keep: KeepSignedIn = 'session') {
+  const cookie = ownerSessionCookie(keep, now(), signature, !dev);
+  cookies.set(COOKIE, cookie.value, cookie.options);
 }
 
 export function ownerSignedIn(cookies: Cookies) {
-  const value = cookies.get(COOKIE);
-  if (!value) return false;
-  const [expiry, mac] = value.split('.');
-  return Boolean(expiry && mac && Number(expiry) > Date.now() / 1000 && equal(signature(expiry), mac));
+  return ownerSessionValid(cookies.get(COOKIE), now(), (expiry, mac) => equal(signature(expiry), mac));
 }
 
 export function requireOwner(cookies: Cookies) {
   if (!ownerSignedIn(cookies)) redirect(303, '/studio/sign-in');
 }
 
-export function endOwnerSession(cookies: Cookies) { cookies.delete(COOKIE, { path: '/' }); }
+export function endOwnerSession(cookies: Cookies) { cookies.delete(COOKIE, { path: '/', httpOnly: true, secure: !dev, sameSite: 'lax' }); }

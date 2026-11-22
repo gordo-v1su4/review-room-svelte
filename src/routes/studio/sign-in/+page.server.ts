@@ -5,6 +5,7 @@ import { api, internal } from '../../../../convex/_generated/api';
 import type { Actions, PageServerLoad } from './$types';
 import { ownerSignedIn, passwordMatches, startOwnerSession } from '$lib/server/owner-auth';
 import { db } from '$lib/server/personal';
+import { keepSignedInChoice } from '$lib/session-lifetime';
 
 const email = (value: FormDataEntryValue | null) => String(value ?? '').trim().toLowerCase();
 
@@ -36,7 +37,7 @@ export const actions: Actions = {
       client.setAuth(result.tokens.token);
       const user = await client.query(api.auth.loggedInAppUser, {});
       if (user?.role !== 'admin') return fail(403, { unauthorized: true });
-      startOwnerSession(cookies);
+      startOwnerSession(cookies, keepSignedInChoice(form.get('keep')));
     } catch {
       return fail(401, { invalid: true });
     }
@@ -63,7 +64,7 @@ export const actions: Actions = {
         return fail(400, { setupInvalid: true });
       }
       await db().mutation(internal.auth.bootstrapOwner, { authUserId: authUser._id });
-      startOwnerSession(cookies);
+      startOwnerSession(cookies, keepSignedInChoice(form.get('keep')));
     } catch {
       return fail(400, { setupInvalid: true });
     }
@@ -72,7 +73,7 @@ export const actions: Actions = {
   legacy: async ({ request, cookies }) => {
     const form = await request.formData();
     if (!passwordMatches(String(form.get('password') ?? ''))) return fail(401, { legacyInvalid: true });
-    startOwnerSession(cookies);
+    startOwnerSession(cookies, keepSignedInChoice(form.get('keep')));
     redirect(303, '/');
   }
 };
