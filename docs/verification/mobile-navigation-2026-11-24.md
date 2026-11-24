@@ -33,6 +33,24 @@ and one sample reviewer note do not write production data.
 The independently approved drawer changes include shared footer simplification on
 desktop. The subsequent workspace/panel refresh is limited to widths up to 640px.
 
+### User-requested browsing refinements
+
+After the first walkthrough, the user requested uniform compact controls and
+consistent folder colors/hover states. At 430px with touch emulation, Tools, Add,
+media filters and folder links now measure 28px tall with 5px corners; their tap
+areas extend vertically to 44px. Folder navigation and back were exercised again,
+and the document has no horizontal overflow. Font declarations were retained.
+
+The user separately requested a wider desktop sidebar and matching browsing
+controls. At 1280px with mouse input, the sidebar measures 300px. Ordinary and
+connected folder hover fills both compute to `rgba(27,32,34,.125)` with 5px corners;
+the connected label remains blue (`rgb(143,185,242)`) while hovered. Folder links
+are borderless and share Add media's compact height. These are explicit exceptions
+to preserving the wider layout, recorded in Design Spec section 15.
+
+Type checking still reports zero errors and eight existing warnings. The current
+production build also passes. These refinements remain pending user UI approval.
+
 ## Limits
 
 This verifies rendered UI and navigation using local dev data, not playback of
