@@ -12,10 +12,11 @@ Approved in this chat on 2026-11-24. Canonical visual decisions live in
 - Retain the approved navigation drawer, including its independently approved shared footer changes.
 - Apply the new browsing/review/panel arrangement only at viewport widths up to 640px.
 - Keep all wider desktop and intermediate layouts as they were before this refresh.
-- User-requested exceptions: a 300px desktop sidebar, uniform compact browsing controls and folder hover/color treatment, and shared Notes & info dropdown styling/content described below.
+- User-requested exceptions: a 300px desktop sidebar, folder hover/color styling, and shared Notes & info dropdown styling/content described below. Desktop control geometry otherwise matches the original main baseline; compact browsing geometry is phone-only.
 - Preserve role checks, selected versions, feedback drafts, canonical media and existing operations.
 - Verify vertical folder browsing, media filters and wrapped breadcrumbs without sideways scrolling.
 - Verify dedicated review with Menu and Back to folder available, plus Media and Notes & info sections.
+- Phone video frames always stay 16:9 at the available width, with controls below.
 - Verify secondary project, folder, account and publishing controls through Tools.
 - Verify inset dialogs, reachable close controls, and publishing's Section chooser with scrolling body.
 - Verify expandable phone table rows and retain the wider table.

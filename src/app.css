@@ -2084,13 +2084,13 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 
 /* Phone refresh: keep every new arrangement below the tablet breakpoint. */
 .library-filter-group { display:contents; }
-.app-shell .project-tools > button { height:var(--control-height);min-height:var(--control-height);border-radius:var(--control-radius); }
 /* Folder identity survives selection and hover in both navigation surfaces. */
 :is(.app-shell,.nav-drawer) .project-tree .collection-link.locked { color:var(--folder-locked); }
 :is(.app-shell,.nav-drawer) .project-tree .collection-link.connected { color:var(--folder-connected); }
 :is(.app-shell,.nav-drawer) .project-tree :is(.project-link,.collection-link):hover { background:var(--raised);border-radius:var(--control-radius); }
 @media(max-width:640px) {
   :root { --control-height:28px; }
+  .app-shell .project-tools > button { height:var(--control-height);min-height:var(--control-height);border-radius:var(--control-radius); }
   .app-shell .topbar { position:sticky;top:0;z-index:20;display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;gap:6px;min-height:60px;height:auto;padding:8px 12px;background:rgb(12 22 18 / 94%);backdrop-filter:blur(16px); }
   .app-shell .topbar .phone-hidden { display:none; }
   .app-shell.focused-review .mobile-menu { display:inline-flex; }
@@ -2143,20 +2143,25 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
   .app-shell.phone-review .review-view-controls :is(.version-selector,.current-version-slot) { grid-column:auto; }
   .app-shell.phone-review .review-title h2 { white-space:normal;overflow-wrap:anywhere; }
   .app-shell.phone-review .review-view-controls .compact-version-actions { grid-column:1 / -1; }
-  .app-shell.phone-review .picture { height:clamp(160px,35dvh,360px);aspect-ratio:auto; }
+  .app-shell.phone-review .picture { width:100%;height:auto;min-height:0;aspect-ratio:16 / 9; }
   .app-shell.phone-review .picture .preview-canvas { height:100%;object-fit:contain; }
   body .phone-panel[data-dialog-content],body .phone-tools-panel[data-dialog-content] { position:fixed;left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);width:calc(100% - 32px);max-width:420px;min-width:0;height:auto;max-height:80dvh;padding:16px;border-radius:12px;overflow-y:auto;overscroll-behavior:contain; }
   body .phone-panel :is(.sheet-heading,.dialog-heading,.inbox-heading,.archived-heading,.metadata-sheet-heading,.copy-heading,.misfiled-heading),.phone-panel-heading { position:sticky;top:-16px;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:8px;padding-block:8px;background:var(--panel); }
   .phone-panel-heading { margin-bottom:12px; }
   .phone-tools-content { display:grid;gap:16px;min-width:0; }
-  .phone-tools-content .project-tools { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%; }
+  .phone-tools-content .project-tools { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 8px;width:100%; }
   .phone-tools-content .project-tools > :is(button,span) { min-width:0;max-width:100%;white-space:normal; }
   .phone-tools-content .project-tools > .primary-button { grid-column:1 / -1; }
   .phone-tools-content .project-tools button[aria-label='Project settings']::after { content:'Project settings'; }
   .phone-tools-content .project-tools button[aria-label='Import options']::after { content:'Import options'; }
   .phone-tools-content .project-tools > button { width:100%;justify-content:flex-start;gap:8px; }
+  body .phone-tools-content .project-tools button { position:relative;display:flex;align-items:center;height:var(--control-height);min-height:var(--control-height);min-width:0;padding:0 12px;border-radius:var(--control-radius); }
+  body .phone-tools-content .project-tools button::before { content:'';position:absolute;inset:-8px 0; }
+  body .phone-tools-content .project-tools .folder-menu-trigger { width:28px;padding:0;justify-content:center; }
   .phone-tools-content .header-account-tools { display:flex;flex-wrap:wrap;justify-content:flex-start;margin:0;gap:8px; }
   body .phone-panel input:not([type='checkbox']),body .phone-panel textarea { min-width:0;max-width:100%;font-size:16px; }
+  .publishing-body :is(.shell,.panel,.stack,.field,.stage1-select-trigger) { min-width:0;max-width:100%; }
+  .publishing-body .stage1-select-trigger > span { min-width:0; }
   body :is(.selection-menu,.compact-view-menu,.workspace-menu) { max-width:calc(100vw - 32px);max-height:70dvh;overflow-y:auto;overflow-wrap:anywhere; }
   body :is(.appearance-popover,.filter-popover) { max-height:75dvh; }
 }

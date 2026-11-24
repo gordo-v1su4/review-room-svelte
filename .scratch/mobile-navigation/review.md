@@ -71,3 +71,12 @@ model choices were shown in the inset Asset fields panel. Reference options were
 empty in this fixture, so selecting multiple actual reference images is not
 claimed as browser-verified. No production metadata was saved. User UI acceptance
 of this shared desktop/phone correction remains pending.
+
+## Desktop-scope and player correction
+
+Focused Standards and Spec reviews rechecked the changes since `a5956b2` after the
+user reaffirmed original desktop geometry and an always-16:9 phone player. Both
+reported no findings: desktop folder/project control geometry restored; compact
+Tools and destination-select shrink rules confined to <=640px; phone frame ratio
+explicitly 16:9. Native baseline comparison and phone walkthrough evidence are in
+the verification record. No UI approval is inferred from these reviews.

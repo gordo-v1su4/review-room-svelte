@@ -1,6 +1,6 @@
 # Phone refresh plan and UI approval
 
-Current step: **1 — Browse folders and media, awaiting user review.**
+Current step: **5 — Final responsive review; walkthroughs shown, UI approval pending.**
 
 This checklist records delivery progress and user acceptance separately. Local
 checks and code review do not approve the UI on the user's behalf.
@@ -17,8 +17,10 @@ checks and code review do not approve the UI on the user's behalf.
 ## Visible walkthrough — one flow at a time
 
 For each step: show the native phone preview, demonstrate the flow, collect the
-user's feedback, implement adjustments, and record explicit approval here before
-moving to the next acceptance step. Keep the current step visible in chat.
+user's feedback, implement adjustments, and record approval when provided. Keep
+working through implementation and walkthroughs while acceptance is pending;
+pending UI approval does not stop development. Keep the current step visible in
+chat. Final UI approval still gates PR readiness, merge and deployment.
 
 1. **Browsing — CURRENT**
    - [x] Show requested refinements: compact 28px button faces, matching corners/padding, borderless folder links, consistent colored folder labels and hover fill.
@@ -33,16 +35,16 @@ moving to the next acceptance step. Keep the current step visible in chat.
    - [ ] Record user's approval of the metadata dropdown follow-up.
    - [x] Implement dedicated Media / Notes & info sections and Back to folder.
    - [x] Verify draft retention and inbox navigation locally.
-   - [ ] Demonstrate opening an asset, notes, previous/next and returning to its folder.
+   - [x] Demonstrate opening an asset, notes, previous/next and returning to its folder.
    - [ ] Record user's approval of review navigation.
 3. **Tools and panels**
    - [x] Group secondary actions under Tools.
    - [x] Implement inset panels, sticky heading/close and publishing Section chooser.
-   - [ ] Demonstrate project/folder tools and publishing sections, scrolling and closing.
+   - [x] Demonstrate project/folder tools and publishing sections, scrolling and closing.
    - [ ] Record user's approval of tools/panels.
 4. **Asset table**
    - [x] Implement expandable phone rows and retain the wider table.
-   - [ ] Demonstrate expanding fields, selection and opening/returning from review.
+   - [x] Demonstrate expanding fields, selection controls and opening/returning from review.
    - [ ] Record user's approval of phone table.
 5. **Final responsive acceptance**
    - [x] Check representative 320px/430px phone and 641px/1280px wider layouts locally.
@@ -68,3 +70,5 @@ physical iPhone behavior remain separate from synthetic local UI evidence.
 - 2026-11-24: User requested explicit screen-by-screen UI approval and a visible plan/goal. New screens remain unapproved.
 - 2026-11-24: Browsing walkthrough shown in the visible native browser at a verified 430px viewport: project → episode → nested folder → back; collapse folders; Videos filter; return to All media. Browsing approval is pending.
 - 2026-11-24: User requested uniform compact controls and folder hover behavior. Verified phone Tools/Add/filters/folder links all have 28px faces and 5px corners; expanded tap areas remain. Verified folder entry/back navigation and no horizontal overflow at 430px. At 1280px with mouse input, sidebar is 300px; connected and ordinary folder hover fills both compute to rgba(27,32,34,.125), radius 5px, and connected text remains rgb(143,185,242). Existing font declarations retained. `bun run check`: zero errors, eight existing warnings; Svelte autofixer reviewed (pre-existing non-style suggestions only). User approval remains pending.
+- 2026-11-24: User reaffirmed original desktop layout, retaining requested dropdown/styling corrections. Restored desktop folder controls to baseline 32px, 10px padding and original borders; compact face changes are phone-only. Desktop project tool heights restored. Compared original commit in an isolated baseline checkout: heading 21px, topbar 58px, Add media 28px, library folder/filter 32px and explorer toolbar 50px match. Existing 300px sidebar request retained. Found Square appearance preference in the working preview versus Landscape in baseline and restored Landscape via Appearance. Phone video frame now measures 398.02 × 223.88 at measured viewport 430 × 767 (16:9). User requested continued work, so individual pending acceptance boxes no longer stop implementation/walkthroughs.
+- 2026-11-24: Continued visible phone walkthrough: next/previous asset, Notes section and Back to folder; Tools → publishing Upload/Private review and closing both panels; expanded table row → Open review → Back to folder, preserving expansion and reachable Menu. Corrected Tools project buttons to 28px within the phone-only portal. Found and fixed publishing's horizontal overflow from a long destination name: publishing body and descendants now fit (no overflowing descendants). Final UI acceptance remains pending; no approval is inferred.

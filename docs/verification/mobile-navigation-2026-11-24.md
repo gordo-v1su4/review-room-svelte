@@ -78,6 +78,39 @@ zero fail. Production build and diff whitespace checks pass. Focused Standards
 review found no issues; both Spec findings were fixed and rechecked. UI approval
 is pending; the native phone preview shows the new Model menu.
 
+### Desktop restoration and 16:9 follow-up
+
+The user reaffirmed that desktop layout must match the original, retaining the
+requested dropdown/styling changes and earlier wider-sidebar request. Superseding
+the earlier compact desktop-control note above, folder/filter geometry is restored
+to the original 32px height and 10px padding, with original folder borders. Project
+tool button geometry is restored; compact geometry and the subsequent Tools and
+publishing overflow corrections are confined to the phone breakpoint.
+
+Compared rendered desktop with an isolated detached checkout of `c880092` using
+mouse input at 1280 × 900. Both use heading font 21px, topbar height 58px, Add media
+28px with 12px padding/5px corners, folder/filter controls 32px with 10px padding/5px
+corners, and explorer toolbar 50px. Content width differs by the explicitly
+requested sidebar widening (220px baseline versus 300px current at this width).
+The working preview had Square 1:1 selected in Appearance while baseline used
+Landscape 16:9; restored Landscape using the Appearance UI. Existing sidebar footer
+and dropdown/color/hover corrections remain intentional shared changes. This is
+rendered measurement evidence for these controls, not a claim of pixel identity
+across every state.
+
+Phone `.picture` now has `aspect-ratio:16/9` and automatic height, replacing the
+viewport-height clamp. At measured CSS viewport 430 × 767 its frame measures
+398.02 × 223.88 (ratio 1.77783). The frame contains media; controls are below it.
+The synthetic fixture cannot play actual stored media.
+
+Continued native walkthrough verified next/previous asset, Notes, Back to folder,
+Tools, publishing Upload → Private review and panel closing, expanded table row →
+review → Back with its expansion retained, and Menu opening after scrolling.
+Tools project buttons now measure 28px. A long publishing destination previously
+overflowed by 18px; after the phone-only shrink rule the panel measures
+396px client/scroll width with no overflowing descendants. User approval remains
+pending; implementation did not stop at individual acceptance gates.
+
 ## Limits
 
 This verifies rendered UI and navigation using local dev data, not playback of
