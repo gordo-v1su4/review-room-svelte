@@ -51,6 +51,12 @@ to preserving the wider layout, recorded in Design Spec section 15.
 Type checking still reports zero errors and eight existing warnings. The current
 production build also passes. These refinements remain pending user UI approval.
 
+The compact-control revision was additionally checked at a measured CSS viewport
+of 320 × 640: document scroll width is 320px, with Tools, Add, filters and folder
+links retaining 28px faces. The preview's 80% display scaling required compensating
+device metrics; dimensions above come from the rendered document, not the device
+preset label. The preview was restored to a measured 430px width afterward.
+
 ## Limits
 
 This verifies rendered UI and navigation using local dev data, not playback of
