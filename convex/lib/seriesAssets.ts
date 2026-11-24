@@ -61,35 +61,46 @@ export type ChangeFeed = {
 
 const versionChangedAt = (version: Doc<'assetVersions'>) => Math.max(version.createdAt, version.metadataUpdatedAt ?? 0, version.updatedAt ?? 0);
 
-/** Assets (and their versions) in a project or one folder that changed after `since`. Items near the cursor may repeat: treat it as an upsert feed. */
-export async function changesSince(ctx: QueryCtx | MutationCtx, projectId: Id<'projects'>, since: number, folderId?: Id<'projectFolders'>): Promise<ChangeFeed> {
-  const assets = folderId
+/**
+ * The rows behind a change read: every asset in scope that changed after `since`, each with its changed versions, plus removals.
+ * Items near the cursor may repeat. `assetIds` is every asset in scope, changed or not.
+ */
+export async function changedSince(ctx: QueryCtx | MutationCtx, projectId: Id<'projects'>, since: number, folderId?: Id<'projectFolders'>) {
+  const scope = folderId
     ? await ctx.db.query('videos').withIndex('by_project_folder', q => q.eq('projectId', projectId).eq('folderId', folderId)).collect()
     : await ctx.db.query('videos').withIndex('by_project', q => q.eq('projectId', projectId)).collect();
   const after = since - CURSOR_OVERLAP_MS;
   let cursor = since;
-  const feed: ChangeFeed = { cursor: '', assets: [], versions: [], removedAssets: [] };
-  for (const removed of await ctx.db.query('removedAssets').withIndex('by_project_removed', q => q.eq('projectId', projectId).gt('removedAt', after)).collect()) {
-    if (folderId && removed.folderId !== folderId) continue;
-    cursor = Math.max(cursor, removed.removedAt);
-    feed.removedAssets.push({ assetId: removed.assetId, folderId: removed.folderId ?? null, mergedIntoAssetId: removed.mergedIntoAssetId ?? null, reason: removed.reason, removedAt: removed.removedAt });
+  const removed: Doc<'removedAssets'>[] = [];
+  for (const row of await ctx.db.query('removedAssets').withIndex('by_project_removed', q => q.eq('projectId', projectId).gt('removedAt', after)).collect()) {
+    if (folderId && row.folderId !== folderId) continue;
+    cursor = Math.max(cursor, row.removedAt);
+    removed.push(row);
   }
-  for (const asset of assets) {
+  const assets: { asset: Doc<'videos'>; versions: Doc<'assetVersions'>[] }[] = [];
+  for (const asset of scope) {
     // Every version change stamps versionsUpdatedAt on its asset, so quiet polls never read old take histories.
     if (Math.max(asset.updatedAt, asset.versionsUpdatedAt ?? 0) <= after) continue;
     const versions = await ctx.db.query('assetVersions').withIndex('by_asset', q => q.eq('assetId', asset._id)).collect();
     const changed = versions.filter(version => versionChangedAt(version) > after);
     if (asset.updatedAt <= after && !changed.length) continue;
     cursor = Math.max(cursor, asset.updatedAt, ...changed.map(versionChangedAt));
-    feed.assets.push({ assetId: asset._id, folderId: asset.folderId ?? null, assetCode: asset.assetCode ?? null, title: asset.title, status: asset.status,
-      currentVersionId: asset.currentVersionId ?? null, misfiled: !!asset.misfiled, copiedFromAssetId: asset.copiedFromAssetId ?? null, updatedAt: asset.updatedAt });
-    for (const version of changed) {
-      feed.versions.push({ versionId: version._id, assetId: asset._id, version: version.version, isCurrent: version._id === asset.currentVersionId,
-        processingState: version.processingState, mimeType: version.mimeType, createdAt: version.createdAt, metadataUpdatedAt: version.metadataUpdatedAt ?? null,
-        excluded: !!version.excluded });
-    }
+    assets.push({ asset, versions: changed });
   }
-  feed.assets.sort((a, b) => a.updatedAt - b.updatedAt);
-  feed.cursor = String(cursor);
-  return feed;
+  return { cursor, assets, removed, assetIds: scope.map(asset => asset._id) };
+}
+
+/** Assets (and their versions) in a project or one folder that changed after `since`. Items near the cursor may repeat: treat it as an upsert feed. */
+export async function changesSince(ctx: QueryCtx | MutationCtx, projectId: Id<'projects'>, since: number, folderId?: Id<'projectFolders'>): Promise<ChangeFeed> {
+  const changed = await changedSince(ctx, projectId, since, folderId);
+  return {
+    cursor: String(changed.cursor),
+    assets: changed.assets.map(({ asset }) => ({ assetId: asset._id, folderId: asset.folderId ?? null, assetCode: asset.assetCode ?? null, title: asset.title, status: asset.status,
+      currentVersionId: asset.currentVersionId ?? null, misfiled: !!asset.misfiled, copiedFromAssetId: asset.copiedFromAssetId ?? null, updatedAt: asset.updatedAt }))
+      .sort((a, b) => a.updatedAt - b.updatedAt),
+    versions: changed.assets.flatMap(({ asset, versions }) => versions.map(version => ({ versionId: version._id, assetId: asset._id, version: version.version,
+      isCurrent: version._id === asset.currentVersionId, processingState: version.processingState, mimeType: version.mimeType, createdAt: version.createdAt,
+      metadataUpdatedAt: version.metadataUpdatedAt ?? null, excluded: !!version.excluded }))),
+    removedAssets: changed.removed.map(row => ({ assetId: row.assetId, folderId: row.folderId ?? null, mergedIntoAssetId: row.mergedIntoAssetId ?? null, reason: row.reason, removedAt: row.removedAt })),
+  };
 }

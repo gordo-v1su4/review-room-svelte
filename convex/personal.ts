@@ -5,12 +5,12 @@ import { importedMediaMetadata } from './lib/sourceImport';
 import { v, ConvexError } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from './_generated/api';
 import { getReviewLink, passcodeDigest, randomSecret } from "./lib/reviewAccess";
 import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, movePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
 import { validateFolderParent, disposeFolder } from './lib/folderTree';
-import { setCurrentAssetVersion, setVersionExclusion } from './lib/seriesAssets';
+import { changedSince, setCurrentAssetVersion, setVersionExclusion } from './lib/seriesAssets';
 import { fileAsTake, moveMisfiled } from './lib/misfiled';
 import { copyAssetsToFolder, sharedStorageKeys } from './lib/assetCopy';
 
@@ -80,6 +80,34 @@ export const snapshot = internalQuery({
   },
 });
 
+/** What the workspace shows for an asset's current version. Exposes no storage keys. */
+async function processingOf(ctx: Ctx, asset: Doc<'videos'>) {
+  const currentVersion = asset.currentVersionId ? await ctx.db.get(asset.currentVersionId) : null;
+  const version = currentVersion?.assetId === asset._id ? currentVersion : null;
+  const job = version
+    ? await ctx.db.query('mediaJobs').withIndex('by_version', q => q.eq('versionId', version._id)).unique()
+    : null;
+  return {
+    assetId: asset._id, versionId: version?._id ?? null, versionNumber: version?.version ?? 0,
+    updatedAt: Math.max(asset.updatedAt, job?.updatedAt ?? 0),
+    ready: asset.processingStatus === 'ready' && version?.processingState === 'ready',
+    hasPoster: !!version?.posterKey, hasSprite: !!(job?.status === "ready" && job.spriteKey),
+    duration: asset.durationSec, width: asset.width, height: asset.height,
+    job: job ? { _id: job._id, assetId: job.assetId, versionId: job.versionId,
+      attempt: job.attempt, status: job.status, stage: job.stage, runId: job.runId,
+      createdAt: job.createdAt, updatedAt: job.updatedAt } : undefined
+  };
+}
+
+/** One take as the workspace lists it. Exposes no storage keys. */
+async function versionDetailsOf(ctx: Ctx, version: Doc<'assetVersions'>) {
+  const job = await ctx.db.query("mediaJobs").withIndex("by_version", q => q.eq("versionId", version._id)).unique();
+  return { id: version._id, assetId: version.assetId, version: version.version,
+    processingState: version.processingState, hasPoster: !!version.posterKey, hasSprite: !!(job?.status === "ready" && job.spriteKey),
+    sizeBytes: version.sizeBytes, mimeType: version.mimeType, excluded: !!version.excluded,
+    metadata: version.creativeMetadata ?? null, metadataUpdatedAt: version.metadataUpdatedAt ?? null };
+}
+
 // Observation exposes no storage keys, credentials or review-link tokens.
 export const processing = internalQuery({
   args: { assetIds: v.array(v.id('videos')) },
@@ -91,24 +119,37 @@ export const processing = internalQuery({
       if (!asset) return null;
       const project = await ctx.db.get(asset.projectId);
       if (!project || project.createdBy !== profile._id) return null;
-      const currentVersion = asset.currentVersionId ? await ctx.db.get(asset.currentVersionId) : null;
-      const version = currentVersion?.assetId === assetId ? currentVersion : null;
-      const job = version
-        ? await ctx.db.query('mediaJobs').withIndex('by_version', q => q.eq('versionId', version._id)).unique()
-        : null;
-      return {
-        assetId, versionId: version?._id ?? null, versionNumber: version?.version ?? 0,
-        updatedAt: Math.max(asset.updatedAt, job?.updatedAt ?? 0),
-        ready: asset.processingStatus === 'ready' && version?.processingState === 'ready',
-        hasPoster: !!version?.posterKey, hasSprite: !!(job?.status === "ready" && job.spriteKey),
-        duration: asset.durationSec, width: asset.width, height: asset.height,
-        job: job ? { _id: job._id, assetId: job.assetId, versionId: job.versionId,
-          attempt: job.attempt, status: job.status, stage: job.stage, runId: job.runId,
-          createdAt: job.createdAt, updatedAt: job.updatedAt } : undefined
-      };
+      return await processingOf(ctx, asset);
     }));
     return updates.filter(update => update !== null);
   }
+});
+
+/**
+ * What changed in one project since a cursor, shaped for an open owner workspace: the same change detection as the
+ * automation changes feed, so a quiet read costs one pass over the project's assets and returns almost nothing.
+ * `known` is how many of the project's assets the workspace holds; every asset id is listed only when that differs,
+ * which is how a plain delete (no removal record) is noticed.
+ */
+export const changes = internalQuery({
+  args: { projectId: v.id('projects'), since: v.number(), known: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const { project } = await ownedProject(ctx, args.projectId);
+    if (!Number.isSafeInteger(args.since) || args.since < 0) throw new Error('Invalid cursor');
+    const changed = await changedSince(ctx, project._id, args.since);
+    return {
+      cursor: String(changed.cursor),
+      assets: await Promise.all(changed.assets.map(async ({ asset }) => ({
+        id: asset._id, projectId: asset.projectId, folderId: asset.folderId ?? null, name: asset.assetCode ?? asset.title, assetCode: asset.assetCode ?? '',
+        originalFilename: asset.originalFilename, mimeType: asset.mimeType, sizeBytes: asset.sizeBytes ?? 0, importedAt: asset.uploadedAt,
+        misfiled: !!asset.misfiled, tags: asset.tags, status: asset.status, rating: asset.rating, shortlisted: asset.isSelect, viewed: asset.viewed,
+        processing: await processingOf(ctx, asset),
+      }))),
+      versions: await Promise.all(changed.assets.flatMap(({ versions }) => versions.map(version => versionDetailsOf(ctx, version)))),
+      removedAssetIds: changed.removed.map(row => row.assetId),
+      ...(args.known !== undefined && args.known !== changed.assetIds.length ? { assetIds: changed.assetIds } : {}),
+    };
+  },
 });
 
 async function deleteOwnedAssets(ctx: MutationCtx, projectId: Id<'projects'>, assetIds: Id<'videos'>[], allowArchived = false, purgeOwnerId?: Id<'appUsers'>) {
@@ -441,11 +482,7 @@ export const versionDetails = internalQuery({
     const asset = version && await ctx.db.get(version.assetId);
     if (!version || !asset) return null;
     await ownedProject(ctx, asset.projectId, true);
-    const job = await ctx.db.query("mediaJobs").withIndex("by_version", q => q.eq("versionId", version._id)).unique();
-    return { id: version._id, assetId: asset._id, version: version.version,
-      processingState: version.processingState, hasPoster: !!version.posterKey, hasSprite: !!(job?.status === "ready" && job.spriteKey),
-      sizeBytes: version.sizeBytes, mimeType: version.mimeType, excluded: !!version.excluded,
-      metadata: version.creativeMetadata ?? null, metadataUpdatedAt: version.metadataUpdatedAt ?? null };
+    return await versionDetailsOf(ctx, version);
   },
 });
 

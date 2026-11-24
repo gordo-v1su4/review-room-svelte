@@ -1921,8 +1921,18 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
   stop-color: color-mix(in srgb, var(--project-accent, #14b8a6) 8%, #363d3a);
 }
 
-/* Let navigation and workspace share one continuous surface. */
-.app-shell {
+/*
+ * Let navigation and workspace share one continuous surface. It is drawn on the window, not on the page, so it
+ * looks the same however far the page is scrolled (on the page it stretched over the whole scroll height and the
+ * navigation faded to black on the way down).
+ */
+.app-shell { isolation: isolate; }
+.app-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background:
     radial-gradient(ellipse 85% 50% at 5% 0%, #171e1d 0%, transparent 72%),
     linear-gradient(90deg, transparent 0%, rgb(0 0 0 / 15%) 42%, #000 100%),

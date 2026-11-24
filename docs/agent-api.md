@@ -52,6 +52,10 @@ To connect an existing empty folder, the Creative Studio Pro credential sends `P
 - Locked folders cannot be connected to Trailer Feed. In the workspace, select deliverables (or open one and pick a version) and use **Copy to folder** to copy them into an ordinary folder, then connect that folder. A copy is a new asset that shares the stored file, keeps its code and metadata and records `copiedFromAssetId`/`copiedFromVersionId`; editing or deleting either side never affects the other, and stored files are only removed once no asset uses them. Copies appear in the changes feed with `copiedFromAssetId`; upload-by-code always targets the original.
 - Ownership is tied to the credential ID, so revoking the owning credential leaves its folders locked. Keep the Creative Studio Pro credential long-lived.
 
+## What an open workspace shows
+
+An open owner workspace follows what this API changes without a reload: within about ten seconds, and at once when its window is shown or focused again. It follows the open project's current versions, review statuses, excluded takes, new takes, new assets and removed assets. An asset that shows its current version moves to the new pick; a take the owner chose to look at stays on screen and only the "Current" mark moves. New or renamed folders and new notes still need a reload.
+
 ## Workspace addresses
 
 The owner workspace writes what is open into its address, so a link from another app, or a reload, lands on the same thing:
