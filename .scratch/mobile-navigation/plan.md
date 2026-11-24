@@ -24,7 +24,7 @@ moving to the next acceptance step. Keep the current step visible in chat.
    - [x] Implement persistent Menu/location/Tools/Add header.
    - [x] Implement vertical collapsible folders and separate wrapping filters.
    - [x] Remove sideways phone navigation and wrap the folder path.
-   - [ ] Demonstrate project → nested folder → back, filters, and folder collapse.
+   - [x] Demonstrate project → nested folder → back, filters, and folder collapse.
    - [ ] Record user's approval of browsing.
 2. **Review and notes**
    - [x] Implement dedicated Media / Notes & info sections and Back to folder.
@@ -62,3 +62,4 @@ physical iPhone behavior remain separate from synthetic local UI evidence.
 - 2026-11-24: Drawer approved by user: "that looks identical on both ... that one looks good."
 - 2026-11-24: Five design recommendations approved for mobile only.
 - 2026-11-24: User requested explicit screen-by-screen UI approval and a visible plan/goal. New screens remain unapproved.
+- 2026-11-24: Browsing walkthrough shown in the visible native browser at a verified 430px viewport: project → episode → nested folder → back; collapse folders; Videos filter; return to All media. Browsing approval is pending.
