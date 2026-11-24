@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PhoneSelect from './PhoneSelect.svelte';
   import { onDestroy, tick, untrack } from 'svelte';
   import { Dialog } from 'bits-ui';
   import { UsersRound, X, LockKeyhole, Globe2, Users } from 'lucide-svelte';
@@ -89,7 +90,7 @@
           <form onsubmit={add} aria-busy={access.busy}>
             <label for="project-member-identifier">Add a person or email rule</label>
             <input id="project-member-identifier" bind:this={memberInput} bind:value={identifier} placeholder="Email, name or *@studio.com" autocomplete="off" disabled={access.busy} aria-describedby="project-access-rule-help"/>
-            <div class="add-actions"><label>Role<select bind:value={role} disabled={access.busy}><option value="editor">Editor</option><option value="viewer">Viewer</option></select></label><button type="submit" class="btn preset-tonal-primary" disabled={access.busy || !identifier.trim()}>{access.busy ? 'Saving…' : 'Add access'}</button></div>
+            <div class="add-actions"><label>Role<PhoneSelect label="Role" bind:value={role} disabled={access.busy} items={[{value:"editor",label:"Editor"},{value:"viewer",label:"Viewer"}]}/></label><button type="submit" class="btn preset-tonal-primary" disabled={access.busy || !identifier.trim()}>{access.busy ? 'Saving…' : 'Add access'}</button></div>
             <p id="project-access-rule-help" class="rule-help">Names match existing users. Email rules apply when a matching user signs in. Adding access makes a private project shared.</p>
           </form>
         {/if}
@@ -126,7 +127,7 @@
   .read-only-visibility { color: var(--ink); }
   .read-only-visibility span { display: block; font-size: 11px; color: var(--muted); }
   form { display: grid; gap: 7px; margin-top: 18px; }
-  input,select { min-width: 0; border: 1px solid var(--border); background: var(--canvas); color: var(--ink); border-radius: 5px; padding: 6px 9px; font-size: 12px; }
+  input,:global(.phone-select-trigger:where(.access-sheet *)) { min-width: 0; border: 1px solid var(--border); background: var(--canvas); color: var(--ink); border-radius: 5px; padding: 6px 9px; font-size: 12px; }
   input { width: 100%; }
   .add-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .add-actions label { display: flex; align-items: center; gap: 8px; }
@@ -142,7 +143,7 @@
   .remove-member { width: 28px; padding: 0; border: 0; background: transparent; }
   .save-message { min-height: 18px; margin-bottom: 0; }
   .access-error { color: var(--status-needs-changes); }
-  button:focus-visible,input:focus-visible,select:focus-visible,:global(.access-trigger:focus-visible),:global(.access-close:focus-visible) { outline: 1px solid var(--focus-ring); outline-offset: 2px; }
+  button:focus-visible,input:focus-visible,:global(.phone-select-trigger:where(.access-sheet *)):focus-visible,:global(.access-trigger:focus-visible),:global(.access-close:focus-visible) { outline: 1px solid var(--focus-ring); outline-offset: 2px; }
   @media(max-width: 760px) { :global(.access-sheet) { width: 100%; border-radius: 10px 10px 0 0; padding-bottom: max(18px, env(safe-area-inset-bottom)); } }
-  @media(pointer: coarse) { button,:global(.access-trigger),:global(.access-close) { min-height: 44px; min-width: 44px; } input,select { min-height: 44px; font-size: 16px; } }
+  @media(pointer: coarse) { button,:global(.access-trigger),:global(.access-close) { min-height: 44px; min-width: 44px; } input,:global(.phone-select-trigger:where(.access-sheet *)) { min-height: 44px; font-size: 16px; } }
 </style>

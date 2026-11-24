@@ -1653,6 +1653,8 @@ button {
 
 .filter-field { display: grid; gap: 7px; margin: 16px 0; color: var(--muted); font-size: 11px; }
 .filter-field select { width: 100%; min-height: 36px; padding: 0 10px; background: var(--canvas); color: var(--ink); border: 1px solid var(--border); border-radius: var(--control-radius); font: inherit; }
+.filter-field .phone-select-trigger { width:100%;min-height:36px;padding-inline:10px;font:inherit; }
+@media (pointer:coarse) and (min-width:641px) { .filter-field .phone-select-trigger { min-height:44px;font-size:16px; } }
 .filter-actions { display: flex; justify-content: space-between; margin-top: 22px; }
 
 @media (pointer:coarse) { .filter-field select { min-height: 44px; font-size: 16px; } }
@@ -2114,7 +2116,25 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
   .phone-review-tabs button:focus-visible { outline:0;box-shadow:none;background:color-mix(in srgb,var(--teal) 30%,var(--panel));color:var(--ink); }
   body :is(.stage1-select-trigger,.stage1-select-item) { min-height:28px;font-size:11px; }
   body .stage1-select-trigger { height:28px; }
-  .app-shell .page-content .project-heading { display:block;margin-bottom:16px; }
+  body :is(.version-picker-trigger,.version-picker-item,.asset-status-trigger,.asset-status-option) { min-height:28px;height:28px;font-size:12px;padding-block:0;border:0; }
+  body :is(.phone-select-trigger,.phone-select-item,.stage1-select-trigger,.stage1-select-item) { font-size:12px; }
+  body .phone-select-trigger.phone-select-trigger { height:28px;min-height:28px;font-size:12px; }
+  body .metadata-sheet .phone-select-trigger.phone-select-trigger { border:0;outline:0;box-shadow:none; }
+  body .metadata-sheet .phone-select-trigger.phone-select-trigger:focus-visible { background:color-mix(in srgb,var(--teal) 12%,var(--canvas)); }
+  body .metadata-sheet.phone-panel .asset-fields :is(input,textarea) { font-size:12px;outline:0;box-shadow:none; }
+  .app-shell .metadata-sheet-trigger { height:28px;min-height:28px;font-size:12px; }
+  .app-shell .mobile-menu { border:0;box-shadow:none;background:transparent;color:var(--muted); }
+  .app-shell .mobile-menu:hover { color:var(--ink);background:transparent; }
+  .app-shell .page-content { padding-top:12px;padding-inline:16px;min-height:0; }
+  .app-shell .time-toggle { font-size:12px;gap:7px; }
+  .app-shell .time-toggle input { width:16px;height:16px; }
+  .app-shell .time-toggle svg { width:15px;height:15px; }
+  .app-shell .inspector-heading button { min-height:28px;height:28px;padding-block:0;font-size:12px; }
+  .app-shell .inspector-tabs { min-height:36px; }
+  .app-shell .card-check { appearance:none;width:16px;height:16px;border:0;border-radius:3px;background:rgb(0 0 0 / 65%);box-shadow:none; }
+  .app-shell .card-check:checked { appearance:auto;accent-color:var(--teal); }
+  .app-shell .page-content .project-heading { display:block;margin-bottom:8px; }
+  .app-shell .project-heading .subtitle-placeholder { display:none; }
   .app-shell .project-heading h1 { overflow-wrap:anywhere; }
   .app-shell .project-heading .folder-path { overflow:visible; }
   .app-shell .folder-path ol { width:auto;flex-wrap:wrap;white-space:normal;gap:4px; }

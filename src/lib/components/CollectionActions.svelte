@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PhoneSelect from './PhoneSelect.svelte';
   import { Dialog, DropdownMenu } from 'bits-ui';
   import { Layers, MoreHorizontal, Pencil, Save, Trash2, X } from 'lucide-svelte';
 
@@ -82,7 +83,7 @@
       <Dialog.Description class="collection-description">{#if operation === 'create'}Save a view of your media as a collection.{:else if operation === 'rename'}Update the name of “{collectionTitle}”.{:else if operation === 'remove'}Delete “{collectionTitle}”? Only the collection is removed. Your media stays where it is.{:else}Replace the rules for “{collectionTitle}” with the current explorer filters. Choose the media these rules search below.{/if}</Dialog.Description>
       <form onsubmit={submit}>
         {#if operation === 'create' || operation === 'rename'}<label class="collection-field">Collection name<input aria-label="Collection name" bind:value={name} placeholder="Collection name" maxlength="100" required/></label>
-        {:else if operation === 'save'}<label class="collection-field">Source folder<select aria-label="Collection source folder" bind:value={sourceFolderId}><option value="">All project media</option>{#each folders as folder (folder.id)}<option value={folder.id}>{folder.title}</option>{/each}</select></label>{/if}
+        {:else if operation === 'save'}<label class="collection-field">Source folder<PhoneSelect label="Collection source folder" bind:value={sourceFolderId} items={[{value:"",label:"All project media"},...folders.map(folder => ({value:folder.id,label:folder.title}))]}/></label>{/if}
         <p class="session-note">Stored in this tab only.</p>
         {#if error}<p class="collection-error" role="alert">{error}</p>{/if}
         <div class="dialog-actions"><Dialog.Close class="collection-cancel" type="button">Cancel</Dialog.Close><button type="submit" class="collection-submit" class:danger={operation === 'remove'} disabled={!canEdit || ((operation === 'create' || operation === 'rename') && !name.trim())}>{operation === 'create' ? 'Create collection' : operation === 'rename' ? 'Save name' : operation === 'remove' ? 'Delete collection' : 'Save rules'}</button></div>
@@ -107,7 +108,7 @@
   :global(.collection-close) { display: grid; place-items: center; width: 28px; height: 28px; background: transparent; border: 0; border-radius: 4px; color: var(--muted); cursor: pointer; }
   :global(.collection-description) { display: block; margin: 8px 0 18px; font-size: 12px; line-height: 1.6; color: var(--muted); }
   .collection-field { display: grid; gap: 7px; font-size: 11px; color: var(--muted); }
-  .collection-field input,.collection-field select { width: 100%; min-width: 0; height: 34px; padding: 0 9px; color: var(--ink); background: var(--canvas); border: 1px solid var(--border); border-radius: 5px; font: inherit; font-size: 12px; }
+  .collection-field input,.collection-field :global(.phone-select-trigger:where(.collection-dialog *)) { width: 100%; min-width: 0; height: 34px; padding: 0 9px; color: var(--ink); background: var(--canvas); border: 1px solid var(--border); border-radius: 5px; font: inherit; font-size: 12px; }
   .session-note { color: var(--muted); margin: 10px 0 0; font-size: 10px; }
   .collection-error { color: #e6a2a2; font-size: 12px; line-height: 1.5; margin: 12px 0 0; }
   .dialog-actions { display: flex; justify-content: end; gap: 7px; margin-top: 20px; }
@@ -115,6 +116,6 @@
   .collection-submit { border-color: transparent; background: color-mix(in srgb, var(--accent, #62b9aa) 22%, var(--panel)); }
   .collection-submit.danger { color: #ecc2c2; background: #592f32; }
   .collection-submit:disabled { opacity: .4; cursor: default; }
-  :global(.collection-button:focus-visible),:global(.collection-close:focus-visible),:global(.collection-cancel:focus-visible),.collection-submit:focus-visible,.collection-field input:focus-visible,.collection-field select:focus-visible { outline: 1px solid var(--accent, #62b9aa); outline-offset: 2px; }
-  @media(pointer: coarse) { :global(.collection-button),:global(.collection-menu-item),:global(.collection-close),:global(.collection-cancel),.collection-submit { min-height: 44px; } :global(.collection-menu-trigger),:global(.collection-close) { min-width: 44px; } .collection-field input,.collection-field select { height: 44px; font-size: 16px; } }
+  :global(.collection-button:focus-visible),:global(.collection-close:focus-visible),:global(.collection-cancel:focus-visible),.collection-submit:focus-visible,.collection-field input:focus-visible,.collection-field :global(.phone-select-trigger:where(.collection-dialog *)):focus-visible { outline: 1px solid var(--accent, #62b9aa); outline-offset: 2px; }
+  @media(pointer: coarse) { :global(.collection-button),:global(.collection-menu-item),:global(.collection-close),:global(.collection-cancel),.collection-submit { min-height: 44px; } :global(.collection-menu-trigger),:global(.collection-close) { min-width: 44px; } .collection-field input,.collection-field :global(.phone-select-trigger:where(.collection-dialog *)) { height: 44px; font-size: 16px; } }
 </style>

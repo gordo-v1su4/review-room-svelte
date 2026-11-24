@@ -10,6 +10,8 @@
     placeholder = 'Choose an option',
     required = false,
     disabled = false,
+    triggerClass = '',
+    status,
     onValueChange,
     multiple = false,
     values = $bindable([]),
@@ -23,6 +25,8 @@
     placeholder?: string;
     required?: boolean;
     disabled?: boolean;
+    triggerClass?: string;
+    status?: string;
     onValueChange?: (value: string) => void;
     multiple?: boolean;
     values?: string[];
@@ -35,7 +39,7 @@
 </script>
 
 {#snippet controls(display: string)}
-  <Select.Trigger {id} class="phone-select-trigger" aria-label={label} title={display}>
+  <Select.Trigger {id} class={`phone-select-trigger ${triggerClass}`} data-status={status} aria-label={label} title={display}>
     <span>{display}</span><ChevronDown size={14} aria-hidden="true" />
   </Select.Trigger>
   <Select.Portal>

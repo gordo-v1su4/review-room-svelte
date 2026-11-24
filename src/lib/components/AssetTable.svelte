@@ -35,8 +35,8 @@
   }
 </script>
 
-{#snippet statusControl(asset: ReviewAsset & AssetReview)}<select class="asset-status-select" data-status={asset.status} aria-label={`Status for ${asset.name}`} value={asset.status} onchange={event => changeStatus(asset.id, event.currentTarget.value)}>{#if asset.status === 'archived'}<option value="archived" disabled>Archived</option>{/if}{#each statuses as status (status.value)}<option value={status.value}>{status.label}</option>{/each}</select>{/snippet}
-{#snippet ratingControl(asset: ReviewAsset & AssetReview)}<select aria-label={`Rating for ${asset.name}`} value={asset.rating} onchange={event => onReview({type:'rate',assetId:asset.id,rating:Number(event.currentTarget.value)})}><option value={0}>Unrated</option>{#each [1,2,3,4,5] as rating (rating)}<option value={rating}>{rating} {rating === 1 ? 'star' : 'stars'}</option>{/each}</select>{/snippet}
+{#snippet statusControl(asset: ReviewAsset & AssetReview)}<PhoneSelect triggerClass="asset-status-select" status={asset.status} label={`Status for ${asset.name}`} value={asset.status} items={asset.status === "archived" ? [{value:"archived",label:"Archived",disabled:true},...statuses] : [...statuses]} onValueChange={value => changeStatus(asset.id,value)}/>{/snippet}
+{#snippet ratingControl(asset: ReviewAsset & AssetReview)}<PhoneSelect label={`Rating for ${asset.name}`} value={String(asset.rating)} items={ratings} onValueChange={value => onReview({type:"rate",assetId:asset.id,rating:Number(value)})}/>{/snippet}
 
 <!-- Keyboard focus allows horizontal scrolling without trapping focus in table controls. -->
 {#if phoneViewport.current}
@@ -47,7 +47,7 @@
       <div class="phone-asset-fields">
         <button type="button" class="asset-title" data-asset-id={asset.id} onclick={event => onSelect(asset.id, event)}>{#if asset.type === 'video'}<Film size={15}/>{:else}<Image size={15}/>{/if}Open review</button>
         <label class="phone-check"><input type="checkbox" aria-label={`Select ${asset.name}`} checked={checkedIds.includes(asset.id)} onclick={event => onCheck(asset.id, event, true)}/>Select asset</label>
-        <label>Status<PhoneSelect label={`Status for ${asset.name}`} value={asset.status} items={asset.status === 'archived' ? [{value:'archived',label:'Archived',disabled:true},...statuses] : [...statuses]} onValueChange={value => changeStatus(asset.id,value)}/></label>
+        <label>Status<PhoneSelect triggerClass="asset-status-select" status={asset.status} label={`Status for ${asset.name}`} value={asset.status} items={asset.status === 'archived' ? [{value:'archived',label:'Archived',disabled:true},...statuses] : [...statuses]} onValueChange={value => changeStatus(asset.id,value)}/></label>
         <label>Rating<PhoneSelect label={`Rating for ${asset.name}`} value={String(asset.rating)} items={ratings} onValueChange={value => onReview({type:'rate',assetId:asset.id,rating:Number(value)})}/></label>
         <button type="button" class="shortlist-control phone-shortlist" aria-label={`Shortlist ${asset.name}`} aria-pressed={asset.shortlisted} onclick={() => onReview({type:'shortlist',assetId:asset.id,shortlisted:!asset.shortlisted})}><Bookmark size={15} fill={asset.shortlisted ? 'currentColor' : 'none'}/></button><span class="note-count">{asset.comments.length} notes</span>
         {#if asset.misfiled && onFixMisfiled}<button type="button" class="misfiled-tag" onclick={() => onFixMisfiled?.(asset.id)}>Misfiled · File…</button>{/if}
@@ -104,14 +104,14 @@
   .version-tag { flex-shrink: 0; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
   .asset-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .media-kind { font-size: 9px; color: var(--muted); margin-left: auto; }
-  select { min-height: 30px; max-width: 160px; padding: 4px 22px 4px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--canvas); color: var(--ink); font: inherit; cursor: pointer; }
+  :global(.phone-select-trigger:where(.asset-table-region *, .phone-asset-rows *)) { min-height: 30px; max-width: 160px; padding: 4px 22px 4px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--canvas); color: var(--ink); font: inherit; cursor: pointer; }
   .shortlist-control { min-height: 30px; min-width: 30px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--muted); }
   .shortlist-control[aria-pressed='true'] { color:var(--selection-accent); background:var(--raised); }
   .note-count { color: var(--muted); font-variant-numeric: tabular-nums; }
   input[type='checkbox'] { accent-color:var(--teal); }
-  select:focus-visible, .asset-table-region:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+  :global(.phone-select-trigger:where(.asset-table-region *, .phone-asset-rows *)):focus-visible, .asset-table-region:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
   @media (pointer: coarse), (max-width: 760px) {
-    select, .asset-title, .shortlist-control { min-height: 44px; }
+    :global(.phone-select-trigger:where(.asset-table-region *, .phone-asset-rows *)), .asset-title, .shortlist-control { min-height: 44px; }
     .shortlist-control { min-width: 44px; }
     th, td { padding: 8px; }
   }
@@ -127,7 +127,7 @@
     .phone-asset-name { min-width:0;overflow-wrap:anywhere; }
     .phone-asset-fields { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:center;gap:12px;padding:12px;border-top:1px solid var(--border); }
     label { display:grid;gap:6px;min-width:0;color:var(--muted);font-size:11px; }
-    select { width:100%;max-width:100%;font-size:16px; }
+    :global(.phone-select-trigger:where(.asset-table-region *, .phone-asset-rows *)) { width:100%;max-width:100%;font-size:16px; }
     .phone-check { display:flex;align-items:center;gap:8px;min-height:44px; }
     .asset-title { min-height:28px;font-size:11px; }
     .phone-shortlist { display:grid;place-items:center;justify-self:start;min-width:28px;width:28px;min-height:28px;height:28px;padding:0;border:0;border-radius:5px;background:var(--canvas); }

@@ -95,3 +95,14 @@ No merge or deployment is included. Actual signed-in local playback is now verif
 - 2026-11-24: User approved the compact stars and bookmark appearance on black: "that's nice ... the size that it is ... for sure." Preserve this treatment. User rejected a draw-over menu; clarification requested to identify whether Workspace tools, Publish & share or left drawer is meant before altering the previously approved drawer. A suspected Back-to-folder bounce was not reproduced in the focused follow-up: after activation the asset query was removed and the folder remained visible across settled checks. No navigation fix is claimed or introduced from that inconclusive observation.
 
 - 2026-11-24: Expanded real-media table row fits at 320px (clientWidth/scrollWidth both286). Open review then Back to folder preserves expansion. Replaced phone-row native Status/Rating selects with PhoneSelect; desktop snippets/table are unchanged. User rejected bulky menus and requested icon-only bookmarks. Removed PhoneSelect coarse-pointer expansion (16px/44px) and overrode Stage1Select coarse sizing only at <=640px; dropdown text/rows now11px/28px. Phone table bookmark has no visible Shortlist label, retains its accessible name, and measures28x28. Native browser confirmed Status option11px/28px and icon-only bookmark. No status/rating/bookmark mutation was performed. Svelte autofixer reports no issues for AssetTable/PhoneSelect; check reported zero errors/eight existing warnings before the final cosmetic adjustments. The main drawer remains unchanged.
+
+## Latest control consistency pass
+
+- [x] Fields group row spans from All at the left to Creative at the right with evenly distributed gaps.
+- [x] Search and completeness match exactly:28px height and equal widths (123.18px each at320px viewport); both12px text.
+- [x] Tags/input focus has border0,outline none,shadow none; tinted fill replaces clipped rings. Production notes/Prompt start112px high.
+- [x] Fields trigger28px; note time label12px,checkbox16px. Hamburger square border removed. Empty nested-folder subtitle and excess heading spacing removed on phones.
+- [x] Phone status/version menu rows28px/12px; icon-only bookmark retained.
+- [x] User explicitly expanded desktop scope to remove all remaining native blue product dropdowns. All product native selects replaced; native selects remain only on dev preview/QA routes. Desktop filter trigger remains36px and table status semantic color hooks are retained.
+- [x] Focused Spec review found two issues (desktop filter height, table status color hook); fixed and re-reviewed with no new findings. Check0errors8existingwarnings;330tests pass. Autofixer findings outside replaced controls are existing suggestions/link diagnostics.
+- [ ] User UI acceptance still pending. No PR/push/deployment authorized.

@@ -157,7 +157,7 @@ The review toolbar groups a bookmark Shortlist control beside the rating stars. 
 
 Use the same routes and functionality on desktop, tablet, and phone; no separate mobile site. Preserve the calm desktop visual system while changing the arrangement to fit the available space.
 
-The phone refresh applies at viewport widths of 640px and below. Wider and intermediate layouts keep their existing arrangement. Phone navigation, folders, filters, breadcrumbs, and asset tables require no horizontal scrolling. The drawer refresh is also phone-only; above 640px preserve the published sidebar, drawer, footer, controls and metadata appearance.
+The phone refresh applies at viewport widths of 640px and below. Wider and intermediate layouts keep their existing arrangement. Phone navigation, folders, filters, breadcrumbs, and asset tables require no horizontal scrolling. The drawer refresh is also phone-only; above 640px preserve the published sidebar, drawer, footer and layout. The explicit cross-size exception is themed dropdowns replacing browser-native blue lists.
 
 On phones, keep a sticky header with Menu, the current location or a labelled Back to folder action, Tools, and Add media. Tools groups secondary project, folder, publishing and account controls. Browse folders as vertical rows in an initially expanded Folders disclosure; show media-type and shortlist filters in their own wrapping group. Breadcrumbs wrap. Opening an asset presents a dedicated review screen with Media and Notes & info sections, preserving the selected version and note draft. Back to folder closes the review and restores focus to its asset where possible.
 
@@ -166,7 +166,7 @@ Phone dialogs sit inset from all screen edges and use at most 80% of the dynamic
 Workspace menus share a dark 80% opaque blurred surface, a subtle outer border, and small corner radii. Options use flat fills without individual outlines, consistent row heights and gaps, and white text over muted brand teal for selected non-status options. Status choices use the same semantic colors as media status badges. Appearance switches use the Upload CTA's brand teal; the layout switcher is a single segmented surface without outlined segments. Review-link readiness uses a distinct green indicator.
 
 Notes & info uses this same themed dropdown for metadata completeness, class,
-model, custom fields, image grid and reference-image selection on phones. Wider layouts keep their original native metadata controls and model choices.
+model, custom fields, image grid and reference-image selection at every size. Product dropdowns use themed lists rather than browser-native blue menus, including filters, table status/rating, folder/collection destinations, access roles, markup width and legacy review controls. Wider layouts retain surrounding geometry and existing model choices.
 Menus stay within the viewport and wrap long labels. Asset class shows Video,
 Image, Contact sheet and Storyboard; incompatible source-file families stay visible
 but disabled with a short explanation. Image models include the workspace's
@@ -211,3 +211,5 @@ Setup-specific operations content is delivered only after server owner authoriza
 1. Admin workspace → 2. Client review page → 3. Video card system → 4. Right-side viewer panel → 5. Rating/comment/approval interactions → 6. Filters + smart-view tabs → 7. Upload states → 8. Table view → 9. Grouped (stacked) view → 10. Mobile refinements.
 
 The **video card** and the **right-side viewer** are the two components everything else hangs on.
+
+Phone control refinements (2026-11-24): use 28px single-line controls with 12px text. Fields categories use space-between alignment across the whole row, from All at the left edge to Creative at the right. Search and completeness use equal columns; metadata value columns align to them. Text inputs/dropdowns use no outer border or focus outline; a tinted fill and caret indicate focus. Keep tags within the scroll area, and start Production notes/Prompt textareas at112px. Fields trigger is28px; note time/checkbox uses12px text and a16px checkbox. Hamburger has no square outline. Hide the unused nested-folder subtitle and reduce phone heading spacing. Status/version menu rows match compact triggers.

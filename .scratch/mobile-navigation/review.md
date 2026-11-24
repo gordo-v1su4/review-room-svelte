@@ -130,3 +130,9 @@ Acceptance still required: browsing, review navigation and metadata, Tools/publi
 
 ---
 
+
+## Latest user-requested dropdown exception and sizing
+
+The user explicitly requested removal of native blue dropdown lists on desktop as well as phones. This supersedes the earlier native-desktop-control preservation note above. Replaced all remaining product native selects, preserving options, callbacks, disabled states and wider layout geometry. Dev-only preview/QA selects remain native. Phone Fields now uses equal28px controls/12px text, borderless tinted focus, edge-spaced categories and112px notes/prompt textareas. Fields trigger, note time styling, hamburger and nested-folder heading spacing are refined only <=640px.
+
+Focused Spec review found desktop filter height and status-color-hook regressions; both fixed and rechecked. Desktop Sort by trigger measures36px and opens the themed list. At320px Fields has no horizontal overflow; search/completeness widths both123.18px,height28px,font12px. Tag entry focus computes border0/outline none/shadow none. Production notes measures112px/font12px. All330tests pass; typecheck0errors8existingwarnings. Screenshots fields-aligned-controls.jpg and desktop-themed-sort.jpg are outside Git. UI acceptance remains pending and PR hold unchanged.

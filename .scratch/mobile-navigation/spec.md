@@ -27,7 +27,7 @@ Approved in this chat on 2026-11-24. Canonical visual decisions live in
 
 Replace native selects throughout Asset metadata with the existing dark themed
 dropdowns: completeness, asset class, model, custom-field type/boolean, image grid
-and multiple reference images. This correction applies only on phones; the wider inspector retains its original controls. Asset class lists Video, Image, Contact
+and multiple reference images. The user subsequently requested themed product dropdowns on desktop as well (2026-11-24), while retaining wider layout geometry. Asset class lists Video, Image, Contact
 sheet and Storyboard, with incompatible source-file families disabled rather than
 silently relabelling a still image as a video or vice versa. Add the user's requested image-model labels GPT Imagen 2.6,
 Nano Banana Pro, Nano Banana 2.1 and Seedream 5.0; retain existing video presets,
