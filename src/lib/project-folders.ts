@@ -13,6 +13,22 @@ export function folderAncestors(folders: readonly ProjectFolder[], folderId?: st
 export function folderPath(folders: readonly ProjectFolder[], folderId: string): string {
   return folderAncestors(folders, folderId).map(folder => folder.title).join(' / ');
 }
+/** Folder browsing includes this folder and every descendant in the same project. */
+export function folderSubtreeIds(folders: readonly ProjectFolder[], folderId: string): Set<string> {
+  const root = folders.find(folder => folder.id === folderId);
+  const ids = new Set<string>();
+  if (!root) return ids;
+  const pending = [root.id];
+  while (pending.length) {
+    const id = pending.pop()!;
+    if (ids.has(id)) continue;
+    ids.add(id);
+    for (const child of folders) {
+      if (child.projectId === root.projectId && child.parentFolderId === id && !ids.has(child.id)) pending.push(child.id);
+    }
+  }
+  return ids;
+}
 export const lockedFolderMessage = 'Folder is locked: it is managed by Creative Studio Pro';
 /** True when moving this folder would also move a locked folder underneath it. */
 export function hasLockedDescendant(folders: readonly ProjectFolder[], folderId: string): boolean {

@@ -73,7 +73,7 @@
   import Stage1SharingDialog from '$lib/components/Stage1SharingDialog.svelte';
   import ArchivedProjects from '$lib/components/ArchivedProjects.svelte';
   import { updateProjectIdentity, setProjectArchived, prepareProjectBanner, type ProjectIdentity, type ProjectIdentityDraft } from '$lib/project-identity';
-  import { transitionFolderState, folderCoverUrl, folderAncestors, folderPath, canRestructureFolder, type FolderState, type FolderAction } from '$lib/project-folders';
+  import { transitionFolderState, folderCoverUrl, folderAncestors, folderPath, folderSubtreeIds, canRestructureFolder, type FolderState, type FolderAction } from '$lib/project-folders';
   import { canDropFolder, underscoreFoldersFirst } from '$lib/folder-tree';
   import { updateTags } from '$lib/bulk-tags';
   import StillViewer from '$lib/components/StillViewer.svelte';
@@ -157,9 +157,10 @@
   const project = $derived(projects.find(item => item.id === projectId)!);
   const inbox = $derived(feedbackDigests(activeProjects, allAssets, { isAdmin: folderAccess.isAdmin, projectIds: folderAccess.editableProjectIds }));
   let inboxSeek = $state<{ assetId: string; time: number } | null>(null);
+  const folderScopes = $derived(new Map(organization.folders.map(folder => [folder.id, folderSubtreeIds(organization.folders, folder.id)])));
   const treeProjects = $derived(activeProjects.map(project => {
     const items = allAssets.filter(asset => asset.projectId === project.id && !asset.archived);
-    return { ...project, collections: collections.collections.filter(collection => collection.projectId === project.id).map(collection => ({ ...collection, count: queryCollectionAssets(collection, allAssets).length })), folders: foldersWithConnections.filter(folder => folder.projectId === project.id).map(folder => ({ ...folder, count: items.filter(asset => asset.folderId === folder.id).length })), archivedCount: allAssets.filter(asset => asset.projectId === project.id && asset.archived).length, videoCount: items.filter(asset => asset.type === 'video').length, imageCount: items.filter(asset => asset.type === 'image').length, shortlistCount: items.filter(asset => asset.shortlisted).length };
+    return { ...project, collections: collections.collections.filter(collection => collection.projectId === project.id).map(collection => ({ ...collection, count: queryCollectionAssets(collection, allAssets).length })), folders: foldersWithConnections.filter(folder => folder.projectId === project.id).map(folder => ({ ...folder, count: items.filter(asset => asset.folderId && folderScopes.get(folder.id)?.has(asset.folderId)).length })), archivedCount: allAssets.filter(asset => asset.projectId === project.id && asset.archived).length, videoCount: items.filter(asset => asset.type === 'video').length, imageCount: items.filter(asset => asset.type === 'image').length, shortlistCount: items.filter(asset => asset.shortlisted).length };
   }));
   const activeId = $derived(session.activeAssetId);
   function review(action: ReviewAction) {
@@ -263,10 +264,11 @@
   const identityRequests = new Map<string, symbol>();
   const active = $derived(assets.find(asset => asset.id === activeId));
   const activeMediaJob = $derived(processing.find(item => item.assetId === active?.id)?.job);
-  const directAssets = $derived(activeFolderId ? assets.filter(asset => asset.folderId === activeFolderId) : assets);
+  const activeFolderScope = $derived(activeFolderId ? folderScopes.get(activeFolderId) : undefined);
+  const folderAssets = $derived(activeFolderId ? assets.filter(asset => asset.folderId && activeFolderScope?.has(asset.folderId)) : assets);
   const scopedAssets = $derived(activeCollection?.sourceFolderId
     ? assets.filter(asset => asset.folderId === activeCollection.sourceFolderId)
-    : activeFolderId ? assets.filter(asset => asset.folderId === activeFolderId) : assets);
+    : folderAssets);
   // Inside a folder the default order is by code (natural sort), so shots read in order.
   const effectiveSort = $derived(filters.sort === 'default' ? (activeFolderId ? 'code' as const : 'newest' as const) : filters.sort);
   const visible = $derived(activeCollection && !collectionIsConfigured(activeCollection) ? [] : queryWorkspace(scopedAssets, {
@@ -1309,7 +1311,7 @@
 {#snippet accountControls()}<DocumentationLink/>{#if live}<WorkActivity feed={activityFeed} onOpen={openActivity}/>{/if}{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}{/snippet}
 {#snippet sharingControl()}{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot} onVersionFile={queueReplacement} uploadContext={!project.archived && projectId !== "__empty__" ? {folders:folderDestinations,...importOptions,onChange:value => importOptions = value,onChoose:() => picker.click()} : undefined} destinationContext={!project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId) ? {projectId,folderId:activeFolderId,selectedVersionIds:destinationSelection} : undefined}/>{/if}{/snippet}
 {#snippet childFolderLinks()}{#each childFolders as folder (folder.id)}
-          <button class="library-folder" class:locked={folder.locked} class:connected={folder.connected && !folder.locked} title={folder.locked ? `${folder.title} · Locked, managed by Creative Studio Pro` : folder.connected ? `${folder.title} · Connected to Trailer Feed` : folder.title} onclick={() => openRealFolder(projectId, folder.id)}>{#if folder.locked}<FolderLock size={14}/>{:else if folder.connected}<FolderSync size={14}/>{:else}<Folder size={14}/>{/if}<span class="library-folder-name">{folder.title}</span><span class="library-folder-count">{assets.filter(asset => asset.folderId === folder.id).length}</span></button>
+          <button class="library-folder" class:locked={folder.locked} class:connected={folder.connected && !folder.locked} title={folder.locked ? `${folder.title} · Locked, managed by Creative Studio Pro` : folder.connected ? `${folder.title} · Connected to Trailer Feed` : folder.title} onclick={() => openRealFolder(projectId, folder.id)}>{#if folder.locked}<FolderLock size={14}/>{:else if folder.connected}<FolderSync size={14}/>{:else}<Folder size={14}/>{/if}<span class="library-folder-name">{folder.title}</span><span class="library-folder-count">{assets.filter(asset => asset.folderId && folderScopes.get(folder.id)?.has(asset.folderId)).length}</span></button>
         {/each}{/snippet}
 {#snippet navigationHeader()}
   <div class="brand"><BrandLogo/><button class="icon-button sidebar-collapse" aria-label="Collapse navigation" title="Collapse navigation" aria-expanded="true" onclick={() => navCollapsed = true}><PanelLeft size={18} strokeWidth={1.6}/></button></div>
@@ -1376,10 +1378,10 @@
         <h2>This project is archived.</h2><p>Your media, folders and feedback are retained.</p>
         <div><button class="primary-button" onclick={() => { restoreProject(project.id); void focusProjectHeading(); }}>Restore project</button><button class="secondary-button" onclick={() => projectDialog = true}>New project</button></div>
       </section>{:else if !activeCollectionId && !archived && !focusedReview}<nav class="library-navigation" aria-label="Folders and media filters"><div class="library-filter-group">
-        <button class="library-filter" class:chosen={mediaType === 'all' && !filters.statuses.length && !filters.selectedOnly} aria-pressed={mediaType === 'all' && !filters.statuses.length && !filters.selectedOnly} onclick={() => openScopedCollection('all')}>All media<span>{directAssets.length}</span></button>
-        <button class="library-filter" class:chosen={mediaType === 'video'} aria-pressed={mediaType === 'video'} onclick={() => openScopedCollection('video')}><Film size={14}/>Videos<span>{directAssets.filter(asset => asset.type === 'video').length}</span></button>
-        <button class="library-filter" class:chosen={mediaType === 'image'} aria-pressed={mediaType === 'image'} onclick={() => openScopedCollection('image')}><Image size={14}/>Images<span>{directAssets.filter(asset => asset.type === 'image').length}</span></button>
-        <button class="library-filter" class:chosen={filter === 'selected'} aria-pressed={filter === 'selected'} onclick={() => openScopedCollection('selected')}><Bookmark size={14}/>Shortlist<span>{directAssets.filter(asset => asset.shortlisted).length}</span></button>
+        <button class="library-filter" class:chosen={mediaType === 'all' && !filters.statuses.length && !filters.selectedOnly} aria-pressed={mediaType === 'all' && !filters.statuses.length && !filters.selectedOnly} onclick={() => openScopedCollection('all')}>All media<span>{folderAssets.length}</span></button>
+        <button class="library-filter" class:chosen={mediaType === 'video'} aria-pressed={mediaType === 'video'} onclick={() => openScopedCollection('video')}><Film size={14}/>Videos<span>{folderAssets.filter(asset => asset.type === 'video').length}</span></button>
+        <button class="library-filter" class:chosen={mediaType === 'image'} aria-pressed={mediaType === 'image'} onclick={() => openScopedCollection('image')}><Image size={14}/>Images<span>{folderAssets.filter(asset => asset.type === 'image').length}</span></button>
+        <button class="library-filter" class:chosen={filter === 'selected'} aria-pressed={filter === 'selected'} onclick={() => openScopedCollection('selected')}><Bookmark size={14}/>Shortlist<span>{folderAssets.filter(asset => asset.shortlisted).length}</span></button>
         </div>
         {#if phoneViewport.current}
           {#if childFolders.length}<details class="phone-folder-list" open><summary><Folder size={16}/><span>Folders</span><span class="count">{childFolders.length}</span><ChevronDown size={14}/></summary><div>{@render childFolderLinks()}
@@ -1423,7 +1425,7 @@
           {#if activeCollection && !collectionIsConfigured(activeCollection)}<div class="empty-state compact"><Folder size={28}/><h2>Configure this collection</h2><p>Set your filters, then choose Save collection rules in the collection menu. You can also scope it to a folder.</p></div>
           {:else if activeCollection?.sourceFolderId && !projectFolders.some(folder => folder.id === activeCollection.sourceFolderId)}<div class="empty-state compact"><Folder size={28}/><h2>Source folder unavailable</h2><p>Choose another source in the collection settings.</p></div>
           {:else if archived && !assets.length}<div class="empty-state compact"><Folder size={28}/><h2>No archived media</h2><p>Restored assets are available in All media.</p><button class="secondary-button" onclick={() => openFolder(projectId, 'all')}>All media</button></div>
-          {:else if !assets.length || (activeFolderId && !assets.some(asset => asset.folderId === activeFolderId))}<div class="empty-state"><div class="empty-art"><Folder size={58} strokeWidth={1}/><span class="empty-plus"><Plus size={20}/></span></div><h2>{activeFolderId ? 'This folder is empty' : 'Add your first media'}</h2><p>Open a video or image to start reviewing. {live ? 'Videos are saved privately to this workspace.' : 'Media stays on this device.'}</p><button class="primary-button" onclick={() => picker.click()}><Upload size={17}/> {live ? 'Add video' : 'Open local media'}</button></div>
+          {:else if !folderAssets.length}<div class="empty-state"><div class="empty-art"><Folder size={58} strokeWidth={1}/><span class="empty-plus"><Plus size={20}/></span></div><h2>{activeFolderId ? 'This folder is empty' : 'Add your first media'}</h2><p>Open a video or image to start reviewing. {live ? 'Videos are saved privately to this workspace.' : 'Media stays on this device.'}</p><button class="primary-button" onclick={() => picker.click()}><Upload size={17}/> {live ? 'Add video' : 'Open local media'}</button></div>
           {:else if !visible.length}<div class="empty-state compact"><Search size={28}/><h2>No matching media</h2><p>Try another search or clear your filters.</p><button class="secondary-button" onclick={() => { query = ''; filters = defaultFilters(); mediaType = 'all'; }}>Clear filters</button></div>
           {:else}
             {#if !checked.ids.length}<div class="selection-tools"><button class="select-visible-button" onclick={() => checked = transitionSelection(checked, { type: 'select-visible', visibleIds })}>Select all {visible.length}</button></div>{/if}
