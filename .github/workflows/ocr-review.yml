@@ -58,20 +58,20 @@ jobs:
             core.setOutput('head_sha', pr.head.sha);
             core.setOutput('pr_number', String(number));
 
-      - name: Review with Prism Flash
+      - name: Review with Qwen 3.8 Flash
         id: primary
         uses: alibaba/open-code-review@a758d9cbfb689937c7857ad64b2dd66adb58c0c2
         with:
           ocr_version: '1.12.11'
           llm_url: https://hyper.charm.land/v1
           llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
-          llm_model: prism-flash
+          llm_model: qwen3.8-flash
           llm_use_anthropic: 'false'
           llm_protocol: openai
-          llm_extra_body: '{"thinking":{"type":"enabled"},"max_tokens":4096}'
+          llm_extra_body: '{"max_tokens":4096}'
           llm_reasoning_effort: medium
           review_concurrency: '1'
-          max_tokens_budget: '250000'
+          max_tokens_budget: '500000'
           effort: medium
           sticky_summary: 'true'
           base_ref: ${{ steps.context.outputs.base_ref }}
