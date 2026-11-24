@@ -142,7 +142,7 @@ export const changes = internalQuery({
       assets: await Promise.all(changed.assets.map(async ({ asset }) => ({
         id: asset._id, projectId: asset.projectId, folderId: asset.folderId ?? null, name: asset.assetCode ?? asset.title, assetCode: asset.assetCode ?? '',
         originalFilename: asset.originalFilename, mimeType: asset.mimeType, sizeBytes: asset.sizeBytes ?? 0, importedAt: asset.uploadedAt,
-        misfiled: !!asset.misfiled, status: asset.status, rating: asset.rating, shortlisted: asset.isSelect, viewed: asset.viewed,
+        misfiled: !!asset.misfiled, tags: asset.tags, status: asset.status, rating: asset.rating, shortlisted: asset.isSelect, viewed: asset.viewed,
         processing: await processingOf(ctx, asset),
       }))),
       versions: await Promise.all(changed.assets.flatMap(({ versions }) => versions.map(version => versionDetailsOf(ctx, version)))),

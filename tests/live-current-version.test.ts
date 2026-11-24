@@ -72,6 +72,11 @@ test('the open workspace reads a new take and a new asset', async () => {
   expect(changes.versions.map(version => [version.assetId, version.version])).toEqual(expect.arrayContaining([[assetId, 3], [added.assetId, 1]]));
   expect(changes.versions).toHaveLength(2);
   expect(changes.assets.find(asset => asset.id === assetId)?.processing.versionNumber).toBe(3);
+  // Everything the workspace needs to list an asset it has never seen.
+  const fresh = changes.assets.find(asset => asset.id === added.assetId)!;
+  const stored = (await f.t.run(ctx => ctx.db.get(added.assetId)))!;
+  expect(fresh).toMatchObject({ projectId: f.project, folderId: f.scene, name: 'BLR_EP101_PAR_0030', assetCode: 'BLR_EP101_PAR_0030', originalFilename: stored.originalFilename,
+    mimeType: stored.mimeType, importedAt: stored.uploadedAt, tags: stored.tags, misfiled: false, status: 'awaiting_review', rating: 0, shortlisted: false, viewed: false });
 });
 
 test('asset ids are listed only when the workspace holds a different number of assets', async () => {
