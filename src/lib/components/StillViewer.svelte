@@ -19,7 +19,7 @@
     onViewed?: () => void;
     onfailure?: (source: string) => void;
   } = $props();
-  let root: HTMLDivElement;
+  let root = $state<HTMLDivElement>();
   let surface: HTMLDivElement;
   let tool = $state<AnnotationTool>('pen');
   let color = $state('#62b9aa');
@@ -99,6 +99,7 @@
     onViewed?.();
   }
   async function toggleFullscreen() {
+    if (!root) return;
     message = '';
     try { if (document.fullscreenElement === root) await document.exitFullscreen(); else await root.requestFullscreen(); }
     catch { message = 'Fullscreen is unavailable in this browser.'; }
