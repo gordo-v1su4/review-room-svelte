@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { canDropFolder, folderTreeRows, loadCollapsed, revealFolder, saveCollapsed } from './folder-tree';
+import { canDropFolder, folderTreeRows, loadCollapsed, revealFolder, saveCollapsed, underscoreFoldersFirst } from './folder-tree';
 import type { ProjectFolder } from './project-folders';
 
 const folders: ProjectFolder[] = [
@@ -19,6 +19,23 @@ test('tree rows nest three levels deep in order and hide collapsed descendants',
   expect(collapsed.map(row => row.folder.id)).toEqual(['ep', 'sc', 'a', 'b', 'orphan']);
   expect(collapsed.find(row => row.folder.id === 'sc')?.expanded).toBe(false);
   expect(folderTreeRows(folders, new Set(['ep'])).map(row => row.folder.id)).toEqual(['ep', 'a', 'b', 'orphan']);
+});
+
+test('folders starting with "_" sort to the top of their parent, the rest keep their order', () => {
+  const trailer: ProjectFolder[] = [
+    { id: 'tr', projectId: 'p', title: 'TR110 — Teaser Trailer', order: 1 },
+    { id: 'drp', projectId: 'p', title: '010 DRP', order: 1, parentFolderId: 'tr' },
+    { id: 'mid', projectId: 'p', title: '050 RUN', order: 2, parentFolderId: 'tr' },
+    { id: 'cam', projectId: 'p', title: '100 CAM', order: 3, parentFolderId: 'tr' },
+    { id: 'del', projectId: 'p', title: '_Deliverables', order: 4, parentFolderId: 'tr' },
+    { id: 'notes', projectId: 'p', title: 'Notes', order: 2 },
+    { id: 'arch', projectId: 'p', title: '_Archive', order: 3 },
+  ];
+  const ordered = underscoreFoldersFirst(trailer);
+  expect(ordered.map(folder => folder.id)).toEqual(['del', 'arch', 'tr', 'drp', 'mid', 'cam', 'notes']);
+  expect(folderTreeRows(ordered, new Set()).map(row => row.folder.id)).toEqual(['arch', 'tr', 'del', 'drp', 'mid', 'cam', 'notes']);
+  expect(ordered.filter(folder => folder.parentFolderId === 'tr').map(folder => folder.title)).toEqual(['_Deliverables', '010 DRP', '050 RUN', '100 CAM']);
+  expect(trailer[4].id).toBe('del');
 });
 
 test('cyclic legacy folders are shown once without looping', () => {
