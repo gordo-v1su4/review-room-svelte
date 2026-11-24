@@ -48,7 +48,7 @@
     <Select.Content class="phone-select-content" sideOffset={4}>
       <Select.Viewport>
         {#each items as item (item.value)}
-          <Select.Item class="phone-select-item" value={item.value} label={item.label} disabled={item.disabled}>{item.label}</Select.Item>
+          <Select.Item class="phone-select-item" value={item.value} label={item.label} disabled={item.disabled} data-status={status === undefined ? undefined : item.value}>{item.label}</Select.Item>
         {/each}
       </Select.Viewport>
     </Select.Content>
@@ -72,6 +72,8 @@
   :global(.phone-select-trigger:focus-visible) { outline:1px solid var(--accent);outline-offset:2px; }
   :global(.phone-select-content) { box-sizing:border-box;z-index:110;min-width:min(var(--bits-select-anchor-width),calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:min(280px,var(--bits-select-content-available-height));overflow-y:auto;overflow-x:hidden;padding:4px;border:1px solid var(--border);border-radius:5px;background:color-mix(in srgb,var(--raised) 70%,transparent);backdrop-filter:blur(18px);box-shadow:0 10px 30px #0008; }
   :global(.phone-select-item) { display:flex;align-items:center;min-height:28px;padding:0 9px;border-radius:3px;color:var(--ink);font-size:11px;outline:none;cursor:pointer;white-space:normal;overflow-wrap:anywhere; }
-  :global(.phone-select-item[data-highlighted]),:global(.phone-select-item[data-state='checked']) { background:color-mix(in srgb,var(--accent) 20%,var(--panel));color:var(--ink); }
+  :global(.phone-select-item[data-highlighted]),:global(.phone-select-item[data-selected]) { background:color-mix(in srgb,var(--accent) 20%,var(--panel));color:var(--ink); }
+  :global(.phone-select-item[data-status]) { color:var(--status-tone); }
+  :global(.phone-select-item[data-status][data-highlighted]),:global(.phone-select-item[data-status][data-selected]) { background:color-mix(in srgb,var(--status-tone) 20%,var(--panel));color:var(--status-tone); }
   :global(.phone-select-item[data-disabled]) { opacity:.45;cursor:default; }
 </style>

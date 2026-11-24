@@ -2083,20 +2083,15 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 .navigation-footer .sidebar-bottom { padding:4px 12px 0; }
 .navigation-footer .sidebar-bottom p { margin:0; font-size:9px; line-height:1.5; }
 .nav-drawer .brand { flex:0 0 58px; margin:0 8px 18px; }
-.nav-drawer { overflow:hidden; }
 .nav-drawer > .drawer-close { position:absolute; z-index:2; width:44px; min-width:44px; height:44px; min-height:44px; background:transparent; border:0; }
 .nav-drawer .navigation-footer { padding-bottom:0; }
 .nav-drawer .project-tree .tree-scroll { overscroll-behavior-y:contain; touch-action:pan-y; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) transparent; }
-@media (max-width:1023px) {
   .nav-drawer .project-tree .project-link, .nav-drawer .project-tree .collection-link,
   .nav-drawer .project-tree .disclosure, .nav-drawer .project-tree .add-project,
   .nav-drawer .project-tree .edit-project, .nav-drawer .navigation-footer .nav-item,
   .nav-drawer .navigation-status summary { min-height:44px; }
   .nav-drawer .project-tree .disclosure { min-width:32px; }
-}
 @media (prefers-reduced-motion:reduce) { .navigation-status summary svg { transition:none; } }
-
-/* Phone refresh: keep every new arrangement below the tablet breakpoint. */
 
 }
 .library-filter-group { display:contents; }
@@ -2244,4 +2239,7 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
   .publishing-body .stage1-select-trigger > span { min-width:0; }
   body :is(.selection-menu,.compact-view-menu,.workspace-menu) { max-width:calc(100vw - 32px);max-height:70dvh;overflow-y:auto;overflow-wrap:anywhere; }
   body :is(.appearance-popover,.filter-popover) { max-height:75dvh; }
+}
+@media(max-width:640px) and (pointer:coarse) {
+  body .metadata-sheet.phone-panel .asset-fields :is(input,textarea) { font-size:16px; }
 }

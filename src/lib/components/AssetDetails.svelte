@@ -211,4 +211,5 @@
    .tag-entry button { height:28px;min-height:28px;width:28px;flex-basis:28px; }
    .class-help { display:block;margin-top:5px;color:var(--muted);font-size:10px; }
  }
+ @media(max-width:640px) and (pointer:coarse) { input,textarea { font-size:16px; } }
 </style>

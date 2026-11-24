@@ -122,3 +122,7 @@ PR #37's external Greptile review did not run: its service comment reported no
 remaining organization review credits. This is not a review pass. See the review
 record for the exact comment link; local code reviews and user UI acceptance are
 tracked separately.
+
+## November 24 independent review fixes
+
+See `.scratch/mobile-navigation/review.md` for the Standards/Spec review and finding dispositions. Native-browser checks at 320px and 430px verified Tools → Notes, 16px coarse-phone editable Fields text with unchanged 28px/112px heights, persistent multiple-reference selected fill and semantic status choices. Reference draft changes were restored without saving; no saved metadata/status/rating was changed. No horizontal overflow at 320px; phone layout query remains inactive at 641px and 1280px. Physical iPhone focus-zoom behavior remains unverified. All 363 tests pass; type check reports zero errors/eight existing warnings.
