@@ -2201,7 +2201,7 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
   .app-shell.phone-review .transport .icon-button { position:relative;min-width:28px;width:28px;min-height:28px;height:28px;border-radius:var(--control-radius); }
   .app-shell.phone-review .transport .icon-button::before { content:'';position:absolute;inset:-8px 0; }
   .app-shell.phone-review .review-feedback { display:flex;gap:16px;align-items:center; }
-  .app-shell.phone-review .review-feedback .rating { display:flex;gap:16px; }
+  .app-shell.phone-review .review-feedback .rating { display:flex;gap:8px; }
   .app-shell.phone-review .review-feedback :is(.shortlist-toggle,.rating button) { position:relative;width:28px;min-width:28px;height:28px;min-height:28px;border-radius:var(--control-radius); }
   .app-shell.phone-review .review-feedback :is(.shortlist-toggle,.rating button)::before { content:'';position:absolute;inset:-8px 0; }
   .app-shell.phone-review .asset-step-pair { display:flex;gap:8px; }

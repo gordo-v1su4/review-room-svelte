@@ -112,3 +112,5 @@ No merge or deployment is included. Actual signed-in local playback is now verif
 - Final handoff: PR#37 reopened/ready after explicit UI and PR approval. Current main3131297 merged without conflicts.362tests pass;check0errors8existingwarnings;build passes. Final Standards/Spec and compatibility bug findings addressed; fullscreen portal fix source rechecked. Retro completed in retro.md; proposals presented without altering CI/global guidance. No merge/deploy performed.
 
 - Card follow-up: Appearance Shortlist now displays an empty/filled bookmark before rating stars, no textual state or corner duplicate;4px spacing between controls. Browser checked both states without metadata mutation. This user-requested shared card refinement is included in PR#37.
+
+- Mobile spacing follow-up: user requested halving the gap between review stars while preserving the bookmark-to-stars gap. Changed only <=640px review rating gap from16px to8px. Native preview computes8px between stars and16px between bookmark and rating group. Desktop/card spacing remains as previously approved. Included in PR#37.
