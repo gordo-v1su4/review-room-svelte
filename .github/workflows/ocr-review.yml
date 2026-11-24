@@ -1,6 +1,7 @@
 # Canonical template: https://github.com/gordo-v1su4/proxmox-home/blob/main/docs/opencode-review-github-actions.md
 # Runs on request only: comment `@hyper-reviewer` (or `/hyper-reviewer`) on a pull request, or use Run workflow.
 name: OpenCodeReview PR Review
+run-name: 'OCR review for PR #${{ github.event.issue.number || inputs.pr_number }} (Qwen medium)'
 
 on:
   issue_comment:
@@ -74,6 +75,7 @@ jobs:
           max_tokens_budget: '500000'
           effort: medium
           sticky_summary: 'true'
+          stream_progress: 'true'
           base_ref: ${{ steps.context.outputs.base_ref }}
           head_sha: ${{ steps.context.outputs.head_sha }}
           pr_number: ${{ steps.context.outputs.pr_number }}
