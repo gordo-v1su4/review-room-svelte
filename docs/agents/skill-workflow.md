@@ -29,5 +29,24 @@ For an explicitly requested design-to-PR sequence:
 Keep upstream skill instructions in their installed folders. Put runtime mappings
 and repository conventions here so instruction copies do not drift.
 
+## PR and external review policy
+
+Prefer one coherent PR for the agreed feature; do not create a separate PR for
+each skill, phase or ticket. Greptile and OCR run only when Robert explicitly
+requests that reviewer. Never post trigger comments, request reviews or dispatch
+review workflows automatically. A request to open a PR is not a review request.
+An explicitly requested Greptile-to-5/5 loop stays on the same PR; OCR is an
+explicitly requested fallback, not an automatic response to exhausted credits.
+
+`.greptile/config.json` sets `autoReview` to an empty array to request manual-only
+reviews. Verify effective service settings separately; a file on a feature branch
+does not prove account-wide configuration. OCR supports `@hyper-reviewer` or
+`/hyper-reviewer` in a PR comment, plus manual Actions dispatch. Its workflow must
+also be enabled in GitHub. `sticky_summary` reuses the summary comment and does
+not by itself limit inline findings.
+
+The cross-repository setup profile is maintained in proxmox-home's
+`docs/project-agent-setup.md`; this file owns Review Room's local workflow.
+
 `retro` was installed from `mattpocock/skills`, path `skills/engineering/retro`.
 `review` and `review-bugbot` were copied from the existing global installation.
