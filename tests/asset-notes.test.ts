@@ -76,3 +76,12 @@ test('an archived project, an unknown credential and another owner\'s asset are 
   await f.t.run(ctx => ctx.db.patch(f.project, { archived: true }));
   await expect(f.t.mutation(internal.automation.assetNotes, { keyDigest: cspDigest, assetId: f.assetId })).rejects.toThrow('Asset unavailable');
 });
+
+test('an asset that no longer exists is unavailable, even to a credential restricted to one project', async () => {
+  const f = await fixture();
+  await f.t.run(ctx => ctx.db.delete(f.assetId));
+  await expect(f.t.mutation(internal.automation.assetNotes, { keyDigest: cspDigest, assetId: f.assetId })).rejects.toThrow('Asset unavailable');
+  const writeOnly = '5'.repeat(64);
+  await f.t.mutation(internal.automation.issue, { name: 'Folders only', keyDigest: writeOnly, projectId: f.project, actions: ['folders:write'] });
+  await expect(f.t.mutation(internal.automation.assetNotes, { keyDigest: writeOnly, assetId: f.assetId })).rejects.toThrow('Automation scope denied');
+});

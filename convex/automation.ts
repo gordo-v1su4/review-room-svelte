@@ -154,7 +154,9 @@ export const assetNotes = internalMutation({
   args: { keyDigest: v.string(), assetId: v.id('videos') },
   handler: async (ctx, { keyDigest, assetId }) => {
     const asset = await ctx.db.get(assetId);
-    const credential = await authorize(ctx, keyDigest, 'media:read', asset?.projectId);
+    const record = await ctx.db.query('automationCredentials').withIndex('by_digest', q => q.eq('keyDigest', keyDigest)).unique();
+    // An asset that no longer exists is checked against the credential's own project, so it reads as unavailable (404), not out of scope.
+    const credential = await authorize(ctx, keyDigest, 'media:read', asset?.projectId ?? record?.projectId);
     const project = asset && await ctx.db.get(asset.projectId);
     if (!asset || !project || project.archived || project.createdBy !== credential.createdBy) throw new Error('Asset unavailable');
     const comments = await ctx.db.query('comments').withIndex('by_video', q => q.eq('videoId', assetId)).collect();
