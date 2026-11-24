@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Plus, Search, X } from 'lucide-svelte';
+  import Stage1Select from './Stage1Select.svelte';
   import type { ReviewAsset } from '$lib/review';
   import type { AssetReview } from '$lib/review-session';
   import { CREATIVE_MODEL_PRESETS, filterMetadataFields, normalizeCreativeMetadata, normalizeTags, type MetadataSaveState, type VersionImageOption, type AssetMetadataPatch, type CreativeMetadata, type CustomMetadataField, type MetadataField, type MetadataFilter } from '$lib/asset-metadata';
@@ -79,7 +80,7 @@
 <section class="asset-fields" aria-label="Asset metadata">
   <div class="field-tools">
     <div class="group-options" aria-label="Field groups">{#each groups as item (item)}<button type="button" class:chosen={group === item} aria-pressed={group === item} onclick={() => group = item}>{item}</button>{/each}</div>
-    <div class="field-search"><Search size={13} aria-hidden="true"/><input aria-label="Search metadata fields" placeholder="Search fields" bind:value={search}/><select aria-label="Field completeness" bind:value={presence}>{#each states as item (item)}<option value={item}>{item === 'all' ? 'All fields' : item === 'empty' ? 'Empty' : 'Filled'}</option>{/each}</select></div>
+    <div class="field-search"><Search size={13} aria-hidden="true"/><input aria-label="Search metadata fields" placeholder="Search fields" bind:value={search}/><div class="completeness-select"><Stage1Select label="Field completeness" value={presence} items={states.map(value => ({ value, label: value === 'all' ? 'All fields' : value === 'empty' ? 'Empty' : 'Filled' }))} onValueChange={value => { if (value === 'all' || value === 'empty' || value === 'filled') presence = value; }}/></div></div>
   </div>
   <fieldset class="field-list" disabled={saveState?.busy}>
     {#each visible as row (row.id)}
@@ -88,36 +89,37 @@
         <label for={`metadata-${uid}-${asset.id}-${row.id}`}>{row.label}</label>
         <div class="field-value">
           {#if row.id === 'assetClass' && canEdit}
-            <select id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label="Asset class" value={asset.assetClass} onchange={event => { const value = event.currentTarget.value; if (value === 'VID' || value === 'IMG' || value === 'CTX' || value === 'STB') change({ assetClass: value }); }}>{#if asset.type === 'video'}<option value="VID">Video · VID</option>{:else}<option value="IMG">Image · IMG</option><option value="CTX">Contact sheet · CTX</option><option value="STB">Storyboard · STB</option>{/if}</select>
+            <Stage1Select id={`metadata-${uid}-${asset.id}-${row.id}`} label="Asset class" value={asset.assetClass} disabled={saveState?.busy} items={[{ value: 'VID', label: 'Video', disabled: asset.type !== 'video' }, { value: 'IMG', label: 'Image', disabled: asset.type === 'video' }, { value: 'CTX', label: 'Contact sheet', disabled: asset.type === 'video' }, { value: 'STB', label: 'Storyboard', disabled: asset.type === 'video' }]} onValueChange={value => { if (asset.type === 'video' ? value === 'VID' : value === 'IMG' || value === 'CTX' || value === 'STB') change({ assetClass: value as ReviewAsset['assetClass'] }); }}/>
+            <small class="class-help">{asset.type === 'video' ? 'Video file; image classes apply to still images.' : 'Still image; Video applies to video files.'}</small>
           {:else if row.id === 'tags'}
             <div class="tags">{#each asset.tags as tag (tag)}<span class="tag chip preset-tonal-surface">{tag}{#if canEdit}<button type="button" aria-label={`Remove tag ${tag}`} onclick={() => change({ tags: asset.tags.filter(item => item !== tag) })}><X size={11}/></button>{/if}</span>{/each}{#if !asset.tags.length && !canEdit}<span class="empty-value">—</span>{/if}</div>
             {#if canEdit}<form class="tag-entry" onsubmit={event => { event.preventDefault(); addTags(tagDrafts[asset.id] ?? ''); }}><input id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label="Add tags" placeholder="Add tags…" list={`tag-suggestions-${uid}-${asset.id}`} maxlength="500" value={tagDrafts[asset.id] ?? ''} oninput={event => tagDrafts[asset.id] = event.currentTarget.value}/><button type="submit" aria-label="Add tags" disabled={!tagDrafts[asset.id]?.trim()}><Plus size={14}/></button><datalist id={`tag-suggestions-${uid}-${asset.id}`}>{#each suggestions as tag (tag)}<option value={tag}></option>{/each}</datalist></form>{/if}
           {:else if (row.id === 'notes' || row.id === 'prompt') && canEdit}
             <textarea id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label={row.label} rows="3" value={row.value as string} placeholder="—" oninput={event => changeCreative({ [row.id]: event.currentTarget.value })}></textarea>
           {:else if row.id === 'model' && canEdit}
-            <select id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label="Model" value={customModelEnabled ? '__custom__' : metadata.model} onchange={event => { customModel = { version: modelKey, enabled: event.currentTarget.value === '__custom__' }; if (!customModel.enabled) changeCreative({ model: event.currentTarget.value }); }}><option value="">—</option>{#each modelOptions as model (model)}<option value={model}>{model}</option>{/each}<option value="__custom__">Custom model…</option></select>
+            <Stage1Select id={`metadata-${uid}-${asset.id}-${row.id}`} label="Model" disabled={saveState?.busy} value={customModelEnabled ? '__custom__' : metadata.model} items={[{ value: '', label: '—' }, ...modelOptions.map(value => ({ value, label: value })), { value: '__custom__', label: 'Custom model…' }]} onValueChange={value => { customModel = { version: modelKey, enabled: value === '__custom__' }; if (!customModel.enabled) changeCreative({ model: value }); }}/>
             {#if customModelEnabled}<input aria-label="Custom model name" maxlength="200" value={metadata.model} oninput={event => changeCreative({ model: event.currentTarget.value })}/>{/if}
           {:else if row.id === 'sourceCreatedAt' && canEdit}
             <input id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label="Source created (UTC)" type="datetime-local" step="1" value={metadata.sourceCreatedAt === undefined ? '' : new Date(metadata.sourceCreatedAt).toISOString().slice(0, 19)} onchange={event => { const input = event.currentTarget; const timestamp = input.value ? Date.parse(input.value + 'Z') : undefined; if (timestamp !== undefined && !Number.isFinite(timestamp)) { input.setCustomValidity('Enter a valid UTC date and time.'); input.reportValidity(); return; } input.setCustomValidity(''); changeCreative({ sourceCreatedAt: timestamp }); }}/>
           {:else if (row.id === 'sourceLabel' || row.id === 'releaseDate' || row.id === 'releasePlatforms') && canEdit}
             <input id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label={row.label} type={row.id === 'releaseDate' ? 'date' : 'text'} value={row.value as string} placeholder={row.id === 'releasePlatforms' ? 'Web, Instagram, cinema…' : '—'} onchange={event => changeCreative(row.id === 'releasePlatforms' ? { releasePlatforms: normalizeTags(event.currentTarget.value.split(',')) } : { [row.id]: event.currentTarget.value })}/>
           {:else if custom && canEdit}
-            <div class="custom-control">{#if custom.kind === 'boolean'}<select id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label={custom.label} value={custom.value === null ? '' : String(custom.value)} onchange={event => editCustom(custom, event.currentTarget.value)}><option value="">—</option><option value="true">Yes</option><option value="false">No</option></select>{:else}<input id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label={custom.label} type={custom.kind === 'number' ? 'number' : custom.kind === 'date' ? 'date' : 'text'} step={custom.kind === 'number' ? 'any' : undefined} value={custom.value ?? ''} placeholder="—" onchange={event => editCustom(custom, event.currentTarget.value)}/>{/if}<button type="button" class="remove-field" aria-label={`Remove field ${custom.label}`} onclick={() => changeCreative({ customFields: metadata.customFields.filter(field => field.id !== custom.id) })}><X size={12}/></button></div>
+            <div class="custom-control">{#if custom.kind === 'boolean'}<Stage1Select id={`metadata-${uid}-${asset.id}-${row.id}`} label={custom.label} disabled={saveState?.busy} value={custom.value === null ? '' : String(custom.value)} items={[{ value: '', label: '—' }, { value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]} onValueChange={value => editCustom(custom, value)}/>{:else}<input id={`metadata-${uid}-${asset.id}-${row.id}`} aria-label={custom.label} type={custom.kind === 'number' ? 'number' : custom.kind === 'date' ? 'date' : 'text'} step={custom.kind === 'number' ? 'any' : undefined} value={custom.value ?? ''} placeholder="—" onchange={event => editCustom(custom, event.currentTarget.value)}/>{/if}<button type="button" class="remove-field" aria-label={`Remove field ${custom.label}`} onclick={() => changeCreative({ customFields: metadata.customFields.filter(field => field.id !== custom.id) })}><X size={12}/></button></div>
           {:else}<span id={`metadata-${uid}-${asset.id}-${row.id}`} class:empty-value={row.value === null || row.value === undefined || row.value === ''}>{row.value === null || row.value === undefined || row.value === '' ? '—' : typeof row.value === 'boolean' ? (row.value ? 'Yes' : 'No') : row.value}</span>{/if}
         </div>
       </div>
     {:else}<p class="no-fields">No fields match these filters.</p>{/each}
   </fieldset>
   {#if canEdit && (group === 'all' || group === 'creative')}
-    <fieldset class="custom-fields" disabled={saveState?.busy}>{#if customDraft.open}<form onsubmit={event => { event.preventDefault(); addField(); }}><input aria-label="Custom field name" placeholder="Field name" maxlength="80" value={customDraft.name} oninput={event => updateCustomDraft({ name: event.currentTarget.value })} required/><select aria-label="Custom field type" value={customDraft.kind} onchange={event => { const kind = event.currentTarget.value; if (kind === 'text' || kind === 'number' || kind === 'boolean' || kind === 'date') updateCustomDraft({ kind }); }}>{#each kinds as kind (kind)}<option value={kind}>{kind === 'boolean' ? 'Yes / No' : kind[0].toUpperCase() + kind.slice(1)}</option>{/each}</select><div class="custom-actions"><button type="button" onclick={() => updateCustomDraft({ open: false })}>Cancel</button><button type="submit" class="chosen" disabled={!customDraft.name.trim()}>Add field</button></div></form>{:else}<button type="button" class="add-field" onclick={() => updateCustomDraft({ open: true })}><Plus size={13}/> Add field</button>{/if}</fieldset>
+    <fieldset class="custom-fields" disabled={saveState?.busy}>{#if customDraft.open}<form onsubmit={event => { event.preventDefault(); addField(); }}><input aria-label="Custom field name" placeholder="Field name" maxlength="80" value={customDraft.name} oninput={event => updateCustomDraft({ name: event.currentTarget.value })} required/><Stage1Select label="Custom field type" disabled={saveState?.busy} value={customDraft.kind} items={kinds.map(value => ({ value, label: value === 'boolean' ? 'Yes / No' : value[0].toUpperCase() + value.slice(1) }))} onValueChange={kind => { if (kind === 'text' || kind === 'number' || kind === 'boolean' || kind === 'date') updateCustomDraft({ kind }); }}/><div class="custom-actions"><button type="button" onclick={() => updateCustomDraft({ open: false })}>Cancel</button><button type="submit" class="chosen" disabled={!customDraft.name.trim()}>Add field</button></div></form>{:else}<button type="button" class="add-field" onclick={() => updateCustomDraft({ open: true })}><Plus size={13}/> Add field</button>{/if}</fieldset>
   {/if}
   {#if asset.versionId && (group === 'all' || group === 'creative')}
     <div class="reference-fields">
       <label for={`grid-${uid}`}>Image grid</label>
-      <select id={`grid-${uid}`} disabled={!canEdit || saveState?.busy} value={metadata.gridImageVersionId ?? ''} onchange={event => changeCreative({ gridImageVersionId: event.currentTarget.value || undefined })}><option value="">—</option>{#each referenceImages as image (image.versionId)}<option value={image.versionId}>{image.label}</option>{/each}</select>
+      <Stage1Select id={`grid-${uid}`} label="Image grid" disabled={!canEdit || saveState?.busy} value={metadata.gridImageVersionId ?? ''} items={[{ value: '', label: '—' }, ...referenceImages.map(image => ({ value: image.versionId, label: image.label }))]} onValueChange={value => changeCreative({ gridImageVersionId: value || undefined })}/>
       {#if metadata.gridImageVersionId}<button type="button" disabled={!canEdit || saveState?.busy} onclick={() => changeCreative({ gridImageVersionId: undefined })}>Remove image grid{referenceImages.some(image => image.versionId === metadata.gridImageVersionId) ? '' : ' (unavailable)'}</button>{/if}
       <label for={`refs-${uid}`}>Reference images</label>
-      <select id={`refs-${uid}`} multiple disabled={!canEdit || saveState?.busy} value={metadata.referenceImageVersionIds ?? []} onchange={event => changeCreative({ referenceImageVersionIds: Array.from(event.currentTarget.selectedOptions, option => option.value) })}>{#each referenceImages as image (image.versionId)}<option value={image.versionId}>{image.label}</option>{/each}</select>
+      <Stage1Select id={`refs-${uid}`} label="Reference images" multiple disabled={!canEdit || saveState?.busy} values={metadata.referenceImageVersionIds ?? []} items={referenceImages.map(image => ({ value: image.versionId, label: image.label }))} placeholder="Choose reference images" onValuesChange={values => changeCreative({ referenceImageVersionIds: values })}/>
       {#each metadata.referenceImageVersionIds ?? [] as versionId (versionId)}<button type="button" disabled={!canEdit || saveState?.busy} onclick={() => changeCreative({ referenceImageVersionIds: metadata.referenceImageVersionIds?.filter(id => id !== versionId) })}>Remove {referenceImages.find(image => image.versionId === versionId)?.label ?? 'unavailable reference'}</button>{/each}
       <div class="reference-previews">{#each referenceImages.filter(image => image.versionId === metadata.gridImageVersionId || metadata.referenceImageVersionIds?.includes(image.versionId)) as image (image.versionId)}<a href={image.url} target="_blank" rel="noreferrer"><img src={image.url} alt={image.label} loading="lazy"/></a>{/each}</div>
     </div>
@@ -141,15 +143,16 @@
   button.chosen { color: var(--ink); background: color-mix(in srgb, var(--accent, #62b9aa) 12%, var(--panel)); }
   .field-search { display: flex; align-items: center; gap: 5px; color: var(--muted); }
   .field-search input { flex: 1; width: 0; }
-  .field-search select { width: 80px; padding-left: 4px; }
-  input,select,textarea { min-width: 0; width: 100%; color: var(--ink); background: var(--canvas); font: inherit; border: 1px solid var(--border); border-radius: 4px; padding: 6px 7px; }
-  input,select { height: 30px; }
+  .completeness-select { flex:0 0 100px;min-width:0; }
+  input,textarea { min-width: 0; width: 100%; color: var(--ink); background: var(--canvas); font: inherit; border: 1px solid var(--border); border-radius: 4px; padding: 6px 7px; }
+  input { height: 30px; }
   textarea { resize: vertical; line-height: 1.6; }
   input::placeholder,textarea::placeholder { color: var(--muted); opacity: .7; }
-  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 1px solid var(--accent, #62b9aa); outline-offset: 2px; }
+  input:focus-visible, textarea:focus-visible, button:focus-visible { outline: 1px solid var(--accent, #62b9aa); outline-offset: 2px; }
   .field-row { display: grid; grid-template-columns: minmax(70px, .85fr) minmax(0, 1.3fr); gap: 12px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--border); }
   .field-row label { color: var(--muted); padding-top: 6px; line-height: 1.4; }
   .field-value { min-width: 0; overflow-wrap: anywhere; line-height: 1.5; }
+  .class-help { display:block;margin-top:5px;color:var(--muted);font-size:10px; }
   .field-value > span { display: block; padding: 6px 0; white-space: pre-wrap; }
   .field-row.wide { grid-template-columns: minmax(0, 1fr); gap: 7px; }
   .field-row.wide label { padding: 0; }
@@ -167,5 +170,5 @@
   .custom-actions button { padding: 7px 10px; }
   .add-field { display: flex; align-items: center; gap: 6px; padding: 6px 0; }
   .no-fields { color: var(--muted); padding: 18px 0; }
-  @media (pointer: coarse) { input,select,.tag-entry button { height: 44px; } input,select,textarea { font-size: 16px; } .group-options button,.custom-actions button,.add-field { min-height: 44px; } .tag button { min-width: 28px; min-height: 28px; } .remove-field { flex-basis: 36px; height: 44px; } }
+  @media (pointer: coarse) { input,.tag-entry button { height: 44px; } input,textarea { font-size: 16px; } .group-options button,.custom-actions button,.add-field { min-height: 44px; } .tag button { min-width: 28px; min-height: 28px; } .remove-field { flex-basis: 36px; height: 44px; } }
 </style>

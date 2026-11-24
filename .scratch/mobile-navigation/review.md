@@ -55,3 +55,19 @@ https://github.com/gordo-v1su4/review-room-svelte/pull/37#issuecomment-712378228
 
 The local review evidence above remains separate. No billing, credit purchase,
 merge or deployment action was taken. User UI acceptance remains pending.
+
+## Metadata dropdown follow-up
+
+Focused Standards and Spec reviews compared the new metadata changes against
+`8b638cc`. Standards reported no findings. Spec reported two P2 findings, both
+resolved and rechecked: keep incompatible asset classes visible but disabled,
+with an independent callback guard; bound menu width and wrap long labels.
+
+Native browser checks verified all four class labels and disabled still-image
+choices for a video source; Nano Banana Pro selection; Custom model entry; a long
+saved custom-model label wrapping without internal horizontal overflow; multiple
+reference selector semantics; and Escape returning focus to its trigger. Phone
+model choices were shown in the inset Asset fields panel. Reference options were
+empty in this fixture, so selecting multiple actual reference images is not
+claimed as browser-verified. No production metadata was saved. User UI acceptance
+of this shared desktop/phone correction remains pending.

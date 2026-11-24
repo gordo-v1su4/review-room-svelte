@@ -57,6 +57,27 @@ links retaining 28px faces. The preview's 80% display scaling required compensat
 device metrics; dimensions above come from the rendered document, not the device
 preset label. The preview was restored to a measured 430px width afterward.
 
+### Metadata dropdown follow-up
+
+The user requested matching dark menus throughout Notes & info, all four asset
+class labels, and image-model presets. All native AssetDetails selects now use the
+shared select, with multiple selection for reference images. Source-family guards
+remain: Video is visible but disabled for still images, and image classes are
+disabled for video sources. Source files are not converted.
+
+At a measured 430px phone viewport, the Model menu is vertically scrollable and
+280px tall; long saved model labels wrap without internal horizontal overflow.
+Verified Nano Banana Pro selection and Custom model input, then restored the
+original blank model without saving. Verified all class labels and disabled item
+attributes, multiple-selection semantics on Reference images, and Escape restoring
+focus to its trigger. The fixture contains no reference-image options, so actual
+multi-image selection and live persistence remain unverified.
+
+`bun run check`: zero errors, eight existing warnings. `bun test`: 330 pass,
+zero fail. Production build and diff whitespace checks pass. Focused Standards
+review found no issues; both Spec findings were fixed and rechecked. UI approval
+is pending; the native phone preview shows the new Model menu.
+
 ## Limits
 
 This verifies rendered UI and navigation using local dev data, not playback of

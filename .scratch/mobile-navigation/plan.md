@@ -29,6 +29,8 @@ moving to the next acceptance step. Keep the current step visible in chat.
    - [x] Demonstrate project → nested folder → back, filters, and folder collapse.
    - [ ] Record user's approval of browsing.
 2. **Review and notes**
+   - [x] Add user-requested themed metadata dropdowns, visible file-compatible asset classes and image model presets; shared desktop/phone exception.
+   - [ ] Record user's approval of the metadata dropdown follow-up.
    - [x] Implement dedicated Media / Notes & info sections and Back to folder.
    - [x] Verify draft retention and inbox navigation locally.
    - [ ] Demonstrate opening an asset, notes, previous/next and returning to its folder.
