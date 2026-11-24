@@ -22,6 +22,9 @@
   }
 
   import { onDestroy, onMount, tick, untrack, setContext } from 'svelte';
+  import { replaceState } from '$app/navigation';
+  import { page } from '$app/state';
+  import { parseWorkspaceAddress, resolveWorkspaceAddress, workspaceSearch, type WorkspaceAddress } from '$lib/workspace-address';
   import { folderLink } from '../../convex/lib/folderLock';
   import WorkActivity from '$lib/components/WorkActivity.svelte';
   import { ACTIVITY_CONTEXT, createActivityFeed, type ActivityItem } from '$lib/work-activity';
@@ -811,6 +814,52 @@
       if (sameAsset && player?.seek(note.timecodeSec)) inboxSeek = null;
     }
   }
+  // The address (?project=&folder=&asset=&version=&t=) follows what is open, so a link or a reload lands on the same thing.
+  let addressLive = $state(false);
+  let addressSeek: { assetId: string; t: number } | null = null;
+  let addressTurn = 0;
+  /** Opens what the address names once the workspace data is loaded: project, folder, asset, version, then an optional seek. */
+  function applyAddress() {
+    const target = resolveWorkspaceAddress(parseWorkspaceAddress(location.search), {
+      projects, folders: organization.folders, versions: knownVersions,
+      assets: (data.snapshot?.assets ?? []).map(item => ({ id: item._id, projectId: item.projectId, folderId: item.folderId, code: item.assetCode, archived: item.status === 'archived', copy: !!item.copiedFromAssetId })),
+    });
+    if (target.projectId) {
+      openFolder(target.projectId, 'all');
+      activeFolderId = target.folderId; importOptions.folderId = target.folderId;
+      if (target.assetId) {
+        select(target.assetId);
+        if (target.versionId) selectAssetVersion(target.assetId, target.versionId);
+        if (target.t !== null) {
+          addressSeek = { assetId: target.assetId, t: target.t };
+          if (media.find(item => item.id === target.assetId)?.type === 'video') inboxSeek = { assetId: target.assetId, time: target.t };
+        }
+      }
+    }
+    addressLive = true;
+  }
+  function writeAddress(address: WorkspaceAddress) {
+    const turn = ++addressTurn;
+    // Shallow routing: the server load does not depend on the URL, so the snapshot is not refetched.
+    // Deferred a tick because the first write is asked for while the router is still starting.
+    void tick().then(() => {
+      if (turn !== addressTurn || disposed) return;
+      const search = workspaceSearch(location.search, address);
+      if (search === location.search) return;
+      try { replaceState(location.pathname + search + location.hash, page.state); }
+      catch { /* The router is not ready; the next change writes the address. */ }
+    });
+  }
+  $effect(() => {
+    if (!addressLive) return;
+    if (addressSeek && addressSeek.assetId !== activeId) addressSeek = null;
+    const chosen = activeId ? selectedVersions[activeId] : undefined;
+    const pinned = chosen && chosen !== '__current__' ? chosen : undefined;
+    const number = pinned ? knownVersions.find(version => version.id === pinned)?.version : undefined;
+    const open = projectId !== '__empty__' && projects.some(item => item.id === projectId && !item.archived);
+    writeAddress(open ? { project: projectId, folder: activeFolderId ?? undefined, asset: activeId ?? undefined,
+      version: number ? formatVersion(number) : pinned, t: addressSeek?.t } : {});
+  });
   function applyInboxSeek(source: string) {
     if (!inboxSeek || active?.id !== inboxSeek.assetId || active.url !== source) return;
     if (player?.seek(inboxSeek.time)) inboxSeek = null;
@@ -1066,10 +1115,12 @@
         }))
       })));
       media = fromServer;
+      applyAddress();
       processingObserver = observeProcessing(() => processing
         .filter(item => !item.ready || item.assetId === activeId).map(item => item.assetId), applyProcessing);
       return () => { processingObserver?.stop(); for (const controller of versionReads.values()) controller.abort(); };
     }
+    applyAddress();
   });
   function applyProcessing(updates: ProcessingUpdate[]) {
     for (const update of updates) {

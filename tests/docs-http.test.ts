@@ -48,6 +48,17 @@ test('operations denies anonymous, collaborator, forged and expired owner sessio
   }
 }, 30000);
 
+test('an anonymous owner page request carries its address to sign-in as a same-site return path', async () => {
+  const response = await get('/docs/operations?from=studio&t=12.5');
+  expect(response.status).toBe(303);
+  const location = new URL(response.headers.get('location')!, base);
+  expect(location.pathname).toBe('/studio/sign-in');
+  expect(location.searchParams.get('next')).toBe('/docs/operations?from=studio&t=12.5');
+  expect((await get('/docs/operations')).headers.get('location')).toBe('/studio/sign-in?next=%2Fdocs%2Foperations');
+  // A direct download is not a page to return to.
+  expect((await get('/docs/operations/runbook.md')).headers.get('location')).toBe('/studio/sign-in');
+}, 30000);
+
 test('a valid owner can read operations, with private non-indexable responses', async () => {
   const response = await get('/docs/operations', ownerCookie());
   expect(response.status).toBe(200);

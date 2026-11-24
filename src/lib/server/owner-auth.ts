@@ -1,3 +1,4 @@
+import { signInPath } from '$lib/return-path';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { env } from '$env/dynamic/private';
 import { dev } from '$app/environment';
@@ -37,8 +38,9 @@ export function ownerSignedIn(cookies: Cookies) {
   return Boolean(expiry && mac && Number(expiry) > Date.now() / 1000 && equal(signature(expiry), mac));
 }
 
-export function requireOwner(cookies: Cookies) {
-  if (!ownerSignedIn(cookies)) redirect(303, '/studio/sign-in');
+/** Pass the request URL from a page load so sign-in can return to it; it is read only when the redirect happens. */
+export function requireOwner(cookies: Cookies, url?: URL) {
+  if (!ownerSignedIn(cookies)) redirect(303, url ? signInPath(url.pathname + url.search) : '/studio/sign-in');
 }
 
 export function endOwnerSession(cookies: Cookies) { cookies.delete(COOKIE, { path: '/' }); }

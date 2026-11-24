@@ -1,5 +1,6 @@
 import { env } from '$env/dynamic/private';
 import { fail, redirect } from '@sveltejs/kit';
+import { afterSignIn, safeReturnPath } from '$lib/return-path';
 import { ConvexHttpClient } from 'convex/browser';
 import { api, internal } from '../../../../convex/_generated/api';
 import type { Actions, PageServerLoad } from './$types';
@@ -15,14 +16,16 @@ function authClient() {
   return new ConvexHttpClient(env.REVIEW_ROOM_CONVEX_URL);
 }
 
-export const load: PageServerLoad = async ({ cookies, setHeaders }) => {
+export const load: PageServerLoad = async ({ cookies, setHeaders, url }) => {
   setHeaders({ 'cache-control': 'no-store', 'x-robots-tag': 'noindex' });
-  if (ownerSignedIn(cookies)) redirect(303, '/');
-  return { ownerReady: await authClient().query(api.auth.ownerReady, {}) };
+  // `next` is where the owner was heading; only a path on this site is honoured.
+  const next = safeReturnPath(url.searchParams.get('next'));
+  if (ownerSignedIn(cookies)) redirect(303, next ?? '/');
+  return { ownerReady: await authClient().query(api.auth.ownerReady, {}), next };
 };
 
 export const actions: Actions = {
-  email: async ({ request, cookies }) => {
+  email: async ({ request, cookies, url }) => {
     const form = await request.formData();
     const address = email(form.get('email'));
     const password = String(form.get('password') ?? '');
@@ -40,9 +43,9 @@ export const actions: Actions = {
     } catch {
       return fail(401, { invalid: true });
     }
-    redirect(303, '/');
+    redirect(303, afterSignIn(url.searchParams.get('next')));
   },
-  create: async ({ request, cookies }) => {
+  create: async ({ request, cookies, url }) => {
     const form = await request.formData();
     const address = email(form.get('email'));
     const password = String(form.get('password') ?? '');
@@ -67,12 +70,12 @@ export const actions: Actions = {
     } catch {
       return fail(400, { setupInvalid: true });
     }
-    redirect(303, '/');
+    redirect(303, afterSignIn(url.searchParams.get('next')));
   },
-  legacy: async ({ request, cookies }) => {
+  legacy: async ({ request, cookies, url }) => {
     const form = await request.formData();
     if (!passwordMatches(String(form.get('password') ?? ''))) return fail(401, { legacyInvalid: true });
     startOwnerSession(cookies);
-    redirect(303, '/');
+    redirect(303, afterSignIn(url.searchParams.get('next')));
   }
 };

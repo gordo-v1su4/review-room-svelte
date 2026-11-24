@@ -1,8 +1,8 @@
 import type { PageServerLoad } from './$types';
 import { requireOwner } from '$lib/server/owner-auth';
 
-export const load: PageServerLoad = ({ cookies }) => {
-  requireOwner(cookies);
+export const load: PageServerLoad = ({ cookies, url }) => {
+  requireOwner(cookies, url);
   // Private operational content travels only in authorized server responses.
   return { sections: [
     { title: 'Connect the dedicated setup', paragraphs: [

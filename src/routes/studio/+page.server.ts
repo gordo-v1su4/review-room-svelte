@@ -8,8 +8,8 @@ function value(form: FormData, name: string) { return String(form.get(name) ?? '
 function origins(form: FormData) { return value(form, 'origins').split(/[\s,]+/).filter(Boolean); }
 function done() { redirect(303, '/?sharing=1'); }
 
-export const load: PageServerLoad = async ({ cookies, setHeaders }) => {
-  requireOwner(cookies);
+export const load: PageServerLoad = async ({ cookies, setHeaders, url }) => {
+  requireOwner(cookies, url);
   redirect(303, '/?sharing=1');
 };
 

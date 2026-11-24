@@ -4,6 +4,8 @@
   let { data, form } = $props();
   let setup = $state(false);
   let showSetup = $derived(setup || Boolean(form?.setupInvalid));
+  // Carried on each form action so a failed attempt and all three ways in return to where the owner was heading.
+  const next = $derived(data.next ? `&next=${encodeURIComponent(data.next)}` : '');
 </script>
 
 <svelte:head><title>Sign in · Review Room</title><meta name="robots" content="noindex" /></svelte:head>
@@ -12,7 +14,7 @@
   <div class="intro"><p class="eyebrow">V1su4 workspace</p><h1>Sign in</h1><p>Continue to your projects and private reviews.</p></div>
 
   {#if !showSetup}
-    <form method="POST" action="?/email" class="fields">
+    <form method="POST" action="?/email{next}" class="fields">
       <label for="email">Email</label><input id="email" type="email" name="email" autocomplete="username" required />
       <label for="password">Password</label><input id="password" type="password" name="password" autocomplete="current-password" required />
       {#if form?.invalid}<p class="error" role="alert">Email or password was not accepted.</p>{/if}
@@ -20,7 +22,7 @@
       <button class="primary" type="submit">Sign in</button>
     </form>
   {:else}
-    <form method="POST" action="?/create" class="fields">
+    <form method="POST" action="?/create{next}" class="fields">
       <p class="hint">Create your owner account with the current owner password.</p>
       <label for="setup-email">Owner email</label><input id="setup-email" type="email" name="email" autocomplete="username" required />
       <label for="setup-password">New password</label><input id="setup-password" type="password" name="password" autocomplete="new-password" minlength="8" required />
@@ -31,7 +33,7 @@
   {/if}
 
   {#if !data.ownerReady || showSetup}<button class="mode" type="button" onclick={() => showSetup ? location.assign('/studio/sign-in') : setup = true}>{showSetup ? 'Back to sign in' : 'Set up owner account'}</button>{/if}
-  <details class="legacy"><summary>Use current owner password</summary><form method="POST" action="?/legacy" class="fields"><label for="legacy-password">Owner password</label><input id="legacy-password" type="password" name="password" autocomplete="current-password" required />{#if form?.legacyInvalid}<p class="error" role="alert">Password not accepted.</p>{/if}<button type="submit">Continue</button></form></details>
+  <details class="legacy"><summary>Use current owner password</summary><form method="POST" action="?/legacy{next}" class="fields"><label for="legacy-password">Owner password</label><input id="legacy-password" type="password" name="password" autocomplete="current-password" required />{#if form?.legacyInvalid}<p class="error" role="alert">Password not accepted.</p>{/if}<button type="submit">Continue</button></form></details>
 </main>
 
 <style>
