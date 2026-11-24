@@ -26,6 +26,8 @@
   } = $props();
   const showVersion = $derived(appearance.visibleFields.includes('version'));
   const fields = $derived(appearance.fieldOrder.filter(id => id !== 'version' && appearance.visibleFields.includes(id)));
+  const showShortlist = $derived(fields.includes('shortlist'));
+  const showRating = $derived(fields.includes('rating'));
   const labels = Object.fromEntries(CARD_FIELD_DEFINITIONS.map(field => [field.id, field.label]));
   function fieldValue(asset: Asset, field: CardFieldId): string {
     switch (field) {
@@ -46,6 +48,10 @@
   }
 </script>
 
+{#snippet bookmarkControl(asset: Asset)}
+  <button type="button" class="card-bookmark" class:filled={asset.shortlisted} aria-label={`${asset.shortlisted ? 'Remove' : 'Add'} ${asset.name} ${asset.shortlisted ? 'from' : 'to'} shortlist`} aria-pressed={asset.shortlisted} title={asset.shortlisted ? 'Remove from shortlist' : 'Add to shortlist'} disabled={access.kind === 'none' || busyIds.includes(asset.id) || asset.status === 'archived'} onclick={() => onReview({type:'shortlist',assetId:asset.id,shortlisted:!asset.shortlisted})}><Bookmark size={14} fill={asset.shortlisted ? 'currentColor' : 'none'}/></button>
+{/snippet}
+
 <div class="media-grid" class:list-layout={view === 'list'} data-thumbnail-fit={appearance.fit}
   style:--card-ratio={appearance.aspect === 'square' ? '1' : appearance.aspect === 'portrait' ? '9 / 16' : '16 / 9'}
   style:--card-fit={appearance.fit === 'fit' ? 'contain' : 'cover'}
@@ -57,7 +63,6 @@
         <div class="thumbnail">
           <MediaThumbnail src={asset.url} poster={asset.poster} sprite={asset.sprite} type={asset.type} name={asset.name} availability={asset.availability ?? 'ready'}/>
           <span class="asset-type">{asset.assetClass}</span>
-          {#if asset.shortlisted}<span class="shortlist-icon" title="Shortlisted"><Bookmark size={16} fill="currentColor"/></span>{/if}
         </div>
       </button>
       {#if appearance.showInfo}<div class="card-body">
@@ -65,8 +70,10 @@
   {#if fields.length}<div class="card-fields">{#each fields as field (field)}
           {#if field === 'status'}<AssetStatusMenu status={asset.status} name={asset.name} access={busyIds.includes(asset.id) ? { kind: 'none' } : access} onChange={status => onReview({ type: 'status', assetId: asset.id, status })}/>
           {:else if field === 'rating'}<div class="card-rating" role="group" aria-label={`Rating for ${asset.name}`}>
+            {#if showShortlist}{@render bookmarkControl(asset)}{/if}
             {#each [1, 2, 3, 4, 5] as rating (rating)}<button type="button" class="card-star" class:filled={asset.rating >= rating} aria-label={`Rate ${asset.name} ${rating} stars`} aria-pressed={asset.rating === rating} title={asset.rating === rating ? 'Clear rating' : `${rating} stars`} disabled={access.kind === 'none' || busyIds.includes(asset.id) || asset.status === 'archived'} onclick={() => onReview({ type: 'rate', assetId: asset.id, rating: asset.rating === rating ? 0 : rating })}><Star size={14} fill={asset.rating >= rating ? 'currentColor' : 'none'}/></button>{/each}
           </div>
+          {:else if field === 'shortlist'}{#if !showRating}{@render bookmarkControl(asset)}{/if}
           {:else}<span title={`${labels[field]}: ${fieldValue(asset, field)}`} aria-label={`${labels[field]}: ${fieldValue(asset, field)}`}>{fieldValue(asset, field)}</span>{/if}
         {/each}</div>{/if}
       </div>{/if}
@@ -102,7 +109,10 @@
   button.misfiled-badge:focus-visible { outline: 1px solid var(--status-needs-changes); outline-offset: 2px; }
   .version-tag { flex: none; margin-left: 4px; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
   .card-name:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }
-  .card-rating { display: flex; flex: 0 0 100%; min-width: 0; }
+  .card-rating { display: flex; flex: 0 0 100%; min-width: 0; gap:4px; }
+  .card-bookmark { display:grid;place-items:center;flex:0 1 24px;min-width:0;height:28px;padding:0;border:0;border-radius:3px;background:transparent;color:var(--muted); }
+  .card-bookmark.filled,.card-bookmark:hover:not(:disabled) { color:var(--teal); }
+  .card-bookmark:focus-visible { outline:1px solid var(--teal);outline-offset:1px; }
   .card-star { display: grid; place-items: center; flex: 0 1 24px; min-width: 0; height: 28px; padding: 0; background: transparent; color: var(--muted); border-radius: 3px; }
   .card-star.filled, .card-star:hover:not(:disabled) { color: var(--teal); }
   @media (pointer: coarse) { .card-star { flex-basis: 44px; height: 44px; } .media-grid:not(.list-layout) { grid-template-columns: repeat(auto-fill, minmax(min(100%, max(240px, var(--card-width))), 1fr)); } }
@@ -110,4 +120,5 @@
   .card-fields > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .card-open:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
   @media (pointer:coarse) { .card-check { opacity:1; width:22px; height:22px; top:11px; left:11px; } .card-check::before { content:''; position:absolute; inset:-11px; } }
+  @media(max-width:640px) { .card-star { flex-basis:24px;height:28px; } }
 </style>

@@ -110,3 +110,5 @@ No merge or deployment is included. Actual signed-in local playback is now verif
 - 2026-11-24: User approved current phone/Fields styling and wider layout: "everything looks fine ... desktop is not hurt" and explicitly authorized sending PR and completing reviews/retro. Final requested tweaks: plain Current status (Make current remains actionable for noncurrent takes), Fields X hover white with no filled/outlined box. Physical iPhone acceptance is not claimed.
 
 - Final handoff: PR#37 reopened/ready after explicit UI and PR approval. Current main3131297 merged without conflicts.362tests pass;check0errors8existingwarnings;build passes. Final Standards/Spec and compatibility bug findings addressed; fullscreen portal fix source rechecked. Retro completed in retro.md; proposals presented without altering CI/global guidance. No merge/deploy performed.
+
+- Card follow-up: Appearance Shortlist now displays an empty/filled bookmark before rating stars, no textual state or corner duplicate;4px spacing between controls. Browser checked both states without metadata mutation. This user-requested shared card refinement is included in PR#37.
