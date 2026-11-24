@@ -1403,15 +1403,17 @@
   .folder-path-separator { color: #ffffff2e; font-size: 12px; }
   .library-folder.locked { color: var(--folder-locked); border-color: color-mix(in srgb, var(--folder-locked) 28%, transparent); }
   .library-folder.connected { color: var(--folder-connected); border-color: color-mix(in srgb, var(--folder-connected) 24%, transparent); }
-  .library-filter, .library-folder { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; white-space: nowrap; cursor: pointer; }
+  .library-filter, .library-folder { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 6px; height: var(--control-height); padding: 0 12px; border: 0; border-radius: var(--control-radius); background: transparent; color: var(--muted); font: inherit; font-size: 11px; white-space: nowrap; cursor: pointer; }
   .library-filter { border:0; }
   .library-filter.chosen { background: var(--raised); color: var(--ink); }
   .library-filter:hover, .library-folder:hover { background: var(--raised); color: var(--ink); }
+  .library-folder.locked:hover { color: var(--folder-locked); }
+  .library-folder.connected:hover { color: var(--folder-connected); }
   .library-filter > span, .library-folder-count { font-size: 10px; color: var(--muted); }
   .library-folder-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
   .library-divider { flex: 0 0 1px; height: 20px; margin: 0 4px; background: var(--border); }
   .library-filter:focus-visible, .library-folder:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }
-  @media (pointer: coarse) { .library-filter, .library-folder { height: 44px; } }
+  @media (pointer: coarse) and (min-width: 641px) { .library-filter, .library-folder { height: 44px; } }
 
   .media-job { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:7px 12px; border-block:1px solid var(--border); background:color-mix(in srgb, var(--teal) 7%, var(--panel)); color:var(--muted); font-size:11px; }
   .media-job span { color:var(--ink); }

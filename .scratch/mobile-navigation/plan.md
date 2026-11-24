@@ -21,6 +21,8 @@ user's feedback, implement adjustments, and record explicit approval here before
 moving to the next acceptance step. Keep the current step visible in chat.
 
 1. **Browsing — CURRENT**
+   - [x] Show requested refinements: compact 28px button faces, matching corners/padding, borderless folder links, consistent colored folder labels and hover fill.
+   - [x] Show the explicitly requested desktop exception: fixed 300px sidebar at 1024px and wider; keep fonts unchanged.
    - [x] Implement persistent Menu/location/Tools/Add header.
    - [x] Implement vertical collapsible folders and separate wrapping filters.
    - [x] Remove sideways phone navigation and wrap the folder path.
@@ -63,3 +65,4 @@ physical iPhone behavior remain separate from synthetic local UI evidence.
 - 2026-11-24: Five design recommendations approved for mobile only.
 - 2026-11-24: User requested explicit screen-by-screen UI approval and a visible plan/goal. New screens remain unapproved.
 - 2026-11-24: Browsing walkthrough shown in the visible native browser at a verified 430px viewport: project → episode → nested folder → back; collapse folders; Videos filter; return to All media. Browsing approval is pending.
+- 2026-11-24: User requested uniform compact controls and folder hover behavior. Verified phone Tools/Add/filters/folder links all have 28px faces and 5px corners; expanded tap areas remain. Verified folder entry/back navigation and no horizontal overflow at 430px. At 1280px with mouse input, sidebar is 300px; connected and ordinary folder hover fills both compute to rgba(27,32,34,.125), radius 5px, and connected text remains rgb(143,185,242). Existing font declarations retained. `bun run check`: zero errors, eight existing warnings; Svelte autofixer reviewed (pre-existing non-style suggestions only). User approval remains pending.
