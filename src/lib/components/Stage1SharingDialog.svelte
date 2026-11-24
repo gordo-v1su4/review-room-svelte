@@ -21,7 +21,7 @@
         <div><Dialog.Title class="dialog-title">Publish &amp; share</Dialog.Title><Dialog.Description>Private reviews and optional published embeds</Dialog.Description></div>
         <Dialog.Close class="publishing-close" aria-label="Close publishing tools"><X size={17} /></Dialog.Close>
       </div>
-      <Stage1Controls {snapshot} onVersionFile={onVersionFile ? (file, projectId, assetId) => { open = false; onVersionFile?.(file, projectId, assetId); } : undefined} destinationContext={open ? destinationContext : undefined} uploadContext={uploadContext ? {...uploadContext,onChoose:() => { open = false; uploadContext?.onChoose(); }} : undefined} />
+      <div class="publishing-body"><Stage1Controls {snapshot} onVersionFile={onVersionFile ? (file, projectId, assetId) => { open = false; onVersionFile?.(file, projectId, assetId); } : undefined} destinationContext={open ? destinationContext : undefined} uploadContext={uploadContext ? {...uploadContext,onChoose:() => { open = false; uploadContext?.onChoose(); }} : undefined} /></div>
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
@@ -36,5 +36,10 @@
   :global(.publishing-close:focus-visible) { outline:1px solid var(--accent);outline-offset:2px; }
   @media(max-width:760px) { :global(body .stage-one-sheet) { width:100%;border-radius:12px 12px 0 0;padding-bottom:max(18px,env(safe-area-inset-bottom)); } }
   @media(pointer:coarse) { :global(.publishing-close) { min-width:44px;min-height:44px; } }
+  @media(max-width:640px) {
+    :global(body .stage-one-sheet) { display:flex;flex-direction:column;left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);width:calc(100% - 32px);max-width:420px;height:auto;max-height:80dvh;padding:16px;border-radius:12px;overflow:hidden; }
+    .stage-one-heading { flex:none; }
+    .publishing-body { min-height:0;overflow-y:auto;overscroll-behavior:contain; }
+  }
 </style>
 

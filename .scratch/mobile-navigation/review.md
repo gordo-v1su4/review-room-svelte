@@ -1,0 +1,160 @@
+# Phone refresh review
+
+Reviewed initial implementation `d8e4eab` against fixed point
+`c8800926f60ac393d067be00e1fe2fde6f73b86f` on independent axes.
+Findings below describe that reviewed revision; resolutions are in subsequent commits.
+
+## Standards
+
+Two documented findings and one judgement call:
+
+- **P2, conflicting canonical spec:** obsolete toolbar and fullscreen-dialog rules
+  contradicted the approved phone screen. Resolved by rewriting the superseded
+  bullets in Design Spec section 15.
+- **P2, phone target size:** wrapped breadcrumb buttons were 36px high. Resolved to 44px.
+- **Possible duplicated code:** folder loops and table status/rating controls appeared
+  in both arrangements. Resolved with shared Svelte snippets, keeping distinct layouts.
+
+## Spec
+
+Two P2 findings:
+
+- Drawer Edit project could address an unmounted settings dialog. Resolved by
+  opening Tools before mounting and opening its controlled project settings dialog.
+  Verified from the phone drawer at 320px.
+- Hidden phone table buttons preceded wider table buttons, breaking desktop focus
+  restoration. Resolved by rendering only the active table arrangement. Verified
+  at 1280px: closing review restored focus to asset `par-0010`, with no phone rows mounted.
+
+## Independent bug-focused review
+
+The requested `review-bugbot` skill is installed locally. This Codex runtime does
+not expose the dedicated Bugbot service/agent type; a general independent agent
+performed an explicitly identified compatibility review. This is not a native
+Bugbot service check or a GitHub approval.
+
+| Severity | Location (reviewed revision) | Finding and resolution |
+|---|---|---|
+| P2 | src/routes/+page.svelte:1369 | Drawer settings mount issue; fixed and verified as above. |
+| P2 | src/routes/+page.svelte:806 | Inbox navigation selected Media and could leave Tools covering the note. It now selects Notes, dismisses Tools and restores notes focus below the sticky header. Verified through Notifications → Inbox → note. |
+| P2 | src/routes/+page.svelte:1369 | The publishing return address could not mount its dialog. Phone `sharing=1` now opens Tools so publishing mounts and opens; verified on a fresh address load. |
+| P2 | src/app.css:2139 | Copy and misfiled panel headings were omitted from the sticky treatment. Both heading classes now share the phone panel rule. |
+
+The initial wider-table focus defect was also found by this reviewer and resolved
+before its final report. Parent verification additionally fixed phone heading
+scroll placement and retained the unsaved comment draft across Media/Notes switches.
+
+These were local code reviews. There is no claim of external Bugbot or OCR approval.
+
+## PR service status
+
+On 2026-11-24, PR #37 was open, draft and mergeable at `c2eb40a`.
+It had no submitted GitHub reviews or status checks. Greptile posted that the
+organization was out of review credits, so its external review did not run:
+https://github.com/gordo-v1su4/review-room-svelte/pull/37#issuecomment-7123782281
+
+The local review evidence above remains separate. No billing, credit purchase,
+merge or deployment action was taken. User UI acceptance remains pending.
+
+## Metadata dropdown follow-up
+
+Focused Standards and Spec reviews compared the new metadata changes against
+`8b638cc`. Standards reported no findings. Spec reported two P2 findings, both
+resolved and rechecked: keep incompatible asset classes visible but disabled,
+with an independent callback guard; bound menu width and wrap long labels.
+
+Native browser checks verified all four class labels and disabled still-image
+choices for a video source; Nano Banana Pro selection; Custom model entry; a long
+saved custom-model label wrapping without internal horizontal overflow; multiple
+reference selector semantics; and Escape returning focus to its trigger. Phone
+model choices were shown in the inset Asset fields panel. Reference options were
+empty in this fixture, so selecting multiple actual reference images is not
+claimed as browser-verified. No production metadata was saved. User UI acceptance
+of this shared desktop/phone correction remains pending.
+
+## Desktop-scope and player correction
+
+Focused Standards and Spec reviews rechecked the changes since `a5956b2` after the
+user reaffirmed original desktop geometry and an always-16:9 phone player. Both
+reported no findings: desktop folder/project control geometry restored; compact
+Tools and destination-select shrink rules confined to <=640px; phone frame ratio
+explicitly 16:9. Native baseline comparison and phone walkthrough evidence are in
+the verification record. No UI approval is inferred from these reviews.
+
+## Current recovery and Fields verification (2026-11-24)
+
+This supersedes earlier shared-desktop styling and sidebar-width exceptions. Desktop and intermediate layouts retain the main baseline; the new metadata select styling and image-model presets are phone-only. PR #37 is closed, unmerged. Do not create or reopen a PR until the user separately authorizes it, even after UI approval.
+
+The phone Fields dialog now has fixed 80dvh height. Its heading, centered group controls, search/completeness controls and save footer stay anchored; only the fields scroll. The six groups were switched through in the real signed-in local app at 430 x 768: every dialog had top 76.8359375 and height 614.6614379882812 CSS pixels. Media/Notes now use restrained underline tabs. Decision-button sizing remains unchanged at the user's request.
+
+Spec review of the final Fields layout reported no findings. The compatibility bug-focused review of the preceding recovery reported no actionable bugs; this is local agent evidence, not a native Bugbot approval. Final check: zero errors and eight existing warnings; build passed. Existing test suite: 330 passed. No new test seam was introduced.
+
+Actual existing media playback and previous/next asset navigation were verified without metadata/status/rating edits. Phone review fit 430 x 768 and 320 x 640 without page overflow. Unauthenticated owner-version-metadata GET/POST now return JSON 401 rather than redirected HTML. After the production build, the dev listener was restarted to clear its stale generated-module state; the visible signed-in phone preview then loaded successfully. The temporary baseline comparison listener was stopped.
+
+Rendered evidence is outside Git under C:/Users/Gordo/.codex/visualizations/2026/11/24/01a20be2-920f-75c1-9f99-d29aac742621/mobile-proof/: phone-fields-all.jpg, phone-fields-tags.jpg, phone-review.jpg, plus earlier published/local desktop comparisons. The full All panel image was visually inspected. The native browser is left on the phone Fields panel. Physical-phone and user UI acceptance remain pending; no PR, push, merge or deployment was performed during this recovery.
+
+## Compact controls follow-up
+
+User rejected underline tabs and bulky touch dropdowns. Phone Media/Notes now use borderless rounded fill selection; dropdowns retain compact11px/28px styling on touch devices. Table Status/Rating use PhoneSelect only in the phone branch. The table bookmark is icon-only with its accessible label retained. Phone panel scrollbar styling matches the existing thin20%-opacity token. Main drawer and wider table/native selects remain unchanged.
+
+Focused Spec source review reported no actionable findings: existing status/rating/shortlist callbacks and values retained, archived display disabled, no desktop/intermediate leakage. Native UI verified compact option geometry and icon-only bookmark, table expansion and review/back retention, and publishing width fit at320/430. Latest check: zero errors/eight existing warnings. User approval and separate PR authorization remain pending. The original main CSS is still preserved verbatim as a prefix of app.css (normalized line endings), with scoped additions after it.
+# Current review handoff
+
+Current handoff: PR #37 is open and ready after explicit user approval and PR authorization. Current main3131297 is integrated. Merge/deployment remain outside scope. Historical holds below are superseded.
+
+The phone refresh (<=640px) separates folder browsing from media review, groups secondary actions under Tools, and uses inset publishing/Fields panels. Wider layouts retain the published baseline. Media/Notes selectors now use rounded background highlights with no underline or selection border. Phone dropdowns use compact 11px text/28px rows; bookmarks are icon-only. Fields groups remain centered and their panel stays fixed while contents scroll.
+
+```mermaid
+flowchart TD
+  Drawer[Navigation drawer] --> Library[Folder library]
+  Library --> Grid[Grid or list]
+  Library --> Table[Expandable phone rows]
+  Grid --> Review[16:9 media review]
+  Table --> Review
+  Review -->|Back to folder| Library
+  Review --> Notes[Notes and info]
+  Notes --> Fields[Fixed-height Fields panel]
+  Fields -->|Close| Notes
+  Library --> Tools[Workspace tools]
+  Review --> Tools
+  Tools --> Publish[Publish and share]
+  Publish --> Section[Section chooser]
+  Section --> Destinations[Destinations]
+```
+
+Validation: latest type check has zero errors/eight existing warnings; latest production build passed. The existing suite previously passed 330 tests. Svelte autofixer reports no issues for the final table and phone select components. Focused Spec review found no actionable issues in the final compact-control changes. Local bug-focused review is compatibility evidence, not native Bugbot approval; the earlier external Bugbot review could not run because of review credits.
+
+Rendered evidence covers real signed-in media playback, asset previous/next, Back to folder, table expansion retention, fixed Fields groups, publishing sections and no horizontal overflow at 320/430px. The main stylesheet's baseline prefix remains unchanged. No production publishing or metadata/status/rating changes were performed for verification.
+
+Acceptance: user approved the final UI and wider arrangement and authorized PR publication. Physical-phone confirmation is not claimed. The repository-local retro is recorded in retro.md.
+
+---
+
+
+## Latest user-requested dropdown exception and sizing
+
+The user explicitly requested removal of native blue dropdown lists on desktop as well as phones. This supersedes the earlier native-desktop-control preservation note above. Replaced all remaining product native selects, preserving options, callbacks, disabled states and wider layout geometry. Dev-only preview/QA selects remain native. Phone Fields now uses equal28px controls/12px text, borderless tinted focus, edge-spaced categories and112px notes/prompt textareas. Fields trigger, note time styling, hamburger and nested-folder heading spacing are refined only <=640px.
+
+Focused Spec review found desktop filter height and status-color-hook regressions; both fixed and rechecked. Desktop Sort by trigger measures36px and opens the themed list. At320px Fields has no horizontal overflow; search/completeness widths both123.18px,height28px,font12px. Tag entry focus computes border0/outline none/shadow none. Production notes measures112px/font12px. All330tests pass; typecheck0errors8existingwarnings. Screenshots fields-aligned-controls.jpg and desktop-themed-sort.jpg are outside Git. UI acceptance remains pending and PR hold unchanged.
+
+## Final approved handoff (2026-11-24)
+
+User explicitly approved current phone/Fields appearance and preserved desktop layout, then authorized PR publication and reviews/retro. This supersedes every historical pending-approval/PR-hold note. Current main3131297 was fetched and merged without conflicts; its live refresh and fixed background are retained.
+
+Final Standards:0 documented violations;2 optional maintainability notes addressed (shared table control snippets and unambiguous PhoneSelect import). Spec:no actionable findings. Independent compatibility bug review found a P2 fullscreen markup-menu portal regression; PhoneSelect now accepts an optional portalTarget and StillViewer targets the viewer root while fullscreen. Source recheck found no further issues. The in-app browser rejects fullscreen requests, so actual fullscreen acceptance remains unverified; normal Width options were browser-verified. This review is not native Bugbot approval.
+
+Current selected-version status is now plain borderless text with no interactive hover treatment. Make current remains a real action only for other takes. Fields close uses white text on hover/focus without an outlined box. Existing authenticated review actions, media and metadata were preserved. Latest suite after main integration:362 tests pass. Final check:0errors8existingwarnings. No merge/deployment authorized.
+
+## Card shortlist follow-up
+
+User requested an icon-only shortlist field in Appearance/Card fields, positioned before the five rating stars. MediaCards now renders an empty/filled bookmark using the existing shortlist action and permission/busy/archive guards. It removes textual shortlist state and the duplicate thumbnail-corner badge; when Rating is hidden, the Shortlist field still renders its icon. Added4px star-row gaps and retained compact phone faces. Native browser verified filled/empty icons, bookmark before five stars, zero corner badges and no Not shortlisted text. Only local appearance preferences were changed for QA; saved asset shortlist/rating was not modified.
+
+## Independent review follow-up (2026-11-24)
+
+Two independent GPT-6.2 Astra high-reasoning agents reviewed Standards and Spec against pinned base `11e8e0c`, then rechecked the fixes. Four confirmed defects were corrected: touch Fields editable text now uses 16px without changing compact control heights; Tools → Notes & info opens the phone Notes tab and closes Tools; themed selects retain selected fill through Bits UI's actual data-selected marker; status options retain semantic colors. Wider Notes behavior and layout geometry are unchanged. The selected-state and semantic-color corrections are approved shared dropdown styling.
+
+Standards: no remaining actionable source findings after recheck. Spec: all four confirmed defects resolved. These reviews are independent Astra reviews, not native Bugbot or a completed OCR review. OCR's missing relative-position claim was false (shared button styles already position relatively); its dialog-width concern was not supported by the effective phone selector specificity. Harmless nested media/duplicate drawer CSS was simplified without widening its <=640px scope.
+
+Browser checks used actual signed-in local media at 320px/430px: Tools navigation works; editable Fields text computes 16px, single-line controls 28px, notes/prompt 112px; reference selections retain fill after focus moves; status choices show semantic colors. Temporary reference selections were restored without saving. No horizontal overflow was measured at 320px. At 641px and 1280px the phone query is inactive and page width stays within the viewport. This is breakpoint evidence, not a fresh pixel comparison of every desktop state. Physical iPhone focus zoom remains unverified.
+
+Validation: 363 tests pass; type check has zero errors and eight existing warnings. Next requested OCR attempt will use Qwen 3.8 Flash, medium review/model effort, one attempt and a 1,000,000-token safety budget; no external rerun was launched for this follow-up. The prior 500k OCR result remains partial. PR #37 remains unmerged and the UI is not deployed.

@@ -51,7 +51,7 @@
   </Dialog.Trigger>{/if}
   <Dialog.Portal>
     <Dialog.Overlay class="dialog-overlay"/>
-    <Dialog.Content class="filter-sheet inbox-sheet" onCloseAutoFocus={event => { if (navigatingToNote && onNavigateFocus?.()) event.preventDefault();
+    <Dialog.Content class="filter-sheet inbox-sheet phone-panel" onCloseAutoFocus={event => { if (navigatingToNote && onNavigateFocus?.()) event.preventDefault();
       else if (onRestoreFocus) { event.preventDefault(); onRestoreFocus(); }
       navigatingToNote = false; }}>
       <div class="inbox-heading">

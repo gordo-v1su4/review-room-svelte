@@ -112,7 +112,7 @@
   <Dialog.Trigger class="identity-trigger" aria-label="Project settings" title="Project settings" disabled={!canEdit}><Settings2 size={15}/></Dialog.Trigger>
   <Dialog.Portal>
     <Dialog.Overlay class="dialog-overlay"/>
-    <Dialog.Content class="filter-sheet identity-sheet" onOpenAutoFocus={focusName} onCloseAutoFocus={event => {
+    <Dialog.Content class="filter-sheet identity-sheet phone-panel" onOpenAutoFocus={focusName} onCloseAutoFocus={event => {
       if (archivedOnClose && onArchiveFocus) { event.preventDefault(); onArchiveFocus(); }
       archivedOnClose = false;
     }}>

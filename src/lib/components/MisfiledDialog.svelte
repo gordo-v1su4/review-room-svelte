@@ -31,7 +31,7 @@
 <Dialog.Root bind:open>
   <Dialog.Portal>
     <Dialog.Overlay class="folder-overlay"/>
-    <Dialog.Content class="folder-dialog">
+    <Dialog.Content class="folder-dialog phone-panel">
       <div class="misfiled-heading"><Dialog.Title class="folder-dialog-title">File misfiled item</Dialog.Title><Dialog.Close class="folder-close" aria-label="Close"><X size={17}/></Dialog.Close></div>
       <Dialog.Description class="folder-description">“{filename}” ({assetName}) has no shot code that matches this folder. File it as a take, or move it to the right scene folder.</Dialog.Description>
       <section>

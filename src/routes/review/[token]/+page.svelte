@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PhoneSelect from '$lib/components/PhoneSelect.svelte';
   import { onMount } from 'svelte';
   import { MessageSquare, Play } from 'lucide-svelte';
   import Player from '$lib/playback/Player.svelte';
@@ -87,9 +88,9 @@
           {:else}<StillViewer assetId={selected.id} src={`/api/review-media/${data.token}/${selected.id}`} name={selected.title} strokes={markup[selected.id] ?? selected.annotationStrokes ?? []} dirty={selected.id in markup} canAnnotate={true} saveDisabled={busy} onChange={strokes => { if (selected) markup[selected.id] = strokes; }} onSave={async () => { if (!selected) return; const id = selected.id; await mutate('annotations', id, { strokes: markup[id] ?? [] }); delete markup[id]; }} onViewed={() => selected && viewed(selected.id)}/>{/if}
           <div class="video-meta"><span>{selected.assetCode ?? 'VIDEO'}</span><span>{selected.status.replaceAll('_', ' ')}</span></div>
           <div class="review-controls">
-            <label>Rating<select aria-label="Rating" value={selected.rating} disabled={busy} onchange={event => update('rating', { rating: Number(event.currentTarget.value) })}>{#each [0,1,2,3,4,5] as rating (rating)}<option value={rating}>{rating ? `${rating} / 5` : 'Unrated'}</option>{/each}</select></label>
+            <label>Rating<PhoneSelect label="Rating" value={String(selected.rating)} disabled={busy} items={[0,1,2,3,4,5].map(rating => ({value:String(rating),label:rating ? `${rating} / 5` : "Unrated"}))} onValueChange={value => update("rating", {rating:Number(value)})}/></label>
             <button disabled={busy} aria-pressed={selected.isSelect} onclick={() => update('shortlist')}>{selected.isSelect ? 'Shortlisted' : 'Shortlist'}</button>
-            <label>Review status<select aria-label="Review status" value={selected.status} disabled={busy} onchange={event => update('status', { status: event.currentTarget.value })}><option value="awaiting_review">Awaiting review</option><option value="in_progress">In review</option><option value="needs_changes">Needs changes</option><option value="approved">Approved</option></select></label>
+            <label>Review status<PhoneSelect label="Review status" value={selected.status} disabled={busy} items={[{value:"awaiting_review",label:"Awaiting review"},{value:"in_progress",label:"In review"},{value:"needs_changes",label:"Needs changes"},{value:"approved",label:"Approved"}]} onValueChange={value => update("status", {status:value})}/></label>
             {#if selected.downloadEnabled && selected.versionId}<a href={`/api/review-download/${data.token}/${selected.id}/${selected.versionId}`} download>Download original</a>{/if}
           </div>
         </section>
@@ -103,7 +104,7 @@
 </main>
 
 <style>
-  .review-controls{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin-top:14px}.review-controls label{display:grid;gap:5px;color:var(--muted);font-size:11px}.review-controls button,.review-controls select,.review-controls a,.timecode{min-height:34px;padding:6px 9px;background:var(--panel);border:1px solid var(--control-border);border-radius:4px;color:var(--ink);font:inherit;font-size:11px}.review-controls a{text-decoration:none}.comment .timecode{margin-left:8px;min-height:24px}.comment-form .timecode{display:flex;align-items:center}.timecode input{width:auto}
+  .review-controls{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin-top:14px}.review-controls label{display:grid;gap:5px;color:var(--muted);font-size:11px}.review-controls button,.review-controls :global(.phone-select-trigger),.review-controls a,.timecode{min-height:34px;padding:6px 9px;background:var(--panel);border:1px solid var(--control-border);border-radius:4px;color:var(--ink);font:inherit;font-size:11px}.review-controls a{text-decoration:none}.comment .timecode{margin-left:8px;min-height:24px}.comment-form .timecode{display:flex;align-items:center}.timecode input{width:auto}
   .review-shell{min-height:100svh;background:linear-gradient(125deg,#14191a 0%,#0d1112 25%,#090b0c 60%);color:var(--ink)}
   .review-header{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--border)}
   .brand{font-size:18px;font-weight:600;letter-spacing:-.8px}.private-label,.eyebrow{color:var(--muted);font-size:10px;letter-spacing:.12em;text-transform:uppercase}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PhoneSelect from './PhoneSelect.svelte';
   import { onDestroy, untrack } from 'svelte';
   import { ArrowUpRight, Circle, Download, Maximize, Minimize, Pencil, Save, Square, Trash2, Undo2 } from 'lucide-svelte';
   import type { AnnotationPoint, AnnotationStroke, AnnotationTool } from '$lib/annotations';
@@ -18,7 +19,7 @@
     onViewed?: () => void;
     onfailure?: (source: string) => void;
   } = $props();
-  let root: HTMLDivElement;
+  let root = $state<HTMLDivElement>();
   let surface: HTMLDivElement;
   let tool = $state<AnnotationTool>('pen');
   let color = $state('#62b9aa');
@@ -98,6 +99,7 @@
     onViewed?.();
   }
   async function toggleFullscreen() {
+    if (!root) return;
     message = '';
     try { if (document.fullscreenElement === root) await document.exitFullscreen(); else await root.requestFullscreen(); }
     catch { message = 'Fullscreen is unavailable in this browser.'; }
@@ -123,7 +125,7 @@
     {#if canAnnotate}
       <div class="tool-group" aria-label="Markup tools">{#each tools as item (item.id)}<button type="button" class:chosen={tool === item.id} aria-label={item.label} title={item.label} aria-pressed={tool === item.id} disabled={saving} onclick={() => { cancelStroke(); tool = item.id; }}><item.icon size={15}/></button>{/each}</div>
       <div class="tool-group colors" aria-label="Markup colors">{#each colors as item (item.value)}<button type="button" aria-label={`${item.label} markup`} title={item.label} aria-pressed={color === item.value} class:chosen={color === item.value} disabled={saving} onclick={() => color = item.value}><span style:background={item.value}></span></button>{/each}</div>
-      <label class="stroke-size">Width<select aria-label="Markup width" bind:value={width} disabled={saving}><option value={2}>2 px</option><option value={3}>3 px</option><option value={5}>5 px</option><option value={8}>8 px</option></select></label>
+      <label class="stroke-size">Width<PhoneSelect portalTarget={fullscreen ? root : undefined} label="Markup width" value={String(width)} disabled={saving} items={[2,3,5,8].map(value => ({value:String(value),label:`${value} px`}))} onValueChange={value => width = Number(value)}/></label>
       <div class="tool-group actions"><button type="button" aria-label="Undo markup" title="Undo" disabled={!strokes.length || saving} onclick={() => { cancelStroke(); changeStrokes(strokes.slice(0, -1)); }}><Undo2 size={15}/></button><button type="button" aria-label="Clear markup" title="Clear markup" disabled={!strokes.length || saving} onclick={() => { cancelStroke(); changeStrokes([]); }}><Trash2 size={15}/></button><button type="button" class="save" disabled={!dirty || saving || saveDisabled || Boolean(active)} onclick={save}><Save size={13}/>{saving ? 'Saving' : 'Save'}</button></div>
     {/if}
     <!-- Original media Blob URLs are downloads, not SvelteKit routes; do not resolve them. -->
@@ -165,11 +167,11 @@
   button:hover:not(:disabled) { background: var(--raised); color: var(--ink); }
   button:disabled { opacity: .35; cursor: default; }
   button.chosen { background: color-mix(in srgb, var(--accent, #62b9aa) 14%, var(--panel)); color: var(--ink); }
-  button:focus-visible,select:focus-visible,.drawing-surface:focus-visible { outline: 1px solid var(--accent, #62b9aa); outline-offset: -1px; }
+  button:focus-visible,:global(.phone-select-trigger:where(.still-viewer *)):focus-visible,.drawing-surface:focus-visible { outline: 1px solid var(--accent, #62b9aa); outline-offset: -1px; }
   .colors button { min-width: 25px; }
   .colors span { width: 10px; height: 10px; border-radius: 2px; }
   .stroke-size { display: inline-flex; gap: 5px; align-items: center; color: var(--muted); font-size: 10px; padding: 0 4px; }
-  select { background: var(--canvas); color: var(--ink); height: 28px; border: 1px solid var(--border); border-radius: 4px; font: inherit; padding: 0 3px; }
+  :global(.phone-select-trigger:where(.still-viewer *)) { background: var(--canvas); color: var(--ink); height: 28px; border: 1px solid var(--border); border-radius: 4px; font: inherit; padding: 0 3px; }
   button.save { padding: 0 8px; color: var(--ink); background: var(--raised); }
   .fullscreen { margin-left: auto; }
   .download { display: inline-flex; align-items: center; justify-content: center; min-width: 29px; height: 29px; color: var(--muted); border-radius: 4px; }
@@ -187,5 +189,5 @@
   .still-viewer:fullscreen { display: flex; flex-direction: column; border-radius: 0; }
   .still-viewer:fullscreen .still-stage { flex: 1; min-height: 0; }
   .still-viewer:fullscreen img { max-height: calc(100dvh - 132px); }
-  @media (pointer: coarse) { button,.colors button,.download { min-width: 44px; height: 44px; } select { height: 44px; font-size: 16px; } .still-toolbar { gap: 3px; } }
+  @media (pointer: coarse) { button,.colors button,.download { min-width: 44px; height: 44px; } :global(.phone-select-trigger:where(.still-viewer *)) { height: 44px; font-size: 16px; } .still-toolbar { gap: 3px; } }
 </style>

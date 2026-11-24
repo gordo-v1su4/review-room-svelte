@@ -1,11 +1,11 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { ConvexError } from 'convex/values';
-import { requireOwner } from '$lib/server/owner-auth';
+import { ownerSignedIn } from '$lib/server/owner-auth';
 import { db, personal } from '$lib/server/personal';
 
 export const GET: RequestHandler = async ({ cookies, url }) => {
-  requireOwner(cookies);
+  if (!ownerSignedIn(cookies)) return json({ message: 'Sign in again to access version metadata.' }, { status: 401, headers: { 'cache-control': 'private, no-store' } });
   const versionId = url.searchParams.get('versionId');
   if (!versionId) throw error(400, 'Version required');
   const details = await db().query(personal.versionDetails, { versionId });
@@ -14,7 +14,7 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
 };
 
 export const POST: RequestHandler = async ({ cookies, request }) => {
-  requireOwner(cookies);
+  if (!ownerSignedIn(cookies)) return json({ message: 'Sign in again before saving. Your draft is retained.' }, { status: 401, headers: { 'cache-control': 'private, no-store' } });
   let body;
   try { body = await request.json(); }
   catch { throw error(400, 'Invalid JSON'); }

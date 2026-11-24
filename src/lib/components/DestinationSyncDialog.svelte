@@ -153,7 +153,7 @@
     {#if message}<p class="operation-message" role="status">{message}</p>{/if}
 {/snippet}
 {#if embedded}<div class="destination-body">{@render content()}</div>{:else}
-<Dialog.Root bind:open><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="filter-sheet publishing-sheet destination-dialog" onEscapeKeydown={event => { if (busy) event.preventDefault(); }} onInteractOutside={event => { if (busy) event.preventDefault(); }}>{@render content()}</Dialog.Content></Dialog.Portal></Dialog.Root>
+<Dialog.Root bind:open><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="filter-sheet publishing-sheet destination-dialog phone-panel" onEscapeKeydown={event => { if (busy) event.preventDefault(); }} onInteractOutside={event => { if (busy) event.preventDefault(); }}>{@render content()}</Dialog.Content></Dialog.Portal></Dialog.Root>
 {/if}
 <style>
   :global(.destination-dialog){width:min(560px,calc(100vw - 28px));height:auto;color:var(--ink);font-size:11px;line-height:1.5}

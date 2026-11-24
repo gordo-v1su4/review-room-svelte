@@ -9,7 +9,7 @@
   <Dialog.Trigger class="account-trigger avatar small" aria-label="Account" title="Account"><UserRound size={14}/></Dialog.Trigger>
   <Dialog.Portal>
     <Dialog.Overlay class="dialog-overlay"/>
-    <Dialog.Content class="filter-sheet account-sheet">
+    <Dialog.Content class="filter-sheet account-sheet phone-panel">
       <div class="sheet-heading"><Dialog.Title class="dialog-title">Account</Dialog.Title><Dialog.Close class="account-close" aria-label="Close account"><X size={16}/></Dialog.Close></div>
       <Dialog.Description>Connect to your Review Room workspace.</Dialog.Description>
       {#if open}<AccountPanel/>{/if}

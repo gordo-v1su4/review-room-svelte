@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { MediaQuery } from 'svelte/reactivity';
+  import PhoneSelect from './PhoneSelect.svelte';
+  const phoneViewport = new MediaQuery('(max-width: 640px)', false);
   import { formatVersion } from '../../../convex/lib/shotCode';
   import { Bookmark, Film, Image } from 'lucide-svelte';
   import type { ReviewAsset } from '$lib/review';
@@ -24,6 +27,7 @@
     { value: 'final', label: 'Final' },
     { value: 'omitted', label: 'Omitted' }
   ] as const;
+  const ratings = [{ value: '0', label: 'Unrated' }, ...[1,2,3,4,5].map(rating => ({ value: String(rating), label: `${rating} ${rating === 1 ? 'star' : 'stars'}` }))];
 
   function changeStatus(assetId: string, value: string) {
     const status = statuses.find(status => status.value === value);
@@ -31,7 +35,27 @@
   }
 </script>
 
+{#snippet statusControl(asset: ReviewAsset & AssetReview)}<PhoneSelect triggerClass="asset-status-select" status={asset.status} label={`Status for ${asset.name}`} value={asset.status} items={asset.status === "archived" ? [{value:"archived",label:"Archived",disabled:true},...statuses] : [...statuses]} onValueChange={value => changeStatus(asset.id,value)}/>{/snippet}
+{#snippet ratingControl(asset: ReviewAsset & AssetReview)}<PhoneSelect label={`Rating for ${asset.name}`} value={String(asset.rating)} items={ratings} onValueChange={value => onReview({type:"rate",assetId:asset.id,rating:Number(value)})}/>{/snippet}
+
 <!-- Keyboard focus allows horizontal scrolling without trapping focus in table controls. -->
+{#if phoneViewport.current}
+<div class="phone-asset-rows" aria-label="Media review rows">
+  {#each assets as asset (asset.id)}
+    <details class="phone-asset-row" class:active-row={activeId === asset.id}>
+      <summary><span class="phone-asset-name">{asset.name}</span><span class="version-tag">{formatVersion(asset.versionNumber ?? 1)}</span></summary>
+      <div class="phone-asset-fields">
+        <button type="button" class="asset-title" data-asset-id={asset.id} onclick={event => onSelect(asset.id, event)}>{#if asset.type === 'video'}<Film size={15}/>{:else}<Image size={15}/>{/if}Open review</button>
+        <label class="phone-check"><input type="checkbox" aria-label={`Select ${asset.name}`} checked={checkedIds.includes(asset.id)} onclick={event => onCheck(asset.id, event, true)}/>Select asset</label>
+        <label>Status{@render statusControl(asset)}</label>
+        <label>Rating{@render ratingControl(asset)}</label>
+        <button type="button" class="shortlist-control phone-shortlist" aria-label={`Shortlist ${asset.name}`} aria-pressed={asset.shortlisted} onclick={() => onReview({type:'shortlist',assetId:asset.id,shortlisted:!asset.shortlisted})}><Bookmark size={15} fill={asset.shortlisted ? 'currentColor' : 'none'}/></button><span class="note-count">{asset.comments.length} notes</span>
+        {#if asset.misfiled && onFixMisfiled}<button type="button" class="misfiled-tag" onclick={() => onFixMisfiled?.(asset.id)}>Misfiled · File…</button>{/if}
+      </div>
+    </details>
+  {/each}
+</div>
+{:else}
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="asset-table-region" role="region" aria-label="Media review table" tabindex="0">
   <table>
@@ -49,16 +73,10 @@
             {#if asset.misfiled}{#if onFixMisfiled}<button type="button" class="misfiled-tag" title="Dropped without a matching shot code. File it as a take or move it." onclick={() => onFixMisfiled(asset.id)}>Misfiled · File…</button>{:else}<span class="misfiled-tag">Misfiled</span>{/if}{/if}
           </th>
           <td>
-            <select class="asset-status-select" data-status={asset.status} aria-label={`Status for ${asset.name}`} value={asset.status} onchange={event => changeStatus(asset.id, event.currentTarget.value)}>
-              {#if asset.status === 'archived'}<option value="archived" disabled>Archived</option>{/if}
-              {#each statuses as status (status.value)}<option value={status.value}>{status.label}</option>{/each}
-            </select>
+            {@render statusControl(asset)}
           </td>
           <td>
-            <select aria-label={`Rating for ${asset.name}`} value={asset.rating} onchange={event => onReview({ type: 'rate', assetId: asset.id, rating: Number(event.currentTarget.value) })}>
-              <option value={0}>Unrated</option>
-              {#each [1, 2, 3, 4, 5] as rating (rating)}<option value={rating}>{rating} {rating === 1 ? 'star' : 'stars'}</option>{/each}
-            </select>
+            {@render ratingControl(asset)}
           </td>
           <td><button type="button" class="shortlist-control" aria-label={`Shortlist ${asset.name}`} aria-pressed={asset.shortlisted} onclick={() => onReview({ type: 'shortlist', assetId: asset.id, shortlisted: !asset.shortlisted })}><Bookmark size={15} fill={asset.shortlisted ? 'currentColor' : 'none'}/></button></td>
           <td class="note-count">{asset.comments.length}</td>
@@ -67,8 +85,10 @@
     </tbody>
   </table>
 </div>
+{/if}
 
 <style>
+  .phone-asset-rows { display:none; }
   .asset-table-region { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
   table { width: 100%; min-width: 610px; border-collapse: collapse; font-size: 12px; text-align: left; }
   th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -84,15 +104,32 @@
   .version-tag { flex-shrink: 0; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
   .asset-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .media-kind { font-size: 9px; color: var(--muted); margin-left: auto; }
-  select { min-height: 30px; max-width: 160px; padding: 4px 22px 4px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--canvas); color: var(--ink); font: inherit; cursor: pointer; }
+  :global(.phone-select-trigger:where(.asset-table-region *, .phone-asset-rows *)) { min-height: 30px; max-width: 160px; padding: 4px 22px 4px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--canvas); color: var(--ink); font: inherit; cursor: pointer; }
   .shortlist-control { min-height: 30px; min-width: 30px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--muted); }
   .shortlist-control[aria-pressed='true'] { color:var(--selection-accent); background:var(--raised); }
   .note-count { color: var(--muted); font-variant-numeric: tabular-nums; }
   input[type='checkbox'] { accent-color:var(--teal); }
-  select:focus-visible, .asset-table-region:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+  :global(.phone-select-trigger:where(.asset-table-region *, .phone-asset-rows *)):focus-visible, .asset-table-region:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
   @media (pointer: coarse), (max-width: 760px) {
-    select, .asset-title, .shortlist-control { min-height: 44px; }
+    :global(.phone-select-trigger:where(.asset-table-region *, .phone-asset-rows *)), .asset-title, .shortlist-control { min-height: 44px; }
     .shortlist-control { min-width: 44px; }
     th, td { padding: 8px; }
+  }
+  @media(max-width:640px) {
+    .asset-table-region { display:none; }
+    .phone-asset-rows { display:grid;gap:8px;min-width:0; }
+    .phone-asset-row { min-width:0;border:1px solid var(--border);border-radius:8px;background:var(--panel); }
+    summary { display:flex;align-items:center;gap:8px;min-height:52px;padding:10px 12px;cursor:pointer;font-size:12px; }
+    summary::after { content:'+';margin-left:auto;color:var(--muted); }
+    details[open] summary::after { content:'−'; }
+    summary::-webkit-details-marker { display:none; }
+    summary:focus-visible { outline:1px solid var(--teal);outline-offset:2px; }
+    .phone-asset-name { min-width:0;overflow-wrap:anywhere; }
+    .phone-asset-fields { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:center;gap:12px;padding:12px;border-top:1px solid var(--border); }
+    label { display:grid;gap:6px;min-width:0;color:var(--muted);font-size:11px; }
+    :global(.phone-select-trigger:where(.asset-table-region *, .phone-asset-rows *)) { width:100%;max-width:100%;font-size:16px; }
+    .phone-check { display:flex;align-items:center;gap:8px;min-height:44px; }
+    .asset-title { min-height:28px;font-size:11px; }
+    .phone-shortlist { display:grid;place-items:center;justify-self:start;min-width:28px;width:28px;min-height:28px;height:28px;padding:0;border:0;border-radius:5px;background:var(--canvas); }
   }
 </style>

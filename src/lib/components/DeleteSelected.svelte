@@ -30,7 +30,7 @@
     </DropdownMenu.Content></DropdownMenu.Portal>
   </DropdownMenu.Root>
   <Dialog.Root {open} onOpenChange={value => { if (!busy) open = value; }}>
-    <Dialog.Portal><Dialog.Overlay class="delete-overlay"/><Dialog.Content class="delete-dialog">
+    <Dialog.Portal><Dialog.Overlay class="delete-overlay"/><Dialog.Content class="delete-dialog phone-panel">
       <Dialog.Title>Delete selected clips?</Dialog.Title>
       <Dialog.Description>Permanently delete {targets.length} selected {targets.length === 1 ? 'clip' : 'clips'}, including versions and feedback. Published links to these clips will stop working. This cannot be undone. Use Archive to keep them instead.</Dialog.Description>
       <ul>{#each targets as asset (asset.id)}<li>{asset.title}</li>{/each}</ul>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PhoneSelect from './PhoneSelect.svelte';
   import { Dialog, DropdownMenu } from 'bits-ui';
   import { ArrowUpRight, Copy, FolderInput, FolderPlus, Image, Lock, MoreHorizontal, Pencil, Trash2, X } from 'lucide-svelte';
   import { folderLink } from '../../../convex/lib/folderLock';
@@ -142,7 +143,7 @@
 <Dialog.Root bind:open>
   <Dialog.Portal>
     <Dialog.Overlay class="folder-overlay"/>
-    <Dialog.Content class="folder-dialog" onCloseAutoFocus={event => { event.preventDefault(); if (returnFocus?.isConnected) returnFocus.focus(); }}>
+    <Dialog.Content class="folder-dialog phone-panel" onCloseAutoFocus={event => { event.preventDefault(); if (returnFocus?.isConnected) returnFocus.focus(); }}>
       <div class="dialog-heading"><Dialog.Title class="folder-dialog-title">{title}</Dialog.Title><Dialog.Close class="folder-close" aria-label="Close folder dialog"><X size={17}/></Dialog.Close></div>
       <Dialog.Description class="folder-description">{#if operation === 'create'}Create a folder {activeFolder ? `inside “${activeFolder.title}”` : 'at the project root'}. {persistent ? 'Saved to your workspace.' : 'Stored in this session.'}{:else if operation === 'rename'}Update “{folderTitle}”.{:else if operation === 'remove'}Choose what happens to the assets in “{folderTitle}”. Subfolders must be moved or removed first.{:else if operation === 'move-folder'}Move “{folderTitle}” and its subfolders to another parent in this project.{:else if operation === 'cover'}Uses the newest image in this folder unless you choose a cover. Stored in this tab only.{:else}Choose a destination in this project. {persistent ? 'The new location is saved to your workspace.' : 'Your media files stay on this device.'}{/if}</Dialog.Description>
       {#if operation === 'cover'}
@@ -162,7 +163,7 @@
         {#if operation === 'create' || operation === 'rename'}
           <label class="folder-field">Folder name<input aria-label="Folder name" bind:value={name} placeholder="Folder name" maxlength="100" required/></label>
         {:else if operation === 'move' || operation === 'move-folder'}
-          <label class="folder-field">Destination<select aria-label="Folder destination" bind:value={destination}><option value="">Project root</option>{#each destinations as folder (folder.id)}<option value={folder.id}>{folder.title}</option>{/each}</select></label>
+          <label class="folder-field">Destination<PhoneSelect label="Folder destination" bind:value={destination} items={[{value:"",label:"Project root"},...destinations.map(folder => ({value:folder.id,label:folder.title}))]}/></label>
         {:else}
           <fieldset class="disposition"><legend>Assets in this folder</legend><label><input type="radio" bind:group={disposition} value="move_to_root"/><span>Move to project root<small>Keep the assets available outside this folder.</small></span></label><label><input type="radio" bind:group={disposition} value="archive_assets"/><span>Archive assets<small>Hide these assets from active views in this session.</small></span></label></fieldset>
         {/if}
@@ -199,7 +200,7 @@
   :global(.folder-close) { display: grid; place-items: center; width: 28px; height: 28px; background: transparent; border: 0; border-radius: 4px; color: var(--muted); cursor: pointer; }
   :global(.folder-description) { display: block; margin: 8px 0 18px; font-size: 12px; line-height: 1.6; color: var(--muted); }
   .folder-field { display: grid; gap: 7px; font-size: 11px; color: var(--muted); }
-  .folder-field input,.folder-field select { width: 100%; min-width: 0; height: 34px; padding: 0 9px; color: var(--ink); background: var(--canvas); border: 1px solid var(--border); border-radius: 5px; font: inherit; font-size: 12px; }
+  .folder-field input,.folder-field :global(.phone-select-trigger:where(.folder-dialog *)) { width: 100%; min-width: 0; height: 34px; padding: 0 9px; color: var(--ink); background: var(--canvas); border: 1px solid var(--border); border-radius: 5px; font: inherit; font-size: 12px; }
   .disposition { padding: 0; margin: 0; border: 0; }
   .disposition legend { margin-bottom: 9px; font-size: 11px; color: var(--muted); }
   .disposition label { display: flex; align-items: start; gap: 9px; padding: 10px 0; font-size: 12px; cursor: pointer; }
@@ -212,6 +213,6 @@
   .folder-submit { border-color: transparent; background: color-mix(in srgb, var(--accent, #62b9aa) 22%, var(--panel)); }
   .folder-submit.danger { color: #ecc2c2; background: #592f32; }
   .folder-submit:disabled { opacity: .4; cursor: default; }
-  :global(.folder-button:focus-visible),:global(.folder-close:focus-visible),:global(.folder-cancel:focus-visible),.folder-submit:focus-visible,.folder-field input:focus-visible,.folder-field select:focus-visible { outline: 1px solid var(--accent, #62b9aa); outline-offset: 2px; }
-  @media(pointer: coarse) { :global(.folder-button),:global(.folder-menu-item),:global(.folder-close),:global(.folder-cancel),.folder-submit { min-height: 44px; } :global(.folder-menu-trigger),:global(.folder-close) { min-width: 44px; } .folder-field input,.folder-field select { height: 44px; font-size: 16px; } .disposition label { min-height: 44px; } }
+  :global(.folder-button:focus-visible),:global(.folder-close:focus-visible),:global(.folder-cancel:focus-visible),.folder-submit:focus-visible,.folder-field input:focus-visible,.folder-field :global(.phone-select-trigger:where(.folder-dialog *)):focus-visible { outline: 1px solid var(--accent, #62b9aa); outline-offset: 2px; }
+  @media(pointer: coarse) { :global(.folder-button),:global(.folder-menu-item),:global(.folder-close),:global(.folder-cancel),.folder-submit { min-height: 44px; } :global(.folder-menu-trigger),:global(.folder-close) { min-width: 44px; } .folder-field input,.folder-field :global(.phone-select-trigger:where(.folder-dialog *)) { height: 44px; font-size: 16px; } .disposition label { min-height: 44px; } }
 </style>

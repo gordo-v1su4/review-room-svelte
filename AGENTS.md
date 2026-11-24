@@ -115,6 +115,10 @@ no API key, $0).
 
 ## Agent skills
 
+User-invoked skills live in `.agents/skills/`; read their local `SKILL.md` even when
+the app's picker omits them. For design, implementation, PR review and retro,
+see `docs/agents/skill-workflow.md`.
+
 ### Issue tracker
 
 Specs and tickets live in local Markdown under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.

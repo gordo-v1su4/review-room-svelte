@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PhoneSelect from './PhoneSelect.svelte';
   import { Dialog } from 'bits-ui';
   import { SlidersHorizontal, X, Check } from 'lucide-svelte';
   import type { VideoStatus } from '$lib/types';
@@ -22,15 +23,15 @@
 </script>
 <Dialog.Root bind:open>
   <Dialog.Trigger class="secondary-button explorer-tool filter-trigger" aria-label={activeCount() ? `Filters, ${activeCount()} active` : "Filters"} title={activeCount() ? `Filters, ${activeCount()} active` : "Filters"} onclick={openFilters}><SlidersHorizontal size={16} /><span class="explorer-tool-label">Filters{#if activeCount()} · {activeCount()}{/if}</span>{#if activeCount()}<span class="explorer-tool-indicator" aria-hidden="true"></span>{/if}</Dialog.Trigger>
-  <Dialog.Portal><Dialog.Overlay class="dialog-overlay" /><Dialog.Content class="filter-sheet" aria-label="Workspace filters">
+  <Dialog.Portal><Dialog.Overlay class="dialog-overlay" /><Dialog.Content class="filter-sheet phone-panel" aria-label="Workspace filters">
     <div class="sheet-heading"><Dialog.Title>Filter media</Dialog.Title><Dialog.Close class="icon-button" aria-label="Close filters"><X size={18} /></Dialog.Close></div>
     <Dialog.Description>Focus on the next decision.</Dialog.Description>
     <div class="filter-section"><span class="filter-label">Status</span><div class="filter-grid">{#each statuses as option (option.value)}<button aria-pressed={draft.statuses.includes(option.value)} class:chosen={draft.statuses.includes(option.value)} class="filter-option" type="button" onclick={() => toggleStatus(option.value)}>{option.label}{#if draft.statuses.includes(option.value)}<Check size={15} />{/if}</button>{/each}</div></div>
     <div class="filter-section"><span class="filter-label">Media class</span><div class="filter-grid class-grid">{#each classes as option (option.value)}<button aria-pressed={draft.assetClasses.includes(option.value)} class:chosen={draft.assetClasses.includes(option.value)} class="filter-option" type="button" onclick={() => toggleClass(option.value)}>{option.label}{#if draft.assetClasses.includes(option.value)}<Check size={15} />{/if}</button>{/each}</div></div>
     <label class="filter-field">Tags<input aria-label="Filter by tags" placeholder="tag, tag…" value={draft.tags.join(', ')} oninput={(event) => { draft = { ...draft, tags: event.currentTarget.value.split(',').map(tag => tag.trim()).filter(Boolean) }; }} /></label>
-    <label class="filter-field">Minimum rating<select bind:value={draft.minRating}>{#each [0,1,2,3,4,5] as rating (rating)}<option value={rating}>{rating ? `${rating}+ stars` : 'Any rating'}</option>{/each}</select></label>
-    <label class="filter-field">Sort by<select bind:value={draft.sort}><option value="default">Default</option><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="comments">Most comments</option><option value="code">Code</option><option value="name">Name</option><option value="name-desc">Name (Z–A)</option><option value="status">Status</option><option value="rating">Rating</option></select></label>
-    <label class="filter-field">Group by<select bind:value={draft.groupBy}><option value="none">No grouping</option><option value="status">Status</option><option value="class">Media class</option><option value="folder">Folder</option></select></label>
+    <label class="filter-field">Minimum rating<PhoneSelect label="Minimum rating" value={String(draft.minRating)} items={[0,1,2,3,4,5].map(rating => ({value:String(rating),label:rating ? `${rating}+ stars` : 'Any rating'}))} onValueChange={value => draft = {...draft,minRating:Number(value)}}/></label>
+    <label class="filter-field">Sort by<PhoneSelect label="Sort by" bind:value={draft.sort} items={[{value:"default",label:"Default"},{value:"newest",label:"Newest"},{value:"oldest",label:"Oldest"},{value:"comments",label:"Most comments"},{value:"code",label:"Code"},{value:"name",label:"Name"},{value:"name-desc",label:"Name (Z–A)"},{value:"status",label:"Status"},{value:"rating",label:"Rating"}]}/></label>
+    <label class="filter-field">Group by<PhoneSelect label="Group by" bind:value={draft.groupBy} items={[{value:"none",label:"No grouping"},{value:"status",label:"Status"},{value:"class",label:"Media class"},{value:"folder",label:"Folder"}]}/></label>
     <div class="filter-checks"><label class="filter-check"><input type="checkbox" bind:checked={draft.selectedOnly} />Shortlist only</label><label class="filter-check"><input type="checkbox" bind:checked={draft.hasComments} />Has comments</label></div>
     <div class="filter-actions"><button type="button" class="secondary-button" onclick={clear}>Clear</button><button type="button" class="primary-button" onclick={apply}><Check size={16} /> Apply</button></div>
   </Dialog.Content></Dialog.Portal>

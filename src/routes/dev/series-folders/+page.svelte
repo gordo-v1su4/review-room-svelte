@@ -67,7 +67,10 @@
     projects: [{ _id: projectId, _creationTime: 1, title: 'Blood Rush', slug: 'blood-rush', clientName: 'Series · Creative Studio Pro',
       downloadEnabledByDefault: false, createdBy: ownerId, createdAt: 1, updatedAt: 1 }],
     folders, connectedFolderIds: ['trailer-cuts' as Id<'projectFolders'>],
-    assets, versions, mediaJobs: [], comments: [], publications: [], showcases: [], links: [], importedMetadata: [], projectIds: [projectId],
+    assets, versions, mediaJobs: [],
+    comments: [{ _id: 'mobile-note' as Id<'comments'>, _creationTime: 1, videoId: 'par-0010' as Id<'videos'>,
+      projectId, authorName: 'Mobile reviewer', authorRole: 'client', body: 'Check the opening frame before approval.', timecodeSec: 0, createdAt: 1 }],
+    publications: [], showcases: [], links: [], importedMetadata: [], projectIds: [projectId],
   };
 </script>
 

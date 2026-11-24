@@ -32,7 +32,7 @@
   <Dialog.Trigger class="metadata-sheet-trigger" aria-label="Asset fields"><SlidersHorizontal size={14}/>Fields</Dialog.Trigger>
   <Dialog.Portal>
     <Dialog.Overlay class="dialog-overlay"/>
-    <Dialog.Content class="filter-sheet metadata-sheet" onCloseAutoFocus={event => {
+    <Dialog.Content class="filter-sheet metadata-sheet phone-panel" onCloseAutoFocus={event => {
       if (!window.matchMedia('(max-width: 760px)').matches) { event.preventDefault(); onDesktopClose(); }
     }}>
       <div class="metadata-sheet-heading">
@@ -52,8 +52,10 @@
   :global(.metadata-sheet .dialog-title) { margin: 0; font-size: 14px; font-weight: 550; }
   :global(.metadata-sheet .metadata-sheet-description) { margin: 4px 0 0; color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   :global(.metadata-sheet-close) { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--muted); }
-  :global(.metadata-sheet-trigger:hover),:global(.metadata-sheet-close:hover) { background: var(--raised); }
+  :global(.metadata-sheet-trigger:hover) { background: var(--raised); }
+  :global(.metadata-sheet-close:hover) { background:transparent;color:var(--ink); }
   :global(.metadata-sheet-trigger:focus-visible),:global(.metadata-sheet-close:focus-visible) { outline: 1px solid var(--accent); outline-offset: 2px; }
+  :global(.metadata-sheet-close:focus-visible) { outline:0;color:var(--ink); }
   .metadata-sheet-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   @media(max-width: 760px) {
     :global(.metadata-sheet-trigger) { display: inline-flex; }

@@ -1653,6 +1653,8 @@ button {
 
 .filter-field { display: grid; gap: 7px; margin: 16px 0; color: var(--muted); font-size: 11px; }
 .filter-field select { width: 100%; min-height: 36px; padding: 0 10px; background: var(--canvas); color: var(--ink); border: 1px solid var(--border); border-radius: var(--control-radius); font: inherit; }
+.filter-field .phone-select-trigger { width:100%;min-height:36px;padding-inline:10px;font:inherit; }
+@media (pointer:coarse) and (min-width:641px) { .filter-field .phone-select-trigger { min-height:44px;font-size:16px; } }
 .filter-actions { display: flex; justify-content: space-between; margin-top: 22px; }
 
 @media (pointer:coarse) { .filter-field select { min-height: 44px; font-size: 16px; } }
@@ -1978,12 +1980,12 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 .version-selector .version-picker-trigger > svg:last-child { margin-left:auto; }
 /* The current-version slot never disappears: it reads "Current" or offers "Make current" at the same width. */
 .review-view-controls .current-version-slot { min-width:112px; justify-content:center; }
-.review-view-controls .current-state, .review-view-controls .current-state:hover { gap:5px; color:var(--teal); background:color-mix(in srgb, var(--teal) 12%, var(--panel)); border-color:color-mix(in srgb, var(--teal) 28%, transparent); box-shadow:none; cursor:default; }
+.review-view-controls .current-state, .review-view-controls .current-state:hover { gap:5px; color:var(--teal); background:transparent; border:0; box-shadow:none; cursor:default; }
 .review-pane { container-type:inline-size; container-name:review; }
 .review-view-controls .compact-version-actions { display:none; }
 .review-view-controls > :is(.secondary-button,.icon-button), .review-view-controls .version-picker-trigger { height:28px; min-height:28px; border-radius:var(--control-radius); font-size:11px; font-weight:500; line-height:1; letter-spacing:0; }
 .review-view-controls > :is(.secondary-button,.icon-button) { border:0; background:var(--raised); box-shadow:inset 0 0 0 1px var(--border); }
-.review-view-controls > .current-state { background:color-mix(in srgb,var(--teal) 12%,var(--panel)); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--teal) 28%,transparent); }
+.review-view-controls > .current-state { background:transparent; border:0; box-shadow:none; }
 .review-view-controls > .icon-button { width:28px; min-width:28px; padding:0; }
 .review-actions .review-outcome { gap:6px; }
 .review-outcome > :is(.primary-button, .secondary-button), .review-actions .asset-nav .playback-mode { height:28px; min-height:28px; border:0; border-radius:var(--control-radius); font-size:11px; font-weight:500; line-height:1; letter-spacing:0; }
@@ -2063,3 +2065,181 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 
 .navigation-footer { flex:0 0 auto; padding-top:20px; padding-bottom:16px; }
 .navigation-footer > .nav-divider:first-of-type { margin-top:0; }
+
+/* Phone-only navigation and workspace refresh. */
+@media(max-width:640px) {
+.nav-drawer { background:radial-gradient(ellipse 120% 65% at 0% 0%,rgb(55 93 78 / 32%),transparent 78%),linear-gradient(165deg,rgb(19 31 26 / 70%),rgb(5 12 9 / 70%));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);height:100dvh;min-height:0;overflow:hidden;overscroll-behavior:none;padding:max(12px,env(safe-area-inset-top)) 12px max(8px,env(safe-area-inset-bottom)); }
+@media(prefers-reduced-motion:no-preference) { .nav-drawer[data-state='open'] { animation:phone-drawer-in 220ms cubic-bezier(.2,.8,.2,1); } .nav-drawer[data-state='closed'] { animation:phone-drawer-out 180ms ease-in; } .navigation-overlay[data-state='closed'] { animation:overlay-in 180ms ease-in reverse; } }
+@keyframes phone-drawer-in { from { transform:translateX(-100%); } to { transform:translateX(0); } }
+@keyframes phone-drawer-out { to { transform:translateX(-100%); } }
+.navigation-footer { flex:0 0 auto; padding-top:8px; padding-bottom:8px; }
+.navigation-status { margin:4px 8px 0; border-top:1px solid var(--border); }
+.navigation-status summary { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:36px; color:var(--muted); font-size:10px; font-weight:650; letter-spacing:.1em; text-transform:uppercase; list-style:none; cursor:pointer; }
+.navigation-status summary::-webkit-details-marker { display:none; }
+.navigation-status summary svg { transition:transform 160ms ease; }
+.navigation-status[open] summary svg { transform:rotate(180deg); }
+.navigation-status summary:focus-visible { outline:1px solid var(--teal); outline-offset:2px; }
+.navigation-status-options .nav-item { width:100%; margin-bottom:0; padding-inline:4px; }
+.navigation-footer .sidebar-bottom { padding:4px 12px 0; }
+.navigation-footer .sidebar-bottom p { margin:0; font-size:9px; line-height:1.5; }
+.nav-drawer .brand { flex:0 0 58px; margin:0 8px 18px; }
+.nav-drawer > .drawer-close { position:absolute; z-index:2; width:44px; min-width:44px; height:44px; min-height:44px; background:transparent; border:0; }
+.nav-drawer .navigation-footer { padding-bottom:0; }
+.nav-drawer .project-tree .tree-scroll { overscroll-behavior-y:contain; touch-action:pan-y; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) transparent; }
+  .nav-drawer .project-tree .project-link, .nav-drawer .project-tree .collection-link,
+  .nav-drawer .project-tree .disclosure, .nav-drawer .project-tree .add-project,
+  .nav-drawer .project-tree .edit-project, .nav-drawer .navigation-footer .nav-item,
+  .nav-drawer .navigation-status summary { min-height:44px; }
+  .nav-drawer .project-tree .disclosure { min-width:32px; }
+@media (prefers-reduced-motion:reduce) { .navigation-status summary svg { transition:none; } }
+
+}
+.library-filter-group { display:contents; }
+@media(max-width:640px) {
+/* Folder identity survives selection and hover in both navigation surfaces. */
+:is(.app-shell,.nav-drawer) .project-tree .collection-link.locked { color:var(--folder-locked); }
+:is(.app-shell,.nav-drawer) .project-tree .collection-link.connected { color:var(--folder-connected); }
+:is(.app-shell,.nav-drawer) .project-tree :is(.project-link,.collection-link):hover { background:var(--raised);border-radius:var(--control-radius); }
+
+  :root { --control-height:28px;scrollbar-width:none;scrollbar-gutter:auto; }
+  html { scrollbar-width:none; }
+  html::-webkit-scrollbar { display:none; }
+  .app-shell .project-tools > button { height:var(--control-height);min-height:var(--control-height);border-radius:var(--control-radius); }
+  .app-shell .topbar { position:sticky;top:0;z-index:20;display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;gap:6px;min-height:60px;height:auto;padding:8px 12px;background:rgb(12 22 18 / 94%);backdrop-filter:blur(16px); }
+  .app-shell .topbar .phone-hidden { display:none; }
+  .app-shell.focused-review .mobile-menu { display:inline-flex; }
+  .phone-location { min-width:0;font-size:12px; }
+  .phone-location > span { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .phone-back { display:flex;align-items:center;gap:6px;min-width:0;width:100%;min-height:44px;text-align:left;color:var(--ink);font-size:12px; }
+  .phone-back svg { flex:none; }
+  .phone-back span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .phone-tools-trigger,.phone-add { min-height:var(--control-height);padding-inline:12px;font-size:12px;align-self:center; }
+  .phone-review-tabs { position:sticky;top:60px;z-index:19;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px 12px;background:rgb(12 22 18 / 96%); }
+  .phone-review-tabs button { position:relative;min-height:var(--control-height);margin-block:8px;border:0;border-radius:var(--control-radius);background:transparent;box-shadow:none;color:var(--muted);font-size:12px; }
+  .phone-review-tabs button:hover { background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink); }
+  .phone-review-tabs button[aria-pressed='true'] { background:color-mix(in srgb,var(--teal) 18%,var(--panel));color:var(--ink); }
+  .phone-review-tabs button:focus-visible { outline:0;box-shadow:none;background:color-mix(in srgb,var(--teal) 30%,var(--panel));color:var(--ink); }
+  body :is(.stage1-select-trigger,.stage1-select-item) { min-height:28px;font-size:11px; }
+  body .stage1-select-trigger { height:28px; }
+  body :is(.version-picker-trigger,.version-picker-item,.asset-status-trigger,.asset-status-option) { min-height:28px;height:28px;font-size:12px;padding-block:0;border:0; }
+  body :is(.phone-select-trigger,.phone-select-item,.stage1-select-trigger,.stage1-select-item) { font-size:12px; }
+  body .phone-select-trigger.phone-select-trigger { height:28px;min-height:28px;font-size:12px; }
+  body .metadata-sheet .phone-select-trigger.phone-select-trigger { border:0;outline:0;box-shadow:none; }
+  body .metadata-sheet .phone-select-trigger.phone-select-trigger:focus-visible { background:color-mix(in srgb,var(--teal) 12%,var(--canvas)); }
+  body .metadata-sheet.phone-panel .asset-fields :is(input,textarea) { font-size:12px;outline:0;box-shadow:none; }
+  .app-shell .metadata-sheet-trigger { height:28px;min-height:28px;font-size:12px; }
+  .app-shell .mobile-menu { border:0;box-shadow:none;background:transparent;color:var(--muted); }
+  .app-shell .mobile-menu:hover { color:var(--ink);background:transparent; }
+  .app-shell .page-content { padding-top:12px;padding-inline:16px;min-height:0; }
+  .app-shell .time-toggle { font-size:12px;gap:7px; }
+  .app-shell .time-toggle input { width:16px;height:16px; }
+  .app-shell .time-toggle svg { width:15px;height:15px; }
+  .app-shell .inspector-heading button { min-height:28px;height:28px;padding-block:0;font-size:12px; }
+  .app-shell .inspector-tabs { min-height:36px; }
+  .app-shell .card-check { appearance:none;width:16px;height:16px;border:0;border-radius:3px;background:rgb(0 0 0 / 65%);box-shadow:none; }
+  .app-shell .card-check:checked { appearance:auto;accent-color:var(--teal); }
+  .app-shell .page-content .project-heading { display:block;margin-bottom:8px; }
+  .app-shell .project-heading .subtitle-placeholder { display:none; }
+  .app-shell .project-heading h1 { overflow-wrap:anywhere; }
+  .app-shell .project-heading .folder-path { overflow:visible; }
+  .app-shell .folder-path ol { width:auto;flex-wrap:wrap;white-space:normal;gap:4px; }
+  .app-shell .folder-path li { min-width:0;max-width:100%;flex-shrink:1; }
+  .app-shell .folder-path :is(button,.folder-path-current,.folder-path-link) { max-width:100%;overflow-wrap:anywhere;white-space:normal; }
+  .app-shell .folder-path button { position:relative;min-height:var(--control-height);margin-block:8px; }
+  .app-shell .folder-path :is(button,.folder-path-current) span { overflow:visible; }
+  .app-shell .page-content .library-navigation { display:block;overflow:visible;max-width:100%; }
+  .library-filter-group { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 6px;padding-block:8px; }
+  .app-shell .library-filter { position:relative;min-width:0;height:var(--control-height);min-height:var(--control-height);justify-content:flex-start; }
+  .app-shell .library-filter > span:last-child { margin-left:auto; }
+  .phone-folder-list { margin-top:12px;border-block:1px solid var(--border); }
+  .phone-folder-list summary { display:flex;align-items:center;gap:8px;min-height:48px;color:var(--ink);cursor:pointer;font-size:12px;list-style:none; }
+  .phone-folder-list summary::-webkit-details-marker { display:none; }
+  .phone-folder-list summary .count { margin-left:auto; }
+  .phone-folder-list[open] summary > svg:last-child { transform:rotate(180deg); }
+  .phone-folder-list > div { display:grid;gap:16px;padding-block:8px 10px; }
+  .app-shell .phone-folder-list .library-folder { position:relative;display:flex;min-width:0;width:100%;height:auto;min-height:var(--control-height);max-width:none;padding:4px 12px;white-space:normal;text-align:left; }
+  .app-shell :is(.library-folder,.library-filter,.phone-review-tabs button,.folder-path button)::after { content:'';position:absolute;inset:-8px 0; }
+  .app-shell :is(.primary-button,.secondary-button)::after { inset:-8px 0; }
+  .app-shell .phone-folder-list .library-folder-name { white-space:normal;overflow:visible;overflow-wrap:anywhere;max-width:none; }
+  .app-shell .phone-folder-list .library-folder-count { margin-left:auto; }
+  .app-shell .explorer-toolbar { display:flex;flex-wrap:wrap;gap:6px; }
+  .app-shell .explorer-toolbar .search { flex:1 1 100%;width:100%; }
+  .app-shell .explorer-toolbar .search input { width:100%;opacity:1;position:static;min-width:0;font-size:16px; }
+  .app-shell .explorer-toolbar .search > svg { display:block; }
+  .app-shell.phone-review .page-content { padding-top:12px;min-height:0; }
+  .app-shell.phone-review :is(.project-heading,.library-navigation,.workspace-footer) { display:none; }
+  .app-shell.phone-review .pane-host .workspace-panes.has-active { grid-template-areas:'viewer';gap:0; }
+  .app-shell.phone-review .explorer-pane { display:none; }
+  .app-shell.phone-review .pane-host .workspace-panes .pane.inspector-pane { display:none; }
+  .app-shell.phone-review.phone-review-notes .pane-host .workspace-panes.has-active { grid-template-areas:'inspector'; }
+  .app-shell.phone-review.phone-review-notes .pane-host .workspace-panes .pane.inspector-pane { display:block; }
+  .app-shell.phone-review.phone-review-notes .viewer-pane { display:none; }
+  .app-shell.phone-review .review-view-controls > .icon-button { display:none; }
+  .app-shell.phone-review .review-view-controls { grid-template-columns:minmax(0,1fr) auto auto; }
+  .app-shell.phone-review .review-view-controls :is(.version-selector,.current-version-slot) { grid-column:auto; }
+  .app-shell.phone-review .review-title h2 { white-space:normal;overflow-wrap:anywhere; }
+  .app-shell.phone-review .review-view-controls .compact-version-actions { grid-column:auto; }
+  .app-shell.phone-review .review-view-controls { gap:16px 6px; }
+  .app-shell.phone-review .review-view-controls :is(.secondary-button,.version-picker-trigger) { height:var(--control-height);min-height:var(--control-height);border-radius:var(--control-radius); }
+  .app-shell.phone-review .review-actions { gap:16px; }
+  .app-shell.phone-review .review-outcome { row-gap:16px; }
+  .app-shell.phone-review .review-outcome > :is(.primary-button,.secondary-button) { height:var(--control-height);min-height:var(--control-height);border-radius:var(--control-radius); }
+  .app-shell.phone-review .review-actions .asset-nav .playback-mode { height:var(--control-height);min-height:var(--control-height);align-self:center;border-radius:var(--control-radius); }
+  .app-shell.phone-review .picture { width:100%;height:auto;min-height:0;aspect-ratio:16 / 9; }
+  .app-shell.phone-review .picture .preview-canvas { height:100%;object-fit:contain; }
+  .app-shell.phone-review :is(.phone-hide-ready-job,.media-properties) { display:none; }
+  .app-shell.phone-review .player { position:relative; }
+  .app-shell.phone-review .transport > button[aria-label='Fullscreen'] { position:absolute;top:8px;right:8px;z-index:2;background:rgb(8 15 12 / 65%); }
+  .app-shell.phone-review .playback-controls { padding:0 12px 8px; }
+  .app-shell.phone-review .scrubber { padding-block:14px; }
+  .app-shell.phone-review .transport { gap:8px; }
+  .app-shell.phone-review .transport .icon-button { position:relative;min-width:28px;width:28px;min-height:28px;height:28px;border-radius:var(--control-radius); }
+  .app-shell.phone-review .transport .icon-button::before { content:'';position:absolute;inset:-8px 0; }
+  .app-shell.phone-review .review-feedback { display:flex;gap:16px;align-items:center; }
+  .app-shell.phone-review .review-feedback .rating { display:flex;gap:8px; }
+  .app-shell.phone-review .review-feedback :is(.shortlist-toggle,.rating button) { position:relative;width:28px;min-width:28px;height:28px;min-height:28px;border-radius:var(--control-radius); }
+  .app-shell.phone-review .review-feedback :is(.shortlist-toggle,.rating button)::before { content:'';position:absolute;inset:-8px 0; }
+  .app-shell.phone-review .asset-step-pair { display:flex;gap:8px; }
+  .app-shell.phone-review .review-outcome .asset-nav { height:28px;min-height:28px;align-items:center;gap:8px;background:transparent; }
+  .app-shell.phone-review .asset-step { position:relative;display:flex;align-items:center;justify-content:center;gap:4px;min-width:64px;width:auto;height:28px;min-height:28px;padding:0 8px;border-radius:var(--control-radius);font-size:11px;background:var(--raised); }
+  .app-shell.phone-review .asset-step::before { content:'';position:absolute;inset:-8px 0; }
+  .phone-asset-position { align-self:center;flex:none;margin-inline:6px;color:var(--muted);font-size:10px;font-variant-numeric:tabular-nums; }
+  body .phone-panel[data-dialog-content],body .phone-tools-panel[data-dialog-content] { position:fixed;left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);width:calc(100% - 32px);max-width:420px;min-width:0;height:auto;max-height:80dvh;padding:16px;border-radius:12px;overflow-y:auto;overscroll-behavior:contain; }
+  body .phone-panel :is(.sheet-heading,.dialog-heading,.inbox-heading,.archived-heading,.metadata-sheet-heading,.copy-heading,.misfiled-heading),.phone-panel-heading { position:sticky;top:-16px;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:8px;padding-block:8px;background:var(--panel); }
+  .phone-panel-heading { margin-bottom:12px; }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet)[data-dialog-content] { background:color-mix(in srgb,var(--panel) 80%,transparent);backdrop-filter:blur(18px); }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet,.phone-select-content),
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet) * { scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) transparent; }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet,.phone-select-content)::-webkit-scrollbar,
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet) *::-webkit-scrollbar { width:4px;height:0; }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet,.phone-select-content)::-webkit-scrollbar-thumb,
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet) *::-webkit-scrollbar-thumb { background:var(--scrollbar-thumb);border-radius:4px; }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet,.phone-select-content)::-webkit-scrollbar-track,
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet) *::-webkit-scrollbar-track { background:transparent; }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet,.phone-select-content)::-webkit-scrollbar-button,
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet) *::-webkit-scrollbar-button { display:none; }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet)[data-dialog-content],
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet) :is(.publishing-body,.version-list) { overflow-x:hidden; }
+  body .metadata-sheet.phone-panel[data-dialog-content] { display:flex;flex-direction:column;height:80dvh;max-height:calc(100dvh - 32px);overflow:hidden; }
+  body .metadata-sheet.phone-panel .metadata-sheet-heading { position:static;flex:none; }
+  body .metadata-sheet.phone-panel .metadata-sheet-body { flex:1;min-height:0;overflow:hidden; }
+  .phone-tools-content { display:grid;gap:16px;min-width:0; }
+  .phone-tools-content .project-tools { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 8px;width:100%; }
+  .phone-tools-content .project-tools > :is(button,span) { min-width:0;max-width:100%;white-space:normal; }
+  .phone-tools-content .project-tools > .primary-button { grid-column:1 / -1; }
+  .phone-tools-content .project-tools button[aria-label='Project settings']::after { content:'Project settings'; }
+  .phone-tools-content .project-tools button[aria-label='Import options']::after { content:'Import options'; }
+  .phone-tools-content .project-tools > button { width:100%;justify-content:flex-start;gap:8px; }
+  body .phone-tools-content .project-tools button { position:relative;display:flex;align-items:center;height:var(--control-height);min-height:var(--control-height);min-width:0;padding:0 12px;border-radius:var(--control-radius); }
+  body .phone-tools-content .project-tools button::before { content:'';position:absolute;inset:-8px 0; }
+  body .phone-tools-content .project-tools .folder-menu-trigger { width:28px;padding:0;justify-content:center; }
+  .phone-tools-content .header-account-tools { display:flex;flex-wrap:wrap;justify-content:flex-start;margin:0;gap:8px; }
+  body .phone-panel input:not([type='checkbox']),body .phone-panel textarea { min-width:0;max-width:100%;font-size:16px; }
+  .publishing-body :is(.shell,.panel,.stack,.field,.stage1-select-trigger) { min-width:0;max-width:100%; }
+  .publishing-body .stage1-select-trigger > span { min-width:0; }
+  body :is(.selection-menu,.compact-view-menu,.workspace-menu) { max-width:calc(100vw - 32px);max-height:70dvh;overflow-y:auto;overflow-wrap:anywhere; }
+  body :is(.appearance-popover,.filter-popover) { max-height:75dvh; }
+}
+@media(max-width:640px) and (pointer:coarse) {
+  body .metadata-sheet.phone-panel .asset-fields :is(input,textarea) { font-size:16px; }
+}
