@@ -3,7 +3,7 @@
   "info": {
     "title": "Review Room basic agent API",
     "version": "1.0.0",
-    "description": "Canonical media library. Authentication is scoped rr_v1_ bearer credentials. Upload originals and a real JPEG poster using returned signed PUT URLs within 15 minutes, without forwarding the API bearer key to storage. Original MIME must match begin request. Session lifetime is one hour. Still images use durationSec=0 and become ready without video processing; videos wait for the returned job to finish. Sync to portfolio apps is an explicit separate operation and is not implemented by this basic API."
+    "description": "Canonical media library. Authentication is scoped rr_v1_ bearer credentials. Upload originals and a real JPEG poster using returned signed PUT URLs within 15 minutes, without forwarding the API bearer key to storage. Original MIME must match begin request. Session lifetime is one hour. Still images use durationSec=0 and become ready without video processing; videos wait for the returned job to finish. Sync to portfolio apps is an explicit separate operation and is not implemented by this basic API. Not an API call, but stable for links: the owner workspace opens what its address names, /?project={projectId}&folder={folderId}&asset={assetId or asset code}&version={versionId or v003}&t={seconds}; every part is optional, an asset code needs project, and a signed-out owner returns to the address after sign-in."
   },
   "servers": [
     {
@@ -19,7 +19,7 @@
     "/api/v1/catalog": {
       "get": {
         "operationId": "getCatalog",
-        "summary": "List accessible projects and nested folders. Requires folders:write, media:read or projects:edit.",
+        "summary": "List accessible projects and nested folders. Requires folders:write, media:read or projects:edit. Response: { projects: [{ id, title }], folders: [{ id, projectId, parentFolderId?, title, locked, ownerApp, ownedByCaller, externalUrl }] }. externalUrl is a locked folder's page in its owning app (https), or null.",
         "parameters": [
           {
             "name": "projectId",
@@ -209,7 +209,7 @@
     "/api/v1/projects/{projectId}/folders": {
       "post": {
         "operationId": "createFolder",
-        "summary": "Create root folder or subfolder (folders:write). Parent must belong to this project. Pass ownerApp to create a locked folder owned by this credential; subfolders of a locked folder can only be created by its owner.",
+        "summary": "Create root folder or subfolder (folders:write). Parent must belong to this project. Pass ownerApp to create a locked folder owned by this credential; subfolders of a locked folder can only be created by its owner. externalUrl (with ownerApp) links the folder back to its page in the owning app.",
         "parameters": [
           {
             "name": "projectId",
@@ -319,7 +319,7 @@
     "/api/v1/projects/{projectId}/folders/{folderId}": {
       "patch": {
         "operationId": "editFolder",
-        "summary": "Rename, move, or adopt an empty folder in place (folders:write). Locked folders: owning credential only.",
+        "summary": "Rename, move, or adopt an empty folder in place (folders:write). Locked folders: owning credential only. externalUrl sets a locked folder's link back to its owning app; null clears it.",
         "parameters": [
           {
             "name": "projectId",
@@ -1100,6 +1100,31 @@
         "responses": { "200": { "description": "Returns assetId and status; changes feed also reports the new status." }, "400": { "description": "Invalid status or request" }, "401": { "description": "Credential required" }, "403": { "description": "Scope denied" }, "404": { "description": "Asset unavailable" }, "409": { "description": "Approval requires a ready current version or idempotency conflict" } }
       }
     },
+    "/api/v1/assets/{assetId}/notes": {
+      "get": {
+        "operationId": "getAssetNotes",
+        "summary": "Read the reviewer notes on one asset, oldest first (media:read; a project-restricted credential only reaches its project, other projects are 403). Notes belong to the asset, not to a version. Response is private, no-store.",
+        "parameters": [
+          { "name": "assetId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "The asset's notes ordered by createdAt ascending; an asset without notes returns an empty list.", "content": { "application/json": { "schema": { "type": "object", "required": ["assetId", "assetCode", "notes"], "properties": {
+            "assetId": { "type": "string" },
+            "assetCode": { "type": ["string", "null"], "description": "Production code such as BLR_TR100_SHT_0010, or null when the asset has none." },
+            "notes": { "type": "array", "items": { "type": "object", "required": ["id", "body", "timecodeSec", "authorName", "authorRole", "createdAt", "completedAt"], "properties": {
+              "id": { "type": "string" },
+              "body": { "type": "string" },
+              "timecodeSec": { "type": ["number", "null"], "description": "Seconds into the video the note is pinned to, or null for a note on the whole asset." },
+              "authorName": { "type": "string" },
+              "authorRole": { "type": "string", "enum": ["admin", "client"] },
+              "createdAt": { "type": "integer", "description": "Epoch milliseconds." },
+              "completedAt": { "type": ["integer", "null"], "description": "Epoch milliseconds when the note was marked done, or null while it is open." }
+            } } }
+          } } } } },
+          "400": { "description": "Invalid asset ID" }, "401": { "description": "Credential unavailable" }, "403": { "description": "Project or action outside credential scope" }, "404": { "description": "Asset unavailable: unknown, another owner's, or in an archived project" }
+        }
+      }
+    },
     "/api/v1/versions/{versionId}/exclusion": {
       "put": {
         "operationId": "setVersionExcluded",
@@ -1505,6 +1530,12 @@
               "creative-studio-pro"
             ],
             "description": "Create a locked folder owned by the calling credential. Only that credential may rename, move or delete it; Review Room users and other credentials are refused. Media can still be added inside. Locked folders cannot be connected to Trailer Feed."
+          },
+          "externalUrl": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 500,
+            "description": "The folder's page in the owning app, shown in Review Room as \"Open in Creative Studio Pro\". Requires ownerApp (400 without it). https only, no username or password, at most 500 characters (400 otherwise). Omit it to create a folder without a link."
           }
         },
         "required": [
@@ -1531,12 +1562,21 @@
           "ownerApp": {
             "type": "string",
             "enum": ["creative-studio-pro"],
-            "description": "Adopt an existing empty, disconnected folder in place for the calling credential. Send alone, without title or parentFolderId."
+            "description": "Adopt an existing empty, disconnected folder in place for the calling credential. Send alone, without title, parentFolderId or externalUrl."
+          },
+          "externalUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "maxLength": 500,
+            "description": "Set the locked folder's page in the owning app, or null to clear it. May be sent alone or with title/parentFolderId, never with ownerApp. Only the credential that owns the folder may send it: another credential, or an ordinary folder, is 403. https only, no username or password, at most 500 characters (400 otherwise). Omitting it leaves the link unchanged."
           }
         },
         "minProperties": 1,
         "additionalProperties": false,
-        "description": "Rename and/or move, or adopt an existing empty folder with ownerApp alone. Adoption preserves the folder ID, title and parent, and rejects folders containing assets, subfolders, active uploads, or a Trailer Feed connection with 409. A locked folder (or a move that would carry one along, or a move/create into one) is refused with 403 unless the caller owns it."
+        "description": "Rename and/or move, or adopt an existing empty folder with ownerApp alone. Adoption preserves the folder ID, title and parent, and rejects folders containing assets, subfolders, active uploads, or a Trailer Feed connection with 409. A locked folder (or a move that would carry one along, or a move/create into one) is refused with 403 unless the caller owns it. externalUrl links a locked folder the caller owns back to its page in the owning app."
       },
       "UploadBegin": {
         "type": "object",
