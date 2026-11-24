@@ -55,6 +55,7 @@
   :global(.metadata-sheet-trigger:hover) { background: var(--raised); }
   :global(.metadata-sheet-close:hover) { background:transparent;color:var(--ink); }
   :global(.metadata-sheet-trigger:focus-visible),:global(.metadata-sheet-close:focus-visible) { outline: 1px solid var(--accent); outline-offset: 2px; }
+  :global(.metadata-sheet-close:focus-visible) { outline:0;color:var(--ink); }
   .metadata-sheet-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   @media(max-width: 760px) {
     :global(.metadata-sheet-trigger) { display: inline-flex; }

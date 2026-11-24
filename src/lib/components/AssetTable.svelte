@@ -47,8 +47,8 @@
       <div class="phone-asset-fields">
         <button type="button" class="asset-title" data-asset-id={asset.id} onclick={event => onSelect(asset.id, event)}>{#if asset.type === 'video'}<Film size={15}/>{:else}<Image size={15}/>{/if}Open review</button>
         <label class="phone-check"><input type="checkbox" aria-label={`Select ${asset.name}`} checked={checkedIds.includes(asset.id)} onclick={event => onCheck(asset.id, event, true)}/>Select asset</label>
-        <label>Status<PhoneSelect triggerClass="asset-status-select" status={asset.status} label={`Status for ${asset.name}`} value={asset.status} items={asset.status === 'archived' ? [{value:'archived',label:'Archived',disabled:true},...statuses] : [...statuses]} onValueChange={value => changeStatus(asset.id,value)}/></label>
-        <label>Rating<PhoneSelect label={`Rating for ${asset.name}`} value={String(asset.rating)} items={ratings} onValueChange={value => onReview({type:'rate',assetId:asset.id,rating:Number(value)})}/></label>
+        <label>Status{@render statusControl(asset)}</label>
+        <label>Rating{@render ratingControl(asset)}</label>
         <button type="button" class="shortlist-control phone-shortlist" aria-label={`Shortlist ${asset.name}`} aria-pressed={asset.shortlisted} onclick={() => onReview({type:'shortlist',assetId:asset.id,shortlisted:!asset.shortlisted})}><Bookmark size={15} fill={asset.shortlisted ? 'currentColor' : 'none'}/></button><span class="note-count">{asset.comments.length} notes</span>
         {#if asset.misfiled && onFixMisfiled}<button type="button" class="misfiled-tag" onclick={() => onFixMisfiled?.(asset.id)}>Misfiled · File…</button>{/if}
       </div>

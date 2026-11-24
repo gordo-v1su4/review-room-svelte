@@ -12,6 +12,7 @@
     disabled = false,
     triggerClass = '',
     status,
+    portalTarget,
     onValueChange,
     multiple = false,
     values = $bindable([]),
@@ -27,6 +28,7 @@
     disabled?: boolean;
     triggerClass?: string;
     status?: string;
+    portalTarget?: Element;
     onValueChange?: (value: string) => void;
     multiple?: boolean;
     values?: string[];
@@ -42,7 +44,7 @@
   <Select.Trigger {id} class={`phone-select-trigger ${triggerClass}`} data-status={status} aria-label={label} title={display}>
     <span>{display}</span><ChevronDown size={14} aria-hidden="true" />
   </Select.Trigger>
-  <Select.Portal>
+  <Select.Portal to={portalTarget}>
     <Select.Content class="phone-select-content" sideOffset={4}>
       <Select.Viewport>
         {#each items as item (item.value)}

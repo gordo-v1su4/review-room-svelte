@@ -1,8 +1,8 @@
 # Phone refresh plan and UI approval
 
-Current step: **5 — Final local checks and UI refinement; explicit user acceptance remains pending.**
+Current step: **6 — User UI approved; final reviews, PR publication and retro.**
 
-**PR HOLD: #37 is closed. Do not create/reopen a PR, mark ready, merge or deploy until the user separately and explicitly authorizes that action. UI approval alone is not PR authorization. Continue local work.**
+**PR AUTHORIZED (2026-11-24): User approved the current UI and explicitly requested sending the PR, reviews and retro. Reopen #37 against main. Merge/deployment remain outside scope. Earlier hold notes are historical.**
 
 This checklist records delivery progress and user acceptance separately. Local
 checks and code review do not approve the UI on the user's behalf.
@@ -31,32 +31,32 @@ chat. UI acceptance is recorded separately from the explicit future PR authoriza
    - [x] Implement vertical collapsible folders and separate wrapping filters.
    - [x] Remove sideways phone navigation and wrap the folder path.
    - [x] Demonstrate project → nested folder → back, filters, and folder collapse.
-   - [ ] Record user's approval of browsing.
+   - [x] Record user's approval of browsing.
 2. **Review and notes**
    - [x] Add user-requested themed metadata dropdowns, visible file-compatible asset classes and image model presets on phones; wider native controls preserved.
-   - [ ] Record user's approval of the metadata dropdown follow-up.
+   - [x] Record user's approval of the metadata dropdown follow-up.
    - [x] Implement dedicated Media / Notes & info sections and Back to folder.
    - [x] Verify draft retention and inbox navigation locally.
    - [x] Demonstrate opening an asset, notes, previous/next and returning to its folder.
-   - [ ] Record user's approval of review navigation.
+   - [x] Record user's approval of review navigation.
 3. **Tools and panels**
    - [x] Group secondary actions under Tools.
    - [x] Implement inset panels, sticky heading/close and publishing Section chooser.
    - [x] Demonstrate project/folder tools and publishing sections, scrolling and closing.
-   - [ ] Record user's approval of tools/panels.
+   - [x] Record user's approval of tools/panels.
 4. **Asset table**
    - [x] Implement expandable phone rows and retain the wider table.
    - [x] Demonstrate expanding fields, selection controls and opening/returning from review.
-   - [ ] Record user's approval of phone table.
+   - [x] Record user's approval of phone table.
 5. **Final responsive acceptance**
    - [x] Check representative 320px/430px phone and 641px/1280px wider layouts locally.
    - [ ] Show the final layouts after any user adjustments.
-   - [ ] Record user's final UI approval.
+   - [x] Record user's final UI approval.
 
 ## PR and wrap-up
 
 - [x] Closed the prematurely opened draft PR #37 at the user's request; no merge.
-- [ ] Wait for separate explicit user authorization before creating/reopening any PR, even after UI approval.
+- [x] Separate explicit PR authorization received after UI approval.
 - [ ] Re-run relevant checks/review for any further implementation changes.
 - [ ] After explicit PR authorization, include UI acceptance, review evidence and relevant diagrams.
 - [ ] Run `.agents/skills/retro/SKILL.md` after the PR is ready; present improvement candidates.
@@ -106,3 +106,5 @@ No merge or deployment is included. Actual signed-in local playback is now verif
 - [x] User explicitly expanded desktop scope to remove all remaining native blue product dropdowns. All product native selects replaced; native selects remain only on dev preview/QA routes. Desktop filter trigger remains36px and table status semantic color hooks are retained.
 - [x] Focused Spec review found two issues (desktop filter height, table status color hook); fixed and re-reviewed with no new findings. Check0errors8existingwarnings;330tests pass. Autofixer findings outside replaced controls are existing suggestions/link diagnostics.
 - [ ] User UI acceptance still pending. No PR/push/deployment authorized.
+
+- 2026-11-24: User approved current phone/Fields styling and wider layout: "everything looks fine ... desktop is not hurt" and explicitly authorized sending PR and completing reviews/retro. Final requested tweaks: plain Current status (Make current remains actionable for noncurrent takes), Fields X hover white with no filled/outlined box. Physical iPhone acceptance is not claimed.

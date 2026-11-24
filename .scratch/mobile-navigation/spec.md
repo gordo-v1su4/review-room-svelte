@@ -1,6 +1,6 @@
 # Phone navigation refresh
 
-Status: local refinement and verification; PR #37 closed at user request. No new PR until a separate explicit instruction, even after UI approval.
+Status: user UI approved and PR publication authorized on2026-11-24; final review and retro in progress. Merge/deploy remain separate.
 
 Current delivery and acceptance checklist: `plan.md`.
 
