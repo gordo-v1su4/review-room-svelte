@@ -149,6 +149,23 @@ export const versionMetadata = internalMutation({
   },
 });
 
+/** Reviewer notes on one asset, oldest first. Notes belong to the asset, not to a version. */
+export const assetNotes = internalMutation({
+  args: { keyDigest: v.string(), assetId: v.id('videos') },
+  handler: async (ctx, { keyDigest, assetId }) => {
+    const asset = await ctx.db.get(assetId);
+    const credential = await authorize(ctx, keyDigest, 'media:read', asset?.projectId);
+    const project = asset && await ctx.db.get(asset.projectId);
+    if (!asset || !project || project.archived || project.createdBy !== credential.createdBy) throw new Error('Asset unavailable');
+    const comments = await ctx.db.query('comments').withIndex('by_video', q => q.eq('videoId', assetId)).collect();
+    return { assetId, assetCode: asset.assetCode ?? null,
+      notes: comments.sort((a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime).map(comment => ({
+        id: comment._id, body: comment.body, timecodeSec: comment.timecodeSec ?? null,
+        authorName: comment.authorName, authorRole: comment.authorRole,
+        createdAt: comment.createdAt, completedAt: comment.completedAt ?? null })) };
+  },
+});
+
 /** Storage keys for one ready version, for the server to sign; never returned to API callers as keys. */
 export const versionMedia = internalMutation({
   args: { keyDigest: v.string(), versionId: v.id('assetVersions') },
