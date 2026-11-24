@@ -72,7 +72,7 @@ jobs:
           llm_extra_body: '{"max_tokens":4096}'
           llm_reasoning_effort: medium
           review_concurrency: '1'
-          max_tokens_budget: '500000'
+          max_tokens_budget: '1000000'
           effort: medium
           sticky_summary: 'true'
           stream_progress: 'true'
