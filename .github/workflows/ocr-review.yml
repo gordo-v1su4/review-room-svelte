@@ -34,7 +34,10 @@ jobs:
         && (contains(github.event.comment.body, '@hyper-reviewer') || contains(github.event.comment.body, '/hyper-reviewer'))
       )
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
+    env:
+      # The npm launcher otherwise starts a detached updater, even for a pinned install.
+      OCR_NO_UPDATE: '1'
     steps:
       - name: Resolve PR
         id: context
@@ -57,7 +60,6 @@ jobs:
 
       - name: Review with Prism Flash
         id: primary
-        continue-on-error: true
         uses: alibaba/open-code-review@a758d9cbfb689937c7857ad64b2dd66adb58c0c2
         with:
           ocr_version: '1.12.11'
@@ -66,30 +68,12 @@ jobs:
           llm_model: prism-flash
           llm_use_anthropic: 'false'
           llm_protocol: openai
-          llm_extra_body: '{"thinking":{"type":"enabled"}}'
-          llm_reasoning_effort: max
-          review_concurrency: '2'
+          llm_extra_body: '{"thinking":{"type":"enabled"},"max_tokens":4096}'
+          llm_reasoning_effort: medium
+          review_concurrency: '1'
+          max_tokens_budget: '100000'
+          effort: medium
           sticky_summary: 'true'
-          base_ref: ${{ steps.context.outputs.base_ref }}
-          head_sha: ${{ steps.context.outputs.head_sha }}
-          pr_number: ${{ steps.context.outputs.pr_number }}
-
-      - name: Retry with Prism Flash
-        if: ${{ !cancelled() && steps.primary.outcome == 'failure' }}
-        uses: alibaba/open-code-review@a758d9cbfb689937c7857ad64b2dd66adb58c0c2
-        with:
-          ocr_version: '1.12.11'
-          llm_url: https://hyper.charm.land/v1
-          llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
-          llm_model: prism-flash
-          llm_use_anthropic: 'false'
-          llm_protocol: openai
-          llm_extra_body: '{"thinking":{"type":"enabled"}}'
-          llm_reasoning_effort: max
-          review_concurrency: '2'
-          sticky_summary: 'true'
-          # The primary attempt already uploaded this run's diagnostic artifacts.
-          upload_artifacts: 'false'
           base_ref: ${{ steps.context.outputs.base_ref }}
           head_sha: ${{ steps.context.outputs.head_sha }}
           pr_number: ${{ steps.context.outputs.pr_number }}
