@@ -1,4 +1,4 @@
-# Canonical template: docs/opencode-review-github-actions.md
+# Canonical template: https://github.com/gordo-v1su4/proxmox-home/blob/main/docs/opencode-review-github-actions.md
 # Runs on request only: comment `@hyper-reviewer` (or `/hyper-reviewer`) on a pull request, or use Run workflow.
 name: OpenCodeReview PR Review
 
@@ -71,7 +71,7 @@ jobs:
           llm_extra_body: '{"thinking":{"type":"enabled"},"max_tokens":4096}'
           llm_reasoning_effort: medium
           review_concurrency: '1'
-          max_tokens_budget: '100000'
+          max_tokens_budget: '250000'
           effort: medium
           sticky_summary: 'true'
           base_ref: ${{ steps.context.outputs.base_ref }}
