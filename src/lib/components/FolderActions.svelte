@@ -1,9 +1,10 @@
 <script lang="ts">
   import { Dialog, DropdownMenu } from 'bits-ui';
-  import { Copy, FolderInput, FolderPlus, Image, Lock, MoreHorizontal, Pencil, Trash2, X } from 'lucide-svelte';
+  import { ArrowUpRight, Copy, FolderInput, FolderPlus, Image, Lock, MoreHorizontal, Pencil, Trash2, X } from 'lucide-svelte';
+  import { folderLink } from '../../../convex/lib/folderLock';
 
   let { folders, folderLabels, onMoveFolder, onCopy, activeFolderId, canManage = false, selectedCount = 0, coverUrl, hasCustomCover = false, persistent = false, onCreate, onRename, onRemove, onMove, onCover }: {
-    folders: readonly { id: string; title: string; parentFolderId?: string; locked?: boolean }[];
+    folders: readonly { id: string; title: string; parentFolderId?: string; locked?: boolean; externalUrl?: string }[];
     folderLabels?: readonly { id: string; title: string }[];
     onMoveFolder?: (folderId: string, parentFolderId: string | null) => void | Promise<void>;
     /** Opens Copy to folder for the selected assets. */
@@ -51,6 +52,8 @@
   let activeFolder = $derived(folders.find(folder => folder.id === activeFolderId));
   let activeLocked = $derived(!!activeFolder?.locked);
   const lockedNote = 'Locked by Creative Studio Pro — structure is managed there. You can still add media.';
+  // The locked folder's page in Creative Studio Pro, when that app has set one.
+  let activeLink = $derived(activeLocked ? folderLink(activeFolder?.externalUrl) : null);
   let title = $derived(operation === 'create' ? 'New folder' : operation === 'rename' ? 'Rename folder' : operation === 'remove' ? 'Delete folder' : operation === 'cover' ? 'Folder cover' : operation === 'move-folder' ? 'Move folder' : `Move ${selectedCount} ${selectedCount === 1 ? 'asset' : 'assets'}`);
 
   function begin(next: Operation, trigger?: HTMLElement) {
@@ -124,7 +127,8 @@
       <DropdownMenu.Root bind:open={menuOpen}>
         <DropdownMenu.Trigger bind:ref={menuTrigger} class="folder-button folder-menu-trigger" aria-label={`Folder settings for ${activeFolder.title}`} title="Folder settings"><MoreHorizontal size={16}/></DropdownMenu.Trigger>
         <DropdownMenu.Portal><DropdownMenu.Content class="folder-menu" sideOffset={6} align="end" onCloseAutoFocus={event => { if (open) event.preventDefault(); }}>
-          {#if activeLocked}<p class="folder-menu-note"><Lock size={12}/><span>{lockedNote}</span></p>{/if}
+          {#if activeLocked}<p class="folder-menu-note"><Lock size={12}/><span>{lockedNote}{#if activeLink} Open it there to change it.{/if}</span></p>{/if}
+          {#if activeLink}<DropdownMenu.Item class="folder-menu-item folder-menu-link">{#snippet child({ props })}<a {...props} href={activeLink.href} target="_blank" rel="noopener noreferrer" title={`Opens ${activeLink.host} in a new tab`}><ArrowUpRight size={13}/>Open in Creative Studio Pro</a>{/snippet}</DropdownMenu.Item>{/if}
           <DropdownMenu.Item class="folder-menu-item" disabled={activeLocked} onSelect={() => begin('rename')}><Pencil size={13}/>Rename folder</DropdownMenu.Item>
           {#if onMoveFolder}<DropdownMenu.Item class="folder-menu-item" disabled={activeLocked} onSelect={() => begin('move-folder')}><FolderInput size={13}/>Move folder</DropdownMenu.Item>{/if}
           {#if onCover}<DropdownMenu.Item class="folder-menu-item" onSelect={() => begin('cover')}><Image size={13}/>Folder cover</DropdownMenu.Item>{/if}
@@ -183,6 +187,7 @@
   :global(.folder-menu) { z-index: 80; min-width: 164px; padding: 4px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); box-shadow: 0 10px 36px #0006; }
   :global(.folder-menu-item) { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 8px; color: var(--ink); font-size: 11px; border-radius: 4px; cursor: pointer; outline: none; }
   :global(.folder-menu-item[data-highlighted]) { background: var(--raised); }
+  :global(a.folder-menu-link) { text-decoration: none; }
   :global(.folder-menu-item.destructive) { color: #d79d9d; }
   :global(.folder-menu-item[data-disabled]) { opacity: .4; cursor: default; }
   .folder-menu-note { display: flex; align-items: start; gap: 7px; max-width: 220px; margin: 0 0 4px; padding: 7px 8px; border-radius: 4px; background: color-mix(in srgb, var(--folder-locked) 10%, transparent); color: var(--folder-locked); font-size: 10.5px; line-height: 1.45; }

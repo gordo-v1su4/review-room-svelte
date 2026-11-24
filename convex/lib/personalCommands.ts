@@ -6,7 +6,7 @@ import { validateFolderParent, folderNameKey } from './folderTree';
 import { parseProductionCode } from './shotCode';
 import { shotForDroppedFile } from './misfiled';
 import { isLockedFolder } from './folderLock';
-import { assertFolderChangeable, assertSubtreeChangeable, type FolderActor, type FolderOwnerApp } from './folderLock';
+import { assertFolderChangeable, assertSubtreeChangeable, requireFolderLink, type FolderActor, type FolderOwnerApp } from './folderLock';
 
 function title(value: string, kind: string) {
   const normalized = value.trim();
@@ -47,12 +47,14 @@ export async function updatePersonalProject(ctx: MutationCtx, ownerId: Id<'appUs
 }
 
 export async function createPersonalFolder(ctx: MutationCtx, ownerId: Id<'appUsers'>, projectId: Id<'projects'>, name: string, parentFolderId?: Id<'projectFolders'>,
-  options: { actor?: FolderActor; ownerApp?: FolderOwnerApp } = {}) {
+  options: { actor?: FolderActor; ownerApp?: FolderOwnerApp; externalUrl?: string } = {}) {
   const actor = options.actor ?? {};
   const project = await ctx.db.get(projectId);
   if (!project || project.createdBy !== ownerId || project.archived) throw new Error('Project unavailable');
   const normalized = title(name, 'Folder');
   if (options.ownerApp && !actor.credentialId) throw new Error('Locked folders can only be created by an automation credential');
+  if (options.externalUrl !== undefined && !options.ownerApp) throw new Error('Folder link requires a locked folder owned by the caller');
+  const externalUrl = options.externalUrl === undefined ? undefined : requireFolderLink(options.externalUrl);
   const folders = await ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', projectId)).collect();
   await validateFolderParent(ctx, projectId, parentFolderId);
   const parent = folders.find(folder => folder._id === parentFolderId);
@@ -61,7 +63,7 @@ export async function createPersonalFolder(ctx: MutationCtx, ownerId: Id<'appUse
   const now = Date.now();
   return await ctx.db.insert('projectFolders', {
     projectId, parentFolderId, title: normalized, order: Math.max(0, ...folders.filter(folder => folder.parentFolderId === parentFolderId).map(folder => folder.order)) + 1,
-    ...(options.ownerApp ? { ownerApp: options.ownerApp, ownerCredentialId: actor.credentialId } : {}),
+    ...(options.ownerApp ? { ownerApp: options.ownerApp, ownerCredentialId: actor.credentialId, ...(externalUrl ? { externalUrl } : {}) } : {}),
     createdBy: ownerId, createdAt: now, updatedAt: now,
   });
 }

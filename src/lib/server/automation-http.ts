@@ -35,6 +35,8 @@ export function automationError(cause: unknown) {
     ['Folder must be empty and disconnected before adoption', 409],
     ['Folder adoption must be a separate request', 400],
     ['Folder is locked', 403],
+    ['Folder link must be', 400],
+    ['Folder link requires', 403],
     ['Version not ready', 409],
     ['Asset is not ready', 409],
     ['Invalid cursor', 400],
@@ -55,6 +57,7 @@ export function automationError(cause: unknown) {
   const result = known.find(([fragment]) => message.includes(fragment));
   // Messages written for API callers are passed through whole; everything else maps to its fragment.
   const lockDetail = message.match(/Folder is locked: .*? in Review Room/)?.[0] ?? message.match(/Asset code must be .*?BLR_S1_TRL01/)?.[0]
+    ?? message.match(/Folder link must be .*?500 characters/)?.[0] ?? message.match(/Folder link requires a locked folder owned by the caller/)?.[0]
     ?? message.match(/Version not ready: processing is [a-z]+/)?.[0] ?? message.match(/Version unavailable: its asset is archived/)?.[0];
   const publicMessage = result?.[0] === 'ArgumentValidationError' || result?.[0] === 'InvalidId' ? 'Request contains an invalid ID or argument' : lockDetail ?? result?.[0] ?? 'Automation request failed';
   return json({ error: publicMessage },

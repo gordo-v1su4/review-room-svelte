@@ -5,6 +5,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { owner } from './personal';
 import { createPersonalProject, updatePersonalProject, createPersonalFolder, renamePersonalFolder, movePersonalFolder, beginPersonalUpload, finalizePersonalUpload } from './lib/personalCommands';
 import { disposeFolder } from './lib/folderTree';
+import { assertFolderLinkable, requireFolderLink } from './lib/folderLock';
 import { changesSince, setCurrentAssetVersion, setVersionExclusion } from './lib/seriesAssets';
 import { parseVersionMetadata, writeVersionMetadata } from './lib/versionMetadata';
 
@@ -131,7 +132,8 @@ export const catalog = internalMutation({
     const projects = (await ctx.db.query('projects').withIndex('by_creator', q => q.eq('createdBy', credential.createdBy)).collect()).filter(project => !project.archived && (!projectId || project._id === projectId));
     const folders = (await Promise.all(projects.map(project => ctx.db.query('projectFolders').withIndex('by_project', q => q.eq('projectId', project._id)).collect()))).flat();
     return { projects: projects.map(project => ({ id: project._id, title: project.title })), folders: folders.map(folder => ({ id: folder._id, projectId: folder.projectId, parentFolderId: folder.parentFolderId, title: folder.title,
-      locked: folder.ownerApp !== undefined, ownerApp: folder.ownerApp ?? null, ownedByCaller: folder.ownerCredentialId === credential._id })) };
+      locked: folder.ownerApp !== undefined, ownerApp: folder.ownerApp ?? null, ownedByCaller: folder.ownerCredentialId === credential._id,
+      externalUrl: folder.externalUrl ?? null })) };
   },
 });
 
@@ -196,24 +198,26 @@ export const auditVersionMediaRead = internalMutation({
 
 export const createFolder = internalMutation({
   args: { ...request, projectId: v.id('projects'), title: v.string(), parentFolderId: v.optional(v.id('projectFolders')),
-    ownerApp: v.optional(v.literal('creative-studio-pro')) },
+    ownerApp: v.optional(v.literal('creative-studio-pro')), externalUrl: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const credential = await authorize(ctx, args.keyDigest, 'folders:write', args.projectId);
     return await idempotent(ctx, credential, args, 'folders:create',
       () => createPersonalFolder(ctx, credential.createdBy, args.projectId, args.title, args.parentFolderId,
-        { actor: { credentialId: credential._id }, ownerApp: args.ownerApp }));
+        { actor: { credentialId: credential._id }, ownerApp: args.ownerApp, externalUrl: args.externalUrl }));
   },
 });
 
 export const editFolder = internalMutation({
   args: { ...request, projectId: v.id('projects'), folderId: v.id('projectFolders'), title: v.optional(v.string()),
-    parentFolderId: v.optional(v.union(v.id('projectFolders'), v.null())), ownerApp: v.optional(v.literal('creative-studio-pro')) },
+    parentFolderId: v.optional(v.union(v.id('projectFolders'), v.null())), ownerApp: v.optional(v.literal('creative-studio-pro')),
+    // The folder's page in its owning app; null clears it. Only the owning credential may send it.
+    externalUrl: v.optional(v.union(v.string(), v.null())) },
   handler: async (ctx, args) => {
     const folder = await ctx.db.get(args.folderId);
     if (!folder || folder.projectId !== args.projectId) throw new Error('Folder unavailable');
     const credential = await authorize(ctx, args.keyDigest, 'folders:write', folder.projectId);
-    if (args.title === undefined && args.parentFolderId === undefined && args.ownerApp === undefined) throw new Error('Folder title, parent folder, or owner app must be provided');
-    if (args.ownerApp !== undefined && (args.title !== undefined || args.parentFolderId !== undefined)) throw new Error('Folder adoption must be a separate request');
+    if (args.title === undefined && args.parentFolderId === undefined && args.ownerApp === undefined && args.externalUrl === undefined) throw new Error('Folder title, parent folder, owner app, or link must be provided');
+    if (args.ownerApp !== undefined && (args.title !== undefined || args.parentFolderId !== undefined || args.externalUrl !== undefined)) throw new Error('Folder adoption must be a separate request');
     const actor = { credentialId: credential._id };
     return await idempotent(ctx, credential, args, 'folders:edit', async () => {
       if (args.ownerApp !== undefined) {
@@ -234,6 +238,12 @@ export const editFolder = internalMutation({
           connections.some(item => item.folderId === args.folderId && !item.replacedByConnectionId)) throw new Error('Folder must be empty and disconnected before adoption');
         await ctx.db.patch(args.folderId, { ownerApp: args.ownerApp, ownerCredentialId: credential._id, updatedAt: Date.now() });
         return args.folderId;
+      }
+      if (args.externalUrl !== undefined) {
+        const project = await ctx.db.get(folder.projectId);
+        if (!project || project.createdBy !== credential.createdBy || project.archived) throw new Error('Project unavailable');
+        assertFolderLinkable(folder, actor);
+        await ctx.db.patch(args.folderId, { externalUrl: args.externalUrl === null ? undefined : requireFolderLink(args.externalUrl), updatedAt: Date.now() });
       }
       if (args.parentFolderId !== undefined) await movePersonalFolder(ctx, credential.createdBy, args.folderId, args.parentFolderId ?? undefined, actor);
       if (args.title !== undefined) await renamePersonalFolder(ctx, credential.createdBy, args.folderId, args.title, actor);

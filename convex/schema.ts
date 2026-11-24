@@ -119,6 +119,8 @@ const applicationTables = {
     // An owned folder is locked: only the owning automation credential may rename, move or delete it.
     ownerApp: v.optional(v.literal("creative-studio-pro")),
     ownerCredentialId: v.optional(v.id("automationCredentials")),
+    // The folder's page in its owning app (https only); set and cleared by the owning credential.
+    externalUrl: v.optional(v.string()),
     order: v.number(),
     createdBy: v.id("appUsers"),
     createdAt: v.number(),

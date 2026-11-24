@@ -131,3 +131,66 @@ test('a locked folder cannot be connected to Trailer Feed', async () => {
   expect(workspace.folders.find(item => item.id === scene)?.locked).toBe(true);
 });
 
+
+const link = 'https://studio.example.com/series/blood-rush/ep101';
+
+test('the owning credential can give a locked folder a link, change it and clear it; the catalog reports it', async () => {
+  const { t, project, episode, scene, normal } = await fixture();
+  const created: Id<'projectFolders'> = await t.mutation(internal.automation.createFolder, { ...call(ownerDigest), projectId: project, title: 'EP102 — Day Shift', ownerApp: 'creative-studio-pro', externalUrl: link });
+  expect((await folder(t, created))?.externalUrl).toBe(link);
+  expect((await folder(t, episode))?.externalUrl).toBeUndefined();
+
+  expect(await t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: episode, externalUrl: link })).toBe(episode);
+  expect(await folder(t, episode)).toMatchObject({ title: 'EP101 — The Late Shift', externalUrl: link, ownerApp: 'creative-studio-pro' });
+  await t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: scene, title: '010 PAR — Car Park', externalUrl: `${link}/010` });
+  expect(await folder(t, scene)).toMatchObject({ title: '010 PAR — Car Park', externalUrl: `${link}/010`, parentFolderId: episode });
+
+  const catalog = await t.mutation(internal.automation.catalog, { keyDigest: ownerDigest, projectId: project });
+  expect(catalog.folders.find(item => item.id === episode)).toMatchObject({ locked: true, ownedByCaller: true, externalUrl: link });
+  expect(catalog.folders.find(item => item.id === created)).toMatchObject({ externalUrl: link });
+  expect(catalog.folders.find(item => item.id === normal)).toMatchObject({ locked: false, externalUrl: null });
+
+  await t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: episode, externalUrl: null });
+  const cleared = await folder(t, episode);
+  expect(cleared?.externalUrl).toBeUndefined();
+  expect(cleared?.ownerApp).toBe('creative-studio-pro');
+  expect((await t.mutation(internal.automation.catalog, { keyDigest: ownerDigest, projectId: project })).folders.find(item => item.id === episode)).toMatchObject({ locked: true, externalUrl: null });
+});
+
+test('another credential can neither set nor clear a locked folder link', async () => {
+  const { t, project, episode } = await fixture();
+  await t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: episode, externalUrl: link });
+  await expect(t.mutation(internal.automation.editFolder, { ...call(otherDigest), projectId: project, folderId: episode, externalUrl: 'https://elsewhere.example.com/' })).rejects.toThrow('Folder is locked');
+  await expect(t.mutation(internal.automation.editFolder, { ...call(otherDigest), projectId: project, folderId: episode, externalUrl: null })).rejects.toThrow('Folder is locked');
+  expect((await folder(t, episode))?.externalUrl).toBe(link);
+});
+
+test('an ordinary folder cannot carry a link', async () => {
+  const { t, project, normal } = await fixture();
+  await expect(t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: normal, externalUrl: link })).rejects.toThrow('Folder link requires a locked folder owned by the caller');
+  await expect(t.mutation(internal.automation.createFolder, { ...call(ownerDigest), projectId: project, title: 'Loose', externalUrl: link })).rejects.toThrow('Folder link requires a locked folder owned by the caller');
+  expect((await folder(t, normal))?.externalUrl).toBeUndefined();
+  expect((await t.run(ctx => ctx.db.query('projectFolders').collect())).some(item => item.title === 'Loose')).toBe(false);
+});
+
+test('links that are not https, carry credentials or are too long are refused and change nothing', async () => {
+  const { t, project, episode, scene } = await fixture();
+  await t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: episode, externalUrl: link });
+  for (const externalUrl of ['http://studio.example.com/', 'javascript:alert(1)', 'https://user:secret@studio.example.com/', 'https://studio.example.com/' + 'a'.repeat(500), '']) {
+    await expect(t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: episode, externalUrl })).rejects.toThrow('Folder link must be an https URL');
+    await expect(t.mutation(internal.automation.createFolder, { ...call(ownerDigest), projectId: project, title: 'Bad link', ownerApp: 'creative-studio-pro', externalUrl })).rejects.toThrow('Folder link must be an https URL');
+  }
+  // A refused link rolls back a rename sent with it.
+  await expect(t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: scene, title: 'Renamed', externalUrl: 'http://studio.example.com/' })).rejects.toThrow('Folder link must be an https URL');
+  expect((await folder(t, scene))?.title).toBe('010 PAR — Parking Lot');
+  expect((await folder(t, episode))?.externalUrl).toBe(link);
+  expect((await t.run(ctx => ctx.db.query('projectFolders').collect())).some(item => item.title === 'Bad link')).toBe(false);
+});
+
+test('adoption stays a separate request from a link, and a rename-only edit leaves the link alone', async () => {
+  const { t, project, episode, normal } = await fixture();
+  await expect(t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: normal, ownerApp: 'creative-studio-pro', externalUrl: link })).rejects.toThrow('Folder adoption must be a separate request');
+  await t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: episode, externalUrl: link });
+  await t.mutation(internal.automation.editFolder, { ...call(ownerDigest), projectId: project, folderId: episode, title: 'EP101 — Night Shift' });
+  expect(await folder(t, episode)).toMatchObject({ title: 'EP101 — Night Shift', externalUrl: link });
+});

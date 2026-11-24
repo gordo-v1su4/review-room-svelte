@@ -8,10 +8,37 @@ const ownerLabels: Record<FolderOwnerApp, string> = { 'creative-studio-pro': 'Cr
 /** Who is changing folder structure: a signed-in person (no credential) or an automation credential. */
 export type FolderActor = Readonly<{ credentialId?: Id<'automationCredentials'> }>;
 type LockFields = Pick<Doc<'projectFolders'>, 'title' | 'ownerApp' | 'ownerCredentialId'>;
-export type FolderChange = 'renamed' | 'moved' | 'deleted' | 'given new subfolders';
+export type FolderChange = 'renamed' | 'moved' | 'deleted' | 'given new subfolders' | 'given a link';
 
 export function isFolderOwnerApp(value: unknown): value is FolderOwnerApp {
   return typeof value === 'string' && (folderOwnerApps as readonly string[]).includes(value);
+}
+
+/**
+ * A locked folder's page in its owning app: https only, no username or password, at most 500 characters.
+ * Returns the link as sent (trimmed) with its host, or null when it must not be stored or shown.
+ */
+export function folderLink(value: unknown): { href: string; host: string } | null {
+  if (typeof value !== 'string') return null;
+  const href = value.trim();
+  if (!href || href.length > 500 || /[\s\\\u0000-\u001f\u007f]/.test(href) || !/^https:\/\/[^/?#]/i.test(href)) return null;
+  if (href.slice(8).split(/[/?#]/)[0].includes('@')) return null;
+  try {
+    const url = new URL(href);
+    return url.protocol === 'https:' && !url.username && !url.password && url.hostname ? { href, host: url.host } : null;
+  } catch { return null; }
+}
+
+export function requireFolderLink(value: unknown) {
+  const link = folderLink(value);
+  if (!link) throw new Error('Folder link must be an https URL without a username or password, at most 500 characters');
+  return link.href;
+}
+
+/** Only the credential that owns a locked folder may set or clear its link. */
+export function assertFolderLinkable(folder: LockFields, actor: FolderActor) {
+  assertFolderChangeable(folder, actor, 'given a link');
+  if (!isLockedFolder(folder)) throw new Error('Folder link requires a locked folder owned by the caller');
 }
 
 export function isLockedFolder(folder: Pick<LockFields, 'ownerApp'>) { return folder.ownerApp !== undefined; }

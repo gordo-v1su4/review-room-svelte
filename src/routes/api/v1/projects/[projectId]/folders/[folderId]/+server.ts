@@ -4,6 +4,7 @@ import type { Id } from '../../../../../../../../convex/_generated/dataModel';
 import { internal } from '../../../../../../../../convex/_generated/api';
 import { db } from '$lib/server/personal';
 import { automationError, automationRequest } from '$lib/server/automation-http';
+import { folderLink } from '../../../../../../../../convex/lib/folderLock';
 
 export const PATCH: RequestHandler = async (event) => {
   try {
@@ -11,17 +12,20 @@ export const PATCH: RequestHandler = async (event) => {
     if (body?.title !== undefined && typeof body.title !== 'string') return json({ error: 'Folder title must be a string' }, { status: 400 });
     if (body?.parentFolderId !== undefined && body.parentFolderId !== null && (typeof body.parentFolderId !== 'string' || !body.parentFolderId.trim())) return json({ error: 'Parent folder ID must be a nonempty string or null' }, { status: 400 });
     if (body?.ownerApp !== undefined && body.ownerApp !== 'creative-studio-pro') return json({ error: 'Unsupported folder owner app' }, { status: 400 });
-    if (body?.ownerApp !== undefined && (body.title !== undefined || body.parentFolderId !== undefined)) return json({ error: 'Folder adoption must be a separate request' }, { status: 400 });
-    if (body?.title === undefined && body?.parentFolderId === undefined && body?.ownerApp === undefined) return json({ error: 'Folder title, parent folder, or owner app must be provided' }, { status: 400 });
-    // Unchanged body shape for rename-only calls keeps existing idempotency digests stable.
+    if (body?.externalUrl !== undefined && body.externalUrl !== null && !folderLink(body.externalUrl)) return json({ error: 'externalUrl must be an https URL without a username or password, at most 500 characters, or null to clear it' }, { status: 400 });
+    if (body?.ownerApp !== undefined && (body.title !== undefined || body.parentFolderId !== undefined || body.externalUrl !== undefined)) return json({ error: 'Folder adoption must be a separate request' }, { status: 400 });
+    if (body?.title === undefined && body?.parentFolderId === undefined && body?.ownerApp === undefined && body?.externalUrl === undefined) return json({ error: 'Folder title, parent folder, owner app, or externalUrl must be provided' }, { status: 400 });
+    const externalUrl = typeof body.externalUrl === 'string' ? body.externalUrl.trim() : body.externalUrl as null | undefined;
+    // Unchanged body shape for rename-only calls keeps existing idempotency digests stable; externalUrl joins only when sent.
     const auth = automationRequest(event, { projectId: event.params.projectId, folderId: event.params.folderId,
       ...(body.title !== undefined ? { title: body.title } : {}), ...(body.parentFolderId !== undefined ? { parentFolderId: body.parentFolderId } : {}),
-      ...(body.ownerApp !== undefined ? { ownerApp: body.ownerApp } : {}) });
+      ...(body.ownerApp !== undefined ? { ownerApp: body.ownerApp } : {}), ...(externalUrl !== undefined ? { externalUrl } : {}) });
     const folderId = await db().mutation(internal.automation.editFolder,
       { ...auth, projectId: event.params.projectId as Id<'projects'>, folderId: event.params.folderId as Id<'projectFolders'>,
         ...(body.title !== undefined ? { title: body.title as string } : {}),
         ...(body.parentFolderId !== undefined ? { parentFolderId: body.parentFolderId as Id<'projectFolders'> | null } : {}),
-        ...(body.ownerApp !== undefined ? { ownerApp: body.ownerApp as 'creative-studio-pro' } : {}) });
+        ...(body.ownerApp !== undefined ? { ownerApp: body.ownerApp as 'creative-studio-pro' } : {}),
+        ...(externalUrl !== undefined ? { externalUrl } : {}) });
     return json({ folderId }, { headers: { 'cache-control': 'no-store' } });
   } catch (cause) { return automationError(cause); }
 };

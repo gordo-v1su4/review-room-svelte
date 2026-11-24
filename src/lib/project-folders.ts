@@ -1,5 +1,5 @@
-/** `locked`: owned by Creative Studio Pro, structure read-only here. `connected`: a Trailer Feed source folder. */
-export type ProjectFolder = Readonly<{ id: string; projectId: string; title: string; order: number; parentFolderId?: string; coverAssetId?: string; coverImageUrl?: string; locked?: boolean; connected?: boolean }>;
+/** `locked`: owned by Creative Studio Pro, structure read-only here. `externalUrl`: a locked folder's page in that app. `connected`: a Trailer Feed source folder. */
+export type ProjectFolder = Readonly<{ id: string; projectId: string; title: string; order: number; parentFolderId?: string; coverAssetId?: string; coverImageUrl?: string; locked?: boolean; externalUrl?: string; connected?: boolean }>;
 export function folderAncestors(folders: readonly ProjectFolder[], folderId?: string | null): ProjectFolder[] {
   const result: ProjectFolder[] = [];
   const seen = new Set<string>();
