@@ -8,7 +8,7 @@ class DestinationFailure extends Error {
   constructor(message: string, readonly disconnected = false) { super(message); }
 }
 
-async function post(path: 'batches' | 'versions' | 'connections' | 'status' | 'reactivations' | 'source-deletions' | 'metadata-refreshes' | 'unsyncs', payload: Record<string, unknown>) {
+async function post(path: 'batches' | 'versions' | 'connections' | 'status' | 'reactivations' | 'source-deletions' | 'metadata-refreshes' | 'unsyncs' | 'hero-current', payload: Record<string, unknown>) {
   const key = process.env.TRAILER_FEED_REVIEW_INGEST_KEY;
   if (!key) throw new DestinationFailure('Destination delivery is not configured');
   const response = await fetch(`https://media.v1su4.dev/trailer-feed/external/review/${path}`, {
@@ -99,6 +99,15 @@ export const reserve = internalAction({
     } catch (cause) {
       await ctx.runMutation(internal.destinationSync.finishReservation, { ...args, token: claim.token, ok: false, ...failure(cause) });
     }
+  },
+});
+
+export const heroCurrent = internalAction({
+  args: { versionId: v.id('assetVersions') },
+  handler: async (ctx, args): Promise<void> => {
+    const pick = await ctx.runQuery(internal.destinationSync.heroPickContext, args);
+    if (!pick) return;
+    await post('hero-current', { run_id: pick.runId, source_asset_id: pick.assetId, source_version_id: pick.versionId, consent_generation: pick.consentGeneration, is_current: true });
   },
 });
 

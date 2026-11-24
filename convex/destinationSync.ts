@@ -222,6 +222,7 @@ async function confirmSelection(ctx: MutationCtx, args: { connectionId: string; 
       const payloadJson = JSON.stringify({ ...identity, run_id: connection.targetRunId, batch_id: args.confirmationId,
         source_asset_code: asset.assetCode ?? asset.title,
         media_url: media(version._id), ...(version.posterKey ? { poster_url: media(version._id, 'poster') } : {}), metadata,
+        ...(version._id === asset.currentVersionId ? { is_current: true } : {}),
         ...(metadata.gridImageVersionId ? { grid: { source_version_id: metadata.gridImageVersionId, media_url: media(metadata.gridImageVersionId) } } : {}),
         references: metadata.referenceImageVersionIds.map(id => ({ source_version_id: id, media_url: media(id) })) });
       const length = new TextEncoder().encode(payloadJson).byteLength;
@@ -311,6 +312,27 @@ async function stillAuthorized(ctx: MutationCtx, job: { connectionId: Id<'destin
   }
   return true;
 }
+
+export const heroPickContext = internalQuery({
+  args: { versionId: v.id('assetVersions') },
+  handler: async (ctx, args) => {
+    const jobs = await ctx.db.query('syncOutbox').withIndex('by_version', q => q.eq('versionId', args.versionId)).collect();
+    const job = jobs.filter(item => item.state === 'synced' && item.targetArtifactId).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    if (!job) return null;
+    const connection = await ctx.db.get(job.connectionId);
+    if (!connection || connection.replacedByConnectionId) return null;
+    return { runId: connection.targetRunId, assetId: job.assetId, versionId: job.versionId, consentGeneration: job.consentGeneration };
+  },
+});
+
+export const scheduleHeroForCurrentPick = internalMutation({
+  args: { assetId: v.id('videos'), versionId: v.id('assetVersions') },
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset || asset.currentVersionId !== args.versionId) return;
+    await ctx.scheduler.runAfter(0, internal.destinationDelivery.heroCurrent, { versionId: args.versionId });
+  },
+});
 
 export const claimItem = internalMutation({
   args: { jobId: v.id('syncOutbox') },

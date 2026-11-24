@@ -8,6 +8,7 @@ import { disposeFolder } from './lib/folderTree';
 import { assertFolderLinkable, requireFolderLink } from './lib/folderLock';
 import { changesSince, setCurrentAssetVersion, setVersionExclusion } from './lib/seriesAssets';
 import { parseVersionMetadata, writeVersionMetadata } from './lib/versionMetadata';
+import { internal } from './_generated/api';
 
 const actions = ['projects:create', 'projects:edit', 'folders:write', 'media:upload', 'media:read'] as const;
 const request = { keyDigest: v.string(), requestKey: v.string(), bodyDigest: v.string() };
@@ -286,8 +287,10 @@ export const setCurrentVersion = internalMutation({
     const asset = await ctx.db.get(args.assetId);
     if (!asset) throw new Error('Asset unavailable');
     const credential = await authorize(ctx, args.keyDigest, 'media:upload', asset.projectId);
-    return await idempotent(ctx, credential, args, 'media:current-version',
-      () => setCurrentAssetVersion(ctx, credential.createdBy, args.assetId, args.versionId));
+    return await idempotent(ctx, credential, args, 'media:current-version', async () => {
+      await setCurrentAssetVersion(ctx, credential.createdBy, args.assetId, args.versionId);
+      await ctx.scheduler.runAfter(0, internal.destinationSync.scheduleHeroForCurrentPick, { assetId: args.assetId, versionId: args.versionId });
+    });
   },
 });
 

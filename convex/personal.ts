@@ -337,7 +337,9 @@ export const setCurrentVersion = internalMutation({
   args: { assetId: v.id('videos'), versionId: v.id('assetVersions') },
   handler: async (ctx, args) => {
     const profile = await owner(ctx);
-    return await setCurrentAssetVersion(ctx, profile._id, args.assetId, args.versionId);
+    const result = await setCurrentAssetVersion(ctx, profile._id, args.assetId, args.versionId);
+    await ctx.scheduler.runAfter(0, internal.destinationSync.scheduleHeroForCurrentPick, { assetId: args.assetId, versionId: args.versionId });
+    return result;
   },
 });
 
