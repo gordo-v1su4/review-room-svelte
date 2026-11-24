@@ -98,7 +98,8 @@
   import { createThumbnailExtractor } from '$lib/playback/thumbnails';
   import { type LocalAsset, type ReviewAsset } from '$lib/review';
   import { createReviewSession, transitionReviewSession, type ReviewAction, type ReviewAccess } from '$lib/review-session';
-  import { observeProcessing, acceptsProcessingUpdate, processingSource, processingPoster, processingSprite, processingAvailability, type ProcessingUpdate } from '$lib/processing';
+  import { observeProcessing, processingSource, processingPoster, processingSprite, processingAvailability, type ProcessingUpdate } from '$lib/processing';
+  import { liveCursor, liveReader, observeChanges, planLiveRefresh, receivePick, type LiveAsset, type LiveChanges } from '$lib/live-refresh';
   let { data } = $props();
   const live = !!data.snapshot;
   let media = $state<ReviewAsset[]>([]);
@@ -172,7 +173,7 @@
         ...(action.type === 'shortlist' ? { shortlisted: action.shortlisted } : {}),
         ...(action.type === 'mark-viewed' ? { viewed: true } : {}) };
       void fetch('/api/owner-review', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-        .then(async response => { if (!response.ok) throw new Error(await response.text()); session = transitionReviewSession(session, action, localAccess); })
+        .then(async response => { if (!response.ok) throw new Error(await response.text()); liveReads.wrote(); session = transitionReviewSession(session, action, localAccess); })
         .catch(cause => feedback = `Review change was not saved: ${String(cause)}`);
       return;
     }
@@ -196,8 +197,14 @@
       const response = await fetch('/api/owner-assets/delete', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({projectId,assetIds:ids}) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message || 'Could not delete clips. Try again.');
+      liveReads.wrote();
     }
     stopPreview();
+    forgetAssets(ids);
+    feedback = `${ids.length} ${ids.length === 1 ? 'clip deleted' : 'clips deleted'}.`;
+  }
+  /** Drops assets that no longer exist, with everything held about them. */
+  function forgetAssets(ids: readonly string[]) {
     if (activeId && ids.includes(activeId)) select(null);
     const removed = new Set(ids);
     for (const asset of media.filter(asset => removed.has(asset.id))) {
@@ -210,11 +217,10 @@
       versionReads.get(version.id)?.abort(); versionReads.delete(version.id); delete metadataSaves[version.id];
     }
     knownVersions = knownVersions.filter(version => !removed.has(version.assetId));
-    for (const id of removed) delete selectedVersions[id];
     processing = processing.filter(asset => !removed.has(asset.assetId));
     session = { ...session, assets: Object.fromEntries(Object.entries(session.assets).filter(([id]) => !removed.has(id))) };
+    for (const id of removed) { delete selectedVersions[id]; delete currentOverrides[id]; }
     checked = transitionSelection(checked, { type:'reconcile', allIds:media.map(asset => asset.id) });
-    feedback = `${ids.length} ${ids.length === 1 ? 'clip deleted' : 'clips deleted'}.`;
   }
   let player = $state<ReturnType<typeof Player>>();
   let preview = $state.raw<ShortlistPreview | null>(null);
@@ -395,6 +401,7 @@
     try {
       const response = await fetch('/api/owner-version-exclusion', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ versionId, excluded }) });
       if (!response.ok) throw new Error(`Could not ${excluded ? 'exclude' : 'restore'} this take (${response.status}).`);
+      liveReads.wrote();
       knownVersions = knownVersions.map(version => version.id === versionId ? { ...version, excluded } : version);
     } catch (cause) { feedback = cause instanceof Error ? cause.message : 'Could not change this take.'; }
   }
@@ -444,6 +451,7 @@
       if (!response.ok) throw new Error(result.message ?? 'Could not save version metadata. Your draft is retained.');
       versionReads.get(versionId)?.abort(); versionReads.delete(versionId);
       versionDrafts.delete(versionId);
+      liveReads.wrote();
       knownVersions = knownVersions.map(item => item.id === versionId ? { ...item, metadata, metadataUpdatedAt: result.updatedAt } : item);
       media = media.map(item => item.id === id && item.versionId === versionId ? { ...item, metadataUpdatedAt: result.updatedAt } : item);
       metadataSaves[versionId] = { busy: false, message: 'Saved' };
@@ -476,6 +484,7 @@
     for (const [key, value] of Object.entries(fields)) { if (typeof value === 'string') form.set(key, value); else for (const item of value) form.append(key, item); }
     const response = await fetch(`/studio?/${action}`, { method: 'POST', body: form });
     if (!response.ok) throw new Error(`Could not save ${action} (${response.status}).`);
+    liveReads.wrote();
     if (reload) location.reload();
   }
   async function retryMediaJob(jobId: string) {
@@ -542,6 +551,7 @@
     const attempt = liveUploads.get(jobId) ?? {};
     liveUploads.set(jobId, attempt);
     const result = await uploadOriginal(local.sourceFile, { projectId: target.projectId, folderId: target.folderId ?? null, assetId: target.assetId }, (stage, progress) => importQueue.update(jobId, { stage, progress, canCancel: stage !== 'Verifying upload' }), signal, attempt);
+    liveReads.wrote();
     if (!result.asset) throw new Error('Upload is saved. Retry to refresh its receipt.');
     attempt.assetId = result.assetId;
     const descriptor = result.asset;
@@ -1118,20 +1128,34 @@
       applyAddress();
       processingObserver = observeProcessing(() => processing
         .filter(item => !item.ready || item.assetId === activeId).map(item => item.assetId), applyProcessing);
-      return () => { processingObserver?.stop(); for (const controller of versionReads.values()) controller.abort(); };
+      liveObserver = observeChanges(liveReads.read);
+      return () => { processingObserver?.stop(); liveObserver?.stop(); for (const controller of versionReads.values()) controller.abort(); };
     }
     applyAddress();
   });
-  function applyProcessing(updates: ProcessingUpdate[]) {
+  /**
+   * The server's report of each asset's current version (the pick) and its media. `settled`: read after every change
+   * saved in this workspace, so a report that repeats the known pick also drops a local Make current mark.
+   */
+  function applyProcessing(updates: ProcessingUpdate[], settled = false) {
     for (const update of updates) {
       const previous = processing.find(item => item.assetId === update.assetId);
-      if (!previous || !acceptsProcessingUpdate(previous, update)) continue;
-      processing = processing.map(item => item.assetId === update.assetId ? update : item);
-      if (update.versionId !== previous.versionId) delete currentOverrides[update.assetId];
+      if (!previous) continue;
       const displayed = media.find(item => item.id === update.assetId);
-      if ((!selectedVersions[update.assetId] || selectedVersions[update.assetId] === '__current__') && (displayed?.versionId ?? null) !== update.versionId) {
-        media = media.map(item => item.id === update.assetId ? { ...item, versionId: update.versionId ?? undefined, versionNumber: update.versionNumber || undefined, metadata: undefined,
-          metadataUpdatedAt: null, duration: undefined, width: undefined, height: undefined, fps: undefined, codec: undefined } : item);
+      const chosen = selectedVersions[update.assetId];
+      const unsaved = !!displayed?.versionId && (versionDrafts.has(displayed.versionId) || !!metadataSaves[displayed.versionId]?.busy);
+      const pick = receivePick({ current: previous, displayedVersionId: displayed?.versionId ?? null, pinned: !!chosen && chosen !== '__current__', unsaved }, update, settled);
+      if (!pick) continue;
+      processing = processing.map(item => item.assetId === update.assetId ? update : item);
+      if (pick.clearOverride) delete currentOverrides[update.assetId];
+      if (pick.follow && displayed) {
+        // The asset shows its current version again, whatever take was chosen before.
+        delete selectedVersions[update.assetId];
+        const version = knownVersions.find(item => item.id === update.versionId && item.assetId === update.assetId);
+        media = media.map(item => item.id === update.assetId ? { ...item, versionId: update.versionId ?? undefined, versionNumber: update.versionNumber || undefined,
+          metadata: version ? metadataForVersion(version) : undefined, metadataUpdatedAt: version?.metadataUpdatedAt ?? null,
+          ...(version ? { size: version.sizeBytes, sourceFile: versionedSourceFile(item.sourceFile, version.mimeType), type: version.mimeType.startsWith('image/') ? 'image' as const : 'video' as const } : {}),
+          duration: undefined, width: undefined, height: undefined, fps: undefined, codec: undefined } : item);
       }
       media = media.map(item => item.id === update.assetId ? { ...item,
         ...((item.versionId ?? null) === update.versionId ? {
@@ -1142,6 +1166,66 @@
       if (update.versionId && !knownVersions.some(version => version.id === update.versionId)) void refreshVersion(update.versionId);
       const selected = media.find(item => item.id === activeId && item.id === update.assetId);
       if (selected?.versionId) void refreshVersion(selected.versionId);
+    }
+  }
+  // Live refresh: what Creative Studio Pro or another tab changed is merged into the open workspace (rules in $lib/live-refresh).
+  let liveObserver: ReturnType<typeof observeChanges> | undefined;
+  const liveReads = liveReader({
+    target() {
+      const id = projectId;
+      if (!data.snapshot || disposed || id === '__empty__' || !projects.some(item => item.id === id && !item.archived)) return null;
+      return { projectId: id, known: media.filter(asset => organization.placements[asset.id]?.projectId === id).length };
+    },
+    start: id => liveCursor((data.snapshot?.assets ?? []).filter(asset => asset.projectId === id)),
+    apply: applyLiveChanges,
+  });
+  // A project is read when it is opened, not up to ten seconds later.
+  let followedProjectId: string | undefined;
+  $effect(() => {
+    const id = projectId;
+    if (followedProjectId !== undefined && followedProjectId !== id) untrack(() => liveObserver?.refresh());
+    followedProjectId = id;
+  });
+  function mediaFromLive(asset: LiveAsset) {
+    const update = asset.processing, image = asset.mimeType.startsWith('image/');
+    const version = knownVersions.find(item => item.id === update.versionId);
+    return {
+      id: asset.id, projectId: asset.projectId, name: asset.name, url: processingSource(update), type: image ? 'image' as const : 'video' as const,
+      poster: processingPoster(update), sprite: processingSprite(update), availability: processingAvailability(update),
+      ...(update.ready ? { duration: update.duration, width: update.width, height: update.height } : {}),
+      size: asset.sizeBytes, sourceFile: { name: asset.originalFilename, type: asset.mimeType }, assetClass: image ? 'IMG' as const : 'VID' as const,
+      importedAt: asset.importedAt, tags: asset.tags, assetCode: asset.assetCode, ...(asset.misfiled ? { misfiled: true } : {}),
+      versionId: update.versionId ?? undefined, versionNumber: update.versionNumber || undefined, metadataUpdatedAt: version?.metadataUpdatedAt ?? null,
+      metadata: displayVersionMetadata(version?.metadata ?? null, importedMetadata, asset.id, update.versionId ?? undefined, knownVersions),
+    };
+  }
+  function applyLiveChanges(readProjectId: string, changes: LiveChanges) {
+    if (disposed) return;
+    const plan = planLiveRefresh({
+      projectId: readProjectId,
+      assets: media.map(asset => ({ id: asset.id, projectId: organization.placements[asset.id]?.projectId ?? '', displayedVersionId: asset.versionId ?? null })),
+      versions: knownVersions,
+      unsaved: new Set([...versionDrafts.keys(), ...Object.keys(metadataSaves).filter(id => metadataSaves[id]?.busy)]),
+    }, changes);
+    if (plan.removed.length) forgetAssets(plan.removed);
+    if (changes.versions.length) knownVersions = plan.versions;
+    const reviewOf = (asset: LiveAsset) => ({ status: asset.status as VideoStatus, rating: asset.rating, shortlisted: asset.shortlisted, viewed: asset.viewed });
+    const added = plan.added.filter(asset => !media.some(item => item.id === asset.id));
+    if (added.length) {
+      organization = { ...organization, placements: { ...organization.placements,
+        ...Object.fromEntries(added.map(asset => [asset.id, { projectId: asset.projectId, ...(asset.folderId ? { folderId: asset.folderId } : {}) }])) } };
+      processing = [...processing.filter(item => !added.some(asset => asset.id === item.assetId)), ...added.map(asset => asset.processing)];
+      session = { ...session, assets: { ...session.assets, ...createReviewSession(added.map(asset => ({ id: asset.id, ...reviewOf(asset) }))).assets } };
+      media = [...media, ...added.map(mediaFromLive)];
+    }
+    const reviewed = plan.updated.filter(asset => {
+      const held = session.assets[asset.id];
+      return held && (held.status !== asset.status || held.rating !== asset.rating || held.shortlisted !== asset.shortlisted || held.viewed !== asset.viewed);
+    });
+    if (reviewed.length) session = { ...session, assets: { ...session.assets, ...Object.fromEntries(reviewed.map(asset => [asset.id, { ...session.assets[asset.id], ...reviewOf(asset) }])) } };
+    applyProcessing(plan.updated.map(asset => asset.processing), true);
+    for (const version of plan.details) {
+      media = media.map(item => item.versionId === version.id ? { ...item, metadata: metadataForVersion(version), metadataUpdatedAt: version.metadataUpdatedAt } : item);
     }
   }
   onMount(() => {
