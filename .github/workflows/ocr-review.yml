@@ -35,6 +35,9 @@ jobs:
       )
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # The npm launcher otherwise starts a detached updater, even for a pinned install.
+      OCR_NO_UPDATE: '1'
     steps:
       - name: Resolve PR
         id: context
@@ -73,4 +76,3 @@ jobs:
           base_ref: ${{ steps.context.outputs.base_ref }}
           head_sha: ${{ steps.context.outputs.head_sha }}
           pr_number: ${{ steps.context.outputs.pr_number }}
-
