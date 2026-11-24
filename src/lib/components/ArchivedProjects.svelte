@@ -42,7 +42,7 @@
     </Dialog.Trigger>
     <Dialog.Portal>
       <Dialog.Overlay class="dialog-overlay"/>
-      <Dialog.Content class="filter-sheet archived-sheet" onCloseAutoFocus={event => {
+      <Dialog.Content class="filter-sheet archived-sheet phone-panel" onCloseAutoFocus={event => {
         if (navigatingOnClose && onNavigateFocus) { event.preventDefault(); onNavigateFocus(); }
         navigatingOnClose = false;
       }}>

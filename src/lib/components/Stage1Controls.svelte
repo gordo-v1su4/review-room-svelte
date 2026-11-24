@@ -77,6 +77,7 @@
 </script>
 
 <Tabs.Root bind:value={sharingTab} class="shell">
+  <div class="phone-sharing-selector"><span>Section</span><Stage1Select label="Publishing section" value={sharingTab} items={[...(uploadContext ? [{value:'upload',label:'Upload'}] : []),{value:'reviews',label:'Private review'},{value:'embeds',label:'Video embeds'},{value:'showcase',label:'Showcase'},...(destinationContext ? [{value:'destinations',label:'Destinations'}] : [])]} onValueChange={value => sharingTab = value}/></div>
   <Tabs.List class="sharing-tabs" aria-label="Sharing options">
     {#if uploadContext}<Tabs.Trigger value="upload">Upload</Tabs.Trigger>{/if}
     <Tabs.Trigger value="reviews">Private review</Tabs.Trigger>
@@ -164,6 +165,8 @@
   .order li { display:flex;align-items:center;gap:5px; }
   .order li span { flex:1;min-width:0;font-size:11px;overflow-wrap:anywhere; }
   button:focus-visible,input:focus-visible,summary:focus-visible,:global(.sharing-tabs button:focus-visible) { outline:1px solid var(--accent);outline-offset:2px; }
+  .phone-sharing-selector { display:none; }
+  @media(max-width:640px) { .phone-sharing-selector { display:grid;gap:6px;margin:8px 0 16px;color:var(--muted);font-size:11px; } :global(.sharing-tabs) { display:none; } }
   @media(pointer:coarse) { button,input:not([type="checkbox"]),:global(.sharing-tabs button) { min-height:44px; } input:not([type="checkbox"]) { font-size:16px; } .check-option { min-height:44px; } }
 </style>
 

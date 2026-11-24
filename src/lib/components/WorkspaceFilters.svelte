@@ -22,7 +22,7 @@
 </script>
 <Dialog.Root bind:open>
   <Dialog.Trigger class="secondary-button explorer-tool filter-trigger" aria-label={activeCount() ? `Filters, ${activeCount()} active` : "Filters"} title={activeCount() ? `Filters, ${activeCount()} active` : "Filters"} onclick={openFilters}><SlidersHorizontal size={16} /><span class="explorer-tool-label">Filters{#if activeCount()} · {activeCount()}{/if}</span>{#if activeCount()}<span class="explorer-tool-indicator" aria-hidden="true"></span>{/if}</Dialog.Trigger>
-  <Dialog.Portal><Dialog.Overlay class="dialog-overlay" /><Dialog.Content class="filter-sheet" aria-label="Workspace filters">
+  <Dialog.Portal><Dialog.Overlay class="dialog-overlay" /><Dialog.Content class="filter-sheet phone-panel" aria-label="Workspace filters">
     <div class="sheet-heading"><Dialog.Title>Filter media</Dialog.Title><Dialog.Close class="icon-button" aria-label="Close filters"><X size={18} /></Dialog.Close></div>
     <Dialog.Description>Focus on the next decision.</Dialog.Description>
     <div class="filter-section"><span class="filter-label">Status</span><div class="filter-grid">{#each statuses as option (option.value)}<button aria-pressed={draft.statuses.includes(option.value)} class:chosen={draft.statuses.includes(option.value)} class="filter-option" type="button" onclick={() => toggleStatus(option.value)}>{option.label}{#if draft.statuses.includes(option.value)}<Check size={15} />{/if}</button>{/each}</div></div>

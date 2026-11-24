@@ -34,7 +34,7 @@
 <Dialog.Root bind:open>
   <Dialog.Portal>
     <Dialog.Overlay class="folder-overlay"/>
-    <Dialog.Content class="folder-dialog">
+    <Dialog.Content class="folder-dialog phone-panel">
       <div class="copy-heading"><Dialog.Title class="folder-dialog-title">Copy to folder</Dialog.Title><Dialog.Close class="folder-close" aria-label="Close"><X size={17}/></Dialog.Close></div>
       <Dialog.Description class="folder-description">Copy {count === 1 ? 'this asset' : `${count} assets`} into an ordinary folder, for example to submit to Trailer Feed. Copies keep their code and metadata and share the stored file; changing or deleting a copy never touches the original.</Dialog.Description>
       <form onsubmit={submit} aria-busy={busy}>

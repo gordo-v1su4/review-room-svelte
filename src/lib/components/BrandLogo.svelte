@@ -17,6 +17,6 @@
 
 <style>
   .brand-logo { display: block; width: var(--brand-logo-width, 38px); height: auto; flex: none; color: var(--brand-logo-color, #000); }
-  :global(.sidebar .brand) .brand-logo { transform: translateY(12.5px) scale(3.5); transform-origin: top left; pointer-events: none; }
-  :global(.sidebar > :not(.brand)), :global(.sidebar .sidebar-collapse) { position: relative; z-index: 1; }
+  :global(:is(.sidebar, .nav-drawer) .brand) .brand-logo { transform: translateY(12.5px) scale(3.5); transform-origin: top left; pointer-events: none; }
+  :global(:is(.sidebar, .nav-drawer) > :not(.brand):not(.drawer-close)), :global(.sidebar .sidebar-collapse) { position: relative; z-index: 1; }
 </style>

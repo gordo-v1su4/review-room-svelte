@@ -32,6 +32,21 @@
 </script>
 
 <!-- Keyboard focus allows horizontal scrolling without trapping focus in table controls. -->
+<div class="phone-asset-rows" aria-label="Media review rows">
+  {#each assets as asset (asset.id)}
+    <details class="phone-asset-row" class:active-row={activeId === asset.id}>
+      <summary><span class="phone-asset-name">{asset.name}</span><span class="version-tag">{formatVersion(asset.versionNumber ?? 1)}</span></summary>
+      <div class="phone-asset-fields">
+        <button type="button" class="asset-title" data-asset-id={asset.id} onclick={event => onSelect(asset.id, event)}>{#if asset.type === 'video'}<Film size={15}/>{:else}<Image size={15}/>{/if}Open review</button>
+        <label class="phone-check"><input type="checkbox" aria-label={`Select ${asset.name}`} checked={checkedIds.includes(asset.id)} onclick={event => onCheck(asset.id, event, true)}/>Select asset</label>
+        <label>Status<select class="asset-status-select" data-status={asset.status} aria-label={`Status for ${asset.name}`} value={asset.status} onchange={event => changeStatus(asset.id, event.currentTarget.value)}>{#if asset.status === 'archived'}<option value="archived" disabled>Archived</option>{/if}{#each statuses as status (status.value)}<option value={status.value}>{status.label}</option>{/each}</select></label>
+        <label>Rating<select aria-label={`Rating for ${asset.name}`} value={asset.rating} onchange={event => onReview({type:'rate',assetId:asset.id,rating:Number(event.currentTarget.value)})}><option value={0}>Unrated</option>{#each [1,2,3,4,5] as rating (rating)}<option value={rating}>{rating} {rating === 1 ? 'star' : 'stars'}</option>{/each}</select></label>
+        <button type="button" class="shortlist-control phone-shortlist" aria-label={`Shortlist ${asset.name}`} aria-pressed={asset.shortlisted} onclick={() => onReview({type:'shortlist',assetId:asset.id,shortlisted:!asset.shortlisted})}><Bookmark size={15} fill={asset.shortlisted ? 'currentColor' : 'none'}/>Shortlist</button><span class="note-count">{asset.comments.length} notes</span>
+        {#if asset.misfiled && onFixMisfiled}<button type="button" class="misfiled-tag" onclick={() => onFixMisfiled?.(asset.id)}>Misfiled · File…</button>{/if}
+      </div>
+    </details>
+  {/each}
+</div>
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="asset-table-region" role="region" aria-label="Media review table" tabindex="0">
   <table>
@@ -69,6 +84,7 @@
 </div>
 
 <style>
+  .phone-asset-rows { display:none; }
   .asset-table-region { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
   table { width: 100%; min-width: 610px; border-collapse: collapse; font-size: 12px; text-align: left; }
   th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -94,5 +110,21 @@
     select, .asset-title, .shortlist-control { min-height: 44px; }
     .shortlist-control { min-width: 44px; }
     th, td { padding: 8px; }
+  }
+  @media(max-width:640px) {
+    .asset-table-region { display:none; }
+    .phone-asset-rows { display:grid;gap:8px;min-width:0; }
+    .phone-asset-row { min-width:0;border:1px solid var(--border);border-radius:8px;background:var(--panel); }
+    summary { display:flex;align-items:center;gap:8px;min-height:52px;padding:10px 12px;cursor:pointer;font-size:12px; }
+    summary::after { content:'+';margin-left:auto;color:var(--muted); }
+    details[open] summary::after { content:'−'; }
+    summary::-webkit-details-marker { display:none; }
+    summary:focus-visible { outline:1px solid var(--teal);outline-offset:2px; }
+    .phone-asset-name { min-width:0;overflow-wrap:anywhere; }
+    .phone-asset-fields { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:center;gap:12px;padding:12px;border-top:1px solid var(--border); }
+    label { display:grid;gap:6px;min-width:0;color:var(--muted);font-size:11px; }
+    select { width:100%;max-width:100%;font-size:16px; }
+    .phone-check { display:flex;align-items:center;gap:8px;min-height:44px; }
+    .phone-shortlist { display:flex;gap:8px; }
   }
 </style>

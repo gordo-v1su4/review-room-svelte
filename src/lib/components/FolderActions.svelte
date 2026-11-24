@@ -142,7 +142,7 @@
 <Dialog.Root bind:open>
   <Dialog.Portal>
     <Dialog.Overlay class="folder-overlay"/>
-    <Dialog.Content class="folder-dialog" onCloseAutoFocus={event => { event.preventDefault(); if (returnFocus?.isConnected) returnFocus.focus(); }}>
+    <Dialog.Content class="folder-dialog phone-panel" onCloseAutoFocus={event => { event.preventDefault(); if (returnFocus?.isConnected) returnFocus.focus(); }}>
       <div class="dialog-heading"><Dialog.Title class="folder-dialog-title">{title}</Dialog.Title><Dialog.Close class="folder-close" aria-label="Close folder dialog"><X size={17}/></Dialog.Close></div>
       <Dialog.Description class="folder-description">{#if operation === 'create'}Create a folder {activeFolder ? `inside “${activeFolder.title}”` : 'at the project root'}. {persistent ? 'Saved to your workspace.' : 'Stored in this session.'}{:else if operation === 'rename'}Update “{folderTitle}”.{:else if operation === 'remove'}Choose what happens to the assets in “{folderTitle}”. Subfolders must be moved or removed first.{:else if operation === 'move-folder'}Move “{folderTitle}” and its subfolders to another parent in this project.{:else if operation === 'cover'}Uses the newest image in this folder unless you choose a cover. Stored in this tab only.{:else}Choose a destination in this project. {persistent ? 'The new location is saved to your workspace.' : 'Your media files stay on this device.'}{/if}</Dialog.Description>
       {#if operation === 'cover'}

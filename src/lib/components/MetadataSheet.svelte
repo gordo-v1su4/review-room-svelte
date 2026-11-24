@@ -32,7 +32,7 @@
   <Dialog.Trigger class="metadata-sheet-trigger" aria-label="Asset fields"><SlidersHorizontal size={14}/>Fields</Dialog.Trigger>
   <Dialog.Portal>
     <Dialog.Overlay class="dialog-overlay"/>
-    <Dialog.Content class="filter-sheet metadata-sheet" onCloseAutoFocus={event => {
+    <Dialog.Content class="filter-sheet metadata-sheet phone-panel" onCloseAutoFocus={event => {
       if (!window.matchMedia('(max-width: 760px)').matches) { event.preventDefault(); onDesktopClose(); }
     }}>
       <div class="metadata-sheet-heading">

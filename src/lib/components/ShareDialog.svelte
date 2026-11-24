@@ -57,7 +57,7 @@
   <Dialog.Trigger class="share-trigger btn preset-tonal-surface" title="Share review" aria-label="Share review"><Link2 size={14}/><span>Share</span></Dialog.Trigger>
   <Dialog.Portal>
     <Dialog.Overlay class="dialog-overlay"/>
-    <Dialog.Content class="filter-sheet share-sheet">
+    <Dialog.Content class="filter-sheet share-sheet phone-panel">
       <div class="sheet-heading"><Dialog.Title class="dialog-title">Share review</Dialog.Title><Dialog.Close class="share-close" aria-label="Close share review"><X size={16}/></Dialog.Close></div>
       <Dialog.Description>Project-wide review links for {projectTitle}.</Dialog.Description>
       {#if shareState.kind === 'loading'}<p role="status">Loading review links…</p>

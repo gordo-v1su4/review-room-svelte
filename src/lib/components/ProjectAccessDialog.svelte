@@ -65,7 +65,7 @@
   <Dialog.Trigger class="access-trigger btn preset-tonal-surface" aria-label="Project access" title="Project access"><UsersRound size={14}/></Dialog.Trigger>
   <Dialog.Portal>
     <Dialog.Overlay class="dialog-overlay"/>
-    <Dialog.Content class="filter-sheet access-sheet">
+    <Dialog.Content class="filter-sheet access-sheet phone-panel">
       <div class="sheet-heading"><Dialog.Title class="dialog-title">Project access</Dialog.Title><Dialog.Close class="access-close" aria-label="Close project access"><X size={16}/></Dialog.Close></div>
       <Dialog.Description>Who can open {projectTitle} inside the workspace.</Dialog.Description>
       {#if access.kind === 'loading'}<p role="status">Loading project access…</p>

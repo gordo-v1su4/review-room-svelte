@@ -77,7 +77,7 @@
 
 <Dialog.Root bind:open>
   <Dialog.Portal><Dialog.Overlay class="collection-overlay"/>
-    <Dialog.Content class="collection-dialog" onCloseAutoFocus={event => { event.preventDefault(); const target = returnFocus?.isConnected ? returnFocus : newTrigger; target?.focus(); }}>
+    <Dialog.Content class="collection-dialog phone-panel" onCloseAutoFocus={event => { event.preventDefault(); const target = returnFocus?.isConnected ? returnFocus : newTrigger; target?.focus(); }}>
       <div class="dialog-heading"><Dialog.Title class="collection-dialog-title">{title}</Dialog.Title><Dialog.Close class="collection-close" aria-label="Close collection dialog"><X size={17}/></Dialog.Close></div>
       <Dialog.Description class="collection-description">{#if operation === 'create'}Save a view of your media as a collection.{:else if operation === 'rename'}Update the name of “{collectionTitle}”.{:else if operation === 'remove'}Delete “{collectionTitle}”? Only the collection is removed. Your media stays where it is.{:else}Replace the rules for “{collectionTitle}” with the current explorer filters. Choose the media these rules search below.{/if}</Dialog.Description>
       <form onsubmit={submit}>
