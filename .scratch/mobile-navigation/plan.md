@@ -1,6 +1,6 @@
 # Phone refresh plan and UI approval
 
-Current step: **6 — User UI approved; final reviews, PR publication and retro.**
+Current step: **Complete — UI approved, PR #37 ready, reviews addressed and retro recorded.**
 
 **PR AUTHORIZED (2026-11-24): User approved the current UI and explicitly requested sending the PR, reviews and retro. Reopen #37 against main. Merge/deployment remain outside scope. Earlier hold notes are historical.**
 
@@ -50,17 +50,17 @@ chat. UI acceptance is recorded separately from the explicit future PR authoriza
    - [x] Record user's approval of phone table.
 5. **Final responsive acceptance**
    - [x] Check representative 320px/430px phone and 641px/1280px wider layouts locally.
-   - [ ] Show the final layouts after any user adjustments.
+   - [x] Show the final layouts after any user adjustments.
    - [x] Record user's final UI approval.
 
 ## PR and wrap-up
 
 - [x] Closed the prematurely opened draft PR #37 at the user's request; no merge.
 - [x] Separate explicit PR authorization received after UI approval.
-- [ ] Re-run relevant checks/review for any further implementation changes.
-- [ ] After explicit PR authorization, include UI acceptance, review evidence and relevant diagrams.
-- [ ] Run `.agents/skills/retro/SKILL.md` after the PR is ready; present improvement candidates.
-- [ ] Finish the goal only after these steps are complete.
+- [x] Re-run relevant checks/review for any further implementation changes.
+- [x] After explicit PR authorization, include UI acceptance, review evidence and relevant diagrams.
+- [x] Run `.agents/skills/retro/SKILL.md` after the PR is ready; present improvement candidates.
+- [x] Finish the goal only after these steps are complete.
 
 No merge or deployment is included. Actual signed-in local playback is now verified separately from fixtures; uploads/publication and physical iPhone acceptance remain unverified.
 
@@ -105,6 +105,8 @@ No merge or deployment is included. Actual signed-in local playback is now verif
 - [x] Phone status/version menu rows28px/12px; icon-only bookmark retained.
 - [x] User explicitly expanded desktop scope to remove all remaining native blue product dropdowns. All product native selects replaced; native selects remain only on dev preview/QA routes. Desktop filter trigger remains36px and table status semantic color hooks are retained.
 - [x] Focused Spec review found two issues (desktop filter height, table status color hook); fixed and re-reviewed with no new findings. Check0errors8existingwarnings;330tests pass. Autofixer findings outside replaced controls are existing suggestions/link diagnostics.
-- [ ] User UI acceptance still pending. No PR/push/deployment authorized.
+- [x] UI approved; PR publication authorized. Merge/deploy remain separate.
 
 - 2026-11-24: User approved current phone/Fields styling and wider layout: "everything looks fine ... desktop is not hurt" and explicitly authorized sending PR and completing reviews/retro. Final requested tweaks: plain Current status (Make current remains actionable for noncurrent takes), Fields X hover white with no filled/outlined box. Physical iPhone acceptance is not claimed.
+
+- Final handoff: PR#37 reopened/ready after explicit UI and PR approval. Current main3131297 merged without conflicts.362tests pass;check0errors8existingwarnings;build passes. Final Standards/Spec and compatibility bug findings addressed; fullscreen portal fix source rechecked. Retro completed in retro.md; proposals presented without altering CI/global guidance. No merge/deploy performed.

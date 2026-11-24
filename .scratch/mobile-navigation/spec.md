@@ -1,6 +1,6 @@
 # Phone navigation refresh
 
-Status: user UI approved and PR publication authorized on2026-11-24; final review and retro in progress. Merge/deploy remain separate.
+Status: user UI approved; PR #37 open/ready; final reviews addressed and retro completed. Merge/deploy remain separate.
 
 Current delivery and acceptance checklist: `plan.md`.
 

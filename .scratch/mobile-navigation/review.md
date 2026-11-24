@@ -100,7 +100,7 @@ User rejected underline tabs and bulky touch dropdowns. Phone Media/Notes now us
 Focused Spec source review reported no actionable findings: existing status/rating/shortlist callbacks and values retained, archived display disabled, no desktop/intermediate leakage. Native UI verified compact option geometry and icon-only bookmark, table expansion and review/back retention, and publishing width fit at320/430. Latest check: zero errors/eight existing warnings. User approval and separate PR authorization remain pending. The original main CSS is still preserved verbatim as a prefix of app.css (normalized line endings), with scoped additions after it.
 # Current review handoff
 
-Local checkpoint: `2f94613` on `codex/review-room-next`. PR #37 is closed, unmerged. This summary supersedes historical implementation notes below. No PR creation/reopening, push, merge or deployment is authorized by UI approval alone.
+Current handoff: PR #37 is open and ready after explicit user approval and PR authorization. Current main3131297 is integrated. Merge/deployment remain outside scope. Historical holds below are superseded.
 
 The phone refresh (<=640px) separates folder browsing from media review, groups secondary actions under Tools, and uses inset publishing/Fields panels. Wider layouts retain the published baseline. Media/Notes selectors now use rounded background highlights with no underline or selection border. Phone dropdowns use compact 11px text/28px rows; bookmarks are icon-only. Fields groups remain centered and their panel stays fixed while contents scroll.
 
@@ -126,7 +126,7 @@ Validation: latest type check has zero errors/eight existing warnings; latest pr
 
 Rendered evidence covers real signed-in media playback, asset previous/next, Back to folder, table expansion retention, fixed Fields groups, publishing sections and no horizontal overflow at 320/430px. The main stylesheet's baseline prefix remains unchanged. No production publishing or metadata/status/rating changes were performed for verification.
 
-Acceptance still required: browsing, review navigation and metadata, Tools/publishing, phone table, final overall UI and physical-phone confirmation. The drawer and compact stars/bookmark appearance have explicit user approval. Do not infer approval of another screen from those approvals. Run the installed retro after the separately authorized PR step, as requested.
+Acceptance: user approved the final UI and wider arrangement and authorized PR publication. Physical-phone confirmation is not claimed. The repository-local retro is recorded in retro.md.
 
 ---
 
