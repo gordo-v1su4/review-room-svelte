@@ -288,8 +288,9 @@ export const setCurrentVersion = internalMutation({
     if (!asset) throw new Error('Asset unavailable');
     const credential = await authorize(ctx, args.keyDigest, 'media:upload', asset.projectId);
     return await idempotent(ctx, credential, args, 'media:current-version', async () => {
-      await setCurrentAssetVersion(ctx, credential.createdBy, args.assetId, args.versionId);
+      const result = await setCurrentAssetVersion(ctx, credential.createdBy, args.assetId, args.versionId);
       await ctx.scheduler.runAfter(0, internal.destinationSync.scheduleHeroForCurrentPick, { assetId: args.assetId, versionId: args.versionId });
+      return result;
     });
   },
 });
