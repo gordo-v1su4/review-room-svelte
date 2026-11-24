@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { MediaQuery } from 'svelte/reactivity';
+  const phoneViewport = new MediaQuery('(max-width: 640px)', false);
   import { formatVersion } from '../../../convex/lib/shotCode';
   import { Bookmark, Film, Image } from 'lucide-svelte';
   import type { ReviewAsset } from '$lib/review';
@@ -31,7 +33,11 @@
   }
 </script>
 
+{#snippet statusControl(asset: ReviewAsset & AssetReview)}<select class="asset-status-select" data-status={asset.status} aria-label={`Status for ${asset.name}`} value={asset.status} onchange={event => changeStatus(asset.id, event.currentTarget.value)}>{#if asset.status === 'archived'}<option value="archived" disabled>Archived</option>{/if}{#each statuses as status (status.value)}<option value={status.value}>{status.label}</option>{/each}</select>{/snippet}
+{#snippet ratingControl(asset: ReviewAsset & AssetReview)}<select aria-label={`Rating for ${asset.name}`} value={asset.rating} onchange={event => onReview({type:'rate',assetId:asset.id,rating:Number(event.currentTarget.value)})}><option value={0}>Unrated</option>{#each [1,2,3,4,5] as rating (rating)}<option value={rating}>{rating} {rating === 1 ? 'star' : 'stars'}</option>{/each}</select>{/snippet}
+
 <!-- Keyboard focus allows horizontal scrolling without trapping focus in table controls. -->
+{#if phoneViewport.current}
 <div class="phone-asset-rows" aria-label="Media review rows">
   {#each assets as asset (asset.id)}
     <details class="phone-asset-row" class:active-row={activeId === asset.id}>
@@ -39,14 +45,15 @@
       <div class="phone-asset-fields">
         <button type="button" class="asset-title" data-asset-id={asset.id} onclick={event => onSelect(asset.id, event)}>{#if asset.type === 'video'}<Film size={15}/>{:else}<Image size={15}/>{/if}Open review</button>
         <label class="phone-check"><input type="checkbox" aria-label={`Select ${asset.name}`} checked={checkedIds.includes(asset.id)} onclick={event => onCheck(asset.id, event, true)}/>Select asset</label>
-        <label>Status<select class="asset-status-select" data-status={asset.status} aria-label={`Status for ${asset.name}`} value={asset.status} onchange={event => changeStatus(asset.id, event.currentTarget.value)}>{#if asset.status === 'archived'}<option value="archived" disabled>Archived</option>{/if}{#each statuses as status (status.value)}<option value={status.value}>{status.label}</option>{/each}</select></label>
-        <label>Rating<select aria-label={`Rating for ${asset.name}`} value={asset.rating} onchange={event => onReview({type:'rate',assetId:asset.id,rating:Number(event.currentTarget.value)})}><option value={0}>Unrated</option>{#each [1,2,3,4,5] as rating (rating)}<option value={rating}>{rating} {rating === 1 ? 'star' : 'stars'}</option>{/each}</select></label>
+        <label>Status{@render statusControl(asset)}</label>
+        <label>Rating{@render ratingControl(asset)}</label>
         <button type="button" class="shortlist-control phone-shortlist" aria-label={`Shortlist ${asset.name}`} aria-pressed={asset.shortlisted} onclick={() => onReview({type:'shortlist',assetId:asset.id,shortlisted:!asset.shortlisted})}><Bookmark size={15} fill={asset.shortlisted ? 'currentColor' : 'none'}/>Shortlist</button><span class="note-count">{asset.comments.length} notes</span>
         {#if asset.misfiled && onFixMisfiled}<button type="button" class="misfiled-tag" onclick={() => onFixMisfiled?.(asset.id)}>Misfiled · File…</button>{/if}
       </div>
     </details>
   {/each}
 </div>
+{:else}
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="asset-table-region" role="region" aria-label="Media review table" tabindex="0">
   <table>
@@ -64,16 +71,10 @@
             {#if asset.misfiled}{#if onFixMisfiled}<button type="button" class="misfiled-tag" title="Dropped without a matching shot code. File it as a take or move it." onclick={() => onFixMisfiled(asset.id)}>Misfiled · File…</button>{:else}<span class="misfiled-tag">Misfiled</span>{/if}{/if}
           </th>
           <td>
-            <select class="asset-status-select" data-status={asset.status} aria-label={`Status for ${asset.name}`} value={asset.status} onchange={event => changeStatus(asset.id, event.currentTarget.value)}>
-              {#if asset.status === 'archived'}<option value="archived" disabled>Archived</option>{/if}
-              {#each statuses as status (status.value)}<option value={status.value}>{status.label}</option>{/each}
-            </select>
+            {@render statusControl(asset)}
           </td>
           <td>
-            <select aria-label={`Rating for ${asset.name}`} value={asset.rating} onchange={event => onReview({ type: 'rate', assetId: asset.id, rating: Number(event.currentTarget.value) })}>
-              <option value={0}>Unrated</option>
-              {#each [1, 2, 3, 4, 5] as rating (rating)}<option value={rating}>{rating} {rating === 1 ? 'star' : 'stars'}</option>{/each}
-            </select>
+            {@render ratingControl(asset)}
           </td>
           <td><button type="button" class="shortlist-control" aria-label={`Shortlist ${asset.name}`} aria-pressed={asset.shortlisted} onclick={() => onReview({ type: 'shortlist', assetId: asset.id, shortlisted: !asset.shortlisted })}><Bookmark size={15} fill={asset.shortlisted ? 'currentColor' : 'none'}/></button></td>
           <td class="note-count">{asset.comments.length}</td>
@@ -82,6 +83,7 @@
     </tbody>
   </table>
 </div>
+{/if}
 
 <style>
   .phone-asset-rows { display:none; }

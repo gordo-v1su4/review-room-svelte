@@ -2103,7 +2103,7 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
   .app-shell .folder-path ol { width:auto;flex-wrap:wrap;white-space:normal;gap:4px; }
   .app-shell .folder-path li { min-width:0;max-width:100%;flex-shrink:1; }
   .app-shell .folder-path :is(button,.folder-path-current,.folder-path-link) { max-width:100%;overflow-wrap:anywhere;white-space:normal; }
-  .app-shell .folder-path button { min-height:36px; }
+  .app-shell .folder-path button { min-height:44px; }
   .app-shell .folder-path :is(button,.folder-path-current) span { overflow:visible; }
   .app-shell .page-content .library-navigation { display:block;overflow:visible;max-width:100%; }
   .library-filter-group { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px; }
@@ -2132,11 +2132,13 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
   .app-shell.phone-review.phone-review-notes .viewer-pane { display:none; }
   .app-shell.phone-review .review-view-controls > .icon-button { display:none; }
   .app-shell.phone-review .review-view-controls { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .app-shell.phone-review .review-view-controls :is(.version-selector,.current-version-slot) { grid-column:auto; }
+  .app-shell.phone-review .review-title h2 { white-space:normal;overflow-wrap:anywhere; }
   .app-shell.phone-review .review-view-controls .compact-version-actions { grid-column:1 / -1; }
   .app-shell.phone-review .picture { height:clamp(160px,35dvh,360px);aspect-ratio:auto; }
   .app-shell.phone-review .picture .preview-canvas { height:100%;object-fit:contain; }
   body .phone-panel[data-dialog-content],body .phone-tools-panel[data-dialog-content] { position:fixed;left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);width:calc(100% - 32px);max-width:420px;min-width:0;height:auto;max-height:80dvh;padding:16px;border-radius:12px;overflow-y:auto;overscroll-behavior:contain; }
-  body .phone-panel :is(.sheet-heading,.dialog-heading,.inbox-heading,.archived-heading,.metadata-sheet-heading),.phone-panel-heading { position:sticky;top:-16px;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:8px;padding-block:8px;background:var(--panel); }
+  body .phone-panel :is(.sheet-heading,.dialog-heading,.inbox-heading,.archived-heading,.metadata-sheet-heading,.copy-heading,.misfiled-heading),.phone-panel-heading { position:sticky;top:-16px;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:8px;padding-block:8px;background:var(--panel); }
   .phone-panel-heading { margin-bottom:12px; }
   .phone-tools-content { display:grid;gap:16px;min-width:0; }
   .phone-tools-content .project-tools { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%; }

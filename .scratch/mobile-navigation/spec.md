@@ -1,6 +1,6 @@
 # Phone navigation refresh
 
-Status: implementation
+Status: verified locally; ready for pull request review
 
 Approved in this chat on 2026-11-24. Canonical visual decisions live in
 `init-docs/02-Design-Spec.md` section 15; this file is the review and verification scope.

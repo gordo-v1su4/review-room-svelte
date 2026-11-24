@@ -3,6 +3,9 @@
   const phoneViewport = new MediaQuery('(max-width: 640px)', false);
   let phoneToolsOpen = $state(false);
   let phoneReviewTab = $state<'media' | 'notes'>('media');
+  onMount(() => {
+    if (phoneViewport.current && new URLSearchParams(location.search).get('sharing') === '1') phoneToolsOpen = true;
+  });
   import BrandLogo from "$lib/components/BrandLogo.svelte";
   import Stage1Select from "$lib/components/Stage1Select.svelte";
   import ReviewPlaybackMenu from '$lib/components/ReviewPlaybackMenu.svelte';
@@ -800,7 +803,8 @@
   }
   function focusInboxDestination() {
     if (!notesTrigger?.getClientRects().length) return false;
-    notesTrigger.focus();
+    if (phoneViewport.current) { window.scrollTo(0, 0); notesTrigger.focus({ preventScroll: true }); }
+    else notesTrigger.focus();
     return true;
   }
   function openInboxNote(note: FeedbackNote) {
@@ -811,6 +815,7 @@
     activeFolderId = asset.folderId ?? null;
     importOptions.folderId = activeFolderId;
     select(asset.id); showInspector = true; inspectorTab = 'notes';
+    if (phoneViewport.current) { phoneReviewTab = 'notes'; phoneToolsOpen = false; }
     if (asset.type === 'video' && note.timecodeSec !== null) {
       inboxSeek = { assetId: asset.id, time: note.timecodeSec };
       if (sameAsset && player?.seek(note.timecodeSec)) inboxSeek = null;
@@ -904,6 +909,7 @@
   function openProject(id: string) { openFolder(id, 'all'); }
   async function editProject(id: string) {
     openProject(id);
+    if (phoneViewport.current) phoneToolsOpen = true;
     await tick();
     identityDialogOpen = true;
   }
@@ -1215,6 +1221,9 @@
 {#snippet projectControls()}<ImportQueue persistent={live} jobs={importJobs} onRetry={importQueue.retry} onCancel={importQueue.cancel} onClear={importQueue.clearFinished}/>{#if !project.archived}{#if !live}<ProjectAccessDialog projectId={project.id} projectTitle={project.name}/><ShareDialog projectId={project.id} projectTitle={project.name} canManage={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} {appearance}/>{/if}<ProjectIdentityDialog bind:open={identityDialogOpen} {project} persistent={live} canEdit={folderAccess.isAdmin && folderAccess.editableProjectIds.includes(project.id)} canArchive={projectOwnerAccess.isAdmin && projectOwnerAccess.ownedProjectIds.includes(project.id)} onArchive={() => archiveProject(project.id)} onArchiveFocus={focusProjectHeading} onSave={draft => saveProjectIdentity(project.id, draft)}/>{#if !archived}<FolderActions coverUrl={activeFolder ? folderCoverUrl(activeFolder, allAssets) : undefined} hasCustomCover={!!(activeFolder?.coverImageUrl || activeFolder?.coverAssetId)} onCover={setFolderCover} folders={projectFolders} folderLabels={folderDestinations} onMoveFolder={moveFolder} onCopy={live ? () => beginCopy(checked.ids.filter(id => visibleIds.includes(id))) : undefined} persistent={live} {activeFolderId} canManage={true} selectedCount={checked.ids.length} onCreate={createFolder} onRename={renameFolder} onRemove={removeFolder} onMove={moveChecked}/>{:else if checked.ids.length}<button class="secondary-button" onclick={restoreChecked}>Restore {checked.ids.length}</button>{/if}{#if active}<button class="secondary-button" aria-pressed={showInspector} title="Notes & info" onclick={() => showInspector = !showInspector}><PanelRightOpen size={16}/> Notes & info</button>{/if}<ImportOptions persistent={live} folders={folderDestinations} folderId={importOptions.folderId} assetClass={importOptions.assetClass} onChange={value => importOptions = value}/><button class="primary-button" title={`Add media to ${projectFolders.find(folder => folder.id === importOptions.folderId)?.title ?? "project root"}`} onclick={() => picker.click()}><Plus size={18}/> Add media</button>{/if}{/snippet}
 {#snippet accountControls()}<DocumentationLink/>{#if live}<WorkActivity feed={activityFeed} onOpen={openActivity}/>{/if}{#if folderAccess.isAdmin}<FeedbackNotifications groups={inbox} onNavigateFocus={focusInboxDestination} onOpenNote={openInboxNote} onToggleComplete={toggleInboxNote}/>{/if}{#if live}<OwnerAccountMenu/>{:else}<AccountDialog/>{/if}{/snippet}
 {#snippet sharingControl()}{#if data.snapshot}<Stage1SharingDialog snapshot={data.snapshot} onVersionFile={queueReplacement} uploadContext={!project.archived && projectId !== "__empty__" ? {folders:folderDestinations,...importOptions,onChange:value => importOptions = value,onChoose:() => picker.click()} : undefined} destinationContext={!project.archived && projectId !== "__empty__" && projectOwnerAccess.ownedProjectIds.includes(projectId) ? {projectId,folderId:activeFolderId,selectedVersionIds:destinationSelection} : undefined}/>{/if}{/snippet}
+{#snippet childFolderLinks()}{#each childFolders as folder (folder.id)}
+          <button class="library-folder" class:locked={folder.locked} class:connected={folder.connected && !folder.locked} title={folder.locked ? `${folder.title} · Locked, managed by Creative Studio Pro` : folder.connected ? `${folder.title} · Connected to Trailer Feed` : folder.title} onclick={() => openRealFolder(projectId, folder.id)}>{#if folder.locked}<FolderLock size={14}/>{:else if folder.connected}<FolderSync size={14}/>{:else}<Folder size={14}/>{/if}<span class="library-folder-name">{folder.title}</span><span class="library-folder-count">{assets.filter(asset => asset.folderId === folder.id).length}</span></button>
+        {/each}{/snippet}
 {#snippet navigationHeader()}
   <div class="brand"><BrandLogo/><button class="icon-button sidebar-collapse" aria-label="Collapse navigation" title="Collapse navigation" aria-expanded="true" onclick={() => navCollapsed = true}><PanelLeft size={18} strokeWidth={1.6}/></button></div>
   <WorkspaceSwitcher/>
@@ -1273,13 +1282,9 @@
         <button class="library-filter" class:chosen={filter === 'selected'} aria-pressed={filter === 'selected'} onclick={() => openScopedCollection('selected')}><Bookmark size={14}/>Shortlist<span>{directAssets.filter(asset => asset.shortlisted).length}</span></button>
         </div>
         {#if phoneViewport.current}
-          {#if childFolders.length}<details class="phone-folder-list" open><summary><Folder size={16}/><span>Folders</span><span class="count">{childFolders.length}</span><ChevronDown size={14}/></summary><div>{#each childFolders as folder (folder.id)}
-          <button class="library-folder" class:locked={folder.locked} class:connected={folder.connected && !folder.locked} title={folder.locked ? `${folder.title} · Locked, managed by Creative Studio Pro` : folder.connected ? `${folder.title} · Connected to Trailer Feed` : folder.title} onclick={() => openRealFolder(projectId, folder.id)}>{#if folder.locked}<FolderLock size={14}/>{:else if folder.connected}<FolderSync size={14}/>{:else}<Folder size={14}/>{/if}<span class="library-folder-name">{folder.title}</span><span class="library-folder-count">{assets.filter(asset => asset.folderId === folder.id).length}</span></button>
-        {/each}
+          {#if childFolders.length}<details class="phone-folder-list" open><summary><Folder size={16}/><span>Folders</span><span class="count">{childFolders.length}</span><ChevronDown size={14}/></summary><div>{@render childFolderLinks()}
       </div></details>{/if}
-        {:else}{#if childFolders.length}<span class="library-divider" aria-hidden="true"></span>{/if}{#each childFolders as folder (folder.id)}
-          <button class="library-folder" class:locked={folder.locked} class:connected={folder.connected && !folder.locked} title={folder.locked ? `${folder.title} · Locked, managed by Creative Studio Pro` : folder.connected ? `${folder.title} · Connected to Trailer Feed` : folder.title} onclick={() => openRealFolder(projectId, folder.id)}>{#if folder.locked}<FolderLock size={14}/>{:else if folder.connected}<FolderSync size={14}/>{:else}<Folder size={14}/>{/if}<span class="library-folder-name">{folder.title}</span><span class="library-folder-count">{assets.filter(asset => asset.folderId === folder.id).length}</span></button>
-        {/each}
+        {:else}{#if childFolders.length}<span class="library-divider" aria-hidden="true"></span>{/if}{@render childFolderLinks()}
       {/if}
       </nav>{/if}
       {#snippet explorer()}
@@ -1364,7 +1369,7 @@
 {#if live}<CopyToFolderDialog bind:open={copyOpen} count={copyIds.length} folders={copyFolders} onCopy={copyToFolder}/>{/if}
 {#if misfiledAsset}<MisfiledDialog bind:open={misfiledOpen} assetName={misfiledAsset.name} filename={misfiledAsset.sourceFile.name} shots={misfiledShots} folders={misfiledFolders} onFileAsTake={shotId => ownerAction('fileMisfiledAsTake', { assetId: misfiledAsset.id, shotId })} onMove={folderId => ownerAction('moveMisfiledAsset', { assetId: misfiledAsset.id, folderId: folderId ?? '' })}/>{/if}
 {#if phoneViewport.current}
-<Dialog.Root bind:open={phoneToolsOpen}><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="filter-sheet phone-tools-panel">
+<Dialog.Root bind:open={phoneToolsOpen}><Dialog.Portal><Dialog.Overlay class="dialog-overlay"/><Dialog.Content class="filter-sheet phone-tools-panel" onCloseAutoFocus={event => { if (active && phoneReviewTab === 'notes') { event.preventDefault(); void tick().then(focusInboxDestination); } }}>
   <div class="phone-panel-heading"><div><Dialog.Title class="dialog-title">Workspace tools</Dialog.Title><Dialog.Description class="visually-hidden">Project, publishing and account controls</Dialog.Description></div><Dialog.Close class="publishing-close" aria-label="Close workspace tools"><X size={18}/></Dialog.Close></div>
   <div class="phone-tools-content"><div class="phone-tools-sharing">{@render sharingControl()}</div><div class="project-tools">{@render projectControls()}</div><div class="header-account-tools">{@render accountControls()}</div></div>
 </Dialog.Content></Dialog.Portal></Dialog.Root>
