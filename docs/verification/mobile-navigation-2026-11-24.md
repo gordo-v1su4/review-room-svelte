@@ -39,3 +39,8 @@ This verifies rendered UI and navigation using local dev data, not playback of
 real stored media, successful uploads/publication, persistence or production
 authorization. Synthetic media endpoints display the expected unavailable-access
 state. No deployment or physical iPhone verification has occurred.
+
+PR #37's external Greptile review did not run: its service comment reported no
+remaining organization review credits. This is not a review pass. See the review
+record for the exact comment link; local code reviews and user UI acceptance are
+tracked separately.

@@ -45,3 +45,13 @@ before its final report. Parent verification additionally fixed phone heading
 scroll placement and retained the unsaved comment draft across Media/Notes switches.
 
 These were local code reviews. There is no claim of external Bugbot or OCR approval.
+
+## PR service status
+
+On 2026-11-24, PR #37 was open, draft and mergeable at `c2eb40a`.
+It had no submitted GitHub reviews or status checks. Greptile posted that the
+organization was out of review credits, so its external review did not run:
+https://github.com/gordo-v1su4/review-room-svelte/pull/37#issuecomment-7123782281
+
+The local review evidence above remains separate. No billing, credit purchase,
+merge or deployment action was taken. User UI acceptance remains pending.
