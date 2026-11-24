@@ -80,3 +80,21 @@ reported no findings: desktop folder/project control geometry restored; compact
 Tools and destination-select shrink rules confined to <=640px; phone frame ratio
 explicitly 16:9. Native baseline comparison and phone walkthrough evidence are in
 the verification record. No UI approval is inferred from these reviews.
+
+## Current recovery and Fields verification (2026-11-24)
+
+This supersedes earlier shared-desktop styling and sidebar-width exceptions. Desktop and intermediate layouts retain the main baseline; the new metadata select styling and image-model presets are phone-only. PR #37 is closed, unmerged. Do not create or reopen a PR until the user separately authorizes it, even after UI approval.
+
+The phone Fields dialog now has fixed 80dvh height. Its heading, centered group controls, search/completeness controls and save footer stay anchored; only the fields scroll. The six groups were switched through in the real signed-in local app at 430 x 768: every dialog had top 76.8359375 and height 614.6614379882812 CSS pixels. Media/Notes now use restrained underline tabs. Decision-button sizing remains unchanged at the user's request.
+
+Spec review of the final Fields layout reported no findings. The compatibility bug-focused review of the preceding recovery reported no actionable bugs; this is local agent evidence, not a native Bugbot approval. Final check: zero errors and eight existing warnings; build passed. Existing test suite: 330 passed. No new test seam was introduced.
+
+Actual existing media playback and previous/next asset navigation were verified without metadata/status/rating edits. Phone review fit 430 x 768 and 320 x 640 without page overflow. Unauthenticated owner-version-metadata GET/POST now return JSON 401 rather than redirected HTML. After the production build, the dev listener was restarted to clear its stale generated-module state; the visible signed-in phone preview then loaded successfully. The temporary baseline comparison listener was stopped.
+
+Rendered evidence is outside Git under C:/Users/Gordo/.codex/visualizations/2026/11/24/01a20be2-920f-75c1-9f99-d29aac742621/mobile-proof/: phone-fields-all.jpg, phone-fields-tags.jpg, phone-review.jpg, plus earlier published/local desktop comparisons. The full All panel image was visually inspected. The native browser is left on the phone Fields panel. Physical-phone and user UI acceptance remain pending; no PR, push, merge or deployment was performed during this recovery.
+
+## Compact controls follow-up
+
+User rejected underline tabs and bulky touch dropdowns. Phone Media/Notes now use borderless rounded fill selection; dropdowns retain compact11px/28px styling on touch devices. Table Status/Rating use PhoneSelect only in the phone branch. The table bookmark is icon-only with its accessible label retained. Phone panel scrollbar styling matches the existing thin20%-opacity token. Main drawer and wider table/native selects remain unchanged.
+
+Focused Spec source review reported no actionable findings: existing status/rating/shortlist callbacks and values retained, archived display disabled, no desktop/intermediate leakage. Native UI verified compact option geometry and icon-only bookmark, table expansion and review/back retention, and publishing width fit at320/430. Latest check: zero errors/eight existing warnings. User approval and separate PR authorization remain pending. The original main CSS is still preserved verbatim as a prefix of app.css (normalized line endings), with scoped additions after it.

@@ -24,7 +24,8 @@ export type AssetMetadataPatch = {
 };
 export type VersionImageOption = { versionId: string; label: string; url: string };
 export type MetadataSaveState = { busy: boolean; message: string; conflict?: boolean };
-export const CREATIVE_MODEL_PRESETS = ['GPT Imagen 2.6', 'Nano Banana Pro', 'Nano Banana 2.1', 'Seedream 5.0', 'Seedance 2.0', 'Seedance 2.5', 'Sora 2', 'MiniMax H3', 'Kling', 'Veo 3'] as const;
+export const CREATIVE_MODEL_PRESETS = ['Seedance 2.0', 'Seedance 2.5', 'Sora 2', 'MiniMax H3', 'Kling', 'Veo 3'] as const;
+export const CREATIVE_IMAGE_MODEL_PRESETS = ['GPT Imagen 2.6', 'Nano Banana Pro', 'Nano Banana 2.1', 'Seedream 5.0'] as const;
 export type NormalizedCreativeMetadata = CreativeMetadata & { sourceLabel: string; referenceImageVersionIds: string[] };
 export type MetadataGroup = 'essentials' | 'review' | 'file' | 'tags' | 'creative';
 export type MetadataField = { id: string; label: string; group: MetadataGroup; value: string | number | boolean | null | undefined; filled?: boolean };

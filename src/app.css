@@ -958,17 +958,9 @@ button {
   top: 0;
   bottom: 0;
   width: min(300px, 88vw);
-  background:
-    radial-gradient(ellipse 120% 65% at 0% 0%, rgb(55 93 78 / 32%), transparent 78%),
-    linear-gradient(165deg, rgb(19 31 26 / 70%), rgb(5 12 9 / 70%));
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: #17191b;
   z-index: 31;
-  height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-  overscroll-behavior: none;
-  padding: max(12px, env(safe-area-inset-top)) 12px max(8px, env(safe-area-inset-bottom));
+  padding: 30px 18px max(20px, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
@@ -1329,9 +1321,9 @@ button {
   .filter-sheet[data-state="open"] {
     animation: sheet-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
-  .nav-drawer[data-state="open"] { animation: drawer-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1); }
-  .nav-drawer[data-state="closed"] { animation: drawer-out 180ms ease-in; }
-  .navigation-overlay[data-state="closed"] { animation: overlay-in 180ms ease-in reverse; }
+  .nav-drawer[data-state="open"] {
+    animation: drawer-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
 }
 @keyframes overlay-in {
   from {
@@ -1353,13 +1345,14 @@ button {
 }
 @keyframes drawer-in {
   from {
-    transform: translateX(-100%);
+    opacity: 0;
+    translate: -16px 0;
   }
   to {
-    transform: translateX(0);
+    opacity: 1;
+    translate: 0 0;
   }
 }
-@keyframes drawer-out { to { transform: translateX(-100%); } }
 
 /* Keep navigation reachable in short windows and landscape phones. */
 .sidebar,
@@ -1677,7 +1670,7 @@ button {
 /* Workspace chrome: same header baseline, retracting navigation, compact pane tools. */
 .app-shell { --nav-width: 220px; grid-template-columns: var(--nav-width) minmax(0, 1fr); }
 /* Wide screens give nested folder titles (episode → scene) room to read. */
-@media (min-width: 1024px) { .app-shell { --nav-width: 300px; } }
+@media (min-width: 1360px) { .app-shell { --nav-width: 264px; } }
 .app-shell.nav-collapsed { grid-template-columns: 0 minmax(0,1fr); }
 .sidebar { width: var(--nav-width); padding: 0 12px 16px; overflow-x: hidden; }
 .sidebar .brand { height: 58px; min-height: 58px; margin: 0 8px 18px; }
@@ -1705,7 +1698,7 @@ button {
 }
 @media (max-width: 760px) {
   .desktop-nav-toggle { display: none; }
-  .nav-drawer .brand { height: 58px; min-height: 58px; margin: 0 8px 18px; }
+  .nav-drawer .brand { min-height: 38px; margin: 0 8px 20px; }
   .folder-workspace { padding-top: 16px; }
   .folder-workspace .project-heading { align-items: center; flex-wrap: nowrap; }
   .breadcrumb { gap: 6px; }
@@ -2058,6 +2051,15 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 @media(max-width:760px) { .publishing-sheet { width:100%;border-radius:12px 12px 0 0;padding-bottom:max(18px,env(safe-area-inset-bottom)); } }
 @media(pointer:coarse) { .publishing-close { min-width:44px;min-height:44px; } }
 
+.navigation-footer { flex:0 0 auto; padding-top:20px; padding-bottom:16px; }
+.navigation-footer > .nav-divider:first-of-type { margin-top:0; }
+
+/* Phone-only navigation and workspace refresh. */
+@media(max-width:640px) {
+.nav-drawer { background:radial-gradient(ellipse 120% 65% at 0% 0%,rgb(55 93 78 / 32%),transparent 78%),linear-gradient(165deg,rgb(19 31 26 / 70%),rgb(5 12 9 / 70%));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);height:100dvh;min-height:0;overflow:hidden;overscroll-behavior:none;padding:max(12px,env(safe-area-inset-top)) 12px max(8px,env(safe-area-inset-bottom)); }
+@media(prefers-reduced-motion:no-preference) { .nav-drawer[data-state='open'] { animation:phone-drawer-in 220ms cubic-bezier(.2,.8,.2,1); } .nav-drawer[data-state='closed'] { animation:phone-drawer-out 180ms ease-in; } .navigation-overlay[data-state='closed'] { animation:overlay-in 180ms ease-in reverse; } }
+@keyframes phone-drawer-in { from { transform:translateX(-100%); } to { transform:translateX(0); } }
+@keyframes phone-drawer-out { to { transform:translateX(-100%); } }
 .navigation-footer { flex:0 0 auto; padding-top:8px; padding-bottom:8px; }
 .navigation-status { margin:4px 8px 0; border-top:1px solid var(--border); }
 .navigation-status summary { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:36px; color:var(--muted); font-size:10px; font-weight:650; letter-spacing:.1em; text-transform:uppercase; list-style:none; cursor:pointer; }
@@ -2083,13 +2085,18 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
 @media (prefers-reduced-motion:reduce) { .navigation-status summary svg { transition:none; } }
 
 /* Phone refresh: keep every new arrangement below the tablet breakpoint. */
+
+}
 .library-filter-group { display:contents; }
+@media(max-width:640px) {
 /* Folder identity survives selection and hover in both navigation surfaces. */
 :is(.app-shell,.nav-drawer) .project-tree .collection-link.locked { color:var(--folder-locked); }
 :is(.app-shell,.nav-drawer) .project-tree .collection-link.connected { color:var(--folder-connected); }
 :is(.app-shell,.nav-drawer) .project-tree :is(.project-link,.collection-link):hover { background:var(--raised);border-radius:var(--control-radius); }
-@media(max-width:640px) {
-  :root { --control-height:28px; }
+
+  :root { --control-height:28px;scrollbar-width:none;scrollbar-gutter:auto; }
+  html { scrollbar-width:none; }
+  html::-webkit-scrollbar { display:none; }
   .app-shell .project-tools > button { height:var(--control-height);min-height:var(--control-height);border-radius:var(--control-radius); }
   .app-shell .topbar { position:sticky;top:0;z-index:20;display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;gap:6px;min-height:60px;height:auto;padding:8px 12px;background:rgb(12 22 18 / 94%);backdrop-filter:blur(16px); }
   .app-shell .topbar .phone-hidden { display:none; }
@@ -2101,8 +2108,12 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
   .phone-back span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
   .phone-tools-trigger,.phone-add { min-height:var(--control-height);padding-inline:12px;font-size:12px;align-self:center; }
   .phone-review-tabs { position:sticky;top:60px;z-index:19;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px 12px;background:rgb(12 22 18 / 96%); }
-  .phone-review-tabs button { position:relative;min-height:var(--control-height);margin-block:8px;border-radius:var(--control-radius);color:var(--muted);font-size:12px; }
-  .phone-review-tabs button[aria-pressed='true'] { background:var(--raised);color:var(--teal); }
+  .phone-review-tabs button { position:relative;min-height:var(--control-height);margin-block:8px;border:0;border-radius:var(--control-radius);background:transparent;box-shadow:none;color:var(--muted);font-size:12px; }
+  .phone-review-tabs button:hover { background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink); }
+  .phone-review-tabs button[aria-pressed='true'] { background:color-mix(in srgb,var(--teal) 18%,var(--panel));color:var(--ink); }
+  .phone-review-tabs button:focus-visible { outline:0;box-shadow:none;background:color-mix(in srgb,var(--teal) 30%,var(--panel));color:var(--ink); }
+  body :is(.stage1-select-trigger,.stage1-select-item) { min-height:28px;font-size:11px; }
+  body .stage1-select-trigger { height:28px; }
   .app-shell .page-content .project-heading { display:block;margin-bottom:16px; }
   .app-shell .project-heading h1 { overflow-wrap:anywhere; }
   .app-shell .project-heading .folder-path { overflow:visible; }
@@ -2130,7 +2141,7 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
   .app-shell .explorer-toolbar .search { flex:1 1 100%;width:100%; }
   .app-shell .explorer-toolbar .search input { width:100%;opacity:1;position:static;min-width:0;font-size:16px; }
   .app-shell .explorer-toolbar .search > svg { display:block; }
-  .app-shell.phone-review .page-content { padding-top:12px; }
+  .app-shell.phone-review .page-content { padding-top:12px;min-height:0; }
   .app-shell.phone-review :is(.project-heading,.library-navigation,.workspace-footer) { display:none; }
   .app-shell.phone-review .pane-host .workspace-panes.has-active { grid-template-areas:'viewer';gap:0; }
   .app-shell.phone-review .explorer-pane { display:none; }
@@ -2139,15 +2150,54 @@ body :is(.filter-sheet, .compact-view-menu, .asset-status-menu, .collection-menu
   .app-shell.phone-review.phone-review-notes .pane-host .workspace-panes .pane.inspector-pane { display:block; }
   .app-shell.phone-review.phone-review-notes .viewer-pane { display:none; }
   .app-shell.phone-review .review-view-controls > .icon-button { display:none; }
-  .app-shell.phone-review .review-view-controls { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .app-shell.phone-review .review-view-controls { grid-template-columns:minmax(0,1fr) auto auto; }
   .app-shell.phone-review .review-view-controls :is(.version-selector,.current-version-slot) { grid-column:auto; }
   .app-shell.phone-review .review-title h2 { white-space:normal;overflow-wrap:anywhere; }
-  .app-shell.phone-review .review-view-controls .compact-version-actions { grid-column:1 / -1; }
+  .app-shell.phone-review .review-view-controls .compact-version-actions { grid-column:auto; }
+  .app-shell.phone-review .review-view-controls { gap:16px 6px; }
+  .app-shell.phone-review .review-view-controls :is(.secondary-button,.version-picker-trigger) { height:var(--control-height);min-height:var(--control-height);border-radius:var(--control-radius); }
+  .app-shell.phone-review .review-actions { gap:16px; }
+  .app-shell.phone-review .review-outcome { row-gap:16px; }
+  .app-shell.phone-review .review-outcome > :is(.primary-button,.secondary-button) { height:var(--control-height);min-height:var(--control-height);border-radius:var(--control-radius); }
+  .app-shell.phone-review .review-actions .asset-nav .playback-mode { height:var(--control-height);min-height:var(--control-height);align-self:center;border-radius:var(--control-radius); }
   .app-shell.phone-review .picture { width:100%;height:auto;min-height:0;aspect-ratio:16 / 9; }
   .app-shell.phone-review .picture .preview-canvas { height:100%;object-fit:contain; }
+  .app-shell.phone-review :is(.phone-hide-ready-job,.media-properties) { display:none; }
+  .app-shell.phone-review .player { position:relative; }
+  .app-shell.phone-review .transport > button[aria-label='Fullscreen'] { position:absolute;top:8px;right:8px;z-index:2;background:rgb(8 15 12 / 65%); }
+  .app-shell.phone-review .playback-controls { padding:0 12px 8px; }
+  .app-shell.phone-review .scrubber { padding-block:14px; }
+  .app-shell.phone-review .transport { gap:8px; }
+  .app-shell.phone-review .transport .icon-button { position:relative;min-width:28px;width:28px;min-height:28px;height:28px;border-radius:var(--control-radius); }
+  .app-shell.phone-review .transport .icon-button::before { content:'';position:absolute;inset:-8px 0; }
+  .app-shell.phone-review .review-feedback { display:flex;gap:16px;align-items:center; }
+  .app-shell.phone-review .review-feedback .rating { display:flex;gap:16px; }
+  .app-shell.phone-review .review-feedback :is(.shortlist-toggle,.rating button) { position:relative;width:28px;min-width:28px;height:28px;min-height:28px;border-radius:var(--control-radius); }
+  .app-shell.phone-review .review-feedback :is(.shortlist-toggle,.rating button)::before { content:'';position:absolute;inset:-8px 0; }
+  .app-shell.phone-review .asset-step-pair { display:flex;gap:8px; }
+  .app-shell.phone-review .review-outcome .asset-nav { height:28px;min-height:28px;align-items:center;gap:8px;background:transparent; }
+  .app-shell.phone-review .asset-step { position:relative;display:flex;align-items:center;justify-content:center;gap:4px;min-width:64px;width:auto;height:28px;min-height:28px;padding:0 8px;border-radius:var(--control-radius);font-size:11px;background:var(--raised); }
+  .app-shell.phone-review .asset-step::before { content:'';position:absolute;inset:-8px 0; }
+  .phone-asset-position { align-self:center;flex:none;margin-inline:6px;color:var(--muted);font-size:10px;font-variant-numeric:tabular-nums; }
   body .phone-panel[data-dialog-content],body .phone-tools-panel[data-dialog-content] { position:fixed;left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);width:calc(100% - 32px);max-width:420px;min-width:0;height:auto;max-height:80dvh;padding:16px;border-radius:12px;overflow-y:auto;overscroll-behavior:contain; }
   body .phone-panel :is(.sheet-heading,.dialog-heading,.inbox-heading,.archived-heading,.metadata-sheet-heading,.copy-heading,.misfiled-heading),.phone-panel-heading { position:sticky;top:-16px;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:8px;padding-block:8px;background:var(--panel); }
   .phone-panel-heading { margin-bottom:12px; }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet)[data-dialog-content] { background:color-mix(in srgb,var(--panel) 80%,transparent);backdrop-filter:blur(18px); }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet,.phone-select-content),
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet) * { scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) transparent; }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet,.phone-select-content)::-webkit-scrollbar,
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet) *::-webkit-scrollbar { width:4px;height:0; }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet,.phone-select-content)::-webkit-scrollbar-thumb,
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet) *::-webkit-scrollbar-thumb { background:var(--scrollbar-thumb);border-radius:4px; }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet,.phone-select-content)::-webkit-scrollbar-track,
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet) *::-webkit-scrollbar-track { background:transparent; }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet,.phone-select-content)::-webkit-scrollbar-button,
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet) *::-webkit-scrollbar-button { display:none; }
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet)[data-dialog-content],
+  body :is(.phone-panel,.phone-tools-panel,.stage-one-sheet) :is(.publishing-body,.version-list) { overflow-x:hidden; }
+  body .metadata-sheet.phone-panel[data-dialog-content] { display:flex;flex-direction:column;height:80dvh;max-height:calc(100dvh - 32px);overflow:hidden; }
+  body .metadata-sheet.phone-panel .metadata-sheet-heading { position:static;flex:none; }
+  body .metadata-sheet.phone-panel .metadata-sheet-body { flex:1;min-height:0;overflow:hidden; }
   .phone-tools-content { display:grid;gap:16px;min-width:0; }
   .phone-tools-content .project-tools { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 8px;width:100%; }
   .phone-tools-content .project-tools > :is(button,span) { min-width:0;max-width:100%;white-space:normal; }

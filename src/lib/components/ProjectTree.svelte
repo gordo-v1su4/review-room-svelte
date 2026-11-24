@@ -238,10 +238,9 @@
   .collection-list li::before { content: ''; position: absolute; top: 17px; left: -15px; width: 12px; border-top: 1px solid #ffffff12; }
   .collection-link { min-height: 31px; padding-left: 6px; color: #899491; border-radius: 4px; }
   .collection-link.selected { background: #ffffff0a; color: #a8ded2; }
-  .collection-link.locked { color: var(--folder-locked); }
+  .collection-link.locked { color: color-mix(in srgb, var(--folder-locked) 78%, #899491); }
   .collection-link.locked :global(.folder-kind-icon) { color: var(--folder-locked); }
   .collection-link.locked.selected { background: color-mix(in srgb, var(--folder-locked) 11%, transparent); color: var(--folder-locked); }
-  .collection-link.connected { color: var(--folder-connected); }
   .collection-link.connected :global(.folder-kind-icon) { color: var(--folder-connected); }
   .collection-link.connected.selected { background: color-mix(in srgb, var(--folder-connected) 10%, transparent); color: var(--folder-connected); }
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

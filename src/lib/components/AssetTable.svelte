@@ -1,5 +1,6 @@
 <script lang="ts">
   import { MediaQuery } from 'svelte/reactivity';
+  import PhoneSelect from './PhoneSelect.svelte';
   const phoneViewport = new MediaQuery('(max-width: 640px)', false);
   import { formatVersion } from '../../../convex/lib/shotCode';
   import { Bookmark, Film, Image } from 'lucide-svelte';
@@ -26,6 +27,7 @@
     { value: 'final', label: 'Final' },
     { value: 'omitted', label: 'Omitted' }
   ] as const;
+  const ratings = [{ value: '0', label: 'Unrated' }, ...[1,2,3,4,5].map(rating => ({ value: String(rating), label: `${rating} ${rating === 1 ? 'star' : 'stars'}` }))];
 
   function changeStatus(assetId: string, value: string) {
     const status = statuses.find(status => status.value === value);
@@ -45,9 +47,9 @@
       <div class="phone-asset-fields">
         <button type="button" class="asset-title" data-asset-id={asset.id} onclick={event => onSelect(asset.id, event)}>{#if asset.type === 'video'}<Film size={15}/>{:else}<Image size={15}/>{/if}Open review</button>
         <label class="phone-check"><input type="checkbox" aria-label={`Select ${asset.name}`} checked={checkedIds.includes(asset.id)} onclick={event => onCheck(asset.id, event, true)}/>Select asset</label>
-        <label>Status{@render statusControl(asset)}</label>
-        <label>Rating{@render ratingControl(asset)}</label>
-        <button type="button" class="shortlist-control phone-shortlist" aria-label={`Shortlist ${asset.name}`} aria-pressed={asset.shortlisted} onclick={() => onReview({type:'shortlist',assetId:asset.id,shortlisted:!asset.shortlisted})}><Bookmark size={15} fill={asset.shortlisted ? 'currentColor' : 'none'}/>Shortlist</button><span class="note-count">{asset.comments.length} notes</span>
+        <label>Status<PhoneSelect label={`Status for ${asset.name}`} value={asset.status} items={asset.status === 'archived' ? [{value:'archived',label:'Archived',disabled:true},...statuses] : [...statuses]} onValueChange={value => changeStatus(asset.id,value)}/></label>
+        <label>Rating<PhoneSelect label={`Rating for ${asset.name}`} value={String(asset.rating)} items={ratings} onValueChange={value => onReview({type:'rate',assetId:asset.id,rating:Number(value)})}/></label>
+        <button type="button" class="shortlist-control phone-shortlist" aria-label={`Shortlist ${asset.name}`} aria-pressed={asset.shortlisted} onclick={() => onReview({type:'shortlist',assetId:asset.id,shortlisted:!asset.shortlisted})}><Bookmark size={15} fill={asset.shortlisted ? 'currentColor' : 'none'}/></button><span class="note-count">{asset.comments.length} notes</span>
         {#if asset.misfiled && onFixMisfiled}<button type="button" class="misfiled-tag" onclick={() => onFixMisfiled?.(asset.id)}>Misfiled · File…</button>{/if}
       </div>
     </details>
@@ -127,6 +129,7 @@
     label { display:grid;gap:6px;min-width:0;color:var(--muted);font-size:11px; }
     select { width:100%;max-width:100%;font-size:16px; }
     .phone-check { display:flex;align-items:center;gap:8px;min-height:44px; }
-    .phone-shortlist { display:flex;gap:8px; }
+    .asset-title { min-height:28px;font-size:11px; }
+    .phone-shortlist { display:grid;place-items:center;justify-self:start;min-width:28px;width:28px;min-height:28px;height:28px;padding:0;border:0;border-radius:5px;background:var(--canvas); }
   }
 </style>
