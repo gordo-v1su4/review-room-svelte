@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { liveCursor, observeChanges, planLiveRefresh, receivePick, type LiveAsset, type LiveChanges, type LiveRefreshEnv, type LiveVersion } from './live-refresh';
+import { liveCursor, liveReader, observeChanges, planLiveRefresh, receivePick, type LiveAsset, type LiveChanges, type LiveRefreshEnv, type LiveVersion } from './live-refresh';
 import type { ProcessingUpdate } from './processing';
 
 const pick = (versionNumber: number, updatedAt: number, assetId = 'shot'): ProcessingUpdate => ({
@@ -11,7 +11,7 @@ const take = (assetId: string, version: number, extra: Partial<LiveVersion> = {}
 });
 const row = (id: string, current: ProcessingUpdate, extra: Partial<LiveAsset> = {}): LiveAsset => ({
   id, projectId: 'p1', folderId: 'scene', name: id.toUpperCase(), assetCode: id.toUpperCase(), originalFilename: `${id}.mp4`, mimeType: 'video/mp4',
-  sizeBytes: 100, importedAt: 1, misfiled: false, status: 'awaiting_review', rating: 0, shortlisted: false, viewed: false, processing: current, ...extra,
+  sizeBytes: 100, importedAt: 1, misfiled: false, tags: [], status: 'awaiting_review', rating: 0, shortlisted: false, viewed: false, processing: current, ...extra,
 });
 const changes = (extra: Partial<LiveChanges> = {}): LiveChanges => ({ cursor: '50', assets: [], versions: [], removedAssetIds: [], ...extra });
 
@@ -216,4 +216,105 @@ test('a failed read is silent and tried again on the next interval; a deferred r
   await fake.advance(1_000);
   expect(reads).toBe(3);
   observer.stop();
+});
+
+test('a refresh asked for reads at once, and again soon when a read is already under way', async () => {
+  const fake = fakeEnv();
+  let reads = 0, finish = () => {};
+  const observer = observeChanges(() => { reads += 1; return new Promise<void>(resolve => { finish = resolve; }); }, fake.env);
+  // Another project was opened: its changes are read without waiting for the interval.
+  observer.refresh();
+  await fake.advance(0);
+  expect(reads).toBe(1);
+  // Asked again while that read is still out: one more read follows it, soon.
+  observer.refresh();
+  observer.refresh();
+  await fake.advance(5_000);
+  expect(reads).toBe(1);
+  finish();
+  await fake.advance(0);
+  await fake.advance(1_000);
+  expect(reads).toBe(2);
+  finish();
+  await fake.advance(0);
+  await fake.advance(9_000);
+  expect(reads).toBe(2);
+  fake.show(false);
+  observer.refresh();
+  await fake.advance(0);
+  expect(reads).toBe(2);
+  observer.stop();
+  observer.refresh();
+  await fake.advance(60_000);
+  expect(reads).toBe(2);
+});
+
+// --- One read ---
+
+function reader(answers: Record<string, LiveChanges[]>) {
+  const asked: [string, number, number][] = [], applied: [string, LiveChanges][] = [];
+  let open: string | null = 'p1';
+  const live = liveReader({
+    target: () => open ? { projectId: open, known: 3 } : null,
+    start: projectId => projectId === 'p1' ? 100 : 7,
+    apply: (projectId, answer) => { applied.push([projectId, answer]); },
+    request: async (projectId, since, known) => { asked.push([projectId, since, known]); return answers[projectId].shift()!; },
+  });
+  return { live, asked, applied, show(projectId: string | null) { open = projectId; } };
+}
+const signal = new AbortController().signal;
+
+test('a read starts from the snapshot, then from the last answer, one cursor per project', async () => {
+  const r = reader({ p1: [changes({ cursor: '150' }), changes({ cursor: '120' }), changes({ cursor: '160' })], p2: [changes({ cursor: '9' })] });
+  await r.live.read(signal);
+  r.show('p2');
+  await r.live.read(signal);
+  r.show('p1');
+  await r.live.read(signal);
+  // A cursor never moves back: the answer that said 120 leaves it at 150.
+  await r.live.read(signal);
+  expect(r.asked).toEqual([['p1', 100, 3], ['p2', 7, 3], ['p1', 150, 3], ['p1', 150, 3]]);
+  expect(r.applied.map(([projectId]) => projectId)).toEqual(['p1', 'p2', 'p1', 'p1']);
+});
+
+test('nothing is read when no project is open', async () => {
+  const r = reader({ p1: [] });
+  r.show(null);
+  expect(await r.live.read(signal)).toBeUndefined();
+  expect(r.asked).toEqual([]);
+});
+
+test('an answer overtaken by a change saved in this workspace is not used', async () => {
+  const asked: number[] = [], applied: LiveChanges[] = [];
+  let answer = (_: LiveChanges) => {};
+  const live = liveReader({
+    target: () => ({ projectId: 'p1', known: 1 }), start: () => 100, apply: (_, changes) => { applied.push(changes); },
+    request: (_, since) => { asked.push(since); return new Promise<LiveChanges>(resolve => { answer = resolve; }); },
+  });
+  const first = live.read(signal);
+  // The owner approves a shot while the read is out; its answer may describe the shot before that.
+  live.wrote();
+  answer(changes({ cursor: '200' }));
+  expect(await first).toBe(false);
+  expect(applied).toEqual([]);
+  // Asked again from the same place, and this time used.
+  const second = live.read(signal);
+  answer(changes({ cursor: '210' }));
+  expect(await second).toBeUndefined();
+  expect(asked).toEqual([100, 100]);
+  expect(applied).toEqual([changes({ cursor: '210' })]);
+});
+
+test('a failed read keeps its cursor', async () => {
+  const asked: number[] = [];
+  let fail = true;
+  const live = liveReader({
+    target: () => ({ projectId: 'p1', known: 1 }), start: () => 100, apply: () => {},
+    request: async (_, since) => { asked.push(since); if (fail) throw new Error('offline'); return changes({ cursor: '130' }); },
+  });
+  await expect(live.read(signal)).rejects.toThrow('offline');
+  fail = false;
+  await live.read(signal);
+  await live.read(signal);
+  expect(asked).toEqual([100, 100, 130]);
 });

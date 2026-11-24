@@ -13,7 +13,7 @@ export type LiveVersion = {
 /** One changed asset: its review state and what its current version (the pick) now is. */
 export type LiveAsset = {
   id: string; projectId: string; folderId: string | null; name: string; assetCode: string; originalFilename: string;
-  mimeType: string; sizeBytes: number; importedAt: number; misfiled: boolean;
+  mimeType: string; sizeBytes: number; importedAt: number; misfiled: boolean; tags: string[];
   status: string; rating: number; shortlisted: boolean; viewed: boolean; processing: ProcessingUpdate;
 };
 /** One project's changes since a cursor. Rows near the cursor repeat, so every part is applied as an upsert. */
@@ -129,15 +129,57 @@ export function browserRefreshEnv(): LiveRefreshEnv {
   };
 }
 
+export type LiveReaderOptions = {
+  /** What to read now: the open project and how many of its assets the workspace holds. `null`: nothing to read. */
+  target(): { projectId: string; known: number } | null;
+  /** The cursor a project's first read starts from (see `liveCursor`). */
+  start(projectId: string): number;
+  apply(projectId: string, changes: LiveChanges): void;
+  request?(projectId: string, since: number, known: number, signal: AbortSignal): Promise<LiveChanges>;
+};
+
+async function requestChanges(projectId: string, since: number, known: number, signal: AbortSignal): Promise<LiveChanges> {
+  const response = await fetch(`/api/owner-changes?projectId=${encodeURIComponent(projectId)}&since=${since}&known=${known}`, { signal, headers: { accept: 'application/json' } });
+  if (!response.ok) throw new Error('Changes unavailable');
+  return await response.json();
+}
+
+/**
+ * One read of the open project's changes, for `observeChanges`. Each project keeps its own cursor, which never moves back.
+ * Call `wrote()` when a change made in this workspace has been saved: an answer asked for before that may describe
+ * the workspace as it was, so it is not used and `read` resolves `false` (ask again soon, from the same cursor).
+ */
+export function liveReader(options: LiveReaderOptions) {
+  const cursors = new Map<string, number>();
+  const request = options.request ?? requestChanges;
+  let writes = 0;
+  return {
+    wrote() { writes += 1; },
+    async read(signal: AbortSignal): Promise<boolean | void> {
+      const target = options.target();
+      if (!target) return;
+      const asked = writes;
+      const since = cursors.get(target.projectId) ?? options.start(target.projectId);
+      const changes = await request(target.projectId, since, target.known, signal);
+      if (signal.aborted) return;
+      if (writes !== asked) return false;
+      options.apply(target.projectId, changes);
+      const cursor = Number(changes.cursor);
+      cursors.set(target.projectId, Number.isSafeInteger(cursor) ? Math.max(since, cursor) : since);
+    },
+  };
+}
+
 const INTERVAL_MS = 10_000, SOON_MS = 1_000, WAKE_GAP_MS = 2_000, READ_TIMEOUT_MS = 10_000;
 
 /**
  * Asks for changes every ten seconds while the window is visible, and at once when it is shown or focused again.
  * One read at a time; nothing is read while hidden; a failed read is silent and tried again on the next interval.
  * `read` resolves `false` to be asked again soon (its answer could not be used).
+ * `refresh()` asks at once (another project was opened); during a read it asks again soon after it.
  */
 export function observeChanges(read: (signal: AbortSignal) => Promise<boolean | void>, env: LiveRefreshEnv = browserRefreshEnv()) {
-  let stopped = false, busy = false, settledAt = -Infinity;
+  let stopped = false, busy = false, again = false, settledAt = -Infinity;
   let timer: unknown, request: AbortController | undefined;
   function schedule(ms: number) {
     env.clearTimer(timer);
@@ -146,7 +188,7 @@ export function observeChanges(read: (signal: AbortSignal) => Promise<boolean | 
   async function tick() {
     if (stopped || busy) return;
     if (!env.visible()) { schedule(INTERVAL_MS); return; }
-    busy = true;
+    busy = true; again = false;
     env.clearTimer(timer);
     const controller = request = new AbortController();
     const timeout = setTimeout(() => controller.abort(), READ_TIMEOUT_MS);
@@ -156,11 +198,14 @@ export function observeChanges(read: (signal: AbortSignal) => Promise<boolean | 
     finally {
       clearTimeout(timeout);
       busy = false; settledAt = env.now();
-      schedule(soon ? SOON_MS : INTERVAL_MS);
+      schedule(soon || again ? SOON_MS : INTERVAL_MS);
     }
   }
   // Showing and focusing a window usually arrive together; the second one finds the first read just made.
   const unsubscribe = env.onWake(() => { if (!busy && env.now() - settledAt >= WAKE_GAP_MS) void tick(); });
   schedule(INTERVAL_MS);
-  return { stop() { stopped = true; env.clearTimer(timer); request?.abort(); unsubscribe(); } };
+  return {
+    refresh() { if (busy) again = true; else void tick(); },
+    stop() { stopped = true; env.clearTimer(timer); request?.abort(); unsubscribe(); },
+  };
 }
