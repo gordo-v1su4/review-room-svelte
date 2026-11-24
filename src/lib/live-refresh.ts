@@ -148,13 +148,15 @@ async function requestChanges(projectId: string, since: number, known: number, s
  * One read of the open project's changes, for `observeChanges`. Each project keeps its own cursor, which never moves back.
  * Call `wrote()` when a change made in this workspace has been saved: an answer asked for before that may describe
  * the workspace as it was, so it is not used and `read` resolves `false` (ask again soon, from the same cursor).
+ * The newest row always sits inside the cursor overlap, so a quiet project repeats it on every read: an answer
+ * identical to the last one applied is not applied again, until something is saved here.
  */
 export function liveReader(options: LiveReaderOptions) {
-  const cursors = new Map<string, number>();
+  const cursors = new Map<string, number>(), applied = new Map<string, string>();
   const request = options.request ?? requestChanges;
   let writes = 0;
   return {
-    wrote() { writes += 1; },
+    wrote() { writes += 1; applied.clear(); },
     async read(signal: AbortSignal): Promise<boolean | void> {
       const target = options.target();
       if (!target) return;
@@ -163,7 +165,11 @@ export function liveReader(options: LiveReaderOptions) {
       const changes = await request(target.projectId, since, target.known, signal);
       if (signal.aborted) return;
       if (writes !== asked) return false;
-      options.apply(target.projectId, changes);
+      const answer = JSON.stringify(changes);
+      if (applied.get(target.projectId) !== answer) {
+        options.apply(target.projectId, changes);
+        applied.set(target.projectId, answer);
+      }
       const cursor = Number(changes.cursor);
       cursors.set(target.projectId, Number.isSafeInteger(cursor) ? Math.max(since, cursor) : since);
     },

@@ -318,3 +318,29 @@ test('a failed read keeps its cursor', async () => {
   await live.read(signal);
   expect(asked).toEqual([100, 100, 130]);
 });
+
+test('an answer that repeats the last one used is not applied again', async () => {
+  // The newest row sits inside the cursor overlap, so a quiet project answers with that row on every read.
+  const quiet = () => changes({ cursor: '150', assets: [row('a', pick(2, 20, 'a'))] });
+  const moved = () => changes({ cursor: '150', assets: [row('a', pick(2, 20, 'a'), { status: 'approved' })] });
+  const r = reader({ p1: [quiet(), quiet(), moved(), moved(), quiet()], p2: [quiet()] });
+  for (let i = 0; i < 5; i++) await r.live.read(signal);
+  expect(r.applied.map(([, answer]) => answer.assets[0].status)).toEqual(['awaiting_review', 'approved', 'awaiting_review']);
+  // The same rows for another project are that project's first answer.
+  r.show('p2');
+  await r.live.read(signal);
+  expect(r.applied).toHaveLength(4);
+  expect(r.asked).toHaveLength(6);
+});
+
+test('after a change saved in this workspace the next answer is applied even when it repeats', async () => {
+  const quiet = () => changes({ cursor: '150', assets: [row('a', pick(2, 20, 'a'))] });
+  const r = reader({ p1: [quiet(), quiet(), quiet()] });
+  await r.live.read(signal);
+  await r.live.read(signal);
+  expect(r.applied).toHaveLength(1);
+  // What is on screen changed locally, so the server's word is taken again in full.
+  r.live.wrote();
+  await r.live.read(signal);
+  expect(r.applied).toHaveLength(2);
+});
